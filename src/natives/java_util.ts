@@ -45,6 +45,7 @@ if (typeof Int8Array !== "undefined") {
 export default function (): any {
   let ZipFiles: {[id: number]: TZipFS} = {};
   let ZipMultiReleaseVersions: {[id: number]: number[]} = {};
+  let ZipFileCache: {[name: string]: {modified: string; zipfs: TZipFS; versions: number[]}} = {};
   let ZipEntries: {[id: number]: TCentralDirectory} = {};
   let ZStreams: {[id: number]: ZStream} = {};
   // Start at 1, as 0 is interpreted as an error.
@@ -67,9 +68,16 @@ export default function (): any {
     delete map[id];
   }
 
-  function OpenZipFile(zfile: TZipFS): number {
+  function OpenZipFile(zfile: TZipFS, versions?: number[]): number {
     let id = OpenItem(zfile, ZipFiles);
-    ZipMultiReleaseVersions[id] = GetMultiReleaseVersions(zfile);
+    if (versions === undefined) {
+      versions = (<any> zfile).__doppioMultiReleaseVersions;
+      if (versions === undefined) {
+        versions = GetMultiReleaseVersions(zfile);
+        (<any> zfile).__doppioMultiReleaseVersions = versions;
+      }
+    }
+    ZipMultiReleaseVersions[id] = versions;
     return id;
   }
   function CloseZipFile(id: number): void {
@@ -108,6 +116,28 @@ export default function (): any {
       }
     }
     return zipfs.getCentralDirectoryEntry(name);
+  }
+  function TryGetCentralDirectoryEntry(zipfs: TZipFS, versions: number[], name: string): TCentralDirectory {
+    function tryGet(entryPath: string): TCentralDirectory {
+      var inode = (<any> zipfs)._index.getInode(entryPath);
+      if (inode === null) {
+        return null;
+      }
+      if (inode.isFile() || inode.isDir()) {
+        return inode.getData();
+      }
+      return null;
+    }
+    var entry: TCentralDirectory;
+    if (versions.length > 0 && name.indexOf('/META-INF/') !== 0) {
+      for (let i = 0; i < versions.length; i++) {
+        entry = tryGet(`/META-INF/versions/${versions[i]}${name}`);
+        if (entry !== null) {
+          return entry;
+        }
+      }
+    }
+    return tryGet(name);
   }
   function OpenZipEntry(zentry: TCentralDirectory): number {
     return OpenItem(zentry, ZipEntries);
@@ -547,12 +577,12 @@ export default function (): any {
           name = `/${name}`;
         }
         name = path.resolve(name);
-        try {
-          return Long.fromNumber(OpenZipEntry(GetCentralDirectoryEntry(zipfs, ZipMultiReleaseVersions[jzfile.toNumber()] || [], name)));
-        } catch (e) {
-          return Long.ZERO;
+        let entry = TryGetCentralDirectoryEntry(zipfs, ZipMultiReleaseVersions[jzfile.toNumber()] || [], name);
+        if (entry !== null) {
+          return Long.fromNumber(OpenZipEntry(entry));
         }
       }
+      return Long.ZERO;
     }
 
     public static 'freeEntry(JJ)V'(thread: JVMThread, jzfile: Long, jzentry: Long): void {
@@ -577,12 +607,13 @@ export default function (): any {
     public static 'open(Ljava/lang/String;IJZ)J'(thread: JVMThread, nameObj: JVMTypes.java_lang_String, mode: number, modified: Long, usemmap: number): Long {
       // Ignore mmap option.
       let name = nameObj.toString();
+      let resolvedName = path.resolve(name);
       // Optimization: Check if this is a JAR file on the classpath.
       let cpath = thread.getBsCl().getClassPathItems();
       for (let i = 0; i < cpath.length; i++) {
         let cpathItem = cpath[i];
         if (cpathItem instanceof AbstractClasspathJar) {
-          if (path.resolve(cpathItem.getPath()) === path.resolve(name)) {
+          if (path.resolve(cpathItem.getPath()) === resolvedName) {
             return Long.fromNumber(OpenZipFile((<AbstractClasspathJar> <any> cpathItem).getFS()));
           }
         }
@@ -590,11 +621,21 @@ export default function (): any {
 
       // Async path.
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      let modifiedKey = modified.toString();
+      let cached = ZipFileCache[resolvedName];
+      if (cached !== undefined && cached.modified === modifiedKey) {
+        thread.asyncReturn(Long.fromNumber(OpenZipFile(cached.zipfs, cached.versions)), null);
+        return;
+      }
       fs.readFile(name, (err, data) => {
         if (err) {
           thread.throwNewException("Ljava/io/IOException;", err.message);
         } else {
-          thread.asyncReturn(Long.fromNumber(OpenZipFile(new BrowserFS.FileSystem.ZipFS(data, name))), null);
+          let zipfs = new BrowserFS.FileSystem.ZipFS(data, name);
+          let versions = GetMultiReleaseVersions(zipfs);
+          (<any> zipfs).__doppioMultiReleaseVersions = versions;
+          ZipFileCache[resolvedName] = {modified: modifiedKey, zipfs: zipfs, versions: versions};
+          thread.asyncReturn(Long.fromNumber(OpenZipFile(zipfs, versions)), null);
         }
       });
     }

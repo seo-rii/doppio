@@ -272,7 +272,7 @@ export class BytecodeStackFrame implements IStackFrame {
     // from the previous time this method was run, and is meaningless.
     this.returnToThreadLoop = false;
 
-    if (thread.getJVM().isJITDisabled()) {
+    if (thread.getJVM().isJITDisabled() || method.numBBEntries > 0) {
       // Interpret until we get the signal to return to the thread loop.
       while (!this.returnToThreadLoop) {
         var opCode = code[this.pc];
@@ -1074,15 +1074,18 @@ export class JVMThread implements Thread {
     var frame = stack.pop();
     if (frame.type != StackFrameType.INTERNAL) {
       var frameCast = <BytecodeStackFrame> frame;
-      if (frame.type === StackFrameType.BYTECODE) {
-        // This line will be preceded by a line that prints the method, so can be short n' sweet.
-        trace(`  Returning: ${debug_var(rv)}`);
+      if (!RELEASE) {
+        if (logLevel >= LogLevel.TRACE) {
+          if (frame.type === StackFrameType.BYTECODE) {
+            // This line will be preceded by a line that prints the method, so can be short n' sweet.
+            trace(`  Returning: ${debug_var(rv)}`);
+          }
+          trace(`\nT${this.getRef()} D${this.getStackTrace().length + 1} Returning value from ${frameCast.method.getFullSignature()} [${frameCast.method.accessFlags.isNative() ? 'Native' : 'Bytecode'}]: ${debug_var(rv)}`);
+        }
+        assert(validateReturnValue(this, frameCast.method,
+          frameCast.method.returnType, this.bsCl,
+          frameCast.method.cls.getLoader(), rv, rv2), `Invalid return value for method ${frameCast.method.getFullSignature()}`);
       }
-
-      trace(`\nT${this.getRef()} D${this.getStackTrace().length + 1} Returning value from ${frameCast.method.getFullSignature()} [${frameCast.method.accessFlags.isNative() ? 'Native' : 'Bytecode'}]: ${debug_var(rv)}`);
-      assert(validateReturnValue(this, frameCast.method,
-        frameCast.method.returnType, this.bsCl,
-        frameCast.method.cls.getLoader(), rv, rv2), `Invalid return value for method ${frameCast.method.getFullSignature()}`);
     }
     // Tell the top of the stack that this RV is waiting for it.
     var idx: number = stack.length - 1;

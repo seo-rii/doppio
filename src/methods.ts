@@ -412,7 +412,7 @@ export class Method extends AbstractMethodField {
   /**
    * number of basic block entries
    */
-  private numBBEntries = 0;
+  public numBBEntries = 0;
 
   private compiledFunctions: Function[] = [];
   private failedCompile: boolean[] = [];
@@ -485,7 +485,7 @@ export class Method extends AbstractMethodField {
   }
 
   public getFullSignature(): string {
-    return `${this.cls.getExternalName()}.${this.name}${this.rawDescriptor}`;
+    return this.fullSignature;
   }
 
   /**

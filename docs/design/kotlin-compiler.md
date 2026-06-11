@@ -23,9 +23,9 @@ node --no-deprecation build/release-cli/console/runner.js \
 - The current functional blocker is a long-running one-file compile after FIR
   status resolution is fixed. An empty Kotlin source file now completes under
   Doppio and writes `META-INF/main.kotlin_module`, but adding only
-  `fun main() {}` keeps Doppio CPU-active for ten minutes with no output
-  directory. `Hello.kt` with `println` exceeded fifteen minutes under the same
-  minimal `kotlin-compiler.jar` classpath.
+  `fun main() {}` still exceeds a 420 second timeout with no output directory.
+  `Hello.kt` with `println` exceeded fifteen minutes under the same minimal
+  `kotlin-compiler.jar` classpath.
 - `-Xint` does not solve the one-file compile hang, so JIT overhead is not the
   sole blocker.
 - A `-Xphases-to-dump-before=FileClassLowering` run did not create a dump within
@@ -93,6 +93,17 @@ to `Hello.kt` backend codegen:
   while `StackTraceElement` objects and strings are created when
   `getStackTrace()` materializes them. This keeps stack trace behavior intact
   but also does not make `EmptyMain.kt` finish within ten minutes.
+- Release-mode thread returns no longer build trace strings or validate return
+  types on every `asyncReturn`; those checks are debug-only in release builds.
+- `Method.getFullSignature()` now returns the cached method signature instead
+  of rebuilding class names on hot paths.
+- Cold bytecode methods bypass `Method.getOp()` until they reach Doppio's JIT
+  threshold, avoiding a per-opcode method call for the many one-shot methods
+  Kotlin loads during compiler startup.
+- `ZipFile.getEntry` avoids BrowserFS exception allocation for expected
+  missing entries, and repeated `ZipFile.open` calls for the same path and
+  modification timestamp reuse the parsed `ZipFS` index. Coverage lives in
+  `classes/test/ZipFileHotPaths.java`.
 
 ## Fixed Blocker: Kotlin Backend Visibility
 
@@ -129,12 +140,27 @@ After the visibility fix, the compiler no longer throws
 
 Observed checks:
 
+- 2026-06-12 Kotlin 2.4.0 minimal `kotlin-compiler.jar` measurements under
+  `node --max-old-space-size=4096 --no-deprecation`:
+  - `K2JVMCompiler -version`: status 0 in about 20 seconds.
+  - Empty Kotlin source file: status 0 in about 50 seconds, output
+    `META-INF/main.kotlin_module`.
+  - `fun main() {}`: still timed out at 420 seconds with no output directory.
+- Before the release-return, method-signature, cold-`getOp`, and ZipFS hot-path
+  reductions, the same empty source compile took about 282.8 seconds in this
+  environment.
+- Current V8 CPU profiles no longer show `ext_classname` or BrowserFS
+  `ApiError` construction as dominant costs. Remaining top costs are broad
+  interpreter execution (`BytecodeStackFrame.run`, `Method.getOp` for hot
+  methods), GC, class constructor generation, array copies, and Kotlin's
+  normal zip/class loading work.
+
 - Full `kotlinc/lib/*.jar` classpath: exceeded five minutes, CPU active, no
   class output.
 - Minimal `kotlin-compiler.jar` classpath: exceeded fifteen minutes, CPU active,
   no class output.
-- Empty Kotlin source file: completed under Doppio in roughly three and a half
-  minutes and produced only `META-INF/main.kotlin_module`.
+- Empty Kotlin source file: completed under Doppio and produced only
+  `META-INF/main.kotlin_module`.
 - `fun main() {}` without `println`: exceeded ten minutes both before and after
   direct-buffer and lazy-throwable optimizations, with no output directory.
 - `-Xphases-to-dump-before=GenerateMultifileFacades`: no dump in 90 seconds.
