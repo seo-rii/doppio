@@ -21,6 +21,39 @@ import {setImmediate} from 'browserfs';
 export default function (): any {
   var debug = logging.debug;
 
+  function getThrowableBacktraceFrames(throwable: JVMTypes.java_lang_Throwable): any[] {
+    var backtrace = (<any> throwable)['java/lang/Throwable/backtrace'];
+    if (backtrace === null || backtrace === undefined) {
+      return [];
+    }
+    if (backtrace.array !== undefined) {
+      return backtrace.array;
+    }
+    return backtrace.frames;
+  }
+
+  function writeStackTraceElement(thread: JVMThread, element: JVMTypes.java_lang_StackTraceElement, frame: any): void {
+    var bsCl = thread.getBsCl(),
+      cls = frame.method.cls,
+      ln = -1,
+      sourceFile: string;
+    if (frame.method.accessFlags.isNative()) {
+      sourceFile = 'Native Method';
+    } else {
+      var srcAttr = <attributes.SourceFile> cls.getAttribute('SourceFile'),
+        code = frame.method.getCodeAttribute(),
+        table = <attributes.LineNumberTable> code.getAttribute('LineNumberTable');
+      sourceFile = (srcAttr != null) ? srcAttr.filename : 'unknown';
+      if (table != null) {
+        ln = table.getLineNumber(frame.pc);
+      }
+    }
+    element['java/lang/StackTraceElement/declaringClass'] = util.initString(bsCl, util.ext_classname(cls.getInternalName()));
+    element['java/lang/StackTraceElement/methodName'] = util.initString(bsCl, frame.method.name != null ? frame.method.name : 'unknown');
+    element['java/lang/StackTraceElement/fileName'] = util.initString(bsCl, sourceFile);
+    element['java/lang/StackTraceElement/lineNumber'] = ln;
+  }
+
   function arrayGet(thread: JVMThread, arr: JVMTypes.JVMArray<any>, idx: number): any {
     if (arr == null) {
       thread.throwNewException('Ljava/lang/NullPointerException;', '');
@@ -75,6 +108,26 @@ export default function (): any {
           });
         }
       }
+    }
+
+    public static 'getModule()Ljava/lang/Module;'(thread: JVMThread, javaThis: JVMTypes.java_lang_Class): any {
+      var cachedModule = (<any> javaThis)['java/lang/Class/module'];
+      if (cachedModule !== null && cachedModule !== undefined) {
+        return cachedModule;
+      }
+
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      thread.getBsCl().initializeClass(thread, 'Ljava/lang/Module;', (moduleClass: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+        if (moduleClass === null) {
+          return;
+        }
+        var moduleCons = moduleClass.getConstructor(thread),
+          module = new moduleCons(thread);
+        (<any> module)['java/lang/Module/name'] = null;
+        (<any> module)['java/lang/Module/loader'] = (<any> javaThis)['java/lang/Class/classLoader'];
+        (<any> javaThis)['java/lang/Class/module'] = module;
+        thread.asyncReturn(module);
+      });
     }
 
     public static 'isInstance(Ljava/lang/Object;)Z'(thread: JVMThread, javaThis: JVMTypes.java_lang_Class, obj: JVMTypes.java_lang_Object): boolean {
@@ -798,6 +851,51 @@ export default function (): any {
 
   }
 
+  class java_lang_reflect_Executable {
+    public static 'getParameters0()[Ljava/lang/reflect/Parameter;'(thread: JVMThread, javaThis: JVMTypes.java_lang_reflect_Executable): any {
+      var executable = <any> javaThis,
+        clazz: JVMTypes.java_lang_Class = null,
+        slot: number = -1,
+        method: Method,
+        methodParameters: attributes.MethodParameters,
+        i: number;
+
+      if (executable['java/lang/reflect/Method/clazz'] !== undefined) {
+        clazz = executable['java/lang/reflect/Method/clazz'];
+        slot = executable['java/lang/reflect/Method/slot'];
+      } else if (executable['java/lang/reflect/Constructor/clazz'] !== undefined) {
+        clazz = executable['java/lang/reflect/Constructor/clazz'];
+        slot = executable['java/lang/reflect/Constructor/slot'];
+      }
+
+      if (clazz === null || slot < 0) {
+        return null;
+      }
+
+      method = (<ReferenceClassData<JVMTypes.java_lang_Object>> clazz.$cls).getMethodFromSlot(slot);
+      methodParameters = <attributes.MethodParameters> method.getAttribute('MethodParameters');
+      if (methodParameters === null) {
+        return null;
+      }
+
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      thread.getBsCl().initializeClass(thread, 'Ljava/lang/reflect/Parameter;', (parameterCls: ReferenceClassData<JVMTypes.java_lang_reflect_Parameter>) => {
+        var parameterCons = parameterCls.getConstructor(thread),
+          rv = util.newArray<JVMTypes.java_lang_reflect_Parameter>(thread, thread.getBsCl(), '[Ljava/lang/reflect/Parameter;', methodParameters.parameters.length);
+        for (i = 0; i < methodParameters.parameters.length; i++) {
+          var info = methodParameters.parameters[i],
+            parameter = new parameterCons(thread);
+          parameter['java/lang/reflect/Parameter/name'] = info.name === null ? null : util.initString(thread.getBsCl(), info.name);
+          parameter['java/lang/reflect/Parameter/modifiers'] = info.accessFlags;
+          parameter['java/lang/reflect/Parameter/executable'] = javaThis;
+          parameter['java/lang/reflect/Parameter/index'] = i;
+          rv.array[i] = parameter;
+        }
+        thread.asyncReturn(rv);
+      });
+    }
+  }
+
   class java_lang_Runtime {
 
     public static 'availableProcessors()I'(thread: JVMThread, javaThis: JVMTypes.java_lang_Runtime): number {
@@ -930,7 +1028,7 @@ export default function (): any {
     }
 
     public static 'log10(D)D'(thread: JVMThread, d_val: number): number {
-      return Math.log(d_val) / Math.LN10;
+      return (<any> Math).log10(d_val);
     }
 
     public static 'sqrt(D)D'(thread: JVMThread, d_val: number): number {
@@ -938,12 +1036,7 @@ export default function (): any {
     }
 
     public static 'cbrt(D)D'(thread: JVMThread, d_val: number): number {
-      var is_neg = d_val < 0;
-      if (is_neg) {
-        return -Math.pow(-d_val, 1 / 3);
-      } else {
-        return Math.pow(d_val, 1 / 3);
-      }
+      return (<any> Math).cbrt(d_val);
     }
 
     public static 'IEEEremainder(DD)D'(thread: JVMThread, x: number, y: number): number {
@@ -995,18 +1088,15 @@ export default function (): any {
     }
 
     public static 'cosh(D)D'(thread: JVMThread, d_val: number): number {
-      var exp = Math.exp(d_val);
-      return (exp + 1 / exp) / 2;
+      return (<any> Math).cosh(d_val);
     }
 
     public static 'tanh(D)D'(thread: JVMThread, d_val: number): number {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return 0;
+      return (<any> Math).tanh(d_val);
     }
 
     public static 'hypot(DD)D'(thread: JVMThread, arg0: number, arg1: number): number {
-      return Math.sqrt(Math.pow(arg0, 2) + Math.pow(arg1, 2));
+      return (<any> Math).hypot(arg0, arg1);
     }
 
     public static 'expm1(D)D'(thread: JVMThread, d_val: number): number {
@@ -1014,9 +1104,170 @@ export default function (): any {
     }
 
     public static 'log1p(D)D'(thread: JVMThread, d_val: number): number {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return 0;
+      return (<any> Math).log1p(d_val);
+    }
+
+  }
+
+  class java_lang_StackWalker {
+
+    public static 'getCallerClass()Ljava/lang/Class;'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object): JVMTypes.java_lang_Class {
+      if ((<any> javaThis)['java/lang/StackWalker/retainClassRef'] === 0) {
+        thread.throwNewException('Ljava/lang/UnsupportedOperationException;', 'This StackWalker does not retain class references');
+        return;
+      }
+      var stack = thread.getStackTrace(),
+        skippedImmediateCaller = false;
+      for (var i = stack.length - 1; i >= 0; i--) {
+        var method = stack[i].method,
+          cls = method.cls,
+          internalName = cls.getInternalName();
+        if (internalName.indexOf('Ljava/lang/StackWalker;') === 0 || internalName.indexOf('Ljava/lang/StackWalker$') === 0) {
+          continue;
+        }
+        if (method.isHidden() || internalName.indexOf('$$Lambda$') !== -1) {
+          continue;
+        }
+        if (internalName.indexOf('Ljava/lang/reflect/') === 0 ||
+            internalName.indexOf('Lsun/reflect/') === 0 ||
+            internalName.indexOf('Ljdk/internal/reflect/') === 0) {
+          continue;
+        }
+        if (!skippedImmediateCaller) {
+          skippedImmediateCaller = true;
+          continue;
+        }
+        return cls.getClassObject(thread);
+      }
+      thread.throwNewException('Ljava/lang/IllegalCallerException;', 'no caller frame');
+      return;
+    }
+
+    public static 'getStackFrames()[Ljava/lang/StackWalker$StackFrame;'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object): void {
+      var bsCl = thread.getBsCl(),
+        retainClassRef = (<any> javaThis)['java/lang/StackWalker/retainClassRef'] !== 0,
+        showHiddenFrames = (<any> javaThis)['java/lang/StackWalker/showHiddenFrames'] !== 0,
+        showReflectFrames = (<any> javaThis)['java/lang/StackWalker/showReflectFrames'] !== 0;
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      bsCl.initializeClass(thread, 'Ljava/lang/StackWalker$StackFrameImpl;', (frameCls: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+        if (frameCls === null) {
+          return;
+        }
+        bsCl.resolveClass(thread, '[Ljava/lang/StackWalker$StackFrame;', (arrayCls: ArrayClassData<JVMTypes.java_lang_Object>) => {
+          if (arrayCls === null) {
+            return;
+          }
+          var stack = thread.getStackTrace(),
+            frames: JVMTypes.java_lang_Object[] = [];
+          for (var i = stack.length - 1; i >= 0; i--) {
+            var sf = stack[i],
+              method = sf.method,
+              cls = method.cls,
+              internalName = cls.getInternalName();
+            if (internalName.indexOf('Ljava/lang/StackWalker;') === 0 || internalName.indexOf('Ljava/lang/StackWalker$') === 0) {
+              continue;
+            }
+            if (!showHiddenFrames && (method.isHidden() || internalName.indexOf('$$Lambda$') !== -1)) {
+              continue;
+            }
+            if (!showReflectFrames &&
+                (internalName.indexOf('Ljava/lang/reflect/') === 0 ||
+                 internalName.indexOf('Lsun/reflect/') === 0 ||
+                 internalName.indexOf('Ljdk/internal/reflect/') === 0)) {
+              continue;
+            }
+
+            var sourceFile: string = null,
+              lineNumber = -1,
+              frame = util.newObjectFromClass<JVMTypes.java_lang_Object>(thread, frameCls);
+            if (method.accessFlags.isNative()) {
+              sourceFile = 'Native Method';
+            } else {
+              var srcAttr = <attributes.SourceFile> cls.getAttribute('SourceFile'),
+                code = method.getCodeAttribute(),
+                table = code !== null ? <attributes.LineNumberTable> code.getAttribute('LineNumberTable') : null;
+              sourceFile = srcAttr !== null ? srcAttr.filename : null;
+              lineNumber = table !== null ? table.getLineNumber(sf.pc) : -1;
+            }
+            (<any> frame)['java/lang/StackWalker$StackFrameImpl/retainClassRef'] = retainClassRef ? 1 : 0;
+            (<any> frame)['java/lang/StackWalker$StackFrameImpl/className'] = util.initString(bsCl, util.ext_classname(internalName));
+            (<any> frame)['java/lang/StackWalker$StackFrameImpl/methodName'] = util.initString(bsCl, method.name != null ? method.name : 'unknown');
+            (<any> frame)['java/lang/StackWalker$StackFrameImpl/declaringClass'] = cls.getClassObject(thread);
+            (<any> frame)['java/lang/StackWalker$StackFrameImpl/descriptor'] = util.initString(bsCl, method.rawDescriptor);
+            (<any> frame)['java/lang/StackWalker$StackFrameImpl/byteCodeIndex'] = sf.pc;
+            (<any> frame)['java/lang/StackWalker$StackFrameImpl/fileName'] = sourceFile !== null ? util.initString(bsCl, sourceFile) : null;
+            (<any> frame)['java/lang/StackWalker$StackFrameImpl/lineNumber'] = lineNumber;
+            (<any> frame)['java/lang/StackWalker$StackFrameImpl/nativeMethod'] = method.accessFlags.isNative() ? 1 : 0;
+            frames.push(frame);
+          }
+          thread.asyncReturn(util.newArrayFromDataWithClass<JVMTypes.java_lang_Object>(thread, arrayCls, frames));
+        });
+      });
+    }
+
+  }
+
+  class java_lang_ProcessHandle_CurrentProcessHandle {
+    public static 'currentPid0()J'(thread: JVMThread): Long {
+      return Long.fromNumber(typeof process !== 'undefined' && process.pid !== undefined ? process.pid : 1);
+    }
+
+    public static 'parentPid0()J'(thread: JVMThread): Long {
+      return Long.fromNumber(typeof process !== 'undefined' && (<any> process).ppid !== undefined ? (<any> process).ppid : 0);
+    }
+  }
+
+  class java_lang_ProcessHandle_CurrentProcessInfo {
+    public static 'currentCommand0()Ljava/lang/String;'(thread: JVMThread): JVMTypes.java_lang_String {
+      var bsCl = thread.getBsCl(),
+        command = typeof process !== 'undefined' && process.argv !== undefined && process.argv.length > 0 ? process.argv[0] : 'doppio';
+      return util.initString(bsCl, command);
+    }
+
+    public static 'currentCommandLine0()Ljava/lang/String;'(thread: JVMThread): JVMTypes.java_lang_String {
+      var bsCl = thread.getBsCl(),
+        commandLine = typeof process !== 'undefined' && process.argv !== undefined && process.argv.length > 0 ? process.argv.join(' ') : 'doppio';
+      return util.initString(bsCl, commandLine);
+    }
+
+    public static 'currentArguments0()[Ljava/lang/String;'(thread: JVMThread): JVMTypes.JVMArray<JVMTypes.java_lang_String> {
+      var bsCl = thread.getBsCl(),
+        args = typeof process !== 'undefined' && process.argv !== undefined ? process.argv.slice(2) : [];
+      return util.newArrayFromData<JVMTypes.java_lang_String>(thread, bsCl, '[Ljava/lang/String;', args.map((arg: string) => util.initString(bsCl, arg)));
+    }
+
+    public static 'currentStartMillis0()J'(thread: JVMThread): Long {
+      var startMillis = Date.now();
+      if (typeof process !== 'undefined' && (<any> process).uptime !== undefined) {
+        startMillis -= (<any> process).uptime() * 1000;
+      }
+      return Long.fromNumber(Math.max(1, Math.floor(startMillis)));
+    }
+
+    public static 'currentTotalCpuNanos0()J'(thread: JVMThread): Long {
+      var totalMicros = 1;
+      if (typeof process !== 'undefined' && (<any> process).cpuUsage !== undefined) {
+        var usage = (<any> process).cpuUsage();
+        totalMicros = usage.user + usage.system;
+      }
+      return Long.fromNumber(Math.max(1, Math.floor(totalMicros * 1000)));
+    }
+  }
+
+  class java_lang_StackTraceElement {
+
+    public static 'initStackTraceElements([Ljava/lang/StackTraceElement;Ljava/lang/Throwable;)V'(thread: JVMThread, elements: JVMTypes.JVMArray<JVMTypes.java_lang_StackTraceElement>, throwable: JVMTypes.java_lang_Throwable): void {
+      var backtrace = (<any> throwable)['java/lang/Throwable/backtrace'],
+        frames = getThrowableBacktraceFrames(throwable);
+      if (backtrace !== null && backtrace !== undefined && backtrace.array !== undefined) {
+        for (var i = 0; i < elements.array.length; i++) {
+          elements.array[i] = frames[i];
+        }
+      } else {
+        for (var j = 0; j < elements.array.length; j++) {
+          writeStackTraceElement(thread, elements.array[j], frames[j]);
+        }
+      }
     }
 
   }
@@ -1140,6 +1391,10 @@ export default function (): any {
         thread.setStatus(ThreadStatus.RUNNABLE);
         thread.asyncReturn();
       });
+    }
+
+    public static 'onSpinWait()V'(thread: JVMThread): void {
+      // Java 9 defines this as a spin-loop hint. Doppio has no CPU hint to emit.
     }
 
     public static 'sleep(J)V'(thread: JVMThread, millis: Long): void {
@@ -1312,10 +1567,9 @@ export default function (): any {
      * NOTE: Integer is only there to distinguish this function from non-native fillInStackTrace()V.
      */
     public static 'fillInStackTrace(I)Ljava/lang/Throwable;'(thread: JVMThread, javaThis: JVMTypes.java_lang_Throwable, dummy: number): JVMTypes.java_lang_Throwable {
-      var stackTraceElementCls = <ReferenceClassData<JVMTypes.java_lang_StackTraceElement>> thread.getBsCl().getInitializedClass(thread, 'Ljava/lang/StackTraceElement;'),
-        stacktrace = util.newArray<JVMTypes.java_lang_StackTraceElement>(thread, thread.getBsCl(), '[Ljava/lang/StackTraceElement;', 0),
+      var frames: any[] = [],
         cstack = thread.getStackTrace(),
-        i: number, j: number, bsCl = thread.getBsCl();
+        i: number;
       /**
        * OK, so we need to toss the following stack frames:
        * - The stack frame for this method.
@@ -1335,50 +1589,35 @@ export default function (): any {
       // Construct the stack such that the method on top of the stack is at index
       // 0.
       for (i = cstack.length - 1; i >= 0; i--) {
-        var sf = cstack[i],
-          cls = sf.method.cls,
-          ln = -1,
-          sourceFile: string;
+        var sf = cstack[i];
         // Java 8: Ignore 'Hidden' methods. These are involved in constructing
         // Lambdas, and shouldn't be use-visible.
         if (sf.method.isHidden()) {
           continue;
         }
-
-        if (sf.method.accessFlags.isNative()) {
-          sourceFile = 'Native Method';
-        } else {
-          var srcAttr = <attributes.SourceFile> cls.getAttribute('SourceFile'),
-            code = sf.method.getCodeAttribute(),
-            table = <attributes.LineNumberTable> code.getAttribute('LineNumberTable');
-          sourceFile = (srcAttr != null) ? srcAttr.filename : 'unknown';
-
-          if (table != null) {
-            ln = table.getLineNumber(sf.pc);
-          } else {
-            ln = -1;
-          }
-        }
-
-        var newElement = util.newObjectFromClass<JVMTypes.java_lang_StackTraceElement>(thread, stackTraceElementCls);
-        newElement['java/lang/StackTraceElement/declaringClass'] = util.initString(bsCl, util.ext_classname(cls.getInternalName()));
-        newElement['java/lang/StackTraceElement/methodName'] = util.initString(bsCl, sf.method.name != null ? sf.method.name : 'unknown');
-        newElement['java/lang/StackTraceElement/fileName'] = util.initString(bsCl, sourceFile);
-        newElement['java/lang/StackTraceElement/lineNumber'] = ln;
-        stacktrace.array.push(newElement);
+        frames.push({ method: sf.method, pc: sf.pc });
       }
-      javaThis['java/lang/Throwable/backtrace'] = stacktrace;
+      (<any> javaThis)['java/lang/Throwable/backtrace'] = { frames: frames };
+      (<any> javaThis)['java/lang/Throwable/depth'] = frames.length;
       return javaThis;
     }
 
     public static 'getStackTraceDepth()I'(thread: JVMThread, javaThis: JVMTypes.java_lang_Throwable): number {
       // 'backtrace' is typed as an Object so JVMs have flexibility in what to store there.
-      // We simply store the stack trace element array.
-      return (<JVMTypes.JVMArray<JVMTypes.java_lang_StackTraceElement>> javaThis['java/lang/Throwable/backtrace']).array.length;
+      // We store either a lazy frame list or, for older objects, the materialized array.
+      return getThrowableBacktraceFrames(javaThis).length;
     }
 
     public static 'getStackTraceElement(I)Ljava/lang/StackTraceElement;'(thread: JVMThread, javaThis: JVMTypes.java_lang_Throwable, depth: number): JVMTypes.java_lang_StackTraceElement {
-      return (<JVMTypes.JVMArray<JVMTypes.java_lang_StackTraceElement>> javaThis['java/lang/Throwable/backtrace']).array[depth];
+      var backtrace = (<any> javaThis)['java/lang/Throwable/backtrace'],
+        frames = getThrowableBacktraceFrames(javaThis);
+      if (backtrace !== null && backtrace !== undefined && backtrace.array !== undefined) {
+        return frames[depth];
+      }
+      var stackTraceElementCls = <ReferenceClassData<JVMTypes.java_lang_StackTraceElement>> thread.getBsCl().getInitializedClass(thread, 'Ljava/lang/StackTraceElement;'),
+        element = util.newObjectFromClass<JVMTypes.java_lang_StackTraceElement>(thread, stackTraceElementCls);
+      writeStackTraceElement(thread, element, frames[depth]);
+      return element;
     }
 
   }
@@ -1592,6 +1831,8 @@ export default function (): any {
       var type = memberName['java/lang/invoke/MemberName/type'],
         name = memberName['java/lang/invoke/MemberName/name'].toString(),
         clazz = <ReferenceClassData<JVMTypes.java_lang_Object>> memberName['java/lang/invoke/MemberName/clazz'].$cls,
+        lookupCls = lookupClass !== null && lookupClass.$cls instanceof ReferenceClassData ?
+          <ReferenceClassData<JVMTypes.java_lang_Object>> lookupClass.$cls : null,
         flags = memberName['java/lang/invoke/MemberName/flags'],
         refKind = flags >>> MemberNameConstants.REFERENCE_KIND_SHIFT;
 
@@ -1608,6 +1849,11 @@ export default function (): any {
           var methodTarget = clazz.signaturePolymorphicAwareMethodLookup(name + (<JVMTypes.java_lang_invoke_MethodType> type).toString());
           if (methodTarget !== null) {
             flags |= methodFlags(methodTarget);
+            if (methodTarget.accessFlags.isPrivate() && lookupCls !== null &&
+              lookupCls !== methodTarget.cls && lookupCls.isNestmateOf(methodTarget.cls)) {
+              // Doppio's Java 8 MethodHandles.Lookup does not know Java 11 nestmates.
+              flags = (flags & ~(util.FlagMasks.PUBLIC | util.FlagMasks.PRIVATE | util.FlagMasks.PROTECTED)) | util.FlagMasks.PUBLIC;
+            }
             memberName['java/lang/invoke/MemberName/flags'] = flags;
             memberName.vmtarget = methodTarget.getVMTargetBridgeMethod(thread, flags >>> MemberNameConstants.REFERENCE_KIND_SHIFT);
             // vmindex is only relevant for virtual dispatch.
@@ -1623,6 +1869,10 @@ export default function (): any {
           var fieldTarget = clazz.fieldLookup(name);
           if (fieldTarget !== null) {
             flags |= fieldTarget.accessFlags.getRawByte();
+            if (fieldTarget.accessFlags.isPrivate() && lookupCls !== null &&
+              lookupCls !== fieldTarget.cls && lookupCls.isNestmateOf(fieldTarget.cls)) {
+              flags = (flags & ~(util.FlagMasks.PUBLIC | util.FlagMasks.PRIVATE | util.FlagMasks.PROTECTED)) | util.FlagMasks.PUBLIC;
+            }
             memberName['java/lang/invoke/MemberName/flags'] = flags;
             memberName.vmindex = clazz.getVMIndexForField(fieldTarget);
             return memberName;
@@ -1854,13 +2104,18 @@ export default function (): any {
     'java/lang/Float': java_lang_Float,
     'java/lang/Object': java_lang_Object,
     'java/lang/Package': java_lang_Package,
+    'java/lang/ProcessHandle$CurrentProcessHandle': java_lang_ProcessHandle_CurrentProcessHandle,
+    'java/lang/ProcessHandle$CurrentProcessInfo': java_lang_ProcessHandle_CurrentProcessInfo,
     'java/lang/ProcessEnvironment': java_lang_ProcessEnvironment,
     'java/lang/reflect/Array': java_lang_reflect_Array,
+    'java/lang/reflect/Executable': java_lang_reflect_Executable,
     'java/lang/reflect/Proxy': java_lang_reflect_Proxy,
     'java/lang/Runtime': java_lang_Runtime,
     'java/lang/SecurityManager': java_lang_SecurityManager,
     'java/lang/Shutdown': java_lang_Shutdown,
     'java/lang/StrictMath': java_lang_StrictMath,
+    'java/lang/StackWalker': java_lang_StackWalker,
+    'java/lang/StackTraceElement': java_lang_StackTraceElement,
     'java/lang/String': java_lang_String,
     'java/lang/System': java_lang_System,
     'java/lang/Thread': java_lang_Thread,
