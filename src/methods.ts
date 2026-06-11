@@ -16,6 +16,29 @@ import {JitInfo, opJitInfo} from './jit';
 declare var RELEASE: boolean;
 if (typeof RELEASE === 'undefined') global.RELEASE = false;
 
+function checkByteBufferBulkArgs(thread: JVMThread, javaThis: JVMTypes.java_nio_ByteBuffer, bytes: JVMTypes.JVMArray<number>, offset: number, length: number, overflowException: string): boolean {
+  if (bytes === null) {
+    thread.throwNewException('Ljava/lang/NullPointerException;', '');
+    return false;
+  }
+  if (offset < 0 || length < 0 || offset > bytes.array.length - length) {
+    thread.throwNewException('Ljava/lang/IndexOutOfBoundsException;', '');
+    return false;
+  }
+  if (length > (<any> javaThis)['java/nio/Buffer/limit'] - (<any> javaThis)['java/nio/Buffer/position']) {
+    thread.throwNewException(overflowException, '');
+    return false;
+  }
+  return true;
+}
+
+function advanceByteBufferPosition(javaThis: JVMTypes.java_nio_ByteBuffer, position: number): void {
+  (<any> javaThis)['java/nio/Buffer/position'] = position;
+  if ((<any> javaThis)['java/nio/Buffer/mark'] > position) {
+    (<any> javaThis)['java/nio/Buffer/mark'] = -1;
+  }
+}
+
 var trapped_methods: { [clsName: string]: { [methodName: string]: Function } } = {
   'java/lang/ref/Reference': {
     // NOP, because we don't do our own GC and also this starts a thread?!?!?!
@@ -51,6 +74,34 @@ var trapped_methods: { [clsName: string]: { [methodName: string]: Function } } =
     // this is trapped and NOP'ed for speed
     'run()Ljava/lang/Object;': function (thread: JVMThread, javaThis: JVMTypes.java_nio_charset_Charset$3): JVMTypes.java_lang_Object {
       return null;
+    }
+  },
+  'java/nio/DirectByteBuffer': {
+    'get([BII)Ljava/nio/ByteBuffer;': function(thread: JVMThread, javaThis: JVMTypes.java_nio_ByteBuffer, bytes: JVMTypes.JVMArray<number>, offset: number, length: number): JVMTypes.java_nio_ByteBuffer {
+      if (!checkByteBufferBulkArgs(thread, javaThis, bytes, offset, length, 'Ljava/nio/BufferUnderflowException;')) {
+        return null;
+      }
+      var heap = thread.getJVM().getHeap(),
+        position = (<any> javaThis)['java/nio/Buffer/position'],
+        address = (<any> javaThis)['java/nio/Buffer/address'].toNumber() + position;
+      for (var i = 0; i < length; i++) {
+        bytes.array[offset + i] = heap.get_signed_byte(address + i);
+      }
+      advanceByteBufferPosition(javaThis, position + length);
+      return javaThis;
+    },
+    'put([BII)Ljava/nio/ByteBuffer;': function(thread: JVMThread, javaThis: JVMTypes.java_nio_ByteBuffer, bytes: JVMTypes.JVMArray<number>, offset: number, length: number): JVMTypes.java_nio_ByteBuffer {
+      if (!checkByteBufferBulkArgs(thread, javaThis, bytes, offset, length, 'Ljava/nio/BufferOverflowException;')) {
+        return null;
+      }
+      var heap = thread.getJVM().getHeap(),
+        position = (<any> javaThis)['java/nio/Buffer/position'],
+        address = (<any> javaThis)['java/nio/Buffer/address'].toNumber() + position;
+      for (var i = 0; i < length; i++) {
+        heap.set_signed_byte(address + i, bytes.array[offset + i]);
+      }
+      advanceByteBufferPosition(javaThis, position + length);
+      return javaThis;
     }
   },
   'sun/nio/fs/DefaultFileSystemProvider': {

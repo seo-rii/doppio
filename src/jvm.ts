@@ -69,7 +69,7 @@ class JVM {
   private natives: { [clsName: string]: { [methSig: string]: Function } } = {};
   // 20MB heap
   // @todo Make heap resizeable.
-  private heap: Heap = new Heap(20 * 1024 * 1024);
+  private heap: Heap = new Heap(256 * 1024 * 1024);
   private nativeClasspath: string[] = null;
   private startupTime: Date = new Date();
   private terminationCb: (code: number) => void = null;

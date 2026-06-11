@@ -236,7 +236,7 @@ export class BytecodeStackFrame implements IStackFrame {
     assert(!method.accessFlags.isNative(), 'Cannot run a native method using a BytecodeStackFrame.');
     // @todo This should be a runtime error, since reflection can cause you to
     // try to do this.
-    assert(!method.accessFlags.isAbstract(), 'Cannot run an abstract method!');
+    assert(!method.accessFlags.isAbstract(), `Cannot run abstract method ${method.getFullSignature()}`);
     this.locals = args;
     this.opStack = new PreAllocatedStack(method.getCodeAttribute().getMaxStack());
   }
