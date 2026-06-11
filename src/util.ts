@@ -219,13 +219,30 @@ if (!Array.prototype.indexOf) {
  * y: accessible
  * n: not accessible
  */
+function isMagicAccessor(accessingCls: ReferenceClassData<JVMTypes.java_lang_Object>): boolean {
+  while (accessingCls !== null) {
+    if (accessingCls.getInternalName() === 'Lsun/reflect/MagicAccessorImpl;') {
+      return true;
+    }
+    accessingCls = accessingCls.getSuperClass();
+  }
+  return false;
+}
+
 export function checkAccess(accessingCls: ReferenceClassData<JVMTypes.java_lang_Object>, owningCls: ReferenceClassData<JVMTypes.java_lang_Object>, accessFlags: Flags): boolean {
+  if (isMagicAccessor(accessingCls)) {
+    return true;
+  }
   if (accessFlags.isPublic()) {
     return true;
   } else if (accessFlags.isProtected()) {
     return accessingCls.getPackageName() === owningCls.getPackageName() || accessingCls.isSubclass(owningCls);
   } else if (accessFlags.isPrivate()) {
-    return accessingCls === owningCls;
+    var owningName = owningCls.getInternalName(),
+      lambdaProxyPrefix = 'L' + owningName.slice(1, owningName.length - 1) + '$$Lambda$';
+    // LambdaMetafactory proxy classes are VM-defined helpers with caller access.
+    return accessingCls === owningCls || accessingCls.isNestmateOf(owningCls) ||
+      accessingCls.getInternalName().indexOf(lambdaProxyPrefix) === 0;
   } else {
     return accessingCls.getPackageName() === owningCls.getPackageName();
   }

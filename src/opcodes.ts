@@ -7,7 +7,7 @@
 /* tslint:disable:variable-name typedef:memberVariableDeclarator */
 import gLong from './gLong';
 import {wrapFloat, float2int, descriptor2typestr} from './util';
-import {ClassReference, FieldReference, MethodReference, InterfaceMethodReference, IConstantPoolItem, InvokeDynamic, ConstDouble, ConstLong} from './ConstantPool';
+import {ClassReference, FieldReference, MethodReference, InterfaceMethodReference, IConstantPoolItem, InvokeDynamic, ConstDouble, ConstLong, DynamicConstant} from './ConstantPool';
 import {ClassData, ArrayClassData} from './ClassData';
 import {JVMThread, BytecodeStackFrame} from './threading';
 import {ThreadStatus, OpCode, ConstantPoolItemType, Constants} from './enums';
@@ -1242,7 +1242,7 @@ export class Opcodes {
         return;
       }
     }
-    thread.asyncReturn(frame.opStack.bottom());
+    thread.asyncReturn(frame.opStack.pop());
   }
 
   public static ireturn = Opcodes._return_32;
@@ -1260,7 +1260,7 @@ export class Opcodes {
         return;
       }
     }
-    thread.asyncReturn(frame.opStack.bottom(), null);
+    thread.asyncReturn(frame.opStack.pop2(), null);
   }
 
   public static lreturn = Opcodes._return_64;
@@ -1647,6 +1647,16 @@ export class Opcodes {
     if (appendix !== null) {
       args.push(appendix);
     }
+    if (callSiteSpecifier.isStringConcatCallSite()) {
+      opStack.push(callSiteSpecifier.evaluateStringConcat(thread, args));
+      frame.pc += 3;
+      return;
+    }
+    if (callSiteSpecifier.isObjectMethodsCallSite()) {
+      opStack.push(callSiteSpecifier.evaluateObjectMethods(thread, args));
+      frame.pc += 3;
+      return;
+    }
     fcn(thread, null, args);
     frame.returnToThreadLoop = true;
   }
@@ -1840,6 +1850,10 @@ export class Opcodes {
 
   public static checkcast(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
+    if (frame.opStack.top() === null) {
+      frame.pc += 3;
+      return;
+    }
     var classRef = <ClassReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1));
     if (classRef.isResolved()) {
       // Rewrite to fast version, and re-execute.
@@ -1867,6 +1881,12 @@ export class Opcodes {
 
   public static instanceof(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
+    if (frame.opStack.top() === null) {
+      frame.opStack.pop();
+      frame.opStack.push(0);
+      frame.pc += 3;
+      return;
+    }
     var classRef = <ClassReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1));
     if (classRef.isResolved()) {
       // Rewrite and rerun.
@@ -2002,6 +2022,7 @@ export class Opcodes {
           case ConstantPoolItemType.CLASS:
           case ConstantPoolItemType.METHOD_HANDLE:
           case ConstantPoolItemType.METHOD_TYPE:
+          case ConstantPoolItemType.DYNAMIC:
           case ConstantPoolItemType.INTEGER:
           case ConstantPoolItemType.FLOAT:
             return true;
@@ -2026,6 +2047,7 @@ export class Opcodes {
           case ConstantPoolItemType.CLASS:
           case ConstantPoolItemType.METHOD_HANDLE:
           case ConstantPoolItemType.METHOD_TYPE:
+          case ConstantPoolItemType.DYNAMIC:
           case ConstantPoolItemType.INTEGER:
           case ConstantPoolItemType.FLOAT:
             return true;
@@ -2043,11 +2065,21 @@ export class Opcodes {
   public static ldc2_w(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
     var constant = frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1));
-    assert(constant.getType() === ConstantPoolItemType.LONG
-      || constant.getType() === ConstantPoolItemType.DOUBLE,
-      `Invalid ldc_w constant pool type: ${ConstantPoolItemType[constant.getType()]}`);
-    frame.opStack.pushWithNull((<ConstLong | ConstDouble> constant).value);
-    frame.pc += 3;
+    if (constant.isResolved()) {
+      assert(constant.getType() === ConstantPoolItemType.LONG
+        || constant.getType() === ConstantPoolItemType.DOUBLE
+        || (constant.getType() === ConstantPoolItemType.DYNAMIC &&
+            ['J', 'D'].indexOf((<DynamicConstant> constant).nameAndTypeInfo.descriptor) !== -1),
+        `Invalid ldc2_w constant pool type: ${ConstantPoolItemType[constant.getType()]}`);
+      if (constant.getType() === ConstantPoolItemType.DYNAMIC) {
+        frame.opStack.pushWithNull(constant.getConstant(thread));
+      } else {
+        frame.opStack.pushWithNull((<ConstLong | ConstDouble> constant).value);
+      }
+      frame.pc += 3;
+    } else {
+      resolveCPItem(thread, frame, constant);
+    }
   }
 
   public static wide(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
