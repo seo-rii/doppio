@@ -694,7 +694,10 @@ ClasspathFactory(JAVA_HOME, classpathPaths, (items: IClasspathItem[]) => {
         template.fileEnd(stream);
         stream.end(new Buffer(''), () => {});
         if (args.flag('typescript', false) && args.flag('headers_only', false)) {
-          fs.unlinkSync(path.join(outputDirectory, targetName + '.' + template.getExtension()));
+          let targetFile = path.join(outputDirectory, targetName + '.' + template.getExtension());
+          if (fs.existsSync(targetFile)) {
+            fs.unlinkSync(targetFile);
+          }
         }
       });
       if (args.flag('typescript', false)) {

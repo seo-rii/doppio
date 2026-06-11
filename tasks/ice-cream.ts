@@ -28,7 +28,7 @@ function iceCream(grunt: IGrunt) {
       }), output = escodegen.generate(processedAst, {sourceMap: path.relative(path.dirname(file.dest), file.src[0]), sourceMapWithCode: true});
 
       var mapDest = file.dest + '.map';
-      fs.writeFileSync(mapDest, output.map);
+      fs.writeFileSync(mapDest, output.map.toString());
       fs.writeFileSync(file.dest, `${output.code}\n//# sourceMappingURL=${path.basename(file.dest)}.map`);
     });
   });
