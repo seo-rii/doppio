@@ -41,8 +41,9 @@ export default function (): any {
       var vmManagementStatics = <typeof JVMTypes.sun_management_VMManagementImpl> (<ReferenceClassData<JVMTypes.sun_management_VMManagementImpl>> thread.getBsCl().getInitializedClass(thread, 'Lsun/management/VMManagementImpl;')).getConstructor(thread);
       vmManagementStatics['sun/management/VMManagementImpl/compTimeMonitoringSupport'] = 0;
       vmManagementStatics['sun/management/VMManagementImpl/threadContentionMonitoringSupport'] = 0;
-      vmManagementStatics['sun/management/VMManagementImpl/currentThreadCpuTimeSupport'] = 0;
-      vmManagementStatics['sun/management/VMManagementImpl/otherThreadCpuTimeSupport'] = 0;
+      vmManagementStatics['sun/management/VMManagementImpl/currentThreadCpuTimeSupport'] = 1;
+      vmManagementStatics['sun/management/VMManagementImpl/otherThreadCpuTimeSupport'] = 1;
+      vmManagementStatics['sun/management/VMManagementImpl/threadAllocatedMemorySupport'] = 0;
       vmManagementStatics['sun/management/VMManagementImpl/bootClassPathSupport'] = 0;
       vmManagementStatics['sun/management/VMManagementImpl/objectMonitorUsageSupport'] = 0;
       vmManagementStatics['sun/management/VMManagementImpl/synchronizerUsageSupport'] = 0;
@@ -53,6 +54,10 @@ export default function (): any {
     }
 
     public static 'isThreadCpuTimeEnabled()Z'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): boolean {
+      return false;
+    }
+
+    public static 'isThreadAllocatedMemoryEnabled()Z'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): boolean {
       return false;
     }
 
@@ -200,8 +205,22 @@ export default function (): any {
 
   }
 
+  class sun_management_ThreadImpl {
+    public static 'setThreadCpuTimeEnabled0(Z)V'(thread: JVMThread, enabled: number): void {
+    }
+
+    public static 'getThreadTotalCpuTime0(J)J'(thread: JVMThread, tid: Long): Long {
+      return Long.fromNumber(Math.max(0, Date.now() - thread.getJVM().getStartupTime().getTime()) * 1000000);
+    }
+
+    public static 'getThreadUserCpuTime0(J)J'(thread: JVMThread, tid: Long): Long {
+      return Long.fromNumber(Math.max(0, Date.now() - thread.getJVM().getStartupTime().getTime()) * 1000000);
+    }
+  }
+
   return {
     'sun/management/MemoryImpl': sun_management_MemoryImpl,
+    'sun/management/ThreadImpl': sun_management_ThreadImpl,
     'sun/management/VMManagementImpl': sun_management_VMManagementImpl
   };
 };

@@ -20,6 +20,7 @@ import crc32 = require('pako/lib/zlib/crc32');
 import adler32 = require('pako/lib/zlib/adler32');
 import * as ZStreamCons from 'pako/lib/zlib/zstream';
 import * as GZHeader from 'pako/lib/zlib/gzheader';
+import {manifestHasMultiReleaseTrue, MULTI_RELEASE_RUNTIME_VERSION} from '../classpath';
 import i82u8 = util.i82u8;
 import isInt8Array = util.isInt8Array;
 import u82i8 = util.u82i8;
@@ -43,6 +44,7 @@ if (typeof Int8Array !== "undefined") {
 
 export default function (): any {
   let ZipFiles: {[id: number]: TZipFS} = {};
+  let ZipMultiReleaseVersions: {[id: number]: number[]} = {};
   let ZipEntries: {[id: number]: TCentralDirectory} = {};
   let ZStreams: {[id: number]: ZStream} = {};
   // Start at 1, as 0 is interpreted as an error.
@@ -66,10 +68,13 @@ export default function (): any {
   }
 
   function OpenZipFile(zfile: TZipFS): number {
-    return OpenItem(zfile, ZipFiles);
+    let id = OpenItem(zfile, ZipFiles);
+    ZipMultiReleaseVersions[id] = GetMultiReleaseVersions(zfile);
+    return id;
   }
   function CloseZipFile(id: number): void {
     CloseItem(id, ZipFiles);
+    delete ZipMultiReleaseVersions[id];
   }
   /**
    * Returns the zip file, if it exists.
@@ -77,6 +82,32 @@ export default function (): any {
    */
   function GetZipFile(thread: JVMThread, id: number): TZipFS {
     return GetItem(thread, id, ZipFiles, `ZipFile not found.`);
+  }
+  function GetMultiReleaseVersions(zipfs: TZipFS): number[] {
+    try {
+      let manifest = zipfs.getCentralDirectoryEntry('/META-INF/MANIFEST.MF').getData().toString('utf8');
+      if (!manifestHasMultiReleaseTrue(manifest)) {
+        return [];
+      }
+      return zipfs.readdirSync('/META-INF/versions')
+        .map((version) => parseInt(version, 10))
+        .filter((version) => version >= 9 && version <= MULTI_RELEASE_RUNTIME_VERSION)
+        .sort((a, b) => b - a);
+    } catch (e) {
+      return [];
+    }
+  }
+  function GetCentralDirectoryEntry(zipfs: TZipFS, versions: number[], name: string): TCentralDirectory {
+    if (versions.length > 0 && name.indexOf('/META-INF/') !== 0) {
+      for (let i = 0; i < versions.length; i++) {
+        try {
+          return zipfs.getCentralDirectoryEntry(`/META-INF/versions/${versions[i]}${name}`);
+        } catch (e) {
+          // Try the next version candidate.
+        }
+      }
+    }
+    return zipfs.getCentralDirectoryEntry(name);
   }
   function OpenZipEntry(zentry: TCentralDirectory): number {
     return OpenItem(zentry, ZipEntries);
@@ -517,7 +548,7 @@ export default function (): any {
         }
         name = path.resolve(name);
         try {
-          return Long.fromNumber(OpenZipEntry(zipfs.getCentralDirectoryEntry(name)));
+          return Long.fromNumber(OpenZipEntry(GetCentralDirectoryEntry(zipfs, ZipMultiReleaseVersions[jzfile.toNumber()] || [], name)));
         } catch (e) {
           return Long.ZERO;
         }

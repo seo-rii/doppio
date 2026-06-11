@@ -738,12 +738,12 @@ export default function (): any {
     }
 
     public static 'setLastModifiedTime(Ljava/io/File;J)Z'(thread: JVMThread, javaThis: JVMTypes.java_io_UnixFileSystem, file: JVMTypes.java_io_File, time: Long): void {
-      var mtime = time.toNumber(),
-        atime = (new Date).getTime(),
+      var mtime = new Date(time.toNumber()),
+        atime = new Date(),
         filepath = file['java/io/File/path'].toString();
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
       fs.utimes(filepath, atime, mtime, (err?: NodeJS.ErrnoException) => {
-        thread.asyncReturn(1);
+        thread.asyncReturn(err != null ? 0 : 1);
       });
     }
 

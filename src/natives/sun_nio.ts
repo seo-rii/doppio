@@ -14,15 +14,28 @@ let BFSUtils = BrowserFS.BFSRequire('bfs_utils');
 export default function (): any {
   class sun_nio_ch_FileChannelImpl {
 
-    public static 'map0(IJJ)J'(thread: JVMThread, javaThis: JVMTypes.sun_nio_ch_FileChannelImpl, arg0: number, arg1: Long, arg2: Long): Long {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+    public static 'map0(IJJ)J'(thread: JVMThread, javaThis: JVMTypes.sun_nio_ch_FileChannelImpl, arg0: number, arg1: Long, arg2: Long): void {
+      var fdObj = (<any> javaThis)['sun/nio/ch/FileChannelImpl/fd'],
+        fd = fdObj['java/io/FileDescriptor/fd'],
+        position = arg1.toNumber(),
+        len = arg2.toNumber(),
+        heap = thread.getJVM().getHeap(),
+        addr = heap.malloc(len === 0 ? 1 : len),
+        buf = heap.get_buffer(addr, len);
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      fs.read(fd, buf, 0, len, position, (err) => {
+        if (err) {
+          throwNodeError(thread, err);
+        } else {
+          thread.asyncReturn(Long.fromNumber(addr), null);
+        }
+      });
     }
 
     public static 'unmap0(JJ)I'(thread: JVMThread, arg0: Long, arg1: Long): number {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
+      if (!arg0.isZero()) {
+        thread.getJVM().getHeap().free(arg0.toNumber());
+      }
       return 0;
     }
 
