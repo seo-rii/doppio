@@ -418,6 +418,141 @@ export function setup(grunt: IGrunt) {
         ext: '.runout'
       }
     },
+    javac_modern: {
+      java9: {
+        options: {
+          release: 9
+        },
+        files: [{
+          expand: true,
+          src: 'classes/modern_test/Java9*.java',
+          ext: '.class'
+        }]
+      },
+      java10: {
+        options: {
+          release: 10
+        },
+        files: [{
+          expand: true,
+          src: 'classes/modern_test/Java10*.java',
+          ext: '.class'
+        }]
+      },
+      java11: {
+        options: {
+          release: 11
+        },
+        files: [{
+          expand: true,
+          src: 'classes/modern_test/Java11*.java',
+          ext: '.class'
+        }]
+      },
+      java12: {
+        options: {
+          release: 12
+        },
+        files: [{
+          expand: true,
+          src: 'classes/modern_test/Java12*.java',
+          ext: '.class'
+        }]
+      },
+      java13: {
+        options: {
+          release: 13
+        },
+        files: [{
+          expand: true,
+          src: 'classes/modern_test/Java13*.java',
+          ext: '.class'
+        }]
+      },
+      java14: {
+        options: {
+          release: 14
+        },
+        files: [{
+          expand: true,
+          src: 'classes/modern_test/Java14*.java',
+          ext: '.class'
+        }]
+      },
+      java15: {
+        options: {
+          release: 15
+        },
+        files: [{
+          expand: true,
+          src: 'classes/modern_test/Java15*.java',
+          ext: '.class'
+        }]
+      },
+      java16: {
+        options: {
+          release: 16
+        },
+        files: [{
+          expand: true,
+          src: 'classes/modern_test/Java16*.java',
+          ext: '.class'
+        }]
+      },
+      java17: {
+        options: {
+          release: 17
+        },
+        files: [{
+          expand: true,
+          src: 'classes/modern_test/Java17*.java',
+          ext: '.class'
+        }]
+      },
+      reflect_parameters: {
+        options: {
+          release: 17,
+          extraArgs: ['-parameters']
+        },
+        files: [{
+          expand: true,
+          src: 'classes/modern_test/ReflectParameters.java',
+          ext: '.class'
+        }]
+      },
+      sealed_violation: {
+        options: {
+          release: 17
+        },
+        files: [{
+          expand: true,
+          src: 'classes/modern_test/SealedViolation.java',
+          ext: '.class'
+        }]
+      },
+      module_info: {
+        options: {
+          release: 9,
+          destDir: 'classes/modern_module/out'
+        },
+        files: [{
+          expand: true,
+          src: ['classes/modern_module/module-info.java', 'classes/modern_module/sample/*.java']
+        }]
+      }
+    },
+    run_java_modern: {
+      java17: {
+        expand: true,
+        src: ['classes/modern_test/Java9*.java', 'classes/modern_test/Java10*.java', 'classes/modern_test/Java11*.java', 'classes/modern_test/Java12*.java', 'classes/modern_test/Java13*.java', 'classes/modern_test/Java14*.java', 'classes/modern_test/Java15*.java', 'classes/modern_test/Java16*.java', 'classes/modern_test/Java17*.java', 'classes/modern_test/SealedViolation.java'],
+        ext: '.runout'
+      },
+      reflect_parameters: {
+        expand: true,
+        src: 'classes/modern_test/ReflectParameters.java',
+        ext: '.runout'
+      }
+    },
     compress: {
       doppio: {
         options: {
@@ -426,7 +561,8 @@ export function setup(grunt: IGrunt) {
           level: 0
         },
         files: [
-          { expand: true, cwd: 'classes/', src: 'doppio/**/*.class', dest: ''}
+          { expand: true, cwd: 'classes/', src: 'doppio/**/*.class', dest: ''},
+          { expand: true, cwd: 'classes/modern_classlib/out', src: '**/*.class', dest: ''}
         ]
       }
     },
@@ -439,6 +575,12 @@ export function setup(grunt: IGrunt) {
           expand: true,
           src: ['classes/test/*.runout']
         }]
+      },
+      modern_java17: {
+        files: [{
+          expand: true,
+          src: ['classes/modern_test/Java9*.runout', 'classes/modern_test/Java10*.runout', 'classes/modern_test/Java11*.runout', 'classes/modern_test/Java12*.runout', 'classes/modern_test/Java13*.runout', 'classes/modern_test/Java14*.runout', 'classes/modern_test/Java15*.runout', 'classes/modern_test/Java16*.runout', 'classes/modern_test/Java17*.runout', 'classes/modern_test/SealedViolation.runout', 'classes/modern_test/ReflectParameters.runout']
+        }]
       }
     },
     unit_test: {
@@ -446,6 +588,75 @@ export function setup(grunt: IGrunt) {
         files: [{
           expand: true,
           src: 'classes/test/*.java'
+        }]
+      },
+      modern_java17: {
+        files: [{
+          expand: true,
+          src: ['classes/modern_test/Java9*.java', 'classes/modern_test/Java10*.java', 'classes/modern_test/Java11*.java', 'classes/modern_test/Java12*.java', 'classes/modern_test/Java13*.java', 'classes/modern_test/Java14*.java', 'classes/modern_test/Java15*.java', 'classes/modern_test/Java16*.java', 'classes/modern_test/Java17*.java', 'classes/modern_test/SealedViolation.java', 'classes/modern_test/ReflectParameters.java']
+        }]
+      }
+    },
+    parse_classfile_modern: {
+      module_info: {
+        files: [{
+          expand: true,
+          src: 'classes/modern_module/out/module-info.class'
+        }]
+      },
+      nest_members: {
+        options: {
+          nestMembers: ['Lclasses/modern_test/Java11Nestmates$Reader;']
+        },
+        files: [{
+          expand: true,
+          src: 'classes/modern_test/Java11Nestmates.class'
+        }]
+      },
+      nest_host: {
+        options: {
+          nestHost: 'Lclasses/modern_test/Java11Nestmates;'
+        },
+        files: [{
+          expand: true,
+          src: 'classes/modern_test/Java11Nestmates$Reader.class'
+        }]
+      },
+      record_components: {
+        options: {
+          recordComponents: ['name', 'count']
+        },
+        files: [{
+          expand: true,
+          src: 'classes/modern_test/Java16RecordClassVersion.class'
+        }]
+      },
+      permitted_subclasses: {
+        options: {
+          permittedSubclasses: [
+            'Lclasses/modern_test/Java17SealedClassVersion$Circle;',
+            'Lclasses/modern_test/Java17SealedClassVersion$Square;'
+          ]
+        },
+        files: [{
+          expand: true,
+          src: 'classes/modern_test/Java17SealedClassVersion$Shape.class'
+        }]
+      },
+      classfile_versions: {
+        files: [{
+          expand: true,
+          src: [
+            'classes/modern_test/Java18ClassFileVersion.class',
+            'classes/modern_test/Java19ClassFileVersion.class',
+            'classes/modern_test/Java20ClassFileVersion.class',
+            'classes/modern_test/Java21ClassFileVersion.class',
+            'classes/modern_test/Java22ClassFileVersion.class',
+            'classes/modern_test/Java23ClassFileVersion.class',
+            'classes/modern_test/Java24ClassFileVersion.class',
+            'classes/modern_test/Java25ClassFileVersion.class',
+            'classes/modern_test/Java26ClassFileVersion.class'
+          ]
         }]
       }
     },
@@ -629,7 +840,10 @@ export function setup(grunt: IGrunt) {
       grunt.task.run('compress:doppio');
     } else {
       const zipModified = fs.statSync('vendor/java_home/lib/doppio.jar').mtime;
-      const filesModified = glob.sync('classes/doppio/**/*.java').map((file) => fs.statSync(file).mtime).filter((modTime) => modTime > zipModified);
+      const jarInputs = glob.sync('classes/doppio/**/*.java')
+        .concat(glob.sync('classes/modern_classlib/**/*.java'))
+        .concat(glob.sync('classes/modern_classlib/out/**/*.class'));
+      const filesModified = jarInputs.map((file) => fs.statSync(file).mtime).filter((modTime) => modTime > zipModified);
       if (filesModified.length > 0) {
         grunt.task.run('compress:doppio');
       }
@@ -639,6 +853,7 @@ export function setup(grunt: IGrunt) {
   grunt.registerTask('java',
     ['find_native_java',
      'newer:javac',
+     'javac_modern_classlib',
      'generate_doppio_jar',
      'newer:run_java',
      // Windows: Convert CRLF to LF.
@@ -811,6 +1026,42 @@ export function setup(grunt: IGrunt) {
   grunt.registerTask('test',
     ['release-cli',
      'unit_test']);
+  var modernJavaTestTasks = [
+    'release-cli',
+    'javac_modern_multirelease_jar',
+    'run_java_modern_multirelease',
+    'unit_test_modern_multirelease',
+    'javac_modern:module_info',
+    'parse_classfile_modern:module_info',
+    'generate_return_top_modern',
+    'generate_null_type_checks_modern',
+    'javac_modern:java9',
+    'generate_string_concat_constants_modern',
+    'javac_modern:java10',
+    'javac_modern:java11',
+    'generate_constant_dynamic_modern',
+    'parse_classfile_modern:nest_members',
+    'parse_classfile_modern:nest_host',
+    'javac_modern:java12',
+    'javac_modern:java13',
+    'javac_modern:java14',
+    'javac_modern:java15',
+    'javac_modern:java16',
+    'parse_classfile_modern:record_components',
+    'javac_modern:java17',
+    'javac_modern:reflect_parameters',
+    'parse_classfile_modern:permitted_subclasses',
+    'generate_illegal_sealed_modern',
+    'javac_modern:sealed_violation',
+    'generate_modern_classfile_versions',
+    'parse_classfile_modern:classfile_versions',
+    'run_java_modern:java17',
+    'run_java_modern:reflect_parameters',
+    'lineending:modern_java17',
+    'unit_test:modern_java17'
+  ];
+  grunt.registerTask('test-modern-java', modernJavaTestTasks);
+  grunt.registerTask('test-modern-java17', modernJavaTestTasks);
   grunt.registerTask('build-test-dev',
     [
       'make_build_dir:dev-cli',
