@@ -142,7 +142,10 @@ export enum ConstantPoolItemType {
   UTF8 = 1,
   METHOD_HANDLE = 15,
   METHOD_TYPE = 16,
-  INVOKE_DYNAMIC = 18
+  DYNAMIC = 17,
+  INVOKE_DYNAMIC = 18,
+  MODULE = 19,
+  PACKAGE = 20
 }
 
 /**

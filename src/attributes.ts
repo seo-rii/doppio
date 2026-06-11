@@ -22,6 +22,17 @@ export interface IInnerClassInfo {
   innerAccessFlags: number;
 }
 
+export interface IRecordComponentInfo {
+  name: string;
+  descriptor: string;
+  attrs: IAttribute[];
+}
+
+export interface IMethodParameterInfo {
+  name: string;
+  accessFlags: number;
+}
+
 export class ExceptionHandler implements IAttribute {
   public startPC: number;
   public endPC: number;
@@ -624,6 +635,89 @@ export class BootstrapMethods implements IAttribute {
   }
 }
 
+export class NestHost implements IAttribute {
+  public hostClass: ClassReference;
+
+  constructor(hostClass: ClassReference) {
+    this.hostClass = hostClass;
+  }
+
+  public getName() {
+    return 'NestHost';
+  }
+
+  public static parse(byteStream: ByteStream, constantPool: ConstantPool): IAttribute {
+    return new this(<ClassReference> constantPool.get(byteStream.getUint16()));
+  }
+}
+
+export class NestMembers implements IAttribute {
+  public classes: ClassReference[];
+
+  constructor(classes: ClassReference[]) {
+    this.classes = classes;
+  }
+
+  public getName() {
+    return 'NestMembers';
+  }
+
+  public static parse(byteStream: ByteStream, constantPool: ConstantPool): IAttribute {
+    var numClasses = byteStream.getUint16(),
+      classes: ClassReference[] = [];
+    for (var i = 0; i < numClasses; i++) {
+      classes.push(<ClassReference> constantPool.get(byteStream.getUint16()));
+    }
+    return new this(classes);
+  }
+}
+
+export class PermittedSubclasses implements IAttribute {
+  public classes: ClassReference[];
+
+  constructor(classes: ClassReference[]) {
+    this.classes = classes;
+  }
+
+  public getName() {
+    return 'PermittedSubclasses';
+  }
+
+  public static parse(byteStream: ByteStream, constantPool: ConstantPool): IAttribute {
+    var numClasses = byteStream.getUint16(),
+      classes: ClassReference[] = [];
+    for (var i = 0; i < numClasses; i++) {
+      classes.push(<ClassReference> constantPool.get(byteStream.getUint16()));
+    }
+    return new this(classes);
+  }
+}
+
+export class RecordAttribute implements IAttribute {
+  public components: IRecordComponentInfo[];
+
+  constructor(components: IRecordComponentInfo[]) {
+    this.components = components;
+  }
+
+  public getName() {
+    return 'Record';
+  }
+
+  public static parse(byteStream: ByteStream, constantPool: ConstantPool): IAttribute {
+    var numComponents = byteStream.getUint16(),
+      components: IRecordComponentInfo[] = [];
+    for (var i = 0; i < numComponents; i++) {
+      components.push({
+        name: (<ConstUTF8> constantPool.get(byteStream.getUint16())).value,
+        descriptor: (<ConstUTF8> constantPool.get(byteStream.getUint16())).value,
+        attrs: makeAttributes(byteStream, constantPool)
+      });
+    }
+    return new this(components);
+  }
+}
+
 export class RuntimeVisibleParameterAnnotations implements IAttribute {
   public rawBytes: Buffer;
   constructor(rawBytes: Buffer) {
@@ -636,6 +730,31 @@ export class RuntimeVisibleParameterAnnotations implements IAttribute {
 
   public static parse(byteStream: ByteStream, constantPool: ConstantPool, attrLen: number): IAttribute {
     return new this(byteStream.read(attrLen));
+  }
+}
+
+export class MethodParameters implements IAttribute {
+  public parameters: IMethodParameterInfo[];
+
+  constructor(parameters: IMethodParameterInfo[]) {
+    this.parameters = parameters;
+  }
+
+  public getName() {
+    return 'MethodParameters';
+  }
+
+  public static parse(byteStream: ByteStream, constantPool: ConstantPool): IAttribute {
+    var parameterCount = byteStream.getUint8(),
+      parameters: IMethodParameterInfo[] = [];
+    for (var i = 0; i < parameterCount; i++) {
+      var nameIndex = byteStream.getUint16();
+      parameters.push({
+        name: nameIndex === 0 ? null : (<ConstUTF8> constantPool.get(nameIndex)).value,
+        accessFlags: byteStream.getUint16()
+      });
+    }
+    return new this(parameters);
   }
 }
 
@@ -657,7 +776,12 @@ export function makeAttributes(byteStream: ByteStream, constantPool: ConstantPoo
     'AnnotationDefault': AnnotationDefault,
     'EnclosingMethod': EnclosingMethod,
     'BootstrapMethods': BootstrapMethods,
-    'RuntimeVisibleParameterAnnotations': RuntimeVisibleParameterAnnotations
+    'NestHost': NestHost,
+    'NestMembers': NestMembers,
+    'PermittedSubclasses': PermittedSubclasses,
+    'Record': RecordAttribute,
+    'RuntimeVisibleParameterAnnotations': RuntimeVisibleParameterAnnotations,
+    'MethodParameters': MethodParameters
   };
   var numAttrs = byteStream.getUint16();
   var attrs : IAttribute[] = [];

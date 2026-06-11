@@ -2,7 +2,7 @@ import {ext_classname, Flags, descriptor2typestr, boxClassName, asyncForEach, ty
 import * as util from './util';
 import ByteStream from './ByteStream';
 import {ConstantPool, ClassReference, ConstString, MethodHandle, IConstantPoolItem} from './ConstantPool';
-import {IAttribute, makeAttributes, BootstrapMethods, ConstantValue} from './attributes';
+import {IAttribute, makeAttributes, BootstrapMethods, ConstantValue, NestHost, NestMembers, PermittedSubclasses, RecordAttribute} from './attributes';
 import {JVMThread, InternalStackFrame, NativeStackFrame, BytecodeStackFrame} from './threading';
 import * as logging from './logging';
 import {Method, Field} from './methods';
@@ -19,6 +19,8 @@ import {setImmediate} from 'browserfs';
 
 const trace = logging.trace;
 const debug = logging.debug;
+const MIN_SUPPORTED_CLASSFILE_MAJOR = 45;
+const MAX_SUPPORTED_CLASSFILE_MAJOR = 70;
 
 import global from './global';
 
@@ -824,8 +826,9 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     }
     this.minorVersion = byteStream.getUint16();
     this.majorVersion = byteStream.getUint16();
-    if (!(45 <= this.majorVersion && this.majorVersion <= 52)) {
-      throw new Error("Major version invalid");
+    if (!(MIN_SUPPORTED_CLASSFILE_MAJOR <= this.majorVersion && this.majorVersion <= MAX_SUPPORTED_CLASSFILE_MAJOR)) {
+      throw new Error("Major version invalid: " + this.majorVersion +
+        " (supported range: " + MIN_SUPPORTED_CLASSFILE_MAJOR + "-" + MAX_SUPPORTED_CLASSFILE_MAJOR + ")");
     }
     this.constantPool = new ConstantPool();
     this.constantPool.parse(byteStream, cpPatches);
@@ -1053,8 +1056,18 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
           }
           this._methodLookup[ifaceMethodSig] = ifaceM;
         } else if (ifaceM.isDefault()) {
-          // Default method; uninherited, but still callable via full signature.
-          this._uninheritedDefaultMethods.push(ifaceM);
+          var currentMethod = this._methodLookup[ifaceMethodSig];
+          if (currentMethod.accessFlags.isAbstract() && currentMethod.cls.accessFlags.isInterface()) {
+            this._vmTable[this._vmTable.indexOf(currentMethod)] = ifaceM;
+            this._methodLookup[ifaceMethodSig] = ifaceM;
+          } else if (currentMethod.isDefault() && currentMethod.cls.accessFlags.isInterface() &&
+              ifaceM.cls.isSubinterface(currentMethod.cls)) {
+            this._vmTable[this._vmTable.indexOf(currentMethod)] = ifaceM;
+            this._methodLookup[ifaceMethodSig] = ifaceM;
+          } else {
+            // Default method; uninherited, but still callable via full signature.
+            this._uninheritedDefaultMethods.push(ifaceM);
+          }
         }
       });
     });
@@ -1169,6 +1182,61 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     return results;
   }
 
+  public getNestHostName(): string {
+    var host = <NestHost> this.getAttribute('NestHost');
+    if (host !== null) {
+      return host.hostClass.name;
+    }
+    return this.className;
+  }
+
+  public getNestMemberNames(): string[] {
+    var members = <NestMembers> this.getAttribute('NestMembers');
+    if (members === null) {
+      return [];
+    }
+    return members.classes.map((clsRef: ClassReference) => clsRef.name);
+  }
+
+  public isNestmateOf(other: ReferenceClassData<JVMTypes.java_lang_Object>): boolean {
+    return this.getNestHostName() === other.getNestHostName();
+  }
+
+  public getPermittedSubclassNames(): string[] {
+    var subclasses = <PermittedSubclasses> this.getAttribute('PermittedSubclasses');
+    if (subclasses === null) {
+      return [];
+    }
+    return subclasses.classes.map((clsRef: ClassReference) => clsRef.name);
+  }
+
+  public isRecord(): boolean {
+    return this.getAttribute('Record') !== null;
+  }
+
+  public getRecordComponentNames(): string[] {
+    var record = <RecordAttribute> this.getAttribute('Record');
+    if (record === null) {
+      return [];
+    }
+    return record.components.map((component) => component.name);
+  }
+
+  private getUnpermittedSealedSupertype(superClazz: ReferenceClassData<JVMTypes.java_lang_Object>, interfaceClazzes: ReferenceClassData<JVMTypes.java_lang_Object>[]): ReferenceClassData<JVMTypes.java_lang_Object> {
+    var directSupertypes = interfaceClazzes.slice(0),
+      permittedSubclasses: string[];
+    if (superClazz !== null) {
+      directSupertypes.push(superClazz);
+    }
+    for (var i = 0; i < directSupertypes.length; i++) {
+      permittedSubclasses = directSupertypes[i].getPermittedSubclassNames();
+      if (permittedSubclasses.length > 0 && permittedSubclasses.indexOf(this.className) === -1) {
+        return directSupertypes[i];
+      }
+    }
+    return null;
+  }
+
   /**
    * Get the bootstrap method information for an InvokeDynamic opcode.
    */
@@ -1232,7 +1300,12 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
       }
 
       // It worked!
-      this.setResolved(this.superClassRef !== null ? resolvedItems.pop() : null, resolvedItems);
+      var superClazz = this.superClassRef !== null ? resolvedItems.pop() : null,
+        sealedSupertype = this.getUnpermittedSealedSupertype(superClazz, resolvedItems);
+      if (sealedSupertype !== null) {
+        return false;
+      }
+      this.setResolved(superClazz, resolvedItems);
     }
     return true;
   }
@@ -1460,8 +1533,16 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
       }, explicit);
     }, (err?: any) => {
       if (!err) {
-        this.setResolved(this.superClassRef !== null ? <ReferenceClassData<JVMTypes.java_lang_Object>> this.superClassRef.cls : null, this.interfaceRefs.map((ref: ClassReference) => <ReferenceClassData<JVMTypes.java_lang_Object>> ref.cls));
-        cb(this);
+        var superClazz = this.superClassRef !== null ? <ReferenceClassData<JVMTypes.java_lang_Object>> this.superClassRef.cls : null,
+          interfaceClazzes = this.interfaceRefs.map((ref: ClassReference) => <ReferenceClassData<JVMTypes.java_lang_Object>> ref.cls),
+          sealedSupertype = this.getUnpermittedSealedSupertype(superClazz, interfaceClazzes);
+        if (sealedSupertype !== null) {
+          thread.throwNewException('Ljava/lang/IncompatibleClassChangeError;', `${this.getExternalName()} cannot inherit from sealed ${sealedSupertype.getExternalName()}`);
+          cb(null);
+        } else {
+          this.setResolved(superClazz, interfaceClazzes);
+          cb(this);
+        }
       } else {
         cb(null);
       }
@@ -1470,12 +1551,14 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
 
   /**
    * Find Miranda and default interface methods in this class. These
-   * methods manifest as new vmindices in the virtual method table compared with
-   * the superclass, and are not defined in this class itself.
+   * methods manifest as new vmindices or interface-default replacements in the
+   * virtual method table compared with the superclass, and are not defined in
+   * this class itself.
    */
   public getMirandaAndDefaultMethods(): Method[] {
     var superClsMethodTable: Method[] = this.superClass !== null ? this.superClass.getVMTable() : [];
-    return this.getVMTable().slice(superClsMethodTable.length).filter((method: Method) => method.cls !== this);
+    return this.getVMTable().filter((method: Method, index: number) => method.cls !== this &&
+      (index >= superClsMethodTable.length || superClsMethodTable[index] !== method));
   }
 
   public outputInjectedFields(outputStream: StringOutputStream) {
