@@ -14,6 +14,7 @@ export type TZipFS = TZipFS;
 let BFSFS = BrowserFS.BFSRequire('fs');
 let ZipFS = BrowserFS.FileSystem.ZipFS;
 export type MetaIndex = {[pkgName: string]: boolean | MetaIndex};
+export const MULTI_RELEASE_RUNTIME_VERSION = 17;
 
 /**
  * Represents an item on the classpath. Used by the bootstrap classloader.
@@ -70,6 +71,27 @@ function win2nix(p: string): string {
   return p.replace(/\\/g, '/');
 }
 
+export function manifestHasMultiReleaseTrue(manifest: string): boolean {
+  let lines = manifest.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n'),
+    attributes: {[name: string]: string} = {},
+    currentAttribute: string = null;
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    if (line.length === 0) {
+      currentAttribute = null;
+    } else if (line.charAt(0) === ' ' && currentAttribute !== null) {
+      attributes[currentAttribute] += line.slice(1);
+    } else {
+      let separator = line.indexOf(':');
+      if (separator !== -1) {
+        currentAttribute = line.slice(0, separator).toLowerCase();
+        attributes[currentAttribute] = line.slice(separator + 1).trim();
+      }
+    }
+  }
+  return attributes['multi-release'] === 'true';
+}
+
 /**
  * Represents a JAR file on the classpath.
  */
@@ -83,6 +105,7 @@ export abstract class AbstractClasspathJar {
    */
   protected _jarRead = TriState.INDETERMINATE;
   protected _path: string;
+  private _multiReleaseVersions: number[] = [];
   constructor(path: string) {
     this._path = path;
   }
@@ -100,6 +123,7 @@ export abstract class AbstractClasspathJar {
             ZipFS.computeIndex(data, (index) => {
               try {
                 this._fs.initialize(new ZipFS(index, bfsPath.basename(this._path)));
+                this._multiReleaseVersions = this._getMultiReleaseVersions();
                 this._jarRead = TriState.TRUE;
                 cb();
               } catch (e) {
@@ -120,16 +144,56 @@ export abstract class AbstractClasspathJar {
 
   public abstract hasClass(type: string): TriState;
 
+  protected _getClassEntryPaths(type: string): string[] {
+    let paths: string[] = [];
+    for (let i = 0; i < this._multiReleaseVersions.length; i++) {
+      paths.push(`/META-INF/versions/${this._multiReleaseVersions[i]}/${type}.class`);
+    }
+    paths.push(`/${type}.class`);
+    return paths;
+  }
+
+  protected _normalizeClassEntryPath(p: string): string {
+    let className = p.slice(1, p.length - 6),
+      match = /^META-INF\/versions\/([0-9]+)\/(.+)$/.exec(className);
+    if (match !== null) {
+      let version = parseInt(match[1], 10);
+      if (version >= 9 && version <= MULTI_RELEASE_RUNTIME_VERSION) {
+        return match[2];
+      }
+    }
+    return className;
+  }
+
+  private _getMultiReleaseVersions(): number[] {
+    try {
+      let manifest = this._fs.readFileSync('/META-INF/MANIFEST.MF').toString('utf8');
+      if (!manifestHasMultiReleaseTrue(manifest)) {
+        return [];
+      }
+      return this._fs.readdirSync('/META-INF/versions')
+        .map((version) => parseInt(version, 10))
+        .filter((version) => version >= 9 && version <= MULTI_RELEASE_RUNTIME_VERSION)
+        .sort((a, b) => b - a);
+    } catch (e) {
+      return [];
+    }
+  }
+
   public tryLoadClassSync(type: string): Buffer {
     if (this._jarRead === TriState.TRUE) {
       if (this.hasClass(type) !== TriState.FALSE) {
-        try {
-          // NOTE: Path must be absolute, otherwise BrowserFS
-          // will try to use process.cwd().
-          return this._fs.readFileSync(`/${type}.class`);
-        } catch (e) {
-          return null;
+        let paths = this._getClassEntryPaths(type);
+        for (let i = 0; i < paths.length; i++) {
+          try {
+            // NOTE: Path must be absolute, otherwise BrowserFS
+            // will try to use process.cwd().
+            return this._fs.readFileSync(paths[i]);
+          } catch (e) {
+            // Try the next multi-release candidate.
+          }
         }
+        return null;
       } else {
         return null;
       }
@@ -176,8 +240,23 @@ export abstract class AbstractClasspathJar {
 
   public loadClass(type: string, cb: (err: Error, data?: Buffer) => void): void {
     this._wrapOp(() => {
-      // Path must be absolute to avoid relative path issues.
-      this._fs.readFile(`/${type}.class`, cb);
+      let paths = this._getClassEntryPaths(type),
+        i = 0,
+        nextPath = (): void => {
+          if (i === paths.length) {
+            cb(new Error(`Class ${type} not found in JAR.`));
+          } else {
+            // Path must be absolute to avoid relative path issues.
+            this._fs.readFile(paths[i++], (err: Error, data?: Buffer) => {
+              if (err) {
+                nextPath();
+              } else {
+                cb(null, data);
+              }
+            });
+          }
+        };
+      nextPath();
     }, cb);
   }
 
@@ -268,7 +347,7 @@ export class UnindexedClasspathJar extends AbstractClasspathJar implements IClas
               }
             } else if (bfsPath.extname(p) === '.class') {
               // Cut off initial / from absolute path.
-              classlist.push(p.slice(1, p.length - 6));
+              classlist.push(this._normalizeClassEntryPath(p));
             }
           } catch (e) {
             // Ignore filesystem error and proceed.

@@ -14,6 +14,127 @@ import {setImmediate} from 'browserfs';
 const debug = logging.debug;
 const error = logging.error;
 
+function u2(value: number): Buffer {
+  var rv = Buffer.alloc(2);
+  rv.writeUInt16BE(value, 0);
+  return rv;
+}
+
+function utf8Constant(value: string): Buffer {
+  var text = Buffer.from(value, 'utf8'),
+    rv = Buffer.alloc(3 + text.length);
+  rv.writeUInt8(1, 0);
+  rv.writeUInt16BE(text.length, 1);
+  text.copy(rv, 3);
+  return rv;
+}
+
+function constantPoolEnd(data: Buffer): { count: number; offset: number } {
+  var count = data.readUInt16BE(8),
+    offset = 10;
+  for (var i = 1; i < count; i++) {
+    var tag = data.readUInt8(offset++);
+    switch (tag) {
+      case 1:
+        offset += 2 + data.readUInt16BE(offset);
+        break;
+      case 3:
+      case 4:
+      case 9:
+      case 10:
+      case 11:
+      case 12:
+      case 17:
+      case 18:
+        offset += 4;
+        break;
+      case 5:
+      case 6:
+        offset += 8;
+        i++;
+        break;
+      case 7:
+      case 8:
+      case 16:
+      case 19:
+      case 20:
+        offset += 2;
+        break;
+      case 15:
+        offset += 3;
+        break;
+      default:
+        throw new Error('Unknown constant-pool tag ' + tag);
+    }
+  }
+  return { count: count, offset: offset };
+}
+
+function skipMember(data: Buffer, offset: number): number {
+  var attributesCount: number;
+  offset += 6;
+  attributesCount = data.readUInt16BE(offset);
+  offset += 2;
+  for (var i = 0; i < attributesCount; i++) {
+    offset += 2;
+    offset += 4 + data.readUInt32BE(offset);
+  }
+  return offset;
+}
+
+function methodsInfo(data: Buffer, cpEnd: number): { countOffset: number; count: number; endOffset: number } {
+  var offset = cpEnd + 6,
+    interfacesCount = data.readUInt16BE(offset);
+  offset += 2 + interfacesCount * 2;
+
+  var fieldsCount = data.readUInt16BE(offset);
+  offset += 2;
+  for (var i = 0; i < fieldsCount; i++) {
+    offset = skipMember(data, offset);
+  }
+
+  var countOffset = offset,
+    methodsCount = data.readUInt16BE(offset);
+  offset += 2;
+  for (i = 0; i < methodsCount; i++) {
+    offset = skipMember(data, offset);
+  }
+
+  return { countOffset: countOffset, count: methodsCount, endOffset: offset };
+}
+
+function addJavaLangClassGetModule(data: Buffer): Buffer {
+  var cp = constantPoolEnd(data),
+    nameIndex = cp.count,
+    descriptorIndex = cp.count + 1,
+    extraConstants = Buffer.concat([
+      utf8Constant('getModule'),
+      utf8Constant('()Ljava/lang/Module;')
+    ]),
+    withConstants = Buffer.concat([
+      data.slice(0, 8),
+      u2(cp.count + 2),
+      data.slice(10, cp.offset),
+      extraConstants,
+      data.slice(cp.offset)
+    ]),
+    methods = methodsInfo(withConstants, cp.offset + extraConstants.length),
+    method = Buffer.concat([
+      u2(0x0101),
+      u2(nameIndex),
+      u2(descriptorIndex),
+      u2(0)
+    ]);
+
+  return Buffer.concat([
+    withConstants.slice(0, methods.countOffset),
+    u2(methods.count + 1),
+    withConstants.slice(methods.countOffset + 2, methods.endOffset),
+    method,
+    withConstants.slice(methods.endOffset)
+  ]);
+}
+
 /**
  * Used to lock classes for loading.
  */
@@ -467,12 +588,39 @@ export class BootstrapClassLoader extends ClassLoader {
       });
     }, (pItem?: IClasspathItem) => {
       if (pItem) {
+        if (typeStr === 'Ljava/lang/Class;') {
+          clsData = addJavaLangClassGetModule(clsData);
+        }
         let cls = this.defineClass(thread, typeStr, clsData, null);
         if (cls !== null) {
           this._registerLoadedClass(clsFilePath, pItem);
         }
         cb(cls);
       } else {
+        if (typeStr === 'Ljava/lang/Record;') {
+          let cls = this.defineClass(thread, typeStr, Buffer.from([
+            0xca, 0xfe, 0xba, 0xbe, 0x00, 0x00, 0x00, 0x34, 0x00, 0x0a,
+            0x07, 0x00, 0x02,
+            0x01, 0x00, 0x10, 0x6a, 0x61, 0x76, 0x61, 0x2f, 0x6c, 0x61, 0x6e, 0x67, 0x2f, 0x52, 0x65, 0x63, 0x6f, 0x72, 0x64,
+            0x07, 0x00, 0x04,
+            0x01, 0x00, 0x10, 0x6a, 0x61, 0x76, 0x61, 0x2f, 0x6c, 0x61, 0x6e, 0x67, 0x2f, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74,
+            0x01, 0x00, 0x06, 0x3c, 0x69, 0x6e, 0x69, 0x74, 0x3e,
+            0x01, 0x00, 0x03, 0x28, 0x29, 0x56,
+            0x01, 0x00, 0x04, 0x43, 0x6f, 0x64, 0x65,
+            0x0a, 0x00, 0x03, 0x00, 0x09,
+            0x0c, 0x00, 0x05, 0x00, 0x06,
+            0x04, 0x21, 0x00, 0x01, 0x00, 0x03,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+            0x00, 0x04, 0x00, 0x05, 0x00, 0x06, 0x00, 0x01,
+            0x00, 0x07, 0x00, 0x00, 0x00, 0x11,
+            0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x05,
+            0x2a, 0xb7, 0x00, 0x08, 0xb1,
+            0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00
+          ]), null);
+          cb(cls);
+          return;
+        }
         // No such class.
         debug(`Could not find class ${typeStr}`);
         this.throwClassNotFoundException(thread, typeStr, explicit);
