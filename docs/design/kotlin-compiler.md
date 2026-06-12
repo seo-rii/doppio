@@ -104,6 +104,10 @@ to `Hello.kt` backend codegen:
   missing entries, and repeated `ZipFile.open` calls for the same path and
   modification timestamp reuse the parsed `ZipFS` index. Coverage lives in
   `classes/test/ZipFileHotPaths.java`.
+- `ClassLoader.defineClass(..., byte[], offset, length, ...)` now slices
+  typed-array-backed Java byte arrays with both the view `byteOffset` and the
+  Java offset/length. Coverage lives in `classes/test/DefineClassOffset.java`
+  and prevents padding bytes from reaching the class parser.
 
 ## Fixed Blocker: Kotlin Backend Visibility
 
@@ -141,11 +145,21 @@ After the visibility fix, the compiler no longer throws
 Observed checks:
 
 - 2026-06-12 Kotlin 2.4.0 minimal `kotlin-compiler.jar` measurements under
-  `node --max-old-space-size=4096 --no-deprecation`:
+  `node --max-old-space-size=4096 --no-deprecation`, rechecked after the
+  `defineClass` byte-slicing fix:
   - `K2JVMCompiler -version`: status 0 in about 20 seconds.
   - Empty Kotlin source file: status 0 in about 50 seconds, output
     `META-INF/main.kotlin_module`.
   - `fun main() {}`: still timed out at 420 seconds with no output directory.
+  - `fun main() { println("hi") }`: still timed out at 420 seconds with no
+    output directory.
+- 2026-06-12 Kotlin 2.3.21 `kotlin-compiler.jar` smoke from the local pnpm
+  cache after the `defineClass` byte-slicing fix:
+  - `K2JVMCompiler -version`: status 0, prints `kotlinc-jvm 2.3.21`.
+  - Empty source directory: exits with `error: no source files`, matching this
+    compiler line rather than the 2.4.0 empty-source behavior above.
+  - `fun main() { println("hi") }`: still timed out at 420 seconds with no
+    output directory.
 - Before the release-return, method-signature, cold-`getOp`, and ZipFS hot-path
   reductions, the same empty source compile took about 282.8 seconds in this
   environment.

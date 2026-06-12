@@ -268,8 +268,8 @@ var supportsArrayBuffers = typeof(ArrayBuffer) !== 'undefined';
  */
 export function byteArray2Buffer(bytes: number[] | Int8Array, offset: number = 0, len: number = bytes.length): NodeBuffer {
   if (supportsArrayBuffers && ArrayBuffer.isView(bytes)) {
-    let offset = (<Int8Array> bytes).byteOffset;
-    return new Buffer(<any> (<Int8Array> bytes).buffer.slice(offset, offset + bytes.length));
+    let byteOffset = (<Int8Array> bytes).byteOffset + offset;
+    return new Buffer(<any> (<Int8Array> bytes).buffer.slice(byteOffset, byteOffset + len));
   } else {
     var buff = new Buffer(len), i: number;
     for (i = 0; i < len; i++) {
