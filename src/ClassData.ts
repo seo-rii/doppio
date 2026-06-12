@@ -1556,6 +1556,9 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
    * this class itself.
    */
   public getMirandaAndDefaultMethods(): Method[] {
+    if (this.interfaceClasses.length === 0) {
+      return [];
+    }
     var superClsMethodTable: Method[] = this.superClass !== null ? this.superClass.getVMTable() : [];
     return this.getVMTable().filter((method: Method, index: number) => method.cls !== this &&
       (index >= superClsMethodTable.length || superClsMethodTable[index] !== method));
