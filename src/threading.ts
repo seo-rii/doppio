@@ -434,11 +434,12 @@ export class BytecodeStackFrame implements IStackFrame {
   public type: StackFrameType = StackFrameType.BYTECODE;
 
   public getStackTraceFrame(): IStackTraceFrame {
+    // Stack-trace consumers only need method/pc; Throwable filtering reads locals synchronously.
     return {
       method: this.method,
       pc: this.pc,
-      stack: this.opStack.sliceFromBottom(0),
-      locals: this.locals.slice(0)
+      stack: [],
+      locals: this.locals
     };
   }
 }
