@@ -31,6 +31,7 @@ let maxMethodResumes: number = 10000,
   methodResumesLeft: number = maxMethodResumes,
   // Used for the CMA.
   numSamples: number = 1;
+const emptyStackTraceData: any[] = [];
 
 /**
  * Represents a stack frame.
@@ -441,7 +442,7 @@ export class BytecodeStackFrame implements IStackFrame {
     return {
       method: this.method,
       pc: this.pc,
-      stack: [],
+      stack: emptyStackTraceData,
       locals: this.locals
     };
   }
@@ -516,8 +517,8 @@ export class NativeStackFrame implements IStackFrame {
     return {
       method: this.method,
       pc: -1,
-      stack: [],
-      locals: []
+      stack: emptyStackTraceData,
+      locals: emptyStackTraceData
     };
   }
 
