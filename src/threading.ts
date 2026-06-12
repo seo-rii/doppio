@@ -219,6 +219,7 @@ const jitUtil = {
  */
 export class BytecodeStackFrame implements IStackFrame {
   public pc: number = 0;
+  public code: Buffer;
   public locals: any[];
   public opStack: PreAllocatedStack;
   public returnToThreadLoop: boolean = false;
@@ -237,12 +238,14 @@ export class BytecodeStackFrame implements IStackFrame {
     // @todo This should be a runtime error, since reflection can cause you to
     // try to do this.
     assert(!method.accessFlags.isAbstract(), `Cannot run abstract method ${method.getFullSignature()}`);
+    var code = method.getCodeAttribute();
+    this.code = code.getCode();
     this.locals = args;
-    this.opStack = new PreAllocatedStack(method.getCodeAttribute().getMaxStack());
+    this.opStack = new PreAllocatedStack(code.getMaxStack());
   }
 
   public run(thread: JVMThread): void {
-    var method = this.method, code = this.method.getCodeAttribute().getCode(),
+    var method = this.method, code = this.code,
       opcodeTable = LookupTable;
     if (!RELEASE && logLevel >= LogLevel.TRACE) {
       if (this.pc === 0) {
@@ -308,7 +311,7 @@ export class BytecodeStackFrame implements IStackFrame {
 
   public scheduleResume(thread: JVMThread, rv?: any, rv2?: any): void {
     // Advance to the next opcode.
-    var prevOp = this.method.getCodeAttribute().getCode()[this.pc];
+    var prevOp = this.code[this.pc];
     switch (prevOp) {
       case OpCode.INVOKEINTERFACE:
       case OpCode.INVOKEINTERFACE_FAST:

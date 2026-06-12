@@ -188,6 +188,13 @@ Observed checks:
   direct-buffer and lazy-throwable optimizations, with no output directory.
 - After removing stack-trace frame operand-stack/local-array copies,
   `fun main() {}` still exceeded 180 seconds with no output directory.
+- `class Foo` alone also exceeded 180 seconds with no output directory, and
+  a follow-up `-Xphases-to-dump-after=JvmIrValidationAfterLoweringPhase` run
+  did not produce a dump within 240 seconds. After caching bytecode buffers on
+  stack frames, `class Foo` still exceeded 120 seconds with no output directory.
+  The current reduced blocker is therefore not specific to generated
+  `main(String[])`; any source declaration that needs emitted class metadata or
+  classfile output is enough to hit the slow path.
 - `-Xphases-to-dump-before=GenerateMultifileFacades`: no dump in 90 seconds.
 - `-Xphases-to-dump-before=InterfaceLowering`: no dump in 120 seconds.
 - `-Xphases-to-dump-before=FileClassLowering`: no dump in 90 seconds.
