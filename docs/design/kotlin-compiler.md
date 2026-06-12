@@ -192,6 +192,8 @@ Observed checks:
   a follow-up `-Xphases-to-dump-after=JvmIrValidationAfterLoweringPhase` run
   did not produce a dump within 240 seconds. After caching bytecode buffers on
   stack frames, `class Foo` still exceeded 120 seconds with no output directory.
+  The same 120 second boundary also held with Doppio `-Xint` and after removing
+  the redundant JIT-threshold check from the `Method.getOp` hot path.
   The current reduced blocker is therefore not specific to generated
   `main(String[])`; any source declaration that needs emitted class metadata or
   classfile output is enough to hit the slow path.

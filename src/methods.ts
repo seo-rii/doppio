@@ -520,19 +520,17 @@ export class Method extends AbstractMethodField {
   }
 
   public getOp(pc: number, codeBuffer: Buffer, thread: JVMThread): any {
-    if (this.numBBEntries <= 0) {
-      if (!this.failedCompile[pc]) {
-        const cachedCompiledFunction = this.compiledFunctions[pc];
-        if (!cachedCompiledFunction) {
-          const compiledFunction = this.jitCompileFrom(pc, thread);
-          if (compiledFunction) {
-            return compiledFunction;
-          } else {
-            this.failedCompile[pc] = true;
-          }
+    if (!this.failedCompile[pc]) {
+      const cachedCompiledFunction = this.compiledFunctions[pc];
+      if (!cachedCompiledFunction) {
+        const compiledFunction = this.jitCompileFrom(pc, thread);
+        if (compiledFunction) {
+          return compiledFunction;
         } else {
-          return cachedCompiledFunction;
+          this.failedCompile[pc] = true;
         }
+      } else {
+        return cachedCompiledFunction;
       }
     }
     return codeBuffer[pc];
