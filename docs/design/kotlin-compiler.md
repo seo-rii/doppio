@@ -173,6 +173,10 @@ Observed checks:
   array caching in the existing checked copy loop, with primitive coverage in
   `classes/modern_test/Java17SystemArrayCopy.java` and the legacy
   `classes/test/ArrayCopyTest.java`.
+- Repeated `Throwable.fillInStackTrace` remains visible in Kotlin CPU profiles.
+  Doppio stack-trace frame capture no longer copies bytecode operand stacks or
+  locals arrays for every frame; repeated exception construction is covered by
+  `classes/modern_test/Java17ThrowableStackTraceLoop.java`.
 
 - Full `kotlinc/lib/*.jar` classpath: exceeded five minutes, CPU active, no
   class output.
@@ -182,9 +186,21 @@ Observed checks:
   `META-INF/main.kotlin_module`.
 - `fun main() {}` without `println`: exceeded ten minutes both before and after
   direct-buffer and lazy-throwable optimizations, with no output directory.
+- After removing stack-trace frame operand-stack/local-array copies,
+  `fun main() {}` still exceeded 180 seconds with no output directory.
 - `-Xphases-to-dump-before=GenerateMultifileFacades`: no dump in 90 seconds.
 - `-Xphases-to-dump-before=InterfaceLowering`: no dump in 120 seconds.
 - `-Xphases-to-dump-before=FileClassLowering`: no dump in 90 seconds.
+- `-Xdisable-phases=FileClassLowering`: reached JVM backend codegen and exited
+  with Kotlin's expected assertion that a file-level declaration should have
+  been lowered to an `IrClass` after `JvmLower`.
+- `-Xphases-to-dump-after=FileClassLowering`: produced a dump containing a
+  `MainKt` file class with the original top-level `main`.
+- `-Xphases-to-dump-after=JvmIrValidationAfterLoweringPhase`: produced the
+  final lowering dump containing `MainKt`, the original empty `main()`, and the
+  generated `main(String[])` bridge. The current boundary is therefore after
+  JVM IR lowering, in JVM bytecode generation, metadata/classfile emission, or
+  an immediately adjacent codegen helper.
 - V8 `--prof` shows broad interpreter/thread execution with noticeable
   `Throwable.fillInStackTrace`, string work, and dynamic property access rather
   than one obvious JavaScript infinite loop.
@@ -195,17 +211,18 @@ Observed checks:
   before it was stopped. The compiler is not simply stuck before backend
   codegen, but it is still far too slow or cycling before writing class files.
 
-The next reduction should instrument or smoke-test Kotlin's FIR2IR / early IR
-construction path, and should also check whether Kotlin is intentionally using
-exceptions for control flow in a path where Doppio stack-trace construction is
-too expensive.
+The next reduction should instrument or smoke-test Kotlin's JVM codegen path
+after `JvmIrValidationAfterLoweringPhase`, and should also check whether Kotlin
+is intentionally using exceptions for control flow in a path where Doppio
+stack-trace construction is too expensive.
 
 ## Implementation Plan
 
 1. Keep the repo fixture for interface default-method specificity green.
 2. Build smaller Kotlin smokes that distinguish class declaration, function
    declaration, metadata serialization, and JVM bytecode emission. The important
-   boundary is now empty source success versus any emitted declaration timeout.
+   boundary is now empty source success versus any emitted declaration timeout,
+   with the first backend focus on JVM bytecode generation after lowering.
 3. If a smoke is slow because of repeated Java exceptions, reduce the specific
    exception pattern to a Java fixture before optimizing Doppio. The generic
    lazy `Throwable` stack trace path is already covered.
