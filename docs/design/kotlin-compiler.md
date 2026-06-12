@@ -168,6 +168,11 @@ Observed checks:
   interpreter execution (`BytecodeStackFrame.run`, `Method.getOp` for hot
   methods), GC, class constructor generation, array copies, and Kotlin's
   normal zip/class loading work.
+- A typed-array bulk-copy shortcut in `System.arraycopy` was rejected during
+  Kotlin smoke testing. The retained change is only local source/destination
+  array caching in the existing checked copy loop, with primitive coverage in
+  `classes/modern_test/Java17SystemArrayCopy.java` and the legacy
+  `classes/test/ArrayCopyTest.java`.
 
 - Full `kotlinc/lib/*.jar` classpath: exceeded five minutes, CPU active, no
   class output.

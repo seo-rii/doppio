@@ -796,10 +796,12 @@ export function getLoader(thread: JVMThread, jclo: JVMTypes.java_lang_ClassLoade
  * the special case when src == dest (see code for System.arraycopy below).
  */
 export function arraycopyNoCheck(src: JVMTypes.JVMArray<any>, srcPos: number, dest: JVMTypes.JVMArray<any>, destPos: number, length: number): void {
-  var j = destPos;
-  var end = srcPos + length;
+  var srcArray = src.array,
+    destArray = dest.array,
+    j = destPos,
+    end = srcPos + length;
   for (var i = srcPos; i < end; i++) {
-    dest.array[j++] = src.array[i];
+    destArray[j++] = srcArray[i];
   }
 }
 

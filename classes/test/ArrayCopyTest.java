@@ -1,5 +1,7 @@
 package classes.test;
 
+import java.util.Arrays;
+
 class ArrayCopyTest {
 
   static void ExceptionTest(String name, Class expectedException, Object src,
@@ -97,6 +99,51 @@ class ArrayCopyTest {
       for (int i : intarray) {
         System.out.println("\t" + i);
       }
+    }
+    {
+      byte[] bytes = new byte[] { 0, -1, 2, -128, 4 };
+      byte[] byteDest = new byte[4];
+      System.arraycopy(bytes, 0, byteDest, 0, 4);
+      System.out.println("Test 'primitive byte copy':");
+      System.out.println("\t" + Arrays.toString(byteDest));
+
+      byte[] byteBackward = new byte[] { 10, 11, 12, 13 };
+      System.arraycopy(byteBackward, 0, byteBackward, 1, 3);
+      System.out.println("Test 'src=dst', byte backward:");
+      System.out.println("\t" + Arrays.toString(byteBackward));
+
+      byte[] byteForward = new byte[] { 20, 21, 22, 23 };
+      System.arraycopy(byteForward, 1, byteForward, 0, 3);
+      System.out.println("Test 'src=dst', byte forward:");
+      System.out.println("\t" + Arrays.toString(byteForward));
+    }
+    {
+      char[] chars = new char[] { 'A', 'B', 'C' };
+      char[] charDest = new char[3];
+      System.arraycopy(chars, 0, charDest, 0, 3);
+      System.out.println("Test 'primitive char copy':");
+      System.out.println("\t" + Arrays.toString(charDest));
+    }
+    {
+      short[] shorts = new short[] { 3, -4, 5 };
+      short[] shortDest = new short[3];
+      System.arraycopy(shorts, 0, shortDest, 0, 3);
+      System.out.println("Test 'primitive short copy':");
+      System.out.println("\t" + Arrays.toString(shortDest));
+    }
+    {
+      float[] floats = new float[] { 1.5f, -2.25f, 3.75f };
+      float[] floatDest = new float[3];
+      System.arraycopy(floats, 0, floatDest, 0, 3);
+      System.out.println("Test 'primitive float copy':");
+      System.out.println("\t" + Arrays.toString(floatDest));
+    }
+    {
+      double[] doubles = new double[] { 1.5, -2.25, 3.75 };
+      double[] doubleDest = new double[3];
+      System.arraycopy(doubles, 0, doubleDest, 0, 3);
+      System.out.println("Test 'primitive double copy':");
+      System.out.println("\t" + Arrays.toString(doubleDest));
     }
 
     {
