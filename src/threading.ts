@@ -474,11 +474,17 @@ export class NativeStackFrame implements IStackFrame {
    */
   public run(thread: JVMThread): void {
     trace(`\nT${thread.getRef()} D${thread.getStackTrace().length} Running ${this.method.getFullSignature()} [Native]:`);
-    var rv: any = this.nativeMethod.apply(null, this.method.convertArgs(thread, this.args));
+    var method = this.method,
+      rv: any;
+    if (method instanceof Method && !method.isSignaturePolymorphic() && method.parameterTypes.length === 0) {
+      rv = method.accessFlags.isStatic() ? this.nativeMethod(thread) : this.nativeMethod(thread, this.args[0]);
+    } else {
+      rv = this.nativeMethod.apply(null, method.convertArgs(thread, this.args));
+    }
     // Ensure thread is running, and we are the running method.
-    if (thread.getStatus() === ThreadStatus.RUNNABLE && thread.currentMethod() === this.method) {
+    if (thread.getStatus() === ThreadStatus.RUNNABLE && thread.currentMethod() === method) {
       // Normal native method exit.
-      var returnType = this.method.returnType;
+      var returnType = method.returnType;
       switch (returnType) {
         case 'J':
         case 'D':
