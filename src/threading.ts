@@ -247,8 +247,10 @@ export class BytecodeStackFrame implements IStackFrame {
 
   public run(thread: JVMThread): void {
     var method = this.method, code = this.code,
-      opcodeTable = LookupTable;
-    if (!RELEASE && logLevel >= LogLevel.TRACE) {
+      opcodeTable = LookupTable,
+      traceOpcodes = !RELEASE && logLevel === LogLevel.VTRACE,
+      traceMethod = !RELEASE && logLevel >= LogLevel.TRACE;
+    if (traceMethod) {
       if (this.pc === 0) {
         trace(`\nT${thread.getRef()} D${thread.getStackTrace().length} Running ${this.method.getFullSignature()} [Bytecode]:`);
       } else {
@@ -280,11 +282,11 @@ export class BytecodeStackFrame implements IStackFrame {
       // Interpret until we get the signal to return to the thread loop.
       while (!this.returnToThreadLoop) {
         var opCode = code[this.pc];
-        if (!RELEASE && logLevel === LogLevel.VTRACE) {
-          vtrace(`  ${this.pc} ${annotateOpcode(op, method, code, this.pc)}`);
+        if (traceOpcodes) {
+          vtrace(`  ${this.pc} ${annotateOpcode(opCode, method, code, this.pc)}`);
         }
         opcodeTable[opCode](thread, this, code);
-        if (!RELEASE && !this.returnToThreadLoop && logLevel === LogLevel.VTRACE) {
+        if (traceOpcodes && !this.returnToThreadLoop) {
           vtrace(`    S: [${debug_vars(this.opStack.getRaw())}], L: [${debug_vars(this.locals)}]`);
         }
       }
@@ -293,17 +295,17 @@ export class BytecodeStackFrame implements IStackFrame {
       while (!this.returnToThreadLoop) {
         var op = method.getOp(this.pc, code, thread);
         if (typeof op === 'function') {
-          if (!RELEASE && logLevel === LogLevel.VTRACE) {
+          if (traceOpcodes) {
             vtrace(`  ${this.pc} running JIT compiled function:\n${op.toString()}`);
           }
           op(this, thread, jitUtil);
         } else {
-          if (!RELEASE && logLevel === LogLevel.VTRACE) {
+          if (traceOpcodes) {
             vtrace(`  ${this.pc} ${annotateOpcode(op, method, code, this.pc)}`);
           }
           opcodeTable[op](thread, this, code);
         }
-        if (!RELEASE && !this.returnToThreadLoop && logLevel === LogLevel.VTRACE) {
+        if (traceOpcodes && !this.returnToThreadLoop) {
           vtrace(`    S: [${debug_vars(this.opStack.getRaw())}], L: [${debug_vars(this.locals)}]`);
         }
       }
