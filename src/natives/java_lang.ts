@@ -1323,13 +1323,9 @@ export default function (): any {
         thread.throwNewException('Ljava/lang/ArrayIndexOutOfBoundsException;', 'Tried to write to an illegal index in an array.');
       } else {
         var srcClass = src.getClass(), destClass = dest.getClass();
-        // Special case; need to copy the section of src that is being copied into a temporary array before actually doing the copy.
-        if (src === dest) {
-          src = dest.slice(srcPos, srcPos + length)
-          srcPos = 0;
-        }
         if (srcClass.isCastable(destClass)) {
-          // Fast path
+          // Fast path. arraycopyNoCheck preserves the Java overlap semantics
+          // when src and dest are the same array.
           util.arraycopyNoCheck(src, srcPos, dest, destPos, length);
         } else {
           // Slow path

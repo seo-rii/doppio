@@ -99,6 +99,12 @@ class ArrayCopyTest {
       for (int i : intarray) {
         System.out.println("\t" + i);
       }
+
+      int[] intSource = new int[] { 1, 2, 3, 4, 5 };
+      int[] intDest = new int[] { 9, 9, 9, 9, 9, 9 };
+      System.arraycopy(intSource, 1, intDest, 2, 3);
+      System.out.println("Test 'primitive int subrange copy':");
+      System.out.println("\t" + Arrays.toString(intDest));
     }
     {
       byte[] bytes = new byte[] { 0, -1, 2, -128, 4 };
@@ -144,6 +150,11 @@ class ArrayCopyTest {
       System.arraycopy(doubles, 0, doubleDest, 0, 3);
       System.out.println("Test 'primitive double copy':");
       System.out.println("\t" + Arrays.toString(doubleDest));
+
+      double[] doubleBackward = new double[] { 1.0, 2.0, 3.0, 4.0, 5.0 };
+      System.arraycopy(doubleBackward, 0, doubleBackward, 2, 3);
+      System.out.println("Test 'src=dst', double backward:");
+      System.out.println("\t" + Arrays.toString(doubleBackward));
     }
 
     {

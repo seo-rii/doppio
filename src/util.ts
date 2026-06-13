@@ -792,15 +792,36 @@ export function getLoader(thread: JVMThread, jclo: JVMTypes.java_lang_ClassLoade
  * "Fast" array copy; does not have to check every element for illegal
  * assignments. You can do tricks here (if possible) to copy chunks of the array
  * at a time rather than element-by-element.
- * This function *cannot* access any attribute other than 'array' on src due to
- * the special case when src == dest (see code for System.arraycopy below).
+ * This function preserves Java's memmove-style behavior when src == dest.
  */
 export function arraycopyNoCheck(src: JVMTypes.JVMArray<any>, srcPos: number, dest: JVMTypes.JVMArray<any>, destPos: number, length: number): void {
-  var srcArray = src.array,
-    destArray = dest.array,
-    j = destPos,
-    end = srcPos + length;
-  for (var i = srcPos; i < end; i++) {
+  var srcArray: any = src.array,
+    destArray: any = dest.array,
+    end = srcPos + length,
+    i: number;
+
+  if (length === 0 || (srcArray === destArray && srcPos === destPos)) {
+    return;
+  }
+
+  if (srcArray === destArray) {
+    if (typeof destArray.copyWithin === 'function') {
+      destArray.copyWithin(destPos, srcPos, end);
+      return;
+    }
+    if (srcPos < destPos && destPos < end) {
+      for (i = length - 1; i >= 0; i--) {
+        destArray[destPos + i] = srcArray[srcPos + i];
+      }
+      return;
+    }
+  } else if (typeof destArray.set === 'function' && typeof srcArray.subarray === 'function') {
+    destArray.set(srcArray.subarray(srcPos, end), destPos);
+    return;
+  }
+
+  var j = destPos;
+  for (i = srcPos; i < end; i++) {
     destArray[j++] = srcArray[i];
   }
 }

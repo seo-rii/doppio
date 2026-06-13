@@ -27,6 +27,10 @@ public final class Java17SystemArrayCopy {
     System.arraycopy(chars, 0, charDest, 0, 3);
     System.out.println(Arrays.toString(charDest));
 
+    char[] charBackward = new char[] { 'a', 'b', 'c', 'd' };
+    System.arraycopy(charBackward, 0, charBackward, 1, 3);
+    System.out.println(Arrays.toString(charBackward));
+
     short[] shorts = new short[] { 3, -4, 5 };
     short[] shortDest = new short[3];
     System.arraycopy(shorts, 0, shortDest, 0, 3);
@@ -36,6 +40,11 @@ public final class Java17SystemArrayCopy {
     int[] intDest = new int[3];
     System.arraycopy(ints, 0, intDest, 0, 3);
     System.out.println(Arrays.toString(intDest));
+
+    int[] intSource = new int[] { 1, 2, 3, 4, 5 };
+    int[] intSubrangeDest = new int[] { 9, 9, 9, 9, 9, 9 };
+    System.arraycopy(intSource, 1, intSubrangeDest, 2, 3);
+    System.out.println(Arrays.toString(intSubrangeDest));
 
     long[] longs = new long[] { 11L, -12L, 13L };
     long[] longDest = new long[3];
@@ -51,5 +60,9 @@ public final class Java17SystemArrayCopy {
     double[] doubleDest = new double[3];
     System.arraycopy(doubles, 0, doubleDest, 0, 3);
     System.out.println(Arrays.toString(doubleDest));
+
+    double[] doubleBackward = new double[] { 1.0, 2.0, 3.0, 4.0, 5.0 };
+    System.arraycopy(doubleBackward, 0, doubleBackward, 2, 3);
+    System.out.println(Arrays.toString(doubleBackward));
   }
 }
