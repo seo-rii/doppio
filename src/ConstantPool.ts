@@ -317,7 +317,7 @@ export class ClassReference implements IConstantPoolItem {
       var currentMethod = thread.currentMethod();
       // The stack might be empty during resolution, which occurs during JVM bootup.
       if (currentMethod !== null && this.name === currentMethod.cls.getInternalName()) {
-        this.setResolved(thread, thread.currentMethod().cls);
+        this.setResolved(thread, currentMethod.cls);
         return cb(true);
       }
     }

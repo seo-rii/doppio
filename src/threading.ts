@@ -689,11 +689,11 @@ export class JVMThread implements Thread {
    * Returns the currently running method. Returns NULL if stack is empty.
    */
   public currentMethod(): Method {
-    var stack = this.stack, idx = stack.length, method: Method;
+    var stack = this.stack, idx = stack.length, frame: IStackFrame;
     while (--idx >= 0) {
-      method = stack[idx].getStackTraceFrame().method;
-      if (method !== null) {
-        return method;
+      frame = stack[idx];
+      if (frame.type !== StackFrameType.INTERNAL) {
+        return (<BytecodeStackFrame | NativeStackFrame> frame).method;
       }
     }
     return null;
