@@ -58,6 +58,15 @@ class WeightedRoundRobinScheduler<T extends Thread> implements Scheduler<T> {
   private _queue: T[] = [];
   // Read by runThread. Used as a lock.
   private _threadScheduled: boolean = false;
+  private _runThreadCallback = () => {
+    let queue = this._queue;
+    this._threadScheduled = false;
+    if (queue.length > 0) {
+      let thread = queue[0];
+      assert(thread.getStatus() === ThreadStatus.RUNNABLE, `Attempted to run non-runnable thread.`);
+      thread.run();
+    }
+  };
 
   public scheduleThread(thread: T): void {
     this._queue.push(thread);
@@ -75,15 +84,7 @@ class WeightedRoundRobinScheduler<T extends Thread> implements Scheduler<T> {
       return;
     }
     this._threadScheduled = true;
-    setImmediate(() => {
-      let queue = this._queue;
-      this._threadScheduled = false;
-      if (queue.length > 0) {
-        let thread = this._queue[0];
-        assert(thread.getStatus() === ThreadStatus.RUNNABLE, `Attempted to run non-runnable thread.`);
-        thread.run();
-      }
-    });
+    setImmediate(this._runThreadCallback);
   }
 
   public unscheduleThread(thread: T): void {
