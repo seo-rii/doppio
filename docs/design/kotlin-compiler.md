@@ -204,7 +204,9 @@ Observed checks:
   The same 120 second boundary also held with Doppio `-Xint` and after removing
   the redundant JIT-threshold check from the `Method.getOp` hot path. Reusing
   empty stack-trace arrays and the 2026-06-13 VM return/current-method/native
-  fast paths did not move the 120 second class-only boundary.
+  fast paths did not move the 120 second class-only boundary. Guarding native
+  trace formatting and caching signature-polymorphic method checks also left
+  the 120 second class-only boundary in place.
   The current reduced blocker is therefore not specific to generated
   `main(String[])`; any source declaration that needs emitted class metadata or
   classfile output is enough to hit the slow path.

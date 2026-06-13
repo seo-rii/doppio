@@ -475,10 +475,12 @@ export class NativeStackFrame implements IStackFrame {
    * NOTE: Should only be called once.
    */
   public run(thread: JVMThread): void {
-    trace(`\nT${thread.getRef()} D${thread.getStackTrace().length} Running ${this.method.getFullSignature()} [Native]:`);
+    if (!RELEASE && logLevel >= LogLevel.TRACE) {
+      trace(`\nT${thread.getRef()} D${thread.getStackTrace().length} Running ${this.method.getFullSignature()} [Native]:`);
+    }
     var method = this.method,
       rv: any;
-    if (method instanceof Method && !method.isSignaturePolymorphic() && method.parameterTypes.length === 0) {
+    if (!method.isSignaturePolymorphicMethod && method.parameterTypes.length === 0) {
       rv = method.isStatic ? this.nativeMethod(thread) : this.nativeMethod(thread, this.args[0]);
     } else {
       rv = this.nativeMethod.apply(null, method.convertArgs(thread, this.args));

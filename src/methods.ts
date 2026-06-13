@@ -405,6 +405,7 @@ export class Method extends AbstractMethodField {
   private parameterWords: number;
   public isStatic: boolean;
   public isSynchronized: boolean;
+  public isSignaturePolymorphicMethod: boolean;
   /**
    * Code is either a function, or a CodeAttribute.
    * TODO: Differentiate between NativeMethod objects and BytecodeMethod objects.
@@ -473,6 +474,9 @@ export class Method extends AbstractMethodField {
       // jit threshold. we countdown to zero from here.
       this.numBBEntries = codeLength > 3 ? 200 : 1000 * codeLength;
     }
+    this.isSignaturePolymorphicMethod = this.cls.getInternalName() === 'Ljava/lang/invoke/MethodHandle;' &&
+      this.accessFlags.isNative() && this.accessFlags.isVarArgs() &&
+      this.rawDescriptor === '([Ljava/lang/Object;)Ljava/lang/Object;';
   }
 
   public incrBBEntries() {
@@ -834,9 +838,7 @@ if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.fullSignature}']
    * * It has the ACC_VARARGS and ACC_NATIVE flags set.
    */
   public isSignaturePolymorphic(): boolean {
-    return this.cls.getInternalName() === 'Ljava/lang/invoke/MethodHandle;' &&
-      this.accessFlags.isNative() && this.accessFlags.isVarArgs() &&
-      this.rawDescriptor === '([Ljava/lang/Object;)Ljava/lang/Object;';
+    return this.isSignaturePolymorphicMethod;
   }
 
   /**
