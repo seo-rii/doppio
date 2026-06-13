@@ -190,6 +190,7 @@ export abstract class ClassData {
    * Ljava/lang/Foo;
    */
   protected className: string;
+  private jsClassName: string = null;
   protected superClass: ReferenceClassData<JVMTypes.java_lang_Object> = null;
 
   /**
@@ -212,6 +213,13 @@ export abstract class ClassData {
    */
   public getInternalName(): string {
     return this.className;
+  }
+
+  protected getJSClassName(): string {
+    if (this.jsClassName === null) {
+      this.jsClassName = jvmName2JSName(this.className);
+    }
+    return this.jsClassName;
   }
 
   /**
@@ -698,7 +706,7 @@ export class ArrayClassData<T> extends ClassData {
   private _constructConstructor(thread: JVMThread): IJVMConstructor<JVMTypes.JVMArray<T>> {
     assert(this._constructor === null, `Tried to construct constructor twice for ${this.getExternalName()}!`);
     var outputStream = new StringOutputStream(),
-      jsClassName = jvmName2JSName(this.getInternalName());
+      jsClassName = this.getJSClassName();
       // Arguments: extendClass, cls, superCls, gLongZero, thread
     outputStream.write(`extendClass(${jsClassName}, superCls.getConstructor(thread));
   function ${jsClassName}(thread, lengths) {\n`);
@@ -1579,7 +1587,7 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
   protected _constructConstructor(thread: JVMThread): IJVMConstructor<T> {
     assert(this._constructor === null, `Attempted to construct constructor twice for class ${this.getExternalName()}!`);
 
-    var jsClassName = jvmName2JSName(this.getInternalName()),
+    var jsClassName = this.getJSClassName(),
       outputStream = new StringOutputStream();
 
     // Expects args: extendClass, cls, InternalStackFrame, NativeStackFrame, BytecodeStackFrame, gLongZero, ClassLoader, Monitor, thread
