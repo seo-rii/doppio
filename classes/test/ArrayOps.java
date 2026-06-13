@@ -33,6 +33,9 @@ public class ArrayOps {
     Object[][] arrarr = new Object[1][];
     if (arrarr[0] != null)
       System.out.println(arrarr[0]);
+    int[][] intarrarr = new int[1][];
+    System.out.println("primitive nested null: " + (intarrarr[0] == null));
+    System.out.println("primitive nested value: " + String.valueOf(intarrarr[0]));
 
     // all kinds of array loads
     long[] larr = new long[3];
