@@ -479,11 +479,51 @@ export class NativeStackFrame implements IStackFrame {
       trace(`\nT${thread.getRef()} D${thread.getStackTrace().length} Running ${this.method.getFullSignature()} [Native]:`);
     }
     var method = this.method,
+      args = this.args,
+      parameterCount = method.parameterTypes.length,
       rv: any;
-    if (!method.isSignaturePolymorphicMethod && method.parameterTypes.length === 0) {
-      rv = method.isStatic ? this.nativeMethod(thread) : this.nativeMethod(thread, this.args[0]);
+    if (!method.isSignaturePolymorphicMethod && parameterCount === 0) {
+      rv = method.isStatic ? this.nativeMethod(thread) : this.nativeMethod(thread, args[0]);
+    } else if (!method.isSignaturePolymorphicMethod && method.hasWideParameters === false) {
+      if (method.isStatic) {
+        switch (parameterCount) {
+          case 1:
+            rv = this.nativeMethod(thread, args[0]);
+            break;
+          case 2:
+            rv = this.nativeMethod(thread, args[0], args[1]);
+            break;
+          case 3:
+            rv = this.nativeMethod(thread, args[0], args[1], args[2]);
+            break;
+          case 4:
+            rv = this.nativeMethod(thread, args[0], args[1], args[2], args[3]);
+            break;
+          default:
+            rv = this.nativeMethod.apply(null, method.convertArgs(thread, args));
+            break;
+        }
+      } else {
+        switch (parameterCount) {
+          case 1:
+            rv = this.nativeMethod(thread, args[0], args[1]);
+            break;
+          case 2:
+            rv = this.nativeMethod(thread, args[0], args[1], args[2]);
+            break;
+          case 3:
+            rv = this.nativeMethod(thread, args[0], args[1], args[2], args[3]);
+            break;
+          case 4:
+            rv = this.nativeMethod(thread, args[0], args[1], args[2], args[3], args[4]);
+            break;
+          default:
+            rv = this.nativeMethod.apply(null, method.convertArgs(thread, args));
+            break;
+        }
+      }
     } else {
-      rv = this.nativeMethod.apply(null, method.convertArgs(thread, this.args));
+      rv = this.nativeMethod.apply(null, method.convertArgs(thread, args));
     }
     // Ensure thread is running, and we are the running method.
     if (thread.getStatus() === ThreadStatus.RUNNABLE && thread.currentMethod() === method) {

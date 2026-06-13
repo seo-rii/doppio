@@ -414,6 +414,7 @@ export class Method extends AbstractMethodField {
   public isStatic: boolean;
   public isSynchronized: boolean;
   public isNative: boolean;
+  public hasWideParameters: boolean;
   public isSignaturePolymorphicMethod: boolean;
   private escapedSignature: string;
   private escapedFullSignature: string;
@@ -447,12 +448,14 @@ export class Method extends AbstractMethodField {
     this.returnType = parsedDescriptor.pop();
     this.parameterTypes = parsedDescriptor;
     this.parameterWords = parsedDescriptor.length;
+    this.hasWideParameters = false;
 
     // Double count doubles / longs.
     for (i = 0; i < this.parameterTypes.length; i++) {
       p = this.parameterTypes[i];
       if (p === 'D' || p === 'J') {
         this.parameterWords++;
+        this.hasWideParameters = true;
       }
     }
 
