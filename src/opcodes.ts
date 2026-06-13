@@ -1595,8 +1595,10 @@ export class Opcodes {
 
   public static invokenonvirtual_fast(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
-    var methodReference = <MethodReference | InterfaceMethodReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1)),
-      opStack = frame.opStack, paramSize = methodReference.paramWordSize,
+    var method = frame.method,
+      methodReference = <MethodReference | InterfaceMethodReference> method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1)),
+      opStack = frame.opStack,
+      paramSize = methodReference.paramWordSize,
       obj: JVMTypes.java_lang_Object = opStack.fromTop(paramSize);
 
     if (!isNull(thread, frame, obj)) {
@@ -1610,8 +1612,10 @@ export class Opcodes {
 
   public static invokestatic_fast(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
-    var methodReference = <MethodReference | InterfaceMethodReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1)),
-      opStack = frame.opStack, paramSize = methodReference.paramWordSize,
+    var method = frame.method,
+      methodReference = <MethodReference | InterfaceMethodReference> method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1)),
+      opStack = frame.opStack,
+      paramSize = methodReference.paramWordSize,
       args = paramSize > 0 ? opStack.sliceAndDropFromTop(paramSize) : emptyArgs;
     assert(methodReference.jsConstructor != null, "jsConstructor is missing?!");
     assert(typeof(methodReference.jsConstructor[methodReference.fullSignature]) === 'function', "Resolved method isn't defined?!");
@@ -1621,7 +1625,8 @@ export class Opcodes {
 
   public static invokevirtual_fast(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
-    var methodReference = <MethodReference | InterfaceMethodReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1)),
+    var method = frame.method,
+      methodReference = <MethodReference | InterfaceMethodReference> method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1)),
       count = methodReference.paramWordSize,
       opStack = frame.opStack,
       obj: JVMTypes.java_lang_Object = opStack.fromTop(count);

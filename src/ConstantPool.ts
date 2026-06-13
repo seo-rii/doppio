@@ -6686,6 +6686,10 @@ export class ConstantPool {
     return this.constantPool[idx];
   }
 
+  public getUnchecked(idx: number): IConstantPoolItem {
+    return this.constantPool[idx];
+  }
+
   public each(fn: (idx: number, item: IConstantPoolItem) => void): void {
     this.constantPool.forEach((item: IConstantPoolItem, idx: number) => {
       if (item !== undefined) {
