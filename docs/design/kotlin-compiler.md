@@ -210,7 +210,8 @@ Observed checks:
   during method-table resolution did not change the boundary. Caching
   field/method code-generation metadata also left the 120 second class-only
   boundary in place. Direct native calls for short non-wide argument lists
-  likewise did not move the boundary.
+  likewise did not move the boundary. Avoiding `Array.slice()` for short
+  operand-stack argument copies did not move the boundary.
   The current reduced blocker is therefore not specific to generated
   `main(String[])`; any source declaration that needs emitted class metadata or
   classfile output is enough to hit the slow path.

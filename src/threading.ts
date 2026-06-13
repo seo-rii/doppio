@@ -183,7 +183,22 @@ export class PreAllocatedStack {
   }
 
   sliceFromTop(n: number): any {
-    return this.store.slice(this.curr - n, this.curr);
+    const store = this.store;
+    const curr = this.curr;
+    switch (n) {
+      case 0:
+        return [];
+      case 1:
+        return [store[curr - 1]];
+      case 2:
+        return [store[curr - 2], store[curr - 1]];
+      case 3:
+        return [store[curr - 3], store[curr - 2], store[curr - 1]];
+      case 4:
+        return [store[curr - 4], store[curr - 3], store[curr - 2], store[curr - 1]];
+      default:
+        return store.slice(curr - n, curr);
+    }
   }
 
   dropFromTop(n: number) {
@@ -191,9 +206,23 @@ export class PreAllocatedStack {
   }
 
   sliceAndDropFromTop(n: number): any {
+    const store = this.store;
     const curr = this.curr;
     this.curr -= n;
-    return this.store.slice(curr - n, curr);
+    switch (n) {
+      case 0:
+        return [];
+      case 1:
+        return [store[curr - 1]];
+      case 2:
+        return [store[curr - 2], store[curr - 1]];
+      case 3:
+        return [store[curr - 3], store[curr - 2], store[curr - 1]];
+      case 4:
+        return [store[curr - 4], store[curr - 3], store[curr - 2], store[curr - 1]];
+      default:
+        return store.slice(curr - n, curr);
+    }
   }
 
   getRaw(): any[] {
