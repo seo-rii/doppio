@@ -213,7 +213,8 @@ Observed checks:
   likewise did not move the boundary. Avoiding `Array.slice()` for short
   operand-stack argument copies did not move the boundary. Precomputing native
   call fast-path selection on `Method` objects likewise kept the same 120 second
-  class-only timeout.
+  class-only timeout. Caching bytecode frame code buffers and max-stack metadata
+  on `Method` objects also left the 120 second class-only boundary unchanged.
   The current reduced blocker is therefore not specific to generated
   `main(String[])`; any source declaration that needs emitted class metadata or
   classfile output is enough to hit the slow path.

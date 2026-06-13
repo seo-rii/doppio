@@ -431,6 +431,8 @@ export class Method extends AbstractMethodField {
   public hasWideParameters: boolean;
   public isSignaturePolymorphicMethod: boolean;
   public nativeCallKind: NativeCallKind = NativeCallKind.Converted;
+  public codeBuffer: Buffer = null;
+  public maxStack: number = 0;
   private escapedSignature: string;
   private escapedFullSignature: string;
   private escapedClassInternalName: string;
@@ -502,7 +504,9 @@ export class Method extends AbstractMethodField {
       }
     } else if (!this.accessFlags.isAbstract()) {
       this.code = this.getAttribute('Code');
-      const codeLength = this.code.code.length;
+      this.codeBuffer = this.code.getCode();
+      this.maxStack = this.code.getMaxStack();
+      const codeLength = this.codeBuffer.length;
       this.compiledFunctions = new Array(codeLength);
       this.failedCompile = new Uint8Array(codeLength);
 

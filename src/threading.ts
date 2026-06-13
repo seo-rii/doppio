@@ -268,10 +268,9 @@ export class BytecodeStackFrame implements IStackFrame {
     // @todo This should be a runtime error, since reflection can cause you to
     // try to do this.
     assert(!method.accessFlags.isAbstract(), `Cannot run abstract method ${method.getFullSignature()}`);
-    var code = method.getCodeAttribute();
-    this.code = code.getCode();
+    this.code = method.codeBuffer;
     this.locals = args;
-    this.opStack = new PreAllocatedStack(code.getMaxStack());
+    this.opStack = new PreAllocatedStack(method.maxStack);
   }
 
   public run(thread: JVMThread): void {
