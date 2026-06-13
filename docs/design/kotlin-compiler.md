@@ -177,6 +177,15 @@ Observed checks:
   Doppio stack-trace frame capture no longer copies bytecode operand stacks or
   locals arrays for every frame; repeated exception construction is covered by
   `classes/modern_test/Java17ThrowableStackTraceLoop.java`.
+- 2026-06-13 follow-up reductions removed more VM overhead from the Kotlin
+  class-only path: true no-argument native calls bypass `convertArgs/apply`,
+  `JVMThread.currentMethod()` no longer allocates stack-trace frame objects, and
+  `asyncReturn()` skips the redundant `setStatus(RUNNABLE)` call when already
+  runnable. All three changes pass `test-modern-java` locally and in CI, but
+  `class Foo` still times out at the 120 second boundary with no output
+  directory. The latest profile still points at broad bytecode/thread
+  execution, `Method.getOp`, invoke opcodes, `ClassData._constructConstructor`,
+  GC, and array copies rather than a completed classfile write.
 
 - Full `kotlinc/lib/*.jar` classpath: exceeded five minutes, CPU active, no
   class output.
@@ -194,7 +203,8 @@ Observed checks:
   stack frames, `class Foo` still exceeded 120 seconds with no output directory.
   The same 120 second boundary also held with Doppio `-Xint` and after removing
   the redundant JIT-threshold check from the `Method.getOp` hot path. Reusing
-  empty stack-trace arrays did not move the 120 second class-only boundary.
+  empty stack-trace arrays and the 2026-06-13 VM return/current-method/native
+  fast paths did not move the 120 second class-only boundary.
   The current reduced blocker is therefore not specific to generated
   `main(String[])`; any source declaration that needs emitted class metadata or
   classfile output is enough to hit the slow path.
