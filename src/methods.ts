@@ -958,8 +958,9 @@ if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.fullSignature}']
    * TODO: Move lock logic and such into this function! And other specialization.
    * TODO: Signature polymorphic functions...?
    */
-  public outputJavaScriptFunction(jsConsName: string, outStream: StringOutputStream, nonVirtualOnly: boolean = false): void {
-    var i: number;
+  public outputJavaScriptFunction(jsConsName: string, outStream: StringOutputStream, nonVirtualOnly: boolean = false, methodExpression?: string): void {
+    var i: number,
+      methodExpr = methodExpression || `cls.getSpecificMethod("${this.escapedClassInternalName}", "${this.escapedSignature}")`;
     if (this.isStatic) {
       outStream.write(`${jsConsName}["${this.escapedFullSignature}"] = ${jsConsName}["${this.escapedSignature}"] = `);
     } else {
@@ -998,7 +999,7 @@ if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.fullSignature}']
       thread.setStatus(${ThreadStatus.RUNNABLE});
     }
   };
-})(cls.getSpecificMethod("${this.escapedClassInternalName}", "${this.escapedSignature}"));\n`);
+})(${methodExpr});\n`);
   }
 }
 

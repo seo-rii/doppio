@@ -1604,7 +1604,10 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     assert(this._constructor === null, `Attempted to construct constructor twice for class ${this.getExternalName()}!`);
 
     var jsClassName = this.getJSClassName(),
-      outputStream = new StringOutputStream();
+      outputStream = new StringOutputStream(),
+      methods = this.getMethods(),
+      mirandaAndDefaultMethods = this.getMirandaAndDefaultMethods(),
+      uninheritedDefaultMethods = this.getUninheritedDefaultMethods();
 
     // Expects args: extendClass, cls, InternalStackFrame, NativeStackFrame, BytecodeStackFrame, gLongZero, ClassLoader, Monitor, thread
     outputStream.write(`if (cls.superClass !== null) {
@@ -1626,13 +1629,13 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     this._staticFields.forEach((f: Field) => f.outputJavaScriptField(jsClassName, outputStream));
 
     // Static and instance methods.
-    this.getMethods().forEach((m: Method) => m.outputJavaScriptFunction(jsClassName, outputStream));
+    methods.forEach((m: Method, index: number) => m.outputJavaScriptFunction(jsClassName, outputStream, false, `methods[${index}]`));
 
     // Miranda and default interface methods.
-    this.getMirandaAndDefaultMethods().forEach((m: Method) => m.outputJavaScriptFunction(jsClassName, outputStream));
+    mirandaAndDefaultMethods.forEach((m: Method, index: number) => m.outputJavaScriptFunction(jsClassName, outputStream, false, `mirandaAndDefaultMethods[${index}]`));
 
     // Uninherited default methods.
-    this.getUninheritedDefaultMethods().forEach((m: Method) => m.outputJavaScriptFunction(jsClassName, outputStream, true));
+    uninheritedDefaultMethods.forEach((m: Method, index: number) => m.outputJavaScriptFunction(jsClassName, outputStream, true, `uninheritedDefaultMethods[${index}]`));
 
     outputStream.write(`  return ${jsClassName};`);
 
@@ -1641,8 +1644,8 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     if (!RELEASE && thread !== null && thread.getJVM().shouldDumpCompiledCode()) {
       thread.getJVM().dumpObjectDefinition(this, evalText);
     }
-    const fcn = new Function("extendClass", "cls", "InternalStackFrame", "NativeStackFrame", "BytecodeStackFrame", "gLongZero", "CustomClassLoader", "Monitor", "thread", "getRef", "util", evalText);
-    return fcn(extendClass, this, InternalStackFrame, NativeStackFrame, BytecodeStackFrame, gLong.ZERO, CustomClassLoader, Monitor, thread, getRef, util);
+    const fcn = new Function("extendClass", "cls", "InternalStackFrame", "NativeStackFrame", "BytecodeStackFrame", "gLongZero", "CustomClassLoader", "Monitor", "thread", "getRef", "util", "methods", "mirandaAndDefaultMethods", "uninheritedDefaultMethods", evalText);
+    return fcn(extendClass, this, InternalStackFrame, NativeStackFrame, BytecodeStackFrame, gLong.ZERO, CustomClassLoader, Monitor, thread, getRef, util, methods, mirandaAndDefaultMethods, uninheritedDefaultMethods);
   }
 
   public getConstructor(thread: JVMThread): IJVMConstructor<T> {
