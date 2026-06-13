@@ -215,10 +215,18 @@ export class Field extends AbstractMethodField {
    * (e.g. java/lang/String/value).
    */
   public fullName: string;
+  public isStatic: boolean;
+  private escapedFullName: string;
+  private escapedName: string;
+  private defaultFieldValue: string;
 
   constructor(cls: ReferenceClassData<JVMTypes.java_lang_Object>, constantPool: ConstantPool, slot: number, byteStream: ByteStream) {
     super(cls, constantPool, slot, byteStream);
     this.fullName = `${descriptor2typestr(cls.getInternalName())}/${this.name}`;
+    this.isStatic = this.accessFlags.isStatic();
+    this.escapedFullName = reescapeJVMName(this.fullName);
+    this.escapedName = reescapeJVMName(this.name);
+    this.defaultFieldValue = this.getDefaultFieldValue();
   }
 
   /**
@@ -267,10 +275,10 @@ export class Field extends AbstractMethodField {
    * Outputs a JavaScript field assignment for this field.
    */
   public outputJavaScriptField(jsConsName: string, outputStream: StringOutputStream): void {
-    if (this.accessFlags.isStatic()) {
-      outputStream.write(`${jsConsName}["${reescapeJVMName(this.fullName)}"] = cls._getInitialStaticFieldValue(thread, "${reescapeJVMName(this.name)}");\n`);
+    if (this.isStatic) {
+      outputStream.write(`${jsConsName}["${this.escapedFullName}"] = cls._getInitialStaticFieldValue(thread, "${this.escapedName}");\n`);
     } else {
-      outputStream.write(`this["${reescapeJVMName(this.fullName)}"] = ${this.getDefaultFieldValue()};\n`);
+      outputStream.write(`this["${this.escapedFullName}"] = ${this.defaultFieldValue};\n`);
     }
   }
 }
@@ -405,7 +413,11 @@ export class Method extends AbstractMethodField {
   private parameterWords: number;
   public isStatic: boolean;
   public isSynchronized: boolean;
+  public isNative: boolean;
   public isSignaturePolymorphicMethod: boolean;
+  private escapedSignature: string;
+  private escapedFullSignature: string;
+  private escapedClassInternalName: string;
   /**
    * Code is either a function, or a CodeAttribute.
    * TODO: Differentiate between NativeMethod objects and BytecodeMethod objects.
@@ -423,11 +435,15 @@ export class Method extends AbstractMethodField {
   constructor(cls: ReferenceClassData<JVMTypes.java_lang_Object>, constantPool: ConstantPool, slot: number, byteStream: ByteStream) {
     super(cls, constantPool, slot, byteStream);
     var parsedDescriptor = getTypes(this.rawDescriptor), i: number,
-      p: string;
+      p: string,
+      trappedMethod: Function;
     this.isStatic = this.accessFlags.isStatic();
     this.isSynchronized = this.accessFlags.isSynchronized();
     this.signature = this.name + this.rawDescriptor;
     this.fullSignature = `${descriptor2typestr(this.cls.getInternalName())}/${this.signature}`;
+    this.escapedSignature = reescapeJVMName(this.signature);
+    this.escapedFullSignature = reescapeJVMName(this.fullSignature);
+    this.escapedClassInternalName = reescapeJVMName(this.cls.getInternalName());
     this.returnType = parsedDescriptor.pop();
     this.parameterTypes = parsedDescriptor;
     this.parameterWords = parsedDescriptor.length;
@@ -442,8 +458,9 @@ export class Method extends AbstractMethodField {
 
     // Initialize 'code' property.
     var clsName = this.cls.getInternalName();
-    if (getTrappedMethod(clsName, this.signature) !== null) {
-      this.code = getTrappedMethod(clsName, this.signature);
+    trappedMethod = getTrappedMethod(clsName, this.signature);
+    if (trappedMethod !== null) {
+      this.code = trappedMethod;
       this.accessFlags.setNative(true);
     } else if (this.accessFlags.isNative()) {
       if (this.signature.indexOf('registerNatives()V', 0) < 0 && this.signature.indexOf('initIDs()V', 0) < 0) {
@@ -474,8 +491,9 @@ export class Method extends AbstractMethodField {
       // jit threshold. we countdown to zero from here.
       this.numBBEntries = codeLength > 3 ? 200 : 1000 * codeLength;
     }
+    this.isNative = this.accessFlags.isNative();
     this.isSignaturePolymorphicMethod = this.cls.getInternalName() === 'Ljava/lang/invoke/MethodHandle;' &&
-      this.accessFlags.isNative() && this.accessFlags.isVarArgs() &&
+      this.isNative && this.accessFlags.isVarArgs() &&
       this.rawDescriptor === '([Ljava/lang/Object;)Ljava/lang/Object;';
   }
 
@@ -491,7 +509,7 @@ export class Method extends AbstractMethodField {
    * type.
    */
   public isDefault(): boolean {
-    return (this.accessFlags.isPublic() && !this.accessFlags.isAbstract() && !this.accessFlags.isStatic() && this.cls.accessFlags.isInterface());
+    return (this.accessFlags.isPublic() && !this.accessFlags.isAbstract() && !this.isStatic && this.cls.accessFlags.isInterface());
   }
 
   public getFullSignature(): string {
@@ -678,7 +696,7 @@ if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.fullSignature}']
   }
 
   public getNativeFunction(): Function {
-    assert(this.accessFlags.isNative() && typeof (this.code) === 'function');
+    assert(this.isNative && typeof (this.code) === 'function');
     return this.code;
   }
 
@@ -692,7 +710,7 @@ if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.fullSignature}']
       code: Code = this.code,
       exceptionAttribute = <Exceptions> this.getAttribute("Exceptions");
     // Exception handler types.
-    if (!this.accessFlags.isNative() && !this.accessFlags.isAbstract() && code.exceptionHandlers.length > 0) {
+    if (!this.isNative && !this.accessFlags.isAbstract() && code.exceptionHandlers.length > 0) {
       toResolve.push('Ljava/lang/Throwable;'); // Mimic native Java (in case <any> is the only handler).
       // Filter out the <any> handlers.
       toResolve = toResolve.concat(code.exceptionHandlers.filter((handler) => handler.catchType !== '<any>').map((handler) => handler.catchType));
@@ -803,7 +821,7 @@ if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.fullSignature}']
       return params;
     }
     var convertedArgs = [thread], argIdx = 0, i: number;
-    if (!this.accessFlags.isStatic()) {
+    if (!this.isStatic) {
       convertedArgs.push(params[0]);
       argIdx = 1;
     }
@@ -850,17 +868,17 @@ if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.fullSignature}']
     var outStream = new StringOutputStream(),
       virtualDispatch = !(refKind === MethodHandleReferenceKind.INVOKESTATIC || refKind === MethodHandleReferenceKind.INVOKESPECIAL);
     // Args: thread, cls, util
-    if (this.accessFlags.isStatic()) {
+    if (this.isStatic) {
       assert(!virtualDispatch, "Can't have static virtual dispatch.");
       outStream.write(`var jsCons = cls.getConstructor(thread);\n`);
     }
     outStream.write(`function bridgeMethod(thread, descriptor, args, cb) {\n`);
-    if (!this.accessFlags.isStatic()) {
+    if (!this.isStatic) {
       outStream.write(`  var obj = args.shift();\n`);
       outStream.write(`  if (obj === null) { return thread.throwNewException('Ljava/lang/NullPointerException;', ''); }\n`);
-      outStream.write(`  obj["${reescapeJVMName(virtualDispatch ? this.signature : this.fullSignature)}"](thread, `);
+      outStream.write(`  obj["${virtualDispatch ? this.escapedSignature : this.escapedFullSignature}"](thread, `);
     } else {
-      outStream.write(`  jsCons["${reescapeJVMName(this.fullSignature)}"](thread, `);
+      outStream.write(`  jsCons["${this.escapedFullSignature}"](thread, `);
     }
     // TODO: Is it ever appropriate to box arguments for varargs functions? It appears not.
     outStream.write(`args`);
@@ -882,13 +900,13 @@ if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.fullSignature}']
    */
   public outputJavaScriptFunction(jsConsName: string, outStream: StringOutputStream, nonVirtualOnly: boolean = false): void {
     var i: number;
-    if (this.accessFlags.isStatic()) {
-      outStream.write(`${jsConsName}["${reescapeJVMName(this.fullSignature)}"] = ${jsConsName}["${reescapeJVMName(this.signature)}"] = `);
+    if (this.isStatic) {
+      outStream.write(`${jsConsName}["${this.escapedFullSignature}"] = ${jsConsName}["${this.escapedSignature}"] = `);
     } else {
       if (!nonVirtualOnly) {
-        outStream.write(`${jsConsName}.prototype["${reescapeJVMName(this.signature)}"] = `);
+        outStream.write(`${jsConsName}.prototype["${this.escapedSignature}"] = `);
       }
-      outStream.write(`${jsConsName}.prototype["${reescapeJVMName(this.fullSignature)}"] = `);
+      outStream.write(`${jsConsName}.prototype["${this.escapedFullSignature}"] = `);
     }
     // cb check is boilerplate, required for natives calling into JVM land.
     outStream.write(`(function(method) {
@@ -896,8 +914,8 @@ if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.fullSignature}']
     if (typeof cb === 'function') {
       thread.stack.push(new InternalStackFrame(cb));
     }
-    thread.stack.push(new ${this.accessFlags.isNative() ? "NativeStackFrame" : "BytecodeStackFrame"}(method, `);
-    if (!this.accessFlags.isStatic()) {
+    thread.stack.push(new ${this.isNative ? "NativeStackFrame" : "BytecodeStackFrame"}(method, `);
+    if (!this.isStatic) {
       // Non-static functions need to add the implicit 'this' variable to the
       // local variables.
       outStream.write(`[this`);
@@ -920,7 +938,7 @@ if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.fullSignature}']
       thread.setStatus(${ThreadStatus.RUNNABLE});
     }
   };
-})(cls.getSpecificMethod("${reescapeJVMName(this.cls.getInternalName())}", "${reescapeJVMName(this.signature)}"));\n`);
+})(cls.getSpecificMethod("${this.escapedClassInternalName}", "${this.escapedSignature}"));\n`);
   }
 }
 

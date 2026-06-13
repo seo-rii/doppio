@@ -948,7 +948,7 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
    * be able to differentiate between static and non-static behavior!
    */
   public getVMIndexForField(f: Field): number {
-    if (f.accessFlags.isStatic()) {
+    if (f.isStatic) {
       assert(f.cls === this, "Looks like we actually need to support static field lookups!");
       return this._staticFields.indexOf(f);
     } else {
@@ -1074,7 +1074,7 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
       Object.keys(iface._methodLookup).forEach((ifaceMethodSig: string) => {
         var ifaceM = iface._methodLookup[ifaceMethodSig];
         if (this._methodLookup[ifaceMethodSig] === undefined) {
-          if (!ifaceM.accessFlags.isStatic()) {
+          if (!ifaceM.isStatic) {
             // New vmindex.
             this._vmTable.push(ifaceM);
           }
@@ -1115,7 +1115,7 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     this.interfaceClasses.forEach((iface: ReferenceClassData<JVMTypes.java_lang_Object>) => {
       Object.keys(iface._fieldLookup).forEach((ifaceFieldName: string) => {
         var ifaceF = iface._fieldLookup[ifaceFieldName];
-        assert(ifaceF.accessFlags.isStatic(), "Interface fields must be static.");
+        assert(ifaceF.isStatic, "Interface fields must be static.");
         this._fieldLookup[ifaceFieldName] = ifaceF;
       });
     });
@@ -1123,7 +1123,7 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     // My fields override all other fields.
     this.fields.forEach((f: Field) => {
       this._fieldLookup[f.name] = f;
-      if (f.accessFlags.isStatic()) {
+      if (f.isStatic) {
         this._staticFields.push(f);
       } else {
         this._objectFields.push(f);

@@ -207,7 +207,9 @@ Observed checks:
   fast paths did not move the 120 second class-only boundary. Guarding native
   trace formatting and caching signature-polymorphic method checks also left
   the 120 second class-only boundary in place. Using cached static-method flags
-  during method-table resolution did not change the boundary.
+  during method-table resolution did not change the boundary. Caching
+  field/method code-generation metadata also left the 120 second class-only
+  boundary in place.
   The current reduced blocker is therefore not specific to generated
   `main(String[])`; any source declaration that needs emitted class metadata or
   classfile output is enough to hit the slow path.
