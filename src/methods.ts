@@ -403,6 +403,8 @@ export class Method extends AbstractMethodField {
    * Does not include the "this" argument to non-static functions.
    */
   private parameterWords: number;
+  public isStatic: boolean;
+  public isSynchronized: boolean;
   /**
    * Code is either a function, or a CodeAttribute.
    * TODO: Differentiate between NativeMethod objects and BytecodeMethod objects.
@@ -421,6 +423,8 @@ export class Method extends AbstractMethodField {
     super(cls, constantPool, slot, byteStream);
     var parsedDescriptor = getTypes(this.rawDescriptor), i: number,
       p: string;
+    this.isStatic = this.accessFlags.isStatic();
+    this.isSynchronized = this.accessFlags.isSynchronized();
     this.signature = this.name + this.rawDescriptor;
     this.fullSignature = `${descriptor2typestr(this.cls.getInternalName())}/${this.signature}`;
     this.returnType = parsedDescriptor.pop();
@@ -811,7 +815,7 @@ if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.fullSignature}']
    * Lock this particular method.
    */
   public methodLock(thread: JVMThread, frame: BytecodeStackFrame): Monitor {
-    if (this.accessFlags.isStatic()) {
+    if (this.isStatic) {
       // Static methods lock the class.
       return this.cls.getClassObject(thread).getMonitor();
     } else {

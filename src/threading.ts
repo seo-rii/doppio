@@ -257,7 +257,7 @@ export class BytecodeStackFrame implements IStackFrame {
       vtrace(`  S: [${debug_vars(this.opStack.getRaw())}], L: [${debug_vars(this.locals)}]`);
     }
 
-    if (method.accessFlags.isSynchronized() && !this.lockedMethodLock) {
+    if (method.isSynchronized && !this.lockedMethodLock) {
       // We are starting a synchronized method! These must implicitly enter
       // their respective locks.
       this.lockedMethodLock = method.methodLock(thread, this).enter(thread, () => {
@@ -418,7 +418,7 @@ export class BytecodeStackFrame implements IStackFrame {
       // abrupt method invocation completion
       debug(`${method.getFullSignature()}: Did not catch ${e.getClass().getInternalName()}.`);
       // STEP 3: Synchronized method? Exit from the method's monitor.
-      if (method.accessFlags.isSynchronized()) {
+      if (method.isSynchronized) {
         method.methodLock(thread, this).exit(thread);
       }
       return false;
@@ -477,7 +477,7 @@ export class NativeStackFrame implements IStackFrame {
     var method = this.method,
       rv: any;
     if (method instanceof Method && !method.isSignaturePolymorphic() && method.parameterTypes.length === 0) {
-      rv = method.accessFlags.isStatic() ? this.nativeMethod(thread) : this.nativeMethod(thread, this.args[0]);
+      rv = method.isStatic ? this.nativeMethod(thread) : this.nativeMethod(thread, this.args[0]);
     } else {
       rv = this.nativeMethod.apply(null, method.convertArgs(thread, this.args));
     }

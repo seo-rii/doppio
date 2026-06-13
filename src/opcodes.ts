@@ -1223,7 +1223,7 @@ export class Opcodes {
 
   public static return(thread: JVMThread, frame: BytecodeStackFrame) {
     frame.returnToThreadLoop = true;
-    if (frame.method.accessFlags.isSynchronized()) {
+    if (frame.method.isSynchronized) {
       // monitorexit
       if (!frame.method.methodLock(thread, frame).exit(thread)) {
         // monitorexit threw an exception.
@@ -1237,7 +1237,7 @@ export class Opcodes {
 
   private static _return_32(thread: JVMThread, frame: BytecodeStackFrame) {
     frame.returnToThreadLoop = true;
-    if (frame.method.accessFlags.isSynchronized()) {
+    if (frame.method.isSynchronized) {
       // monitorexit
       if (!frame.method.methodLock(thread, frame).exit(thread)) {
         // monitorexit threw an exception.
@@ -1255,7 +1255,7 @@ export class Opcodes {
 
   private static _return_64(thread: JVMThread, frame: BytecodeStackFrame) {
     frame.returnToThreadLoop = true;
-    if (frame.method.accessFlags.isSynchronized()) {
+    if (frame.method.isSynchronized) {
       // monitorexit
       if (!frame.method.methodLock(thread, frame).exit(thread)) {
         // monitorexit threw an exception.
