@@ -415,7 +415,7 @@ export class Method extends AbstractMethodField {
   public numBBEntries = 0;
 
   private compiledFunctions: Function[] = [];
-  private failedCompile: boolean[] = [];
+  private failedCompile: Uint8Array = null;
 
   constructor(cls: ReferenceClassData<JVMTypes.java_lang_Object>, constantPool: ConstantPool, slot: number, byteStream: ByteStream) {
     super(cls, constantPool, slot, byteStream);
@@ -463,6 +463,8 @@ export class Method extends AbstractMethodField {
     } else if (!this.accessFlags.isAbstract()) {
       this.code = this.getAttribute('Code');
       const codeLength = this.code.code.length;
+      this.compiledFunctions = new Array(codeLength);
+      this.failedCompile = new Uint8Array(codeLength);
 
       // jit threshold. we countdown to zero from here.
       this.numBBEntries = codeLength > 3 ? 200 : 1000 * codeLength;
@@ -527,7 +529,7 @@ export class Method extends AbstractMethodField {
         if (compiledFunction) {
           return compiledFunction;
         } else {
-          this.failedCompile[pc] = true;
+          this.failedCompile[pc] = 1;
         }
       } else {
         return cachedCompiledFunction;
@@ -627,27 +629,27 @@ if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.fullSignature}']
         }
         trace.addOp(i, jitInfo);
         if (jitInfo.hasBranch) {
-          this.failedCompile[i] = true;
+          this.failedCompile[i] = 1;
           closeCurrentTrace();
         }
       } else if (op === OpCode.INVOKESTATIC_FAST && trace !== null) {
         const invokeJitInfo: JitInfo = this.makeInvokeStaticJitInfo(code, i);
         trace.addOp(i, invokeJitInfo);
 
-        this.failedCompile[i] = true;
+        this.failedCompile[i] = 1;
         closeCurrentTrace();
 
       } else if (((op === OpCode.INVOKEVIRTUAL_FAST) || (op === OpCode.INVOKEINTERFACE_FAST)) && trace !== null) {
         const invokeJitInfo: JitInfo = this.makeInvokeVirtualJitInfo(code, i);
         trace.addOp(i, invokeJitInfo);
 
-        this.failedCompile[i] = true;
+        this.failedCompile[i] = 1;
         closeCurrentTrace();
       } else if ((op === OpCode.INVOKENONVIRTUAL_FAST) && trace !== null) {
         const invokeJitInfo: JitInfo = this.makeInvokeNonVirtualJitInfo(code, i);
         trace.addOp(i, invokeJitInfo);
 
-        this.failedCompile[i] = true;
+        this.failedCompile[i] = 1;
         closeCurrentTrace();
       } else {
         if (!RELEASE) {
@@ -655,7 +657,7 @@ if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.fullSignature}']
             statTraceCloser[op]++;
           }
         }
-        this.failedCompile[i] = true;
+        this.failedCompile[i] = 1;
         if (trace) {
           trace.emitEndPC(i);
         }
