@@ -1054,7 +1054,7 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     // My methods override my super class'.
     this.methods.forEach((m: Method) => {
       var superM = this._methodLookup[m.signature];
-      if (!m.accessFlags.isStatic() && m.name !== "<init>") {
+      if (!m.isStatic && m.name !== "<init>") {
         // Only non-static non-constructor methods are placed into the virtual
         // method table.
         if (superM === undefined) {
