@@ -1107,7 +1107,9 @@ export class JVMThread implements Thread {
     }
 
     // Thread state transition.
-    this.setStatus(ThreadStatus.RUNNABLE);
+    if (this.status !== ThreadStatus.RUNNABLE) {
+      this.setStatus(ThreadStatus.RUNNABLE);
+    }
   }
 
   /**
