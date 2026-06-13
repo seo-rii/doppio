@@ -914,7 +914,9 @@ if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.fullSignature}']
       }
     }
     outStream.write(`));
-    thread.setStatus(${ThreadStatus.RUNNABLE});
+    if (thread.status !== ${ThreadStatus.RUNNABLE}) {
+      thread.setStatus(${ThreadStatus.RUNNABLE});
+    }
   };
 })(cls.getSpecificMethod("${reescapeJVMName(this.cls.getInternalName())}", "${reescapeJVMName(this.signature)}"));\n`);
   }
