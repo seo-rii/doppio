@@ -1083,13 +1083,15 @@ export class JVMThread implements Thread {
   public asyncReturn(rv: gLong, rv2: any): void;
   public asyncReturn(rv?: any, rv2?: any): void {
     var stack = this.stack;
-    assert(this.status === ThreadStatus.RUNNABLE || this.status === ThreadStatus.ASYNC_WAITING);
-    assert(typeof (rv) !== 'boolean' && rv2 == null);
+    if (!RELEASE) {
+      assert(this.status === ThreadStatus.RUNNABLE || this.status === ThreadStatus.ASYNC_WAITING);
+      assert(typeof (rv) !== 'boolean' && rv2 == null);
+    }
     // Pop off the current method.
     var frame = stack.pop();
-    if (frame.type != StackFrameType.INTERNAL) {
-      var frameCast = <BytecodeStackFrame> frame;
-      if (!RELEASE) {
+    if (!RELEASE) {
+      if (frame.type !== StackFrameType.INTERNAL) {
+        var frameCast = <BytecodeStackFrame> frame;
         if (logLevel >= LogLevel.TRACE) {
           if (frame.type === StackFrameType.BYTECODE) {
             // This line will be preceded by a line that prints the method, so can be short n' sweet.
