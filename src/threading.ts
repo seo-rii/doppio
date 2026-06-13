@@ -1,6 +1,6 @@
 import {ClassData, IJVMConstructor, ReferenceClassData} from './ClassData';
 import {ClassLoader, BootstrapClassLoader} from './ClassLoader';
-import {Method} from './methods';
+import {Method, NativeCallKind} from './methods';
 import {ThreadStatus, StackFrameType, OpCode, Constants, JVMTIThreadState, OpcodeLayoutType, ConstantPoolItemType, OpcodeLayouts} from './enums';
 import assert from './assert';
 import gLong from './gLong';
@@ -509,50 +509,41 @@ export class NativeStackFrame implements IStackFrame {
     }
     var method = this.method,
       args = this.args,
-      parameterCount = method.parameterTypes.length,
       rv: any;
-    if (!method.isSignaturePolymorphicMethod && parameterCount === 0) {
-      rv = method.isStatic ? this.nativeMethod(thread) : this.nativeMethod(thread, args[0]);
-    } else if (!method.isSignaturePolymorphicMethod && method.hasWideParameters === false) {
-      if (method.isStatic) {
-        switch (parameterCount) {
-          case 1:
-            rv = this.nativeMethod(thread, args[0]);
-            break;
-          case 2:
-            rv = this.nativeMethod(thread, args[0], args[1]);
-            break;
-          case 3:
-            rv = this.nativeMethod(thread, args[0], args[1], args[2]);
-            break;
-          case 4:
-            rv = this.nativeMethod(thread, args[0], args[1], args[2], args[3]);
-            break;
-          default:
-            rv = this.nativeMethod.apply(null, method.convertArgs(thread, args));
-            break;
-        }
-      } else {
-        switch (parameterCount) {
-          case 1:
-            rv = this.nativeMethod(thread, args[0], args[1]);
-            break;
-          case 2:
-            rv = this.nativeMethod(thread, args[0], args[1], args[2]);
-            break;
-          case 3:
-            rv = this.nativeMethod(thread, args[0], args[1], args[2], args[3]);
-            break;
-          case 4:
-            rv = this.nativeMethod(thread, args[0], args[1], args[2], args[3], args[4]);
-            break;
-          default:
-            rv = this.nativeMethod.apply(null, method.convertArgs(thread, args));
-            break;
-        }
-      }
-    } else {
-      rv = this.nativeMethod.apply(null, method.convertArgs(thread, args));
+    switch (method.nativeCallKind) {
+      case NativeCallKind.Static0:
+        rv = this.nativeMethod(thread);
+        break;
+      case NativeCallKind.Instance0:
+        rv = this.nativeMethod(thread, args[0]);
+        break;
+      case NativeCallKind.Static1:
+        rv = this.nativeMethod(thread, args[0]);
+        break;
+      case NativeCallKind.Static2:
+        rv = this.nativeMethod(thread, args[0], args[1]);
+        break;
+      case NativeCallKind.Static3:
+        rv = this.nativeMethod(thread, args[0], args[1], args[2]);
+        break;
+      case NativeCallKind.Static4:
+        rv = this.nativeMethod(thread, args[0], args[1], args[2], args[3]);
+        break;
+      case NativeCallKind.Instance1:
+        rv = this.nativeMethod(thread, args[0], args[1]);
+        break;
+      case NativeCallKind.Instance2:
+        rv = this.nativeMethod(thread, args[0], args[1], args[2]);
+        break;
+      case NativeCallKind.Instance3:
+        rv = this.nativeMethod(thread, args[0], args[1], args[2], args[3]);
+        break;
+      case NativeCallKind.Instance4:
+        rv = this.nativeMethod(thread, args[0], args[1], args[2], args[3], args[4]);
+        break;
+      default:
+        rv = this.nativeMethod.apply(null, method.convertArgs(thread, args));
+        break;
     }
     // Ensure thread is running, and we are the running method.
     if (thread.getStatus() === ThreadStatus.RUNNABLE && thread.currentMethod() === method) {

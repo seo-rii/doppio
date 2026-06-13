@@ -16,6 +16,20 @@ import {JitInfo, opJitInfo} from './jit';
 declare var RELEASE: boolean;
 if (typeof RELEASE === 'undefined') global.RELEASE = false;
 
+export const enum NativeCallKind {
+  Converted = 0,
+  Static0,
+  Instance0,
+  Static1,
+  Static2,
+  Static3,
+  Static4,
+  Instance1,
+  Instance2,
+  Instance3,
+  Instance4
+}
+
 function checkByteBufferBulkArgs(thread: JVMThread, javaThis: JVMTypes.java_nio_ByteBuffer, bytes: JVMTypes.JVMArray<number>, offset: number, length: number, overflowException: string): boolean {
   if (bytes === null) {
     thread.throwNewException('Ljava/lang/NullPointerException;', '');
@@ -416,6 +430,7 @@ export class Method extends AbstractMethodField {
   public isNative: boolean;
   public hasWideParameters: boolean;
   public isSignaturePolymorphicMethod: boolean;
+  public nativeCallKind: NativeCallKind = NativeCallKind.Converted;
   private escapedSignature: string;
   private escapedFullSignature: string;
   private escapedClassInternalName: string;
@@ -498,6 +513,44 @@ export class Method extends AbstractMethodField {
     this.isSignaturePolymorphicMethod = this.cls.getInternalName() === 'Ljava/lang/invoke/MethodHandle;' &&
       this.isNative && this.accessFlags.isVarArgs() &&
       this.rawDescriptor === '([Ljava/lang/Object;)Ljava/lang/Object;';
+    if (this.isNative && !this.isSignaturePolymorphicMethod) {
+      const parameterCount = this.parameterTypes.length;
+      if (parameterCount === 0) {
+        this.nativeCallKind = this.isStatic ? NativeCallKind.Static0 : NativeCallKind.Instance0;
+      } else if (!this.hasWideParameters) {
+        if (this.isStatic) {
+          switch (parameterCount) {
+            case 1:
+              this.nativeCallKind = NativeCallKind.Static1;
+              break;
+            case 2:
+              this.nativeCallKind = NativeCallKind.Static2;
+              break;
+            case 3:
+              this.nativeCallKind = NativeCallKind.Static3;
+              break;
+            case 4:
+              this.nativeCallKind = NativeCallKind.Static4;
+              break;
+          }
+        } else {
+          switch (parameterCount) {
+            case 1:
+              this.nativeCallKind = NativeCallKind.Instance1;
+              break;
+            case 2:
+              this.nativeCallKind = NativeCallKind.Instance2;
+              break;
+            case 3:
+              this.nativeCallKind = NativeCallKind.Instance3;
+              break;
+            case 4:
+              this.nativeCallKind = NativeCallKind.Instance4;
+              break;
+          }
+        }
+      }
+    }
   }
 
   public incrBBEntries() {
