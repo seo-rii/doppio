@@ -1304,7 +1304,7 @@ export class Opcodes {
    */
   public static getstatic_fast32(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
-    var fieldInfo = <FieldReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1));
+    var fieldInfo = <FieldReference> frame.method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1));
     frame.opStack.push(fieldInfo.fieldOwnerConstructor[fieldInfo.fullFieldName]);
     frame.pc += 3;
   }
@@ -1317,7 +1317,7 @@ export class Opcodes {
    */
   public static getstatic_fast64(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
-    var fieldInfo = <FieldReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1));
+    var fieldInfo = <FieldReference> frame.method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1));
     frame.opStack.pushWithNull(fieldInfo.fieldOwnerConstructor[fieldInfo.fullFieldName]);
     frame.pc += 3;
   }
@@ -1359,7 +1359,7 @@ export class Opcodes {
    */
   public static putstatic_fast32(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
-    var fieldInfo = <FieldReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1));
+    var fieldInfo = <FieldReference> frame.method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1));
     fieldInfo.fieldOwnerConstructor[fieldInfo.fullFieldName] = frame.opStack.pop();
     frame.pc += 3;
   }
@@ -1372,7 +1372,7 @@ export class Opcodes {
    */
   public static putstatic_fast64(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
-    var fieldInfo = <FieldReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1));
+    var fieldInfo = <FieldReference> frame.method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1));
     fieldInfo.fieldOwnerConstructor[fieldInfo.fullFieldName] = frame.opStack.pop2();
     frame.pc += 3;
   }
@@ -1405,7 +1405,7 @@ export class Opcodes {
 
   public static getfield_fast32(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
-    var fieldInfo = <FieldReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1)),
+    var fieldInfo = <FieldReference> frame.method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1)),
       opStack = frame.opStack, obj: JVMTypes.java_lang_Object = opStack.pop();
     if (!isNull(thread, frame, obj)) {
       opStack.push((<any> obj)[fieldInfo.fullFieldName]);
@@ -1415,7 +1415,7 @@ export class Opcodes {
 
   public static getfield_fast64(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
-    var fieldInfo = <FieldReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1)),
+    var fieldInfo = <FieldReference> frame.method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1)),
       opStack = frame.opStack, obj: JVMTypes.java_lang_Object = opStack.pop();
     if (!isNull(thread, frame, obj)) {
       opStack.pushWithNull((<any> obj)[fieldInfo.fullFieldName]);
@@ -1458,7 +1458,7 @@ export class Opcodes {
     var opStack = frame.opStack,
       val = opStack.pop(),
       obj: JVMTypes.java_lang_Object = opStack.pop(),
-      fieldInfo = <FieldReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1));
+      fieldInfo = <FieldReference> frame.method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1));
 
     if (!isNull(thread, frame, obj)) {
       (<any> obj)[fieldInfo.fullFieldName] = val;
@@ -1472,7 +1472,7 @@ export class Opcodes {
     var opStack = frame.opStack,
       val = opStack.pop2(),
       obj: JVMTypes.java_lang_Object = opStack.pop(),
-      fieldInfo = <FieldReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1));
+      fieldInfo = <FieldReference> frame.method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1));
 
     if (!isNull(thread, frame, obj)) {
       (<any> obj)[fieldInfo.fullFieldName] = val;
@@ -1644,7 +1644,7 @@ export class Opcodes {
 
   public static invokedynamic_fast(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
-    var callSiteSpecifier = <InvokeDynamic> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1)),
+    var callSiteSpecifier = <InvokeDynamic> frame.method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1)),
       cso = callSiteSpecifier.getCallSiteObject(pc),
       appendix = cso[1],
       fcn = cso[0].vmtarget,
@@ -1673,7 +1673,7 @@ export class Opcodes {
    */
   public static invokehandle(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
-    var methodReference = <MethodReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1)),
+    var methodReference = <MethodReference> frame.method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1)),
       opStack = frame.opStack,
       fcn = methodReference.memberName.vmtarget,
       // Add in 1 for the method handle itself.
@@ -1703,7 +1703,7 @@ export class Opcodes {
    */
   public static invokebasic(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
-    var methodReference = <MethodReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1)),
+    var methodReference = <MethodReference> frame.method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1)),
       paramSize = methodReference.getParamWordSize(),
       opStack = frame.opStack,
       obj: JVMTypes.java_lang_invoke_MethodHandle = opStack.fromTop(paramSize),
@@ -1732,7 +1732,7 @@ export class Opcodes {
    */
   public static linktospecial(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
-    var methodReference = <MethodReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1)),
+    var methodReference = <MethodReference> frame.method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1)),
       opStack = frame.opStack, paramSize = methodReference.paramWordSize,
       // Final argument is the relevant MemberName. Function args are right
       // before it.
@@ -1754,7 +1754,7 @@ export class Opcodes {
   // XXX: Varargs functions. We're supposed to box args if target is varargs.
   public static linktovirtual(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
-    var methodReference = <MethodReference | InterfaceMethodReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1)),
+    var methodReference = <MethodReference | InterfaceMethodReference> frame.method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1)),
       paramSize = methodReference.paramWordSize,
       opStack = frame.opStack,
       args = opStack.sliceFromTop(paramSize),
@@ -1794,7 +1794,7 @@ export class Opcodes {
 
   public static new_fast(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
-    var classRef = <ClassReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1));
+    var classRef = <ClassReference> frame.method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1));
     frame.opStack.push(new classRef.clsConstructor(thread));
     frame.pc += 3;
   }
@@ -1830,7 +1830,7 @@ export class Opcodes {
   public static anewarray_fast(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
     var opStack = frame.opStack,
-      classRef = <ClassReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1)),
+      classRef = <ClassReference> frame.method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1)),
       length = opStack.pop();
 
     if (length >= 0) {
@@ -1872,7 +1872,7 @@ export class Opcodes {
 
   public static checkcast_fast(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
-    var classRef = <ClassReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1)),
+    var classRef = <ClassReference> frame.method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1)),
       cls = classRef.cls,
       opStack = frame.opStack,
       o: JVMTypes.java_lang_Object = opStack.top();
@@ -1906,7 +1906,7 @@ export class Opcodes {
 
   public static instanceof_fast(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
-    var classRef = <ClassReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1)),
+    var classRef = <ClassReference> frame.method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1)),
       cls = classRef.cls,
       opStack = frame.opStack,
       o = <JVMTypes.java_lang_Object> opStack.pop();
@@ -1955,7 +1955,7 @@ export class Opcodes {
 
   public static multianewarray_fast(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
-    var classRef = <ClassReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1)),
+    var classRef = <ClassReference> frame.method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1)),
       opStack = frame.opStack,
       dim = code[pc + 3],
       i: number,
