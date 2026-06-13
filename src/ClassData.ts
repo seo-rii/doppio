@@ -511,6 +511,7 @@ export class ArrayClassData<T> extends ClassData {
   private componentClassName: string;
   private componentClass: ClassData;
   private _constructor: IJVMConstructor<JVMTypes.JVMArray<T>> = null;
+  private jsArrayConstructor: string = null;
 
   constructor(componentType: string, loader: ClassLoader) {
     super(loader);
@@ -624,25 +625,38 @@ export class ArrayClassData<T> extends ClassData {
    * Uses typed arrays when available for primitive arrays.
    */
   private getJSArrayConstructor(): string {
+    if (this.jsArrayConstructor !== null) {
+      return this.jsArrayConstructor;
+    }
+
     if (!typedArraysSupported) {
-      return 'Array';
+      this.jsArrayConstructor = 'Array';
+      return this.jsArrayConstructor;
     }
     switch (this.componentClassName) {
       case 'B':
-        return 'Int8Array';
+        this.jsArrayConstructor = 'Int8Array';
+        break;
       case 'C':
-        return 'Uint16Array';
+        this.jsArrayConstructor = 'Uint16Array';
+        break;
       case 'S':
-        return 'Int16Array';
+        this.jsArrayConstructor = 'Int16Array';
+        break;
       case 'I':
-        return 'Int32Array';
+        this.jsArrayConstructor = 'Int32Array';
+        break;
       case 'F':
-        return 'Float32Array';
+        this.jsArrayConstructor = 'Float32Array';
+        break;
       case 'D':
-        return 'Float64Array';
+        this.jsArrayConstructor = 'Float64Array';
+        break;
       default:
-        return 'Array';
+        this.jsArrayConstructor = 'Array';
+        break;
     }
+    return this.jsArrayConstructor;
   }
 
   /**
@@ -706,34 +720,36 @@ export class ArrayClassData<T> extends ClassData {
   private _constructConstructor(thread: JVMThread): IJVMConstructor<JVMTypes.JVMArray<T>> {
     assert(this._constructor === null, `Tried to construct constructor twice for ${this.getExternalName()}!`);
     var outputStream = new StringOutputStream(),
-      jsClassName = this.getJSClassName();
-      // Arguments: extendClass, cls, superCls, gLongZero, thread
+      jsClassName = this.getJSClassName(),
+      jsArrCons = this.getJSArrayConstructor(),
+      defaultElement = this.getJSDefaultArrayElement();
+    // Arguments: extendClass, cls, superCls, gLongZero, thread
     outputStream.write(`extendClass(${jsClassName}, superCls.getConstructor(thread));
   function ${jsClassName}(thread, lengths) {\n`);
     this.superClass.outputInjectedFields(outputStream);
     // Initialize array.
     if (this.componentClassName[0] !== '[') {
       // Array elements are a non-array type.
-      outputStream.write(`    this.array = new ${this.getJSArrayConstructor()}(lengths);\n`)
-      if (this.getJSArrayConstructor() === 'Array') {
+      outputStream.write(`    this.array = new ${jsArrCons}(lengths);\n`)
+      if (jsArrCons === 'Array') {
         // TypedArrays are already initialized to 0, so this check skips array
         // initialization in that case.
         outputStream.write(`    for (var i = 0; i < lengths; i++) {
-      this.array[i] = ${this.getJSDefaultArrayElement()};
+      this.array[i] = ${defaultElement};
     }\n`)
       }
     } else {
       // Multi-dimensional array.
       outputStream.write(`    if (typeof lengths === 'number') {
-        this.array = new ${this.getJSArrayConstructor()}(lengths);
-        for (var i = 0; i < length; i++) {
+        this.array = new ${jsArrCons}(lengths);
+        for (var i = 0; i < lengths; i++) {
           this.array[i] = null;
         }
       } else {
         var length = lengths[0], otherLengths = lengths.length > 2 ? lengths.slice(1) : lengths[1];
-        this.array = new ${this.getJSArrayConstructor()}(length);
+        this.array = new ${jsArrCons}(length);
         for (var i = 0; i < length; i++) {
-          this.array[i] = ${this.getJSDefaultArrayElement()};
+          this.array[i] = ${defaultElement};
         }
       }\n`)
     }
