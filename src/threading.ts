@@ -278,7 +278,7 @@ export class BytecodeStackFrame implements IStackFrame {
     // from the previous time this method was run, and is meaningless.
     this.returnToThreadLoop = false;
 
-    if (thread.getJVM().isJITDisabled() || method.numBBEntries > 0) {
+    if (thread.jitDisabled || method.numBBEntries > 0) {
       // Interpret until we get the signal to return to the thread loop.
       while (!this.returnToThreadLoop) {
         var opCode = code[this.pc];
@@ -633,12 +633,14 @@ export class JVMThread implements Thread {
   private tpool: ThreadPool<JVMThread>;
   private jvmThreadObj: JVMTypes.java_lang_Thread;
   private jvm: JVM;
+  public jitDisabled: boolean;
 
   /**
    * Initializes a new JVM thread. Starts the thread in the NEW state.
    */
   constructor(jvm: JVM, tpool: ThreadPool<JVMThread>, threadObj: JVMTypes.java_lang_Thread) {
     this.jvm = jvm;
+    this.jitDisabled = jvm.isJITDisabled();
     this.bsCl = jvm.getBootstrapClassLoader();
     this.tpool = tpool;
     this.jvmThreadObj = threadObj;
