@@ -53,7 +53,47 @@ function advanceByteBufferPosition(javaThis: JVMTypes.java_nio_ByteBuffer, posit
   }
 }
 
+function kotlinParameterIsNullMessage(thread: JVMThread, paramName: JVMTypes.java_lang_String): string {
+  var trace = thread.getStackTrace(),
+    param = paramName !== null ? paramName.toString() : "null";
+  for (var i = trace.length - 1; i >= 0; i--) {
+    var method = trace[i].method;
+    if (method.cls.getInternalName() !== 'Lkotlin/jvm/internal/Intrinsics;') {
+      return `Parameter specified as non-null is null: method ${method.cls.getExternalName()}.${method.name}, parameter ${param}`;
+    }
+  }
+  return `Parameter specified as non-null is null: parameter ${param}`;
+}
+
+function kotlinCheckNotNullParameter(thread: JVMThread, value: JVMTypes.java_lang_Object, paramName: JVMTypes.java_lang_String): void {
+  if (value === null) {
+    thread.throwNewException('Ljava/lang/NullPointerException;', kotlinParameterIsNullMessage(thread, paramName));
+  }
+}
+
+function kotlinCheckParameterIsNotNull(thread: JVMThread, value: JVMTypes.java_lang_Object, paramName: JVMTypes.java_lang_String): void {
+  if (value === null) {
+    thread.throwNewException('Ljava/lang/IllegalArgumentException;', kotlinParameterIsNullMessage(thread, paramName));
+  }
+}
+
+function kotlinCheckNotNull(thread: JVMThread, value: JVMTypes.java_lang_Object, message: JVMTypes.java_lang_String): void {
+  if (value === null) {
+    thread.throwNewException('Ljava/lang/NullPointerException;', message !== null ? message.toString() : null);
+  }
+}
+
 var trapped_methods: { [clsName: string]: { [methodName: string]: Function } } = {
+  'kotlin/jvm/internal/Intrinsics': {
+    'checkNotNull(Ljava/lang/Object;)V': function(thread: JVMThread, value: JVMTypes.java_lang_Object): void {
+      if (value === null) {
+        thread.throwNewException('Ljava/lang/NullPointerException;', '');
+      }
+    },
+    'checkNotNull(Ljava/lang/Object;Ljava/lang/String;)V': kotlinCheckNotNull,
+    'checkParameterIsNotNull(Ljava/lang/Object;Ljava/lang/String;)V': kotlinCheckParameterIsNotNull,
+    'checkNotNullParameter(Ljava/lang/Object;Ljava/lang/String;)V': kotlinCheckNotNullParameter
+  },
   'java/lang/ref/Reference': {
     // NOP, because we don't do our own GC and also this starts a thread?!?!?!
     '<clinit>()V': function (thread: JVMThread): void { }

@@ -399,7 +399,7 @@ export function setup(grunt: IGrunt) {
       default: {
         files: [{
           expand: true,
-          src: ['classes/+(awt|demo|test|util)/*.java', 'classes/doppio/**/*.java'],
+          src: ['classes/+(awt|demo|test|util)/*.java', 'kotlin/jvm/internal/*.java', 'classes/doppio/**/*.java'],
           ext: '.class'
         }]
       },
@@ -769,7 +769,7 @@ export function setup(grunt: IGrunt) {
   grunt.loadTasks('tasks');
 
   grunt.registerMultiTask('launcher', 'Creates a launcher for the given CLI release.', function() {
-    var launcherPath: string, exePath: string, options = this.options();
+    var launcherPath: string, exePath: string, task = <any> this, options = task.options();
     launcherPath = options.dest;
     exePath = options.src;
 
@@ -1103,7 +1103,7 @@ export function setup(grunt: IGrunt) {
       'connect:server',
       'karma:dev']);
   grunt.registerTask('clean', 'Deletes built files.', function() {
-    ['includes', 'dist', 'build', 'doppio', 'doppio-dev'].concat(grunt.file.expand(['tscommand*.txt'])).concat(grunt.file.expand(['classes/*/*.+(class|runout)'])).forEach(function (path: string) {
+    ['includes', 'dist', 'build', 'doppio', 'doppio-dev'].concat(grunt.file.expand(['tscommand*.txt'])).concat(grunt.file.expand(['classes/*/*.+(class|runout)', 'kotlin/**/*.class'])).forEach(function (path: string) {
       if (grunt.file.exists(path)) {
         grunt.file.delete(path);
       }

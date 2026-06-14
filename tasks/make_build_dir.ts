@@ -4,25 +4,26 @@ import async = require('async');
 /**
  * Handles setting up a new build folder for arbitrary builds.
  * - Creates directory.
- * - Symlinks in 'classes' and 'vendor'.
+ * - Symlinks in 'classes', 'vendor', and test helper roots.
  */
 function makeBuildDir(grunt: IGrunt) {
 	grunt.registerTask('make_build_dir', 'Creates the build directory, if not present.', function(target: string) {
-    var targetPath = path.resolve(this.options().base, target);
+    var task = <any> this,
+        targetPath = path.resolve(task.options().base, target);
     try {
       if (!fs.existsSync(targetPath)) {
         grunt.file.mkdir(targetPath);
         grunt.log.ok("Created build folder: " + targetPath);
       }
       let asyncPairs: string[][] = [];
-      [['classes', path.resolve(targetPath, 'classes')], ['vendor', path.resolve(targetPath, 'vendor')]].forEach((pair) => {
+      [['classes', path.resolve(targetPath, 'classes')], ['vendor', path.resolve(targetPath, 'vendor')], ['kotlin', path.resolve(targetPath, 'kotlin')]].forEach((pair) => {
         if (!symlink(grunt, pair[0], pair[1])) {
           asyncPairs.push(pair);
         }
       });
 
       if (asyncPairs.length > 0) {
-        let done = this.async();
+        let done = task.async();
         async.eachSeries(asyncPairs, (pair: string[], done: (err?: Error) => void) => {
           copy(grunt, pair[0], pair[1], done);
         }, done);
