@@ -136,6 +136,7 @@ test -f "$out_dir/ModernConstructSmokeKt.class"
 test -f "$out_dir/MetadataLevel.class"
 test -f "$out_dir/MultiTag.class"
 test -f "$out_dir/MultiTag\$Container.class"
+test -f "$out_dir/NioPathSmokeKt.class"
 test -f "$out_dir/MutableBinding.class"
 test -f "$out_dir/MutableDelegateOwner.class"
 test -f "$out_dir/MutableDelegateSmokeKt.class"
@@ -189,6 +190,8 @@ default_expected_output="${default_expected_output}
 0:a:2:0-2,1:bb:25:5-9,2:c:457:12-16|A:1; BB:32; C:654; bad=x|first b=2|a|bb|c|0:5:a,1:6:b,2:5:g|KT/42|true|KOTin"
 default_expected_output="${default_expected_output}
 0:5:a,1:4:b,2:5:g|aaa|input.txt:17,nested/out.txt:17|616c706861|txt/out/nested/out.txt|true/true"
+default_expected_output="${default_expected_output}
+0:5:d,1:7:e,2:4:z|64656c74|input.txt:false,nested:true|input.txt:19,nested/moved.txt:19|input.txt/runtime-nio/nested/moved.txt|true/true/true"
 expected_output="${KOTLIN_SMOKE_EXPECTED_OUTPUT:-"$default_expected_output"}"
 
 native_output="$(java -cp "$runtime_cp" HelloKt)"

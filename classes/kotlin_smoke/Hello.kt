@@ -34,4 +34,5 @@ fun main() {
   println(resultExceptionSummary())
   println(textRegexSummary())
   println(fileIoSummary())
+  println(nioPathSummary())
 }

@@ -420,6 +420,14 @@ Current verified checks:
   `getInvariantSeparatorsPath`, `readBytes`, `CloseableKt.closeFinally`,
   `LambdaMetafactory` bootstrap methods for Kotlin lambdas, `StackMapTable`,
   and `kotlin.Metadata`.
+- A minimal NIO path smoke compiled with the repo suite in 384 seconds and
+  both the host JVM and Doppio printed
+  `0:5:d,1:7:e,2:4:z|64656c74|input.txt:false,nested:true|input.txt:19,nested/moved.txt:19|input.txt/runtime-nio/nested/moved.txt|true/true/true`.
+  `javap` verified `Paths.get`, `Files.exists`, `createDirectories`, `write`,
+  `readAllLines`, `readAllBytes`, `copy`, `move`, `list`, `walk`,
+  `isDirectory`, `isRegularFile`, `size`, and `isSameFile`, explicit stream
+  close paths in `finally` blocks, `LambdaMetafactory` bootstrap methods for
+  Kotlin lambdas, `StackMapTable`, and `kotlin.Metadata`.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering
