@@ -17,4 +17,5 @@ fun main() {
   println(reifiedArraySummary())
   println(annotationReflectionSummary())
   println(modernConstructSummary())
+  println(defaultSyntheticSummary())
 }

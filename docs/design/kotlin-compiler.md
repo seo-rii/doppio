@@ -277,6 +277,14 @@ Current verified checks:
   `invokedynamic`, sealed interface exhaustiveness, `data object` singleton
   behavior, Kotlin 1.9 `Enum.entries`/`EnumEntries`, property-reference
   classes, and class-literal lookup.
+- A minimal default-synthetic smoke compiled in 76 seconds and both the host
+  JVM and Doppio printed
+  `p-box:6!:p-wide:6?:[CORE]:cfg23ab:p-box:6!|p-named:6!|p-full:9!:p-r:3!|q-r:3!|q-r:3?`.
+  The repo smoke now includes the same path and completed in 214 seconds with
+  the full classpath. It covers default-argument `$default` dispatch,
+  `@JvmOverloads` constructors and methods observed through Java reflection,
+  interface `DefaultImpls`, data-class `copy$default`, and
+  `kotlin.jvm.internal.DefaultConstructorMarker` constructor lowering.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering
