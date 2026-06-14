@@ -238,6 +238,13 @@ Current verified checks:
   suspended continuation resumes, and the test drains the queue between each
   step to verify that the generated coroutine state machine preserves locals
   across multiple dispatched suspension points.
+- A minimal callable-reference and lazy-sequence smoke compiled in 175 seconds
+  and both the host JVM and Doppio printed `a2|b7|c4|d9:20:8:7:10`. The repo
+  smoke now includes the same path and completed in 234 seconds with the full
+  classpath. It covers top-level, bound instance, unbound instance,
+  constructor, and companion-object callable references combined with
+  `generateSequence`, `map`, `filter`, `flatMap`, `zip`, `joinToString`, and
+  `fold`.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering

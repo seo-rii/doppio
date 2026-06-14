@@ -12,4 +12,5 @@ fun main() {
   println(threadedStateSummary())
   println(executorStateSummary())
   println(dispatchedStateSummary())
+  println(referenceSequenceSummary())
 }

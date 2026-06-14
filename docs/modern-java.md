@@ -91,8 +91,9 @@ run.
   continuation resumption, a custom `ContinuationInterceptor` event loop with
   multiple queued suspension resumes, `try`/`catch`/`finally`, `Closeable.use`,
   destructuring, range loops, stepped `downTo` loops, `mapIndexed`, and
-  `synchronized`, then runs the generated code on both the host JVM and Doppio
-  with
+  `synchronized`, plus top-level, bound, unbound, constructor, and companion
+  callable references used through lazy `Sequence` pipelines, then runs the
+  generated code on both the host JVM and Doppio with
   `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only
