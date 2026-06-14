@@ -4,6 +4,9 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.startCoroutine
 import kotlin.coroutines.suspendCoroutine
 
+private var delayedContinuation: Continuation<Int>? = null
+private var failingContinuation: Continuation<Int>? = null
+
 suspend fun suspendValue(seed: Int): Int = seed + 2
 
 fun suspendSummary(): String {
@@ -37,4 +40,60 @@ fun stateMachineSummary(): String {
     }
   })
   return outcome
+}
+
+suspend fun delayedStateValue(seed: Int): Int {
+  val resumed = suspendCoroutine<Int> { continuation ->
+    delayedContinuation = continuation
+  }
+  return resumed + seed
+}
+
+fun delayedStateSummary(): String {
+  var outcome = "pending"
+  val block: suspend () -> Int = { delayedStateValue(10) }
+  block.startCoroutine(object : Continuation<Int> {
+    override val context = EmptyCoroutineContext
+
+    override fun resumeWith(result: Result<Int>) {
+      outcome = "delayed=" + result.getOrThrow()
+    }
+  })
+  val beforeResume = outcome
+  val continuation = delayedContinuation ?: return "missing-delayed"
+  delayedContinuation = null
+  continuation.resume(5)
+  return beforeResume + "->" + outcome
+}
+
+suspend fun failingStateValue(): Int {
+  val resumed = suspendCoroutine<Int> { continuation ->
+    failingContinuation = continuation
+  }
+  if (resumed > 0) {
+    throw IllegalStateException("resume$resumed")
+  }
+  return resumed
+}
+
+fun stateExceptionSummary(): String {
+  var outcome = "pending"
+  val block: suspend () -> Int = { failingStateValue() }
+  block.startCoroutine(object : Continuation<Int> {
+    override val context = EmptyCoroutineContext
+
+    override fun resumeWith(result: Result<Int>) {
+      val failure = result.exceptionOrNull()
+      outcome = if (failure == null) {
+        "ok=" + result.getOrThrow()
+      } else {
+        "fail=" + (failure.message ?: failure.javaClass.simpleName)
+      }
+    }
+  })
+  val beforeResume = outcome
+  val continuation = failingContinuation ?: return "missing-failing"
+  failingContinuation = null
+  continuation.resume(3)
+  return beforeResume + "->" + outcome
 }

@@ -6,4 +6,6 @@ fun main() {
   println(suspendSummary())
   println(delegateSummary())
   println(stateMachineSummary())
+  println(delayedStateSummary())
+  println(stateExceptionSummary())
 }
