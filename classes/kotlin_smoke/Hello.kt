@@ -8,4 +8,5 @@ fun main() {
   println(stateMachineSummary())
   println(delayedStateSummary())
   println(stateExceptionSummary())
+  println(bytecodeSummary())
 }

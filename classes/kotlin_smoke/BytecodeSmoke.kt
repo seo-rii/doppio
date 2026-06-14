@@ -1,0 +1,49 @@
+import java.io.Closeable
+
+private object BytecodeLock
+
+class ClosingSmoke : Closeable {
+  var closed: Boolean = false
+
+  fun payload(): Int = 7
+
+  override fun close() {
+    closed = true
+  }
+}
+
+class ComponentSmoke(private val first: Int, private val second: String) {
+  operator fun component1(): Int = first
+  operator fun component2(): String = second
+}
+
+fun bytecodeSummary(): String {
+  val trace = mutableListOf<String>()
+  val caught = try {
+    trace += "try"
+    throw IllegalArgumentException("boom")
+  } catch (e: IllegalArgumentException) {
+    trace += "catch"
+    e.message ?: "missing"
+  } finally {
+    trace += "finally"
+  }
+
+  val closeable = ClosingSmoke()
+  val useValue = closeable.use { it.payload() + 1 }
+
+  val (number, label) = ComponentSmoke(3, "x")
+  var rangeTotal = 0
+  for (i in 1..4) {
+    rangeTotal += i
+  }
+  var steppedTotal = 0
+  for (i in 6 downTo 2 step 2) {
+    steppedTotal += i
+  }
+  val indexed = listOf("a", "bb").mapIndexed { index, value -> index + value.length }.sum()
+  val sync = synchronized(BytecodeLock) { "sync" }
+
+  return trace.joinToString(">") + ":" + caught + ":" + useValue + ":" + closeable.closed +
+    ":" + label + number + ":" + rangeTotal + ":" + steppedTotal + ":" + indexed + ":" + sync
+}

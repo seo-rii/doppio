@@ -87,8 +87,10 @@ run.
   properties, an inline function, a no-suspension `suspend` function launched
   through `kotlin.coroutines.startCoroutine`, and a `suspendCoroutine` resume
   path including delayed continuation resume and resume-time exception
-  propagation, then runs the generated code on both the host JVM and Doppio
-  with `kotlin-stdlib.jar`.
+  propagation, plus `try`/`catch`/`finally`, `Closeable.use`, destructuring,
+  range loops, stepped `downTo` loops, `mapIndexed`, and `synchronized`, then
+  runs the generated code on both the host JVM and Doppio with
+  `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only
   `kotlin-compiler.jar`.
