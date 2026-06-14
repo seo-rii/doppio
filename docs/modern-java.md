@@ -81,8 +81,11 @@ run.
   workflow via `ci/kotlin_smoke.sh`; it now covers a small multi-file source
   set with a data class, annotation class, interface default implementation,
   generic class, default arguments, string templates, lambda, sealed hierarchy,
-  object declaration, companion object, enum, collection pipeline, and exception
-  handling, then runs the generated code on both the host JVM and Doppio with
+  object declaration, companion object, enum, collection pipeline, exception
+  handling, nullable safe-call/Elvis flow, nested/inner/local classes, SAM
+  conversions, an anonymous object expression, a delegated local property, and
+  an inline function, then runs the generated code on both the host JVM and
+  Doppio with
   `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only

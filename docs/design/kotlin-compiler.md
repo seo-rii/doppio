@@ -196,6 +196,12 @@ Current verified checks:
   207 seconds and both the host JVM and Doppio printed
   `mode-FAST:3:2,3:caught`; this construct set is now included in
   `classes/kotlin_smoke`.
+- The current smoke also compiles and runs nullable safe-call/Elvis flow,
+  nested and inner classes, a function-local class, `Runnable`/`Comparator` SAM
+  conversions, an anonymous object expression, a delegated local property, and
+  an inline function. A full-classpath local run completed in 222 seconds and
+  both the host JVM and Doppio printed
+  `OK:FALLBACK:3:9:2:1:accbbb:4:4:7`.
 
 Historical checks that led to this boundary:
 
@@ -372,10 +378,9 @@ Historical checks that led to this boundary:
 
 The next reduction should broaden the compiler smoke rather than keep treating
 minimal `Hello.kt` or full classpath startup as the primary blocker. Focus on
-repeated variance checks and small source files that add properties,
-collections, exceptions, object declarations, companion objects, sealed/data
-hierarchy shapes, suspend metadata, and JVM bytecode emission. The current
-evidence still points at broad compiler throughput, but the first
+repeated variance checks and small source files that add custom delegates,
+suspend metadata, coroutine-shaped lowering, and broader JVM bytecode emission.
+The current evidence still points at broad compiler throughput, but the first
 compile-and-run milestone now passes in both minimal and full-classpath modes.
 
 ## Implementation Plan
@@ -384,8 +389,8 @@ compile-and-run milestone now passes in both minimal and full-classpath modes.
 2. Keep `ci/kotlin_smoke.sh` green in CI while broadening the checked Kotlin
    sources.
 3. Keep broadening the Kotlin smoke in small increments that distinguish
-   nullable flows, nested/local classes, SAM/anonymous objects, delegated
-   properties, inline functions, suspend metadata, and JVM bytecode emission.
+   custom delegated properties, suspend metadata, coroutine-shaped lowering,
+   and broader JVM bytecode emission.
 4. If a smoke is slow because of repeated Java exceptions, reduce the specific
    exception pattern to a Java fixture before optimizing Doppio. The generic
    lazy `Throwable` stack trace path is already covered.

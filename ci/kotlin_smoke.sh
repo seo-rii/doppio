@@ -59,7 +59,7 @@ if [ -z "$compiler_cp" ]; then
 fi
 
 runner="$repo_root/build/release-cli/console/runner.js"
-source_dir="$repo_root/classes/kotlin_smoke"
+source_dir="${KOTLIN_SMOKE_SOURCE_DIR:-"$repo_root/classes/kotlin_smoke"}"
 out_dir="$work_dir/out-hello"
 
 rm -rf "$out_dir"
@@ -83,13 +83,14 @@ compile_end="$(date +%s)"
 test -f "$out_dir/HelloKt.class"
 test -f "$out_dir/ConstructsKt.class"
 test -f "$out_dir/AdvancedKt.class"
+test -f "$out_dir/InteropKt.class"
 test -f "$out_dir/SmokeResult.class"
 test -f "$out_dir/SmokeRegistry.class"
 test -f "$out_dir/META-INF/main.kotlin_module"
 
 runtime_cp="$out_dir"
 runtime_cp="$runtime_cp:$stdlib_jar"
-expected_output="$(printf 'hi\nname=2,4:5\nmode-FAST:3:2,3:caught')"
+expected_output="$(printf 'hi\nname=2,4:5\nmode-FAST:3:2,3:caught\nOK:FALLBACK:3:9:2:1:accbbb:4:4:7')"
 
 native_output="$(java -cp "$runtime_cp" HelloKt)"
 if [ "$native_output" != "$expected_output" ]; then
