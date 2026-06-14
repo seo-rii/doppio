@@ -19,4 +19,5 @@ fun main() {
   println(modernConstructSummary())
   println(defaultSyntheticSummary())
   println(whenMappingSummary())
+  println(inlineControlSummary())
 }

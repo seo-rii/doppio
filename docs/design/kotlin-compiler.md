@@ -292,6 +292,13 @@ Current verified checks:
   verified the generated `$WhenMappings` class, static enum-switch int arrays,
   `NoSuchFieldError` exception table, enum `tableswitch`, string
   `lookupswitch`, and subjectless range branch lowering.
+- A minimal inline control-flow smoke compiled in 77 seconds and both the host
+  JVM and Doppio printed `enter>body>exit:ok:c10:34:stop3`. The repo smoke now
+  includes the same path and completed in 223 seconds with the full classpath.
+  `javap` verified inline `try/finally` `InlineMarker.finallyStart`/
+  `finallyEnd`, non-local return lowering, `crossinline` Runnable classes,
+  retained `noinline` `Function1` storage, and the noinline lambda
+  `invokedynamic` site.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering
