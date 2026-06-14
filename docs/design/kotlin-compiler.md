@@ -190,6 +190,12 @@ Current verified checks:
   in 183 seconds, so runtime variance is still a real tracking point. The
   `Modern Java` workflow runs this full-classpath mode with
   `KOTLIN_SMOKE_CLASSPATH_MODE=full`.
+- A further local reduction compiled and ran sealed class/data subclass,
+  `object`, companion object, enum, collection pipeline (`listOf`, `map`,
+  `filter`, `joinToString`), and exception handling constructs. It completed in
+  207 seconds and both the host JVM and Doppio printed
+  `mode-FAST:3:2,3:caught`; this construct set is now included in
+  `classes/kotlin_smoke`.
 
 Historical checks that led to this boundary:
 
@@ -378,8 +384,8 @@ compile-and-run milestone now passes in both minimal and full-classpath modes.
 2. Keep `ci/kotlin_smoke.sh` green in CI while broadening the checked Kotlin
    sources.
 3. Keep broadening the Kotlin smoke in small increments that distinguish
-   properties, collections, exceptions, object declarations, companion objects,
-   sealed/data hierarchy shapes, suspend metadata, and JVM bytecode emission.
+   nullable flows, nested/local classes, SAM/anonymous objects, delegated
+   properties, inline functions, suspend metadata, and JVM bytecode emission.
 4. If a smoke is slow because of repeated Java exceptions, reduce the specific
    exception pattern to a Java fixture before optimizing Doppio. The generic
    lazy `Throwable` stack trace path is already covered.

@@ -80,8 +80,10 @@ run.
 - The minimal `Hello.kt` smoke runs in the `Modern Java` GitHub Actions
   workflow via `ci/kotlin_smoke.sh`; it now covers a small multi-file source
   set with a data class, annotation class, interface default implementation,
-  generic class, default arguments, string templates, and a lambda, then runs
-  the generated code on both the host JVM and Doppio with `kotlin-stdlib.jar`.
+  generic class, default arguments, string templates, lambda, sealed hierarchy,
+  object declaration, companion object, enum, collection pipeline, and exception
+  handling, then runs the generated code on both the host JVM and Doppio with
+  `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only
   `kotlin-compiler.jar`.

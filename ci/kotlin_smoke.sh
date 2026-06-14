@@ -82,11 +82,14 @@ compile_end="$(date +%s)"
 
 test -f "$out_dir/HelloKt.class"
 test -f "$out_dir/ConstructsKt.class"
+test -f "$out_dir/AdvancedKt.class"
+test -f "$out_dir/SmokeResult.class"
+test -f "$out_dir/SmokeRegistry.class"
 test -f "$out_dir/META-INF/main.kotlin_module"
 
 runtime_cp="$out_dir"
 runtime_cp="$runtime_cp:$stdlib_jar"
-expected_output="$(printf 'hi\nname=2,4:5')"
+expected_output="$(printf 'hi\nname=2,4:5\nmode-FAST:3:2,3:caught')"
 
 native_output="$(java -cp "$runtime_cp" HelloKt)"
 if [ "$native_output" != "$expected_output" ]; then
