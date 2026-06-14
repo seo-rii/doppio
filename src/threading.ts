@@ -205,10 +205,10 @@ export class PreAllocatedStack {
     this.curr -= n;
   }
 
-  sliceAndDropFromTop(n: number): any {
+  sliceAndDropFromTop(n: number, extraDrop: number = 0): any {
     const store = this.store;
     const curr = this.curr;
-    this.curr -= n;
+    this.curr -= n + extraDrop;
     switch (n) {
       case 0:
         return [];

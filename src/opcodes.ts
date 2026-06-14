@@ -1602,8 +1602,10 @@ export class Opcodes {
       obj: JVMTypes.java_lang_Object = opStack.fromTop(paramSize);
 
     if (!isNull(thread, frame, obj)) {
-      var args = paramSize > 0 ? opStack.sliceFromTop(paramSize) : emptyArgs;
-      opStack.dropFromTop(paramSize + 1);
+      var args = paramSize > 0 ? opStack.sliceAndDropFromTop(paramSize, 1) : emptyArgs;
+      if (paramSize === 0) {
+        opStack.dropFromTop(1);
+      }
       assert(typeof (<any> obj)[methodReference.fullSignature] === 'function', `Resolved method ${methodReference.fullSignature} isn't defined?!`, thread);
       (<any> obj)[methodReference.fullSignature](thread, args);
       frame.returnToThreadLoop = true;
@@ -1633,8 +1635,10 @@ export class Opcodes {
     if (!isNull(thread, frame, obj)) {
       // Use the class of the *object*.
       assert(typeof (<any> obj)[methodReference.signature] === 'function', `Resolved method ${methodReference.signature} isn't defined?!`);
-      (<any> obj)[methodReference.signature](thread, count > 0 ? opStack.sliceFromTop(count) : emptyArgs);
-      opStack.dropFromTop(count + 1);
+      (<any> obj)[methodReference.signature](thread, count > 0 ? opStack.sliceAndDropFromTop(count, 1) : emptyArgs);
+      if (count === 0) {
+        opStack.dropFromTop(1);
+      }
       frame.returnToThreadLoop = true;
     }
     // Object is NULL; NPE has been thrown.
