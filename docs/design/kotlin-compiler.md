@@ -28,6 +28,11 @@ node --no-deprecation build/release-cli/console/runner.js \
   `kotlin-compiler.jar` classpath.
 - `-Xint` does not solve the one-file compile hang, so JIT overhead is not the
   sole blocker.
+- The CLI now exposes Doppio's scheduler quantum as
+  `-Xresponsiveness:<milliseconds>`. This is useful for long compiler smokes:
+  the empty Kotlin source compile is materially faster with large CLI-only
+  quanta, but `class Foo` still does not finish within 300 seconds even at
+  `-Xresponsiveness:100000`.
 - A `-Xphases-to-dump-before=FileClassLowering` run did not create a dump within
   90 seconds, so the next investigation should focus before or around FIR2IR /
   early backend IR construction rather than late JVM bytecode emission.
@@ -186,6 +191,28 @@ Observed checks:
   directory. The latest profile still points at broad bytecode/thread
   execution, `Method.getOp`, invoke opcodes, `ClassData._constructConstructor`,
   GC, and array copies rather than a completed classfile write.
+- 2026-06-14 follow-up reductions and measurements:
+  - `Method.isHidden()` / `isCallerSensitive()` cache annotation lookups used by
+    stack-trace filtering.
+  - `ClassReference.setResolved()` no longer constructs JavaScript class
+    constructors eagerly; object allocation materializes the constructor on the
+    `new` fast path.
+  - Java CLI accepts `-Xresponsiveness:<milliseconds>` for compiler-style
+    workloads. This leaves default VM behavior unchanged.
+  - Instance invoke fast paths combine argument slicing with receiver stack
+    dropping for non-zero-argument calls.
+  - Empty Kotlin source still completes and writes `META-INF/main.kotlin_module`;
+    with large `-Xresponsiveness` values it completed in the tens of seconds in
+    local measurements.
+  - `class Foo` still times out at 300 seconds with no output directory at
+    `-Xresponsiveness:100000`.
+  - 120 second and 200 second `JVM.dumpState()` snapshots of the class-only
+    compile both sampled
+    `org.jetbrains.kotlin.codegen.serialization.JvmSerializationBindings.get`
+    at the `MutableSlicedMap.get(slice, key)` `invokeinterface` bytecode. The
+    remaining hot path is therefore in Kotlin metadata serialization over
+    sliced-map/key-map access, stressing Doppio's interface/virtual dispatch and
+    general bytecode execution rather than class loading alone.
 
 - Full `kotlinc/lib/*.jar` classpath: exceeded five minutes, CPU active, no
   class output.
