@@ -321,6 +321,13 @@ Current verified checks:
   `javap` verified captured local-class fields, anonymous `Runnable` object
   lowering, inner-class `this$0`, nested companion construction, and generated
   `access$mix` / `access$getSecret$p` synthetic accessors.
+- A minimal delegation/bridge smoke compiled in 72 seconds and both the host JVM
+  and Doppio printed
+  `text:7|text:5|5x|text:6|z!|az!|apply:Object:Object,describe:String:CharSequence,describe:String:Object|apply:Object:Object,describe:String:Object|echo:Object:Object,read:Object:`.
+  The repo smoke now includes the same path and completed in 233 seconds with
+  the full classpath. Java reflection verified bridge methods at runtime, and
+  `javap` verified interface `DefaultImpls`, delegation forwarding fields,
+  generic signatures, and `ACC_BRIDGE` / `ACC_SYNTHETIC` methods.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering

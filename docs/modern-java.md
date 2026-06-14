@@ -109,8 +109,9 @@ run.
   `provideDelegate`, `getValue`, `setValue`, and generated delegated-property
   references, plus captured local classes, anonymous object lowering,
   inner-class `this$0`, nested companion construction, and synthetic accessor
-  generation, then runs the generated code on both the host JVM and Doppio with
-  `kotlin-stdlib.jar`.
+  generation, plus interface delegation, delegated `DefaultImpls` forwarding,
+  and generic bridge methods verified through Java reflection, then runs the
+  generated code on both the host JVM and Doppio with `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only
   `kotlin-compiler.jar`.
