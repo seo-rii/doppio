@@ -270,6 +270,15 @@ Current verified checks:
   observed through `java.lang.reflect`, plus generated
   `RuntimeVisibleAnnotations`, `RuntimeVisibleParameterAnnotations`, and
   `MethodParameters` attributes.
+- A minimal annotation-metadata smoke compiled in 76 seconds and both the host
+  JVM and Doppio printed
+  `class-a,class-b|class:HIGH:AnnotationMetadataOwner:1,2,3|ctor-a,ctor-b|ctor:LOW:String:4,5|field-a,field-b|field:LOW:int:6|method-a,method-b|method:LOW:long:7,8|arg-a,arg-b|arg:LOW:double:9|kt3`.
+  The repo smoke now includes the same path and completed in 244 seconds with
+  the full classpath. Java reflection verified `getAnnotationsByType` over
+  repeatable annotations plus enum, `KClass`, and `IntArray` annotation
+  elements. `javap` verified `MultiTag$Container`, Java `@Repeatable`,
+  `RuntimeVisibleAnnotations`, `RuntimeVisibleParameterAnnotations`, and
+  `AnnotationDefault` metadata.
 - A minimal modern-construct smoke compiled in 77 seconds and both the host JVM
   and Doppio printed `ABG:1:15:kt5:StagePayload:EmptyStage:true`. The repo
   smoke now includes the same path and completed in 185 seconds with the full

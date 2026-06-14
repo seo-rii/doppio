@@ -97,7 +97,8 @@ run.
   keys, and sorting, plus reified generic type checks, `T::class.java`,
   primitive/object arrays, spread varargs, copied arrays, typed arrays, and
   component-type reflection, plus runtime-retained annotation use-site targets
-  observed through Java reflection, plus Kotlin `fun interface`, sealed
+  observed through Java reflection, repeatable annotation containers, and
+  annotation enum/class/array elements, plus Kotlin `fun interface`, sealed
   interface exhaustiveness, `data object`, `Enum.entries`, property references,
   class literals, default-argument `$default` methods, `@JvmOverloads`,
   interface `DefaultImpls`, data-class `copy$default`, enum `when`
