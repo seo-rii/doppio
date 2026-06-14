@@ -428,6 +428,16 @@ Current verified checks:
   `isDirectory`, `isRegularFile`, `size`, and `isSameFile`, explicit stream
   close paths in `finally` blocks, `LambdaMetafactory` bootstrap methods for
   Kotlin lambdas, `StackMapTable`, and `kotlin.Metadata`.
+- A minimal concurrent cache smoke compiled with the repo suite in 363 seconds
+  and both the host JVM and Doppio printed
+  `a=123,b=12,c=89|true|true:y:Y11|abc:false:true:1|main:11/worker:3/main:11/main:11|locked:3:hold:1:true|k=1,z=12|11`.
+  `javap` verified `ConcurrentHashMap.computeIfAbsent`, `compute`, `merge`,
+  `putIfAbsent`, `replace`, `AtomicInteger`, `AtomicReference.compareAndSet`,
+  `getAndUpdate`, `updateAndGet`, `CopyOnWriteArrayList.addIfAbsent`,
+  `addAllAbsent`, `ThreadLocal.withInitial`, `Thread.start` / `join`,
+  `ReentrantLock` lowered through `Lock.lock` / `unlock`, synchronized map
+  `monitorenter` / `monitorexit`, `LambdaMetafactory`, `StackMapTable`, and
+  `kotlin.Metadata`.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering

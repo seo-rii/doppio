@@ -35,4 +35,5 @@ fun main() {
   println(textRegexSummary())
   println(fileIoSummary())
   println(nioPathSummary())
+  println(concurrentCacheSummary())
 }

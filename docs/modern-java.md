@@ -140,8 +140,11 @@ run.
   plus Kotlin source-level use of Java NIO `Path`/`Files` covering
   `Paths.get`, directory creation, line and byte reads/writes, copy/move,
   `Files.list`, `Files.walk`, metadata predicates, path normalization, and
-  same-file checks, then runs the generated code on both the host JVM and
-  Doppio with `kotlin-stdlib.jar`.
+  same-file checks, plus Kotlin source-level use of concurrent cache
+  primitives covering `ConcurrentHashMap` compute/merge paths, atomics,
+  `CopyOnWriteArrayList`, `ThreadLocal`, `ReentrantLock.withLock`,
+  synchronized maps, and one-shot thread-local isolation, then runs the
+  generated code on both the host JVM and Doppio with `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only
   `kotlin-compiler.jar`.
