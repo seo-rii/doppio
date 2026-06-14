@@ -67,6 +67,11 @@ let parser = new OptionParser({
       desc: 'location to dump compiled object definitions',
       enabled: !RELEASE
     },
+    'responsiveness': {
+      type: ParseType.COLON_VALUE_SYNTAX,
+      optDesc: ':<milliseconds>',
+      desc: 'milliseconds of cooperative execution before yielding'
+    },
     // TODO: Use -Djava.library.path
     'native-classpath': {
       type: ParseType.NORMAL_VALUE_SYNTAX,
@@ -129,6 +134,19 @@ export default function java(args: string[], opts: JVMCLIOptions,
 
   opts.intMode = nonStandard.flag('int', false);
   opts.dumpJITStats = nonStandard.flag('dump-JIT-stats', false);
+  let responsivenessOption = nonStandard.stringOption('responsiveness', null);
+  if (responsivenessOption !== null) {
+    if (!/^[0-9]+$/.test(responsivenessOption)) {
+      process.stderr.write(`Invalid responsiveness: ${responsivenessOption}.\n`);
+      return printNonStandardHelp(opts.launcherName, parser.help('X'), doneCb, 1);
+    }
+    const responsiveness = parseInt(responsivenessOption, 10);
+    if (responsiveness <= 0) {
+      process.stderr.write(`Invalid responsiveness: ${responsivenessOption}.\n`);
+      return printNonStandardHelp(opts.launcherName, parser.help('X'), doneCb, 1);
+    }
+    opts.responsiveness = responsiveness;
+  }
 
   if (/^[0-9]+$/.test(logOption)) {
     setLogLevel(parseInt(logOption, 10));
