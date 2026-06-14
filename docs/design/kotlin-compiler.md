@@ -208,6 +208,10 @@ Observed checks:
     testing. The non-null case must call dynamic Java `equals`, which requires
     a callback/native-frame round trip; the empty Kotlin source smoke regressed
     to about 120 seconds from the previous 77 second local measurement.
+  - A per-method constant-pool cache for resolved fast invoke opcodes was also
+    rejected. Even with lazy allocation, the empty Kotlin source smoke timed
+    out at 121 seconds, so the added cache lookup/allocation pressure outweighed
+    avoiding `readUInt16BE` and `constantPool.getUnchecked` in this workload.
   - Empty Kotlin source still completes and writes `META-INF/main.kotlin_module`;
     with large `-Xresponsiveness` values it completed in the tens of seconds in
     local measurements.
