@@ -21,4 +21,5 @@ fun main() {
   println(whenMappingSummary())
   println(inlineControlSummary())
   println(jvmInteropSummary())
+  println(mutableDelegateSummary())
 }

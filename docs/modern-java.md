@@ -105,8 +105,10 @@ run.
   branches, plus inline `try/finally`, non-local returns, `crossinline`, and
   `noinline` function-object retention, plus `@file:JvmName`, `@JvmName`,
   `@JvmStatic`, `@JvmField`, `const val`, `@Throws`, `@Volatile`, and
-  `@Synchronized` JVM interop lowering, then runs the generated code on both
-  the host JVM and Doppio with `kotlin-stdlib.jar`.
+  `@Synchronized` JVM interop lowering, plus mutable delegated properties with
+  `provideDelegate`, `getValue`, `setValue`, and generated delegated-property
+  references, then runs the generated code on both the host JVM and Doppio with
+  `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only
   `kotlin-compiler.jar`.

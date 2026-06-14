@@ -307,6 +307,14 @@ Current verified checks:
   `@JvmName`, `@JvmStatic`, `@JvmField`, `const val`, `@Throws`, `@Volatile`,
   and `@Synchronized` lowering into static members, exception metadata,
   volatile fields, and synchronized methods.
+- A minimal mutable delegated-property smoke compiled in 104 seconds and both
+  the host JVM and Doppio printed
+  `bind:primary:MutableDelegateOwner:primary:0|bind:primary:MutableDelegateOwner:primary:30|alt:secondary:MutableDelegateOwner:secondary:30|local:local:top:local:0|local:local:top:local:10`.
+  The repo smoke now includes the same path and completed in 232 seconds with
+  the full classpath. `javap` verified `provideDelegate`, `getValue`,
+  `setValue`, generated `$$delegatedProperties`, and mutable property-reference
+  lowering through `MutablePropertyReference0Impl` and
+  `MutablePropertyReference1Impl`.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering
