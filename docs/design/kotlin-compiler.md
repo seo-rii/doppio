@@ -233,11 +233,25 @@ Observed checks:
     underlying sliced map operation and added native/callback-frame overhead;
     the empty-source smoke timed out at 120 seconds from the 62 second
     fast-invoke baseline.
+  - Direct operand-stack extraction inside JIT-emitted invoke snippets was also
+    rejected. The change mirrored the fast invoke opcode's `store/curr`
+    specialization in generated trace code, but the empty-source smoke timed
+    out at 151 seconds where the restored baseline had completed in about 62
+    seconds. The class-only smoke also timed out at 300 seconds in the same
+    experimental build, so the source change was reverted.
   - Empty Kotlin source still completes and writes `META-INF/main.kotlin_module`;
     with large `-Xresponsiveness` values it completed in the tens of seconds in
     local measurements.
-  - `class Foo` still times out at 300 seconds with no output directory at
-    `-Xresponsiveness:100000`.
+  - `class Foo` is now known to be capable of producing bytecode under Doppio,
+    but the result is not stable enough to count as done. One direct `java_cli`
+    diagnostic run completed and wrote `Foo.class` plus
+    `META-INF/main.kotlin_module`; `javap` verified the generated `Foo.class`.
+    A subsequent `console/runner.js` run also exited with status 0 in 176
+    seconds and wrote the same outputs. Repeated runner checks then timed out
+    at 240 and 420 seconds with no output directory, and a repeated direct
+    `java_cli` check timed out at 240 seconds. Treat this as an intermittent
+    class-only success / severe performance-variance finding, not as a stable
+    Kotlin declaration milestone.
   - 120 second and 200 second `JVM.dumpState()` snapshots of the class-only
     compile both sampled
     `org.jetbrains.kotlin.codegen.serialization.JvmSerializationBindings.get`
@@ -245,6 +259,10 @@ Observed checks:
     remaining hot path is therefore in Kotlin metadata serialization over
     sliced-map/key-map access, stressing Doppio's interface/virtual dispatch and
     general bytecode execution rather than class loading alone.
+  - A later successful class-only diagnostic sampled different work at 60 and
+    120 seconds: Kotlin builtins protobuf parsing and ASM-based Java class
+    signature parsing. This suggests the slow path is broad compiler throughput
+    with several hot phases, not one permanently stuck frame.
 
 - Full `kotlinc/lib/*.jar` classpath: exceeded five minutes, CPU active, no
   class output.
@@ -274,9 +292,10 @@ Observed checks:
   call fast-path selection on `Method` objects likewise kept the same 120 second
   class-only timeout. Caching bytecode frame code buffers and max-stack metadata
   on `Method` objects also left the 120 second class-only boundary unchanged.
-  The current reduced blocker is therefore not specific to generated
-  `main(String[])`; any source declaration that needs emitted class metadata or
-  classfile output is enough to hit the slow path.
+  Later runs proved `class Foo` can sometimes finish and write a valid classfile,
+  but repeated 240-420 second checks still time out. The blocker is therefore
+  unstable compiler throughput around class metadata/classfile generation rather
+  than a confirmed semantic failure before classfile output.
 - `-Xphases-to-dump-before=GenerateMultifileFacades`: no dump in 90 seconds.
 - `-Xphases-to-dump-before=InterfaceLowering`: no dump in 120 seconds.
 - `-Xphases-to-dump-before=FileClassLowering`: no dump in 90 seconds.
@@ -300,10 +319,11 @@ Observed checks:
   before it was stopped. The compiler is not simply stuck before backend
   codegen, but it is still far too slow or cycling before writing class files.
 
-The next reduction should instrument or smoke-test Kotlin's JVM codegen path
-after `JvmIrValidationAfterLoweringPhase`, and should also check whether Kotlin
-is intentionally using exceptions for control flow in a path where Doppio
-stack-trace construction is too expensive.
+The next reduction should keep sampling class-only runs across successful and
+timed-out executions, then compare the sampled phases. If class-only can be made
+repeatably successful, advance the boundary to `fun main() {}` and the
+`Hello.kt` smoke. The current evidence points at broad compiler throughput
+rather than a single semantic failure before classfile generation.
 
 ## Implementation Plan
 
