@@ -449,6 +449,7 @@ export class Method extends AbstractMethodField {
 
   private compiledFunctions: Function[] = [];
   private failedCompile: Uint8Array = null;
+  private vmTargetBridgeMethods: {[refKind: number]: (thread: JVMThread, descriptor: string, args: any[], cb?: (e?: JVMTypes.java_lang_Throwable, rv?: any) => void) => void} = {};
 
   constructor(cls: ReferenceClassData<JVMTypes.java_lang_Object>, constantPool: ConstantPool, slot: number, byteStream: ByteStream) {
     super(cls, constantPool, slot, byteStream);
@@ -924,7 +925,11 @@ if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.fullSignature}']
    * encapsulates the logic required to call this particular method.
    */
   public getVMTargetBridgeMethod(thread: JVMThread, refKind: number): (thread: JVMThread, descriptor: string, args: any[], cb?: (e?: JVMTypes.java_lang_Throwable, rv?: any) => void) => void {
-    // TODO: Could cache these in the Method object if desired.
+    var cachedBridgeMethod = this.vmTargetBridgeMethods[refKind];
+    if (cachedBridgeMethod !== undefined) {
+      return cachedBridgeMethod;
+    }
+
     var outStream = new StringOutputStream(),
       virtualDispatch = !(refKind === MethodHandleReferenceKind.INVOKESTATIC || refKind === MethodHandleReferenceKind.INVOKESPECIAL);
     // Args: thread, cls, util
@@ -950,7 +955,9 @@ if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.fullSignature}']
     if (!RELEASE && thread !== null && thread.getJVM().shouldDumpCompiledCode()) {
       thread.getJVM().dumpBridgeMethod(this.fullSignature, evalText);
     }
-    return new Function("thread", "cls", "util", evalText)(thread, this.cls, util);
+    cachedBridgeMethod = new Function("thread", "cls", "util", evalText)(thread, this.cls, util);
+    this.vmTargetBridgeMethods[refKind] = cachedBridgeMethod;
+    return cachedBridgeMethod;
   }
 
   /**
