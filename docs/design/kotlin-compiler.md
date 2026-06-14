@@ -403,6 +403,15 @@ Current verified checks:
   `ResultKt.throwOnFailure`, exception tables for inline `runCatching` /
   `mapCatching` / `recoverCatching` / `try` / `finally`, `StackMapTable`,
   and `kotlin.Metadata`.
+- A minimal text/regex smoke compiled with the repo suite in 324 seconds and
+  both the host JVM and Doppio printed
+  `0:a:2:0-2,1:bb:25:5-9,2:c:457:12-16|A:1; BB:32; C:654; bad=x|first b=2|a|bb|c|0:5:a,1:6:b,2:5:g|KT/42|true|KOTin`.
+  `javap` verified `Regex.findAll`, JDK 8 named-group extension lookup,
+  lazy `SequencesKt.mapIndexed` / `joinToString`, transform replacement,
+  `Regex.replaceFirst`, `Regex.split`, `StringsKt.lineSequence`,
+  `MatchResult.Destructured`, `RegexOption` set construction,
+  `StringsKt.replaceRange`, `LambdaMetafactory` bootstrap methods for the
+  Kotlin lambdas, `StackMapTable`, and `kotlin.Metadata`.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering

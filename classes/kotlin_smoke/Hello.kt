@@ -32,4 +32,5 @@ fun main() {
   println(collectionBuilderSummary())
   println(sequenceBuilderSummary())
   println(resultExceptionSummary())
+  println(textRegexSummary())
 }

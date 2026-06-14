@@ -131,8 +131,11 @@ run.
   and sequence `windowed`, plus deeper `Result` success/failure flow through
   `mapCatching`, `recoverCatching`, `getOrDefault`, `getOrElse`, boxed
   failures, exception cause retention, `try`/`finally` ordering, and inline
-  lambda labeled returns, then runs the generated code on both the host JVM and
-  Doppio with `kotlin-stdlib.jar`.
+  lambda labeled returns, plus Kotlin text/regex APIs covering named groups,
+  lazy `findAll` sequences, destructured matches, transform replacements,
+  `replaceFirst`, `split`, `trimIndent`/`lineSequence`, regex options, and
+  string range replacement, then runs the generated code on both the host JVM
+  and Doppio with `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only
   `kotlin-compiler.jar`.
