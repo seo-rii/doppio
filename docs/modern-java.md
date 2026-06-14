@@ -124,8 +124,12 @@ run.
   `vetoable` delegates, delegated-property references, and companion/nested
   object initialization, plus `buildList`/`buildMap`/`buildSet`, grouping
   folds, windowed/chunked collection transforms, partitioning, `zipWithNext`,
-  `flatten`, `associateWith`, `runningFold`, and `reduceIndexed`, then runs
-  the generated code on both the host JVM and Doppio with `kotlin-stdlib.jar`.
+  `flatten`, `associateWith`, `runningFold`, and `reduceIndexed`, plus
+  `sequence` and `iterator` builders, `SequenceScope.yield`/`yieldAll`,
+  restricted suspend sequence state machines, `constrainOnce`,
+  `generateSequence`, lazy `onEach`/`filter`/`map`/`zipWithNext` pipelines,
+  and sequence `windowed`, then runs the generated code on both the host JVM
+  and Doppio with `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only
   `kotlin-compiler.jar`.

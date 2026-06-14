@@ -384,6 +384,16 @@ Current verified checks:
   `associateWith`, `runningFold`, `reduceIndexed`, `toSortedMap`,
   `invokedynamic` `Function1` lambdas, `StackMapTable`, and
   `kotlin.Metadata`.
+- A minimal sequence-builder smoke compiled in 81 seconds and both the host
+  JVM and Doppio printed
+  `1:2|start>after1|0=3,1=8,2=10|start>after1>start>after1>afterAll>done|abcd|789/IllegalStateException|3,6,12,24|xyyzzz:23`.
+  The repo smoke now includes the same path and completed in 335 seconds with
+  the full classpath. `javap` verified `SequencesKt.sequence`, `iterator`,
+  `asSequence`, `constrainOnce`, `generateSequence`, `windowed`, `onEach`,
+  `zipWithNext`, generated `RestrictedSuspendLambda` classes,
+  `SequenceScope.yield` / `yieldAll`, `Continuation`, `invokeSuspend`,
+  `COROUTINE_SUSPENDED`, `ResultKt.throwOnFailure`, `DebugMetadata`,
+  `StackMapTable`, and `kotlin.Metadata`.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering
