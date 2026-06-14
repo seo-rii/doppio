@@ -1782,6 +1782,7 @@ export class Opcodes {
     if (classRef.isResolved()) {
       var cls = classRef.cls;
       if (cls.isInitialized(thread)) {
+        classRef.clsConstructor = cls.getConstructor(thread);
         code[pc] = OpCode.NEW_FAST;
         // Return to thread, rerun opcode.
       } else {
@@ -1795,6 +1796,9 @@ export class Opcodes {
   public static new_fast(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
     var classRef = <ClassReference> frame.method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1));
+    if (classRef.clsConstructor === null) {
+      classRef.clsConstructor = classRef.cls.getConstructor(thread);
+    }
     frame.opStack.push(new classRef.clsConstructor(thread));
     frame.pc += 3;
   }

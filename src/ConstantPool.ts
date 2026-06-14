@@ -330,9 +330,6 @@ export class ClassReference implements IConstantPoolItem {
 
   private setResolved(thread: JVMThread, cls: ReferenceClassData<JVMTypes.java_lang_Object>) {
     this.cls = cls;
-    if (cls !== null) {
-      this.clsConstructor = cls.getConstructor(thread);
-    }
   }
 
   public getType(): ConstantPoolItemType {
