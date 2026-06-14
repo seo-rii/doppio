@@ -27,4 +27,5 @@ fun main() {
   println(annotationMetadataSummary())
   println(extensionVarianceSummary())
   println(receiverLambdaSummary())
+  println(controlFlowSummary())
 }

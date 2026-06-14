@@ -355,6 +355,14 @@ Current verified checks:
   bound-reference classes, extension property-reference lowering, the
   `decorate$default` bridge, invokedynamic lambda sites, and runtime-visible
   receiver-parameter annotations.
+- A minimal control-flow bytecode smoke compiled in 82 seconds and both the
+  host JVM and Doppio printed
+  `16|1:2:2,1:4:4,2:1:2,2:2:4,2:3:6,2:4:8,3:2:6#6|p357|q46|ok1:neg1:For input string: "x":ok7|2:ccc`.
+  The repo smoke now includes the same path and completed in 305 seconds with
+  the full classpath. `javap` verified tailrec/default bridges, labeled loop
+  lowering, local default-vararg helpers, spread-array calls, inline
+  `runCatching` / `fold`, labeled `return@` lowering, `Exception table`
+  entries, and `StackMapTable` metadata.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering

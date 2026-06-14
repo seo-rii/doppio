@@ -116,8 +116,11 @@ run.
   projections, generic `Signature` attributes, and inlined sorted comparator
   classes, plus receiver lambdas, extension function type metadata, extension
   callable references, bound extension references, extension property
-  references, and runtime-visible receiver-parameter annotations, then runs the
-  generated code on both the host JVM and Doppio with `kotlin-stdlib.jar`.
+  references, and runtime-visible receiver-parameter annotations, plus tailrec
+  lowering, labeled loops, local default-vararg helpers, spread-array calls,
+  inline `Result` control flow, labeled `return@`, exception tables, and
+  `StackMapTable` metadata, then runs the generated code on both the host JVM
+  and Doppio with `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only
   `kotlin-compiler.jar`.
