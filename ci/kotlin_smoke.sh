@@ -114,6 +114,7 @@ test -f "$out_dir/DiagnosticKind.class"
 test -f "$out_dir/EmptyStage.class"
 test -f "$out_dir/ExtensionVarianceSmokeKt.class"
 test -f "$out_dir/ExtensionVarianceSmokeKt\$starKeys\$\$inlined\$sortedBy\$1.class"
+test -f "$out_dir/FileIoSmokeKt.class"
 test -f "$out_dir/GenericCell.class"
 test -f "$out_dir/InlineControlSmokeKt.class"
 test -f "$out_dir/InlineControlSmokeKt\$crossCompute\$runner\$1.class"
@@ -186,6 +187,8 @@ default_expected_output="${default_expected_output}
 44|12|IllegalStateException/99/77|0=ok44,1=errIllegalStateException:again,2=errUnsupportedOperationException:manual|6:body>recover:inner>finally|IllegalArgumentException:root|two|enter:a>ok:a>mapped:44>enter:b>fail:b:ResultSmokeException:boom>recover:boom>enter:c>ok:c>recoverCatching:bad4>else:again"
 default_expected_output="${default_expected_output}
 0:a:2:0-2,1:bb:25:5-9,2:c:457:12-16|A:1; BB:32; C:654; bad=x|first b=2|a|bb|c|0:5:a,1:6:b,2:5:g|KT/42|true|KOTin"
+default_expected_output="${default_expected_output}
+0:5:a,1:4:b,2:5:g|aaa|input.txt:17,nested/out.txt:17|616c706861|txt/out/nested/out.txt|true/true"
 expected_output="${KOTLIN_SMOKE_EXPECTED_OUTPUT:-"$default_expected_output"}"
 
 native_output="$(java -cp "$runtime_cp" HelloKt)"

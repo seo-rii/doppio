@@ -134,8 +134,11 @@ run.
   lambda labeled returns, plus Kotlin text/regex APIs covering named groups,
   lazy `findAll` sequences, destructured matches, transform replacements,
   `replaceFirst`, `split`, `trimIndent`/`lineSequence`, regex options, and
-  string range replacement, then runs the generated code on both the host JVM
-  and Doppio with `kotlin-stdlib.jar`.
+  string range replacement, plus Kotlin file I/O helpers covering
+  `writeText`, `appendText`, `readLines`, `useLines`, `copyTo`,
+  `walkTopDown`, relative path normalization, file metadata, and byte reads,
+  then runs the generated code on both the host JVM and Doppio with
+  `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only
   `kotlin-compiler.jar`.
