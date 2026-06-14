@@ -97,8 +97,10 @@ run.
   keys, and sorting, plus reified generic type checks, `T::class.java`,
   primitive/object arrays, spread varargs, copied arrays, typed arrays, and
   component-type reflection, plus runtime-retained annotation use-site targets
-  observed through Java reflection, then runs the generated code on both the
-  host JVM and Doppio with
+  observed through Java reflection, plus Kotlin `fun interface`, sealed
+  interface exhaustiveness, `data object`, `Enum.entries`, property references,
+  and class literals, then runs the generated code on both the host JVM and
+  Doppio with
   `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only

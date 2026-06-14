@@ -16,4 +16,5 @@ fun main() {
   println(valueClassSummary())
   println(reifiedArraySummary())
   println(annotationReflectionSummary())
+  println(modernConstructSummary())
 }

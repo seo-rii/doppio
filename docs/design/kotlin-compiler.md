@@ -270,6 +270,13 @@ Current verified checks:
   observed through `java.lang.reflect`, plus generated
   `RuntimeVisibleAnnotations`, `RuntimeVisibleParameterAnnotations`, and
   `MethodParameters` attributes.
+- A minimal modern-construct smoke compiled in 77 seconds and both the host JVM
+  and Doppio printed `ABG:1:15:kt5:StagePayload:EmptyStage:true`. The repo
+  smoke now includes the same path and completed in 185 seconds with the full
+  classpath. It covers Kotlin `fun interface` SAM conversion through
+  `invokedynamic`, sealed interface exhaustiveness, `data object` singleton
+  behavior, Kotlin 1.9 `Enum.entries`/`EnumEntries`, property-reference
+  classes, and class-literal lookup.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering
