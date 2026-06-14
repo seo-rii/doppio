@@ -89,8 +89,9 @@ class WeightedRoundRobinScheduler<T extends Thread> implements Scheduler<T> {
 
   public unscheduleThread(thread: T): void {
     let queue = this._queue;
-    let isRunningThread = queue[0] === thread;
-    assert(queue.indexOf(thread) > -1, `Tried to unschedule thread that was not scheduled.`);
+    let queueIndex = queue.indexOf(thread),
+      isRunningThread = queueIndex === 0;
+    assert(queueIndex > -1, `Tried to unschedule thread that was not scheduled.`);
     // Remove thread from queue.
     if (isRunningThread) {
       queue.shift();
@@ -98,7 +99,7 @@ class WeightedRoundRobinScheduler<T extends Thread> implements Scheduler<T> {
       // Schedule the next thread.
       this.runThread();
     } else {
-      queue.splice(queue.indexOf(thread), 1);
+      queue.splice(queueIndex, 1);
     }
   }
 
