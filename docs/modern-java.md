@@ -88,7 +88,8 @@ run.
   through `kotlin.coroutines.startCoroutine`, and a `suspendCoroutine` resume
   path including delayed continuation resume and resume-time exception
   propagation, plus Java `Thread`-based and `ExecutorService`-based
-  continuation resumption, `try`/`catch`/`finally`, `Closeable.use`,
+  continuation resumption, a custom `ContinuationInterceptor` event loop with
+  multiple queued suspension resumes, `try`/`catch`/`finally`, `Closeable.use`,
   destructuring, range loops, stepped `downTo` loops, `mapIndexed`, and
   `synchronized`, then runs the generated code on both the host JVM and Doppio
   with

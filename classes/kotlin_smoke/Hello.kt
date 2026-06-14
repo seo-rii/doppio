@@ -11,4 +11,5 @@ fun main() {
   println(bytecodeSummary())
   println(threadedStateSummary())
   println(executorStateSummary())
+  println(dispatchedStateSummary())
 }

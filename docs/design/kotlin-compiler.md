@@ -230,6 +230,14 @@ Current verified checks:
   after the compile timeout was raised to 900 seconds. This covers
   `Executors.newSingleThreadExecutor()`, `submit`, `Future.get()`, `shutdown`,
   and continuation resume from an executor worker.
+- A minimal `ContinuationInterceptor` event-loop smoke compiled in 91 seconds
+  and both the host JVM and Doppio printed
+  `pending>1>pending>pending>1>pending>pending>1>dispatch=36`. The repo smoke
+  now includes the same path and completed in 412 seconds with the full
+  classpath. A custom interceptor queues the initial coroutine start plus two
+  suspended continuation resumes, and the test drains the queue between each
+  step to verify that the generated coroutine state machine preserves locals
+  across multiple dispatched suspension points.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering

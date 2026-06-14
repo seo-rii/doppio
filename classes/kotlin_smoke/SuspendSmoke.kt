@@ -1,5 +1,8 @@
 import java.util.concurrent.Executors
+import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.Continuation
+import kotlin.coroutines.ContinuationInterceptor
+import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.startCoroutine
@@ -9,6 +12,25 @@ private var delayedContinuation: Continuation<Int>? = null
 private var failingContinuation: Continuation<Int>? = null
 private var threadedContinuation: Continuation<Int>? = null
 private var executorContinuation: Continuation<Int>? = null
+private var dispatchedContinuation: Continuation<Int>? = null
+
+private class SmokeQueueDispatcher :
+    AbstractCoroutineContextElement(ContinuationInterceptor),
+    ContinuationInterceptor {
+  val queue = ArrayDeque<() -> Unit>()
+
+  override fun <T> interceptContinuation(continuation: Continuation<T>): Continuation<T> {
+    return object : Continuation<T> {
+      override val context: CoroutineContext = continuation.context
+
+      override fun resumeWith(result: Result<T>) {
+        queue.add {
+          continuation.resumeWith(result)
+        }
+      }
+    }
+  }
+}
 
 suspend fun suspendValue(seed: Int): Int = seed + 2
 
@@ -159,4 +181,61 @@ fun executorStateSummary(): String {
   } finally {
     executor.shutdown()
   }
+}
+
+fun dispatchedStateSummary(): String {
+  var outcome = "pending"
+  val dispatcher = SmokeQueueDispatcher()
+  val block: suspend () -> Int = {
+    val first = suspendCoroutine<Int> { continuation ->
+      dispatchedContinuation = continuation
+    }
+    val second = suspendCoroutine<Int> { continuation ->
+      dispatchedContinuation = continuation
+    }
+    2 + first * 10 + second
+  }
+  block.startCoroutine(object : Continuation<Int> {
+    override val context: CoroutineContext = dispatcher
+
+    override fun resumeWith(result: Result<Int>) {
+      outcome = "dispatch=" + result.getOrThrow()
+    }
+  })
+
+  val beforeStart = outcome
+  var startSteps = 0
+  while (dispatcher.queue.isNotEmpty()) {
+    dispatcher.queue.removeFirst().invoke()
+    startSteps++
+  }
+  val afterStart = outcome
+  val first = dispatchedContinuation ?: return "missing-first"
+  dispatchedContinuation = null
+  first.resume(3)
+  val afterFirstResume = outcome
+  var firstSteps = 0
+  while (dispatcher.queue.isNotEmpty()) {
+    dispatcher.queue.removeFirst().invoke()
+    firstSteps++
+  }
+  val afterFirstDrain = outcome
+  val second = dispatchedContinuation ?: return "missing-second"
+  dispatchedContinuation = null
+  second.resume(4)
+  val afterSecondResume = outcome
+  var secondSteps = 0
+  while (dispatcher.queue.isNotEmpty()) {
+    dispatcher.queue.removeFirst().invoke()
+    secondSteps++
+  }
+  return beforeStart + ">" +
+      startSteps + ">" +
+      afterStart + ">" +
+      afterFirstResume + ">" +
+      firstSteps + ">" +
+      afterFirstDrain + ">" +
+      afterSecondResume + ">" +
+      secondSteps + ">" +
+      outcome
 }
