@@ -128,8 +128,11 @@ run.
   `sequence` and `iterator` builders, `SequenceScope.yield`/`yieldAll`,
   restricted suspend sequence state machines, `constrainOnce`,
   `generateSequence`, lazy `onEach`/`filter`/`map`/`zipWithNext` pipelines,
-  and sequence `windowed`, then runs the generated code on both the host JVM
-  and Doppio with `kotlin-stdlib.jar`.
+  and sequence `windowed`, plus deeper `Result` success/failure flow through
+  `mapCatching`, `recoverCatching`, `getOrDefault`, `getOrElse`, boxed
+  failures, exception cause retention, `try`/`finally` ordering, and inline
+  lambda labeled returns, then runs the generated code on both the host JVM and
+  Doppio with `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only
   `kotlin-compiler.jar`.

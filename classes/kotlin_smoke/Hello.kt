@@ -31,4 +31,5 @@ fun main() {
   println(initializationDelegateSummary())
   println(collectionBuilderSummary())
   println(sequenceBuilderSummary())
+  println(resultExceptionSummary())
 }
