@@ -285,6 +285,13 @@ Current verified checks:
   `@JvmOverloads` constructors and methods observed through Java reflection,
   interface `DefaultImpls`, data-class `copy$default`, and
   `kotlin.jvm.internal.DefaultConstructorMarker` constructor lowering.
+- A minimal enum/string `when` lowering smoke compiled in 74 seconds and both
+  the host JVM and Doppio printed
+  `1357:nilpe:14:10,30,-1,40:neg|zero|small|big`. The repo smoke now includes
+  the same path and completed in 208 seconds with the full classpath. `javap`
+  verified the generated `$WhenMappings` class, static enum-switch int arrays,
+  `NoSuchFieldError` exception table, enum `tableswitch`, string
+  `lookupswitch`, and subjectless range branch lowering.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering

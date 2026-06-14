@@ -100,8 +100,9 @@ run.
   observed through Java reflection, plus Kotlin `fun interface`, sealed
   interface exhaustiveness, `data object`, `Enum.entries`, property references,
   class literals, default-argument `$default` methods, `@JvmOverloads`,
-  interface `DefaultImpls`, and data-class `copy$default`, then runs the
-  generated code on both the host JVM and Doppio with
+  interface `DefaultImpls`, data-class `copy$default`, enum `when`
+  `$WhenMappings`, string `when` hash switching, and subjectless `when`
+  branches, then runs the generated code on both the host JVM and Doppio with
   `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only

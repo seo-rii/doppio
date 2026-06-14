@@ -18,4 +18,5 @@ fun main() {
   println(annotationReflectionSummary())
   println(modernConstructSummary())
   println(defaultSyntheticSummary())
+  println(whenMappingSummary())
 }
