@@ -212,6 +212,14 @@ Observed checks:
     rejected. Even with lazy allocation, the empty Kotlin source smoke timed
     out at 121 seconds, so the added cache lookup/allocation pressure outweighed
     avoiding `readUInt16BE` and `constantPool.getUnchecked` in this workload.
+  - JIT null-check inlining and invoke-error PC restoration were also rejected
+    for the Kotlin compiler path. Replacing hot `u.isNull(...)` calls with
+    emitted `obj != null` checks left `class Foo` timed out at 181 seconds and
+    slowed the empty-source smoke to about 99 seconds. Keeping only the invoke
+    null-error `f.pc` restoration still made the empty-source smoke time out at
+    120 seconds in the same run, while the restored baseline completed in 64
+    seconds. Coverage for the existing JIT null exception behavior lives in
+    `classes/test/JITNullChecks.java`.
   - Empty Kotlin source still completes and writes `META-INF/main.kotlin_module`;
     with large `-Xresponsiveness` values it completed in the tens of seconds in
     local measurements.
