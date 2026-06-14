@@ -299,6 +299,14 @@ Current verified checks:
   `finallyEnd`, non-local return lowering, `crossinline` Runnable classes,
   retained `noinline` `Function1` storage, and the noinline lambda
   `invokedynamic` site.
+- A minimal JVM interop annotation smoke compiled in 111 seconds and both the
+  host JVM and Doppio printed
+  `kt:java:ok7:IllegalArgumentException:fieldconst:top-3:o5obj:5:11111111`.
+  The repo smoke now includes the same path and completed in 240 seconds with
+  the full classpath. Java reflection and `javap` verified `@file:JvmName`,
+  `@JvmName`, `@JvmStatic`, `@JvmField`, `const val`, `@Throws`, `@Volatile`,
+  and `@Synchronized` lowering into static members, exception metadata,
+  volatile fields, and synchronized methods.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering

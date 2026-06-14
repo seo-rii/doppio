@@ -20,4 +20,5 @@ fun main() {
   println(defaultSyntheticSummary())
   println(whenMappingSummary())
   println(inlineControlSummary())
+  println(jvmInteropSummary())
 }

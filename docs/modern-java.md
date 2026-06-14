@@ -103,7 +103,9 @@ run.
   interface `DefaultImpls`, data-class `copy$default`, enum `when`
   `$WhenMappings`, string `when` hash switching, and subjectless `when`
   branches, plus inline `try/finally`, non-local returns, `crossinline`, and
-  `noinline` function-object retention, then runs the generated code on both
+  `noinline` function-object retention, plus `@file:JvmName`, `@JvmName`,
+  `@JvmStatic`, `@JvmField`, `const val`, `@Throws`, `@Volatile`, and
+  `@Synchronized` JVM interop lowering, then runs the generated code on both
   the host JVM and Doppio with `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only
