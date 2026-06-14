@@ -39,7 +39,7 @@ jobs:
         run: node build/release-cli/console/test_runner.js classes/test/ArrayOps --makefile
 
       - name: Cache Kotlin compiler
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: build/kotlin-smoke-cache
           key: kotlin-compiler-2.4.0
