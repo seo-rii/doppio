@@ -111,8 +111,11 @@ run.
   references, plus captured local classes, anonymous object lowering,
   inner-class `this$0`, nested companion construction, and synthetic accessor
   generation, plus interface delegation, delegated `DefaultImpls` forwarding,
-  and generic bridge methods verified through Java reflection, then runs the
-  generated code on both the host JVM and Doppio with `kotlin-stdlib.jar`.
+  and generic bridge methods verified through Java reflection, plus extension
+  receiver functions/properties, typealias metadata, use-site variance, star
+  projections, generic `Signature` attributes, and inlined sorted comparator
+  classes, then runs the generated code on both the host JVM and Doppio with
+  `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only
   `kotlin-compiler.jar`.
