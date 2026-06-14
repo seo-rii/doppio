@@ -207,6 +207,12 @@ Current verified checks:
   full-classpath local run completed in 171 seconds; both the host JVM and
   Doppio printed `suspend=7`. This covers suspend metadata and immediate
   coroutine completion, but not a real suspension/resume state machine.
+- The smoke now includes custom delegated properties backed by
+  `kotlin.reflect.KProperty` metadata and a `suspendCoroutine` resume path. A
+  full-classpath local run completed in 258 seconds; both the host JVM and
+  Doppio printed `delegate:answer:DelegatedOwner|local:local:top` and
+  `state=14`. This covers synchronous resume through a generated coroutine
+  state machine, but not delayed/asynchronous resumption.
 
 Historical checks that led to this boundary:
 
@@ -383,10 +389,11 @@ Historical checks that led to this boundary:
 
 The next reduction should broaden the compiler smoke rather than keep treating
 minimal `Hello.kt` or full classpath startup as the primary blocker. Focus on
-repeated variance checks and small source files that add custom delegates, real
-suspension/resume state-machine lowering, and broader JVM bytecode emission. The
-current evidence still points at broad compiler throughput, but the first
-compile-and-run milestone now passes in both minimal and full-classpath modes.
+repeated variance checks and small source files that add delayed/asynchronous
+resumption, exception paths through coroutine state machines, and broader JVM
+bytecode emission. The current evidence still points at broad compiler
+throughput, but the first compile-and-run milestone now passes in both minimal
+and full-classpath modes.
 
 ## Implementation Plan
 
@@ -394,8 +401,8 @@ compile-and-run milestone now passes in both minimal and full-classpath modes.
 2. Keep `ci/kotlin_smoke.sh` green in CI while broadening the checked Kotlin
    sources.
 3. Keep broadening the Kotlin smoke in small increments that distinguish
-   custom delegated properties, real suspension/resume state-machine lowering,
-   and broader JVM bytecode emission.
+   delayed/asynchronous resumption, exception paths through coroutine state
+   machines, and broader JVM bytecode emission.
 4. If a smoke is slow because of repeated Java exceptions, reduce the specific
    exception pattern to a Java fixture before optimizing Doppio. The generic
    lazy `Throwable` stack trace path is already covered.

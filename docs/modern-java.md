@@ -83,10 +83,10 @@ run.
   generic class, default arguments, string templates, lambda, sealed hierarchy,
   object declaration, companion object, enum, collection pipeline, exception
   handling, nullable safe-call/Elvis flow, nested/inner/local classes, SAM
-  conversions, an anonymous object expression, a delegated local property, and
-  an inline function, plus a no-suspension `suspend` function launched through
-  `kotlin.coroutines.startCoroutine`, then runs the generated code on both the
-  host JVM and Doppio with
+  conversions, an anonymous object expression, delegated local and custom
+  properties, an inline function, a no-suspension `suspend` function launched
+  through `kotlin.coroutines.startCoroutine`, and a `suspendCoroutine` resume
+  path, then runs the generated code on both the host JVM and Doppio with
   `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only
