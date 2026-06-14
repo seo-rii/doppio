@@ -436,6 +436,8 @@ export class Method extends AbstractMethodField {
   private escapedSignature: string;
   private escapedFullSignature: string;
   private escapedClassInternalName: string;
+  private hidden: boolean = null;
+  private callerSensitive: boolean = null;
   /**
    * Code is either a function, or a CodeAttribute.
    * TODO: Differentiate between NativeMethod objects and BytecodeMethod objects.
@@ -582,16 +584,22 @@ export class Method extends AbstractMethodField {
    * Used by OpenJDK's lambda implementation to hide lambda boilerplate.
    */
   public isHidden(): boolean {
+    if (this.hidden !== null) {
+      return this.hidden;
+    }
     var rva: RuntimeVisibleAnnotations = <any> this.getAttribute('RuntimeVisibleAnnotations');
-    return rva !== null && rva.isHidden;
+    return this.hidden = rva !== null && rva.isHidden;
   }
 
   /**
    * Checks if this particular method has the CallerSensitive annotation.
    */
   public isCallerSensitive(): boolean {
+    if (this.callerSensitive !== null) {
+      return this.callerSensitive;
+    }
     var rva: RuntimeVisibleAnnotations = <any> this.getAttribute('RuntimeVisibleAnnotations');
-    return rva !== null && rva.isCallerSensitive;
+    return this.callerSensitive = rva !== null && rva.isCallerSensitive;
   }
 
   /**
