@@ -202,6 +202,11 @@ Current verified checks:
   an inline function. A full-classpath local run completed in 222 seconds and
   both the host JVM and Doppio printed
   `OK:FALLBACK:3:9:2:1:accbbb:4:4:7`.
+- A no-suspension `suspend` function, suspend lambda, `Continuation`, and
+  `kotlin.coroutines.startCoroutine` path are now included in the repo smoke. A
+  full-classpath local run completed in 171 seconds; both the host JVM and
+  Doppio printed `suspend=7`. This covers suspend metadata and immediate
+  coroutine completion, but not a real suspension/resume state machine.
 
 Historical checks that led to this boundary:
 
@@ -378,9 +383,9 @@ Historical checks that led to this boundary:
 
 The next reduction should broaden the compiler smoke rather than keep treating
 minimal `Hello.kt` or full classpath startup as the primary blocker. Focus on
-repeated variance checks and small source files that add custom delegates,
-suspend metadata, coroutine-shaped lowering, and broader JVM bytecode emission.
-The current evidence still points at broad compiler throughput, but the first
+repeated variance checks and small source files that add custom delegates, real
+suspension/resume state-machine lowering, and broader JVM bytecode emission. The
+current evidence still points at broad compiler throughput, but the first
 compile-and-run milestone now passes in both minimal and full-classpath modes.
 
 ## Implementation Plan
@@ -389,7 +394,7 @@ compile-and-run milestone now passes in both minimal and full-classpath modes.
 2. Keep `ci/kotlin_smoke.sh` green in CI while broadening the checked Kotlin
    sources.
 3. Keep broadening the Kotlin smoke in small increments that distinguish
-   custom delegated properties, suspend metadata, coroutine-shaped lowering,
+   custom delegated properties, real suspension/resume state-machine lowering,
    and broader JVM bytecode emission.
 4. If a smoke is slow because of repeated Java exceptions, reduce the specific
    exception pattern to a Java fixture before optimizing Doppio. The generic
