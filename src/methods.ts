@@ -94,6 +94,103 @@ var trapped_methods: { [clsName: string]: { [methodName: string]: Function } } =
     'checkParameterIsNotNull(Ljava/lang/Object;Ljava/lang/String;)V': kotlinCheckParameterIsNotNull,
     'checkNotNullParameter(Ljava/lang/Object;Ljava/lang/String;)V': kotlinCheckNotNullParameter
   },
+  'org/jetbrains/kotlin/codegen/serialization/JvmSerializationBindings': {
+    'get(Lorg/jetbrains/kotlin/codegen/serialization/JvmSerializationBindings$SerializationMappingSlice;Ljava/lang/Object;)Ljava/lang/Object;': function(thread: JVMThread, javaThis: JVMTypes.java_lang_Object, slice: JVMTypes.java_lang_Object, key: JVMTypes.java_lang_Object): JVMTypes.java_lang_Object {
+      if (slice === null) {
+        thread.throwNewException('Ljava/lang/IllegalArgumentException;',
+          "Argument for @NotNull parameter 'slice' of org/jetbrains/kotlin/codegen/serialization/JvmSerializationBindings.get must not be null");
+        return null;
+      }
+      if (key === null) {
+        thread.throwNewException('Ljava/lang/IllegalArgumentException;',
+          "Argument for @NotNull parameter 'key' of org/jetbrains/kotlin/codegen/serialization/JvmSerializationBindings.get must not be null");
+        return null;
+      }
+
+      const map = (<any> javaThis)['org/jetbrains/kotlin/codegen/serialization/JvmSerializationBindings/map'];
+      if (map === null) {
+        return null;
+      }
+      const backing = (<any> map)['org/jetbrains/kotlin/util/slicedMap/SlicedMapImpl/map'];
+      if (backing === null) {
+        return null;
+      }
+      const arrayObject = (<any> backing)['org/jetbrains/kotlin/util/slicedMap/OpenAddressLinearProbingHashTable/array'],
+        array = arrayObject !== null && arrayObject !== undefined ? arrayObject.array : null,
+        shift = (<any> backing)['org/jetbrains/kotlin/util/slicedMap/OpenAddressLinearProbingHashTable/shift'];
+      if (array === null || array === undefined || typeof shift !== 'number') {
+        thread.setStatus(ThreadStatus.ASYNC_WAITING);
+        (<any> map)['get(Lorg/jetbrains/kotlin/util/slicedMap/ReadOnlySlice;Ljava/lang/Object;)Ljava/lang/Object;'](thread, [slice, key], forwardResult(thread));
+        return null;
+      }
+      const keyClass = typeof (<any> key).getClass === 'function' ? (<any> key).getClass() : null,
+        keyHashCodeMethod = keyClass !== null ? keyClass.methodLookup('hashCode()I') : null;
+      if (keyHashCodeMethod === null || keyHashCodeMethod.cls.getInternalName() !== 'Ljava/lang/Object;') {
+        thread.setStatus(ThreadStatus.ASYNC_WAITING);
+        (<any> map)['get(Lorg/jetbrains/kotlin/util/slicedMap/ReadOnlySlice;Ljava/lang/Object;)Ljava/lang/Object;'](thread, [slice, key], forwardResult(thread));
+        return null;
+      }
+
+      const keyRef = (<any> key).ref | 0,
+        keyRefLow = keyRef & 0xffff,
+        keyRefHigh = keyRef >>> 16,
+        mixedHash = (keyRefLow * 0x79b9 + (((keyRefHigh * 0x79b9 + keyRefLow * 0x9e37) & 0xffff) << 16)) | 0;
+      let holder: JVMTypes.java_lang_Object = null,
+        fallback = false,
+        i = ((mixedHash >>> shift) << 1) >>> 0;
+      if (i >= array.length) {
+        fallback = true;
+      } else {
+        const candidate = array[i];
+        if (candidate === null || candidate === undefined) {
+          return null;
+        } else if (candidate === key) {
+          holder = array[i + 1];
+        } else {
+          fallback = true;
+        }
+      }
+
+      if (fallback) {
+        thread.setStatus(ThreadStatus.ASYNC_WAITING);
+        (<any> map)['get(Lorg/jetbrains/kotlin/util/slicedMap/ReadOnlySlice;Ljava/lang/Object;)Ljava/lang/Object;'](thread, [slice, key], forwardResult(thread));
+        return null;
+      }
+      if (holder === null) {
+        return null;
+      }
+
+      const oneKey = (<any> holder)['com/intellij/util/keyFMap/OneElementFMap/myKey'];
+      if (oneKey !== undefined) {
+        return oneKey === slice ? (<any> holder)['com/intellij/util/keyFMap/OneElementFMap/myValue'] : null;
+      }
+      const pairKey1 = (<any> holder)['com/intellij/util/keyFMap/PairElementsFMap/key1'];
+      if (pairKey1 !== undefined) {
+        if (pairKey1 === slice) {
+          return (<any> holder)['com/intellij/util/keyFMap/PairElementsFMap/value1'];
+        }
+        return (<any> holder)['com/intellij/util/keyFMap/PairElementsFMap/key2'] === slice ?
+          (<any> holder)['com/intellij/util/keyFMap/PairElementsFMap/value2'] : null;
+      }
+      const arrayKeysObject = (<any> holder)['com/intellij/util/keyFMap/ArrayBackedFMap/keys'],
+        arrayValuesObject = (<any> holder)['com/intellij/util/keyFMap/ArrayBackedFMap/values'];
+      if (arrayKeysObject !== undefined && arrayValuesObject !== undefined) {
+        const keys = arrayKeysObject.array,
+          values = arrayValuesObject.array,
+          sliceIndex = (<any> slice)['com/intellij/openapi/util/Key/myIndex'];
+        for (let j = 0; j < keys.length; j++) {
+          if (keys[j] === sliceIndex) {
+            return values[j];
+          }
+        }
+        return null;
+      }
+
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      (<any> map)['get(Lorg/jetbrains/kotlin/util/slicedMap/ReadOnlySlice;Ljava/lang/Object;)Ljava/lang/Object;'](thread, [slice, key], forwardResult(thread));
+      return null;
+    }
+  },
   'java/lang/ref/Reference': {
     // NOP, because we don't do our own GC and also this starts a thread?!?!?!
     '<clinit>()V': function (thread: JVMThread): void { }

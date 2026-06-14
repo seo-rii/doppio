@@ -20,12 +20,13 @@ node --no-deprecation build/release-cli/console/runner.js \
 - `kotlin-compiler.jar` alone is a valid native classpath for the `Hello.kt`
   smoke; using `kotlinc/lib/*.jar` is unnecessary for the first compiler target
   and adds substantial JAR lookup noise under Doppio.
-- The current functional blocker is a long-running one-file compile after FIR
-  status resolution is fixed. An empty Kotlin source file now completes under
-  Doppio and writes `META-INF/main.kotlin_module`, but adding only
-  `fun main() {}` still exceeds a 420 second timeout with no output directory.
-  `Hello.kt` with `println` exceeded fifteen minutes under the same minimal
-  `kotlin-compiler.jar` classpath.
+- The first one-file compiler target now passes under Doppio. With the minimal
+  `kotlin-compiler.jar` classpath, Doppio compiles an empty source,
+  `class Foo`, `fun main() {}`, and `fun main() { println("hi") }`; the
+  generated `HelloKt` class runs on both the host JVM and Doppio. The remaining
+  Kotlin compiler work is now broader throughput and coverage hardening:
+  repeated variance checks, more language constructs, and the full
+  `kotlinc/lib/*.jar` classpath stress case.
 - `-Xint` does not solve the one-file compile hang, so JIT overhead is not the
   sole blocker.
 - The CLI now exposes Doppio's scheduler quantum as
@@ -141,13 +142,40 @@ public
 public
 ```
 
-## Current Blocker: Long-Running Hello.kt Compile
+## Current Boundary: Minimal Hello.kt Compile Passes
 
 After the visibility fix, the compiler no longer throws
-`unknown is not a valid visibility`. The remaining blocker is that the real
-`Hello.kt` compile keeps running without output or class files.
+`unknown is not a valid visibility`. A later class-only diagnostic showed long
+samples in
+`org.jetbrains.kotlin.codegen.serialization.JvmSerializationBindings.get`, at
+the `MutableSlicedMap.get(slice, key)` wrapper call used by Kotlin metadata
+serialization. Doppio now traps the no-collision identity-hit case directly for
+that Kotlin-internal wrapper and falls back to the original bytecode for
+collisions, unknown holder shapes, or backing-map layouts that are not covered
+by the fast path.
 
-Observed checks:
+Current verified checks:
+
+- 2026-06-14 Kotlin 2.4.0 minimal `kotlin-compiler.jar` measurements under
+  `node --max-old-space-size=4096 --no-deprecation`, with
+  `-Xresponsiveness:100000`:
+  - Empty Kotlin source file: status 0 in 85 seconds, output
+    `META-INF/main.kotlin_module`.
+  - `class Foo`: status 0 in 59 seconds, output `Foo.class` and
+    `META-INF/main.kotlin_module`.
+  - `fun main() {}` with `-no-stdlib -no-reflect`: status 0 in 48 seconds,
+    output `EmptyMainKt.class` and `META-INF/main.kotlin_module`.
+  - `fun main() { println("hi") }` with `-no-reflect`: status 0 in 61 seconds,
+    output `HelloKt.class` and `META-INF/main.kotlin_module`.
+  - The generated `HelloKt` class prints `hi` on the host JVM.
+  - The generated `HelloKt` class also prints `hi` under Doppio.
+- The fast path is intentionally narrow: it handles only keys that use
+  `java.lang.Object.hashCode()`, the observed `OpenAddressLinearProbingHashTable`
+  identity slot hit, and `OneElementFMap`, `PairElementsFMap`, and
+  `ArrayBackedFMap` holders. Other cases defer to Kotlin's original bytecode
+  implementation.
+
+Historical checks that led to this boundary:
 
 - 2026-06-12 Kotlin 2.4.0 minimal `kotlin-compiler.jar` measurements under
   `node --max-old-space-size=4096 --no-deprecation`, rechecked after the
@@ -319,34 +347,38 @@ Observed checks:
   before it was stopped. The compiler is not simply stuck before backend
   codegen, but it is still far too slow or cycling before writing class files.
 
-The next reduction should keep sampling class-only runs across successful and
-timed-out executions, then compare the sampled phases. If class-only can be made
-repeatably successful, advance the boundary to `fun main() {}` and the
-`Hello.kt` smoke. The current evidence points at broad compiler throughput
-rather than a single semantic failure before classfile generation.
+The next reduction should broaden the compiler smoke rather than keep treating
+minimal `Hello.kt` as the primary blocker. Focus on repeated variance checks,
+small source files that add calls, properties, data classes, lambdas, generics,
+and annotations, then the full `kotlinc/lib/*.jar` classpath as a stress case.
+The current evidence still points at broad compiler throughput, but the first
+minimal compile-and-run milestone is now passing.
 
 ## Implementation Plan
 
 1. Keep the repo fixture for interface default-method specificity green.
-2. Build smaller Kotlin smokes that distinguish class declaration, function
-   declaration, metadata serialization, and JVM bytecode emission. The important
-   boundary is now empty source success versus any emitted declaration timeout,
-   with the first backend focus on JVM bytecode generation after lowering.
-3. If a smoke is slow because of repeated Java exceptions, reduce the specific
+2. Promote the current `/tmp` Kotlin smoke into a repeatable test harness once
+   the repository has a practical way to cache or fetch the Kotlin compiler
+   artifact in CI without bloating the tree.
+3. Build smaller Kotlin smokes that distinguish class declaration, function
+   declaration, metadata serialization, standard-library calls, lambdas,
+   generics, annotations, and JVM bytecode emission.
+4. If a smoke is slow because of repeated Java exceptions, reduce the specific
    exception pattern to a Java fixture before optimizing Doppio. The generic
    lazy `Throwable` stack trace path is already covered.
-4. If a smoke diverges semantically, reduce the primitive to a Java fixture
+5. If a smoke diverges semantically, reduce the primitive to a Java fixture
    where possible. If it is Kotlin-compiler-internal behavior, keep a small
    `/tmp` Kotlin smoke and document the exact class/method path before changing
    VM semantics.
-5. Fix the primitive, rerun `Hello.kt` with `kotlin-compiler.jar` only, then
-   rerun with the full `kotlinc/lib/*.jar` classpath as a stress check.
+6. Rerun the full `kotlinc/lib/*.jar` classpath as a stress check after each
+   throughput change that helps the minimal smoke.
 
 ## Done Criteria For The First Goal
 
-- `K2JVMCompiler -version` exits with status 0 under Doppio. This is currently
-  passing.
-- A simple `Hello.kt` compiles under Doppio's Kotlin compiler invocation.
-- The resulting class runs on a native JVM and, if feasible, under Doppio.
+- `K2JVMCompiler -version` exits with status 0 under Doppio. This is passing.
+- A simple `Hello.kt` compiles under Doppio's Kotlin compiler invocation. This
+  is passing for the minimal `kotlin-compiler.jar` classpath.
+- The resulting class runs on a native JVM and, if feasible, under Doppio. This
+  is passing for the generated `HelloKt` class.
 - Each compatibility primitive discovered on the path has a focused test in the
   repository rather than only a Kotlin compiler smoke.

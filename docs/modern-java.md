@@ -70,14 +70,15 @@ run.
 ## Kotlin Compiler Bring-Up
 
 - Target: Kotlin compiler 2.4.0.
-- Current Doppio state: `K2JVMCompiler -version` exits with status 0.
-- Empty Kotlin source now compiles under Doppio and writes module metadata.
-- The one-file `Hello.kt` smoke no longer fails with `visibility: unknown`, but
-  `fun main() {}` still exceeds ten minutes with no output directory under
-  `node --max-old-space-size=4096`.
-- Next blocker: isolate why any emitted declaration leaves the compiler in a
-  long-running FIR/IR/codegen path. Current notes live in
-  `docs/design/kotlin-compiler.md`.
+- Current Doppio state: `K2JVMCompiler -version` exits with status 0, and the
+  minimal `Hello.kt` compiler smoke now compiles and runs.
+- Empty Kotlin source, `class Foo`, `fun main() {}`, and
+  `fun main() { println("hi") }` now compile under Doppio with the minimal
+  `kotlin-compiler.jar` classpath; the generated `HelloKt` class prints `hi`
+  on both the host JVM and Doppio.
+- Next blocker: broaden the Kotlin compiler smoke to more source constructs,
+  reduce remaining throughput variance, and stress the full `kotlinc/lib/*.jar`
+  classpath. Current notes live in `docs/design/kotlin-compiler.md`.
 
 ## Current Test Targets
 
