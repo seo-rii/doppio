@@ -373,6 +373,17 @@ Current verified checks:
   `$$delegatedProperties`, `MutablePropertyReference1Impl`, inlined delegate
   classes, companion/nested object initialization, and `StackMapTable`
   metadata.
+- A minimal collection-builder smoke compiled in 78 seconds and both the host
+  JVM and Doppio printed
+  `24678|k0=4,k1=16,k2=36,k3=49,k4=64|e=20,o=7|12,21,8|24|67|8|678/24|2:4;4:6;6:7|abc|22,44,66,77,88|1:3:7:13:20:28|71|2,1,0,9`.
+  The repo smoke now includes the same path and completed in 293 seconds with
+  the full classpath. `javap` verified `CollectionsKt.createListBuilder` /
+  `build`, `MapsKt.createMapBuilder` / `build`,
+  `SetsKt.createSetBuilder` / `build`, inlined `groupingBy`, `fold`,
+  `windowed`, `chunked`, `partition`, `zipWithNext`, `flatten`,
+  `associateWith`, `runningFold`, `reduceIndexed`, `toSortedMap`,
+  `invokedynamic` `Function1` lambdas, `StackMapTable`, and
+  `kotlin.Metadata`.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering

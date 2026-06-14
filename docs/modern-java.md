@@ -122,8 +122,10 @@ run.
   `StackMapTable` metadata, plus `lateinit` property accessors,
   `LazyThreadSafetyMode.NONE` lazy initialization, `notNull`/`observable`/
   `vetoable` delegates, delegated-property references, and companion/nested
-  object initialization, then runs the generated code on both the host JVM and
-  Doppio with `kotlin-stdlib.jar`.
+  object initialization, plus `buildList`/`buildMap`/`buildSet`, grouping
+  folds, windowed/chunked collection transforms, partitioning, `zipWithNext`,
+  `flatten`, `associateWith`, `runningFold`, and `reduceIndexed`, then runs
+  the generated code on both the host JVM and Doppio with `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only
   `kotlin-compiler.jar`.
