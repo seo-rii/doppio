@@ -346,6 +346,15 @@ Current verified checks:
   `ScoreMap` and `PairList` typealias metadata, generic class signatures,
   use-site variance and star-projection `Signature` attributes, and the
   inlined `sortedBy` comparator class.
+- A minimal receiver-lambda and extension callable-reference smoke compiled in
+  79 seconds and both the host JVM and Doppio printed
+  `s|[a]|kn|<GO>|x1|(xy)|{q}|ad|text`. The repo smoke now includes the same
+  path and completed in 275 seconds with the full classpath. `javap` verified
+  `ExtensionFunctionType` metadata, `BuilderBlock` typealias metadata,
+  `Function2` receiver-lambda signatures, extension callable-reference and
+  bound-reference classes, extension property-reference lowering, the
+  `decorate$default` bridge, invokedynamic lambda sites, and runtime-visible
+  receiver-parameter annotations.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering

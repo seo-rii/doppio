@@ -26,4 +26,5 @@ fun main() {
   println(delegationBridgeSummary())
   println(annotationMetadataSummary())
   println(extensionVarianceSummary())
+  println(receiverLambdaSummary())
 }
