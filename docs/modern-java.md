@@ -78,7 +78,10 @@ run.
   `kotlin-compiler.jar` classpath; the generated `HelloKt` class prints `hi`
   on both the host JVM and Doppio.
 - The minimal `Hello.kt` smoke runs in the `Modern Java` GitHub Actions
-  workflow via `ci/kotlin_smoke.sh`.
+  workflow via `ci/kotlin_smoke.sh`; it now covers a small multi-file source
+  set with a data class, annotation class, interface default implementation,
+  generic class, default arguments, string templates, and a lambda, then runs
+  the generated code on both the host JVM and Doppio with `kotlin-stdlib.jar`.
 - Next blocker: broaden the Kotlin compiler smoke to more source constructs,
   reduce remaining throughput variance, and stress the full `kotlinc/lib/*.jar`
   classpath. Current notes live in `docs/design/kotlin-compiler.md`.

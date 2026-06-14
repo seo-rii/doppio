@@ -6,6 +6,7 @@ version="${KOTLIN_COMPILER_VERSION:-2.4.0}"
 cache_dir="${KOTLIN_SMOKE_CACHE_DIR:-"$repo_root/build/kotlin-smoke-cache"}"
 work_dir="${KOTLIN_SMOKE_WORK_DIR:-"$repo_root/build/kotlin-smoke"}"
 compiler_jar="${KOTLIN_COMPILER_JAR:-}"
+stdlib_jar="${KOTLIN_STDLIB_JAR:-}"
 
 if [ -z "$compiler_jar" ]; then
   dist_dir="$cache_dir/kotlin-compiler-$version"
@@ -28,8 +29,19 @@ if [ ! -f "$compiler_jar" ]; then
   exit 1
 fi
 
+if [ -z "$stdlib_jar" ]; then
+  candidate_stdlib_jar="$(dirname "$compiler_jar")/kotlin-stdlib.jar"
+  if [ -f "$candidate_stdlib_jar" ]; then
+    stdlib_jar="$candidate_stdlib_jar"
+  fi
+fi
+if [ -z "$stdlib_jar" ] || [ ! -f "$stdlib_jar" ]; then
+  echo "Kotlin stdlib jar not found; set KOTLIN_STDLIB_JAR or use the kotlin-compiler package layout." >&2
+  exit 1
+fi
+
 runner="$repo_root/build/release-cli/console/runner.js"
-source_file="$repo_root/classes/kotlin_smoke/Hello.kt"
+source_dir="$repo_root/classes/kotlin_smoke"
 out_dir="$work_dir/out-hello"
 
 rm -rf "$out_dir"
@@ -47,20 +59,25 @@ timeout -s INT "${compile_timeout}s" \
   org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
   -no-reflect \
   -d "$out_dir" \
-  "$source_file"
+  "$source_dir"/*.kt
 compile_end="$(date +%s)"
 
 test -f "$out_dir/HelloKt.class"
+test -f "$out_dir/ConstructsKt.class"
 test -f "$out_dir/META-INF/main.kotlin_module"
 
-native_output="$(java -cp "$out_dir" HelloKt)"
-if [ "$native_output" != "hi" ]; then
+runtime_cp="$out_dir"
+runtime_cp="$runtime_cp:$stdlib_jar"
+expected_output="$(printf 'hi\nname=2,4:5')"
+
+native_output="$(java -cp "$runtime_cp" HelloKt)"
+if [ "$native_output" != "$expected_output" ]; then
   echo "Unexpected native JVM output: $native_output" >&2
   exit 1
 fi
 
-doppio_output="$(timeout -s INT "${run_timeout}s" node --no-deprecation "$runner" -cp "$out_dir" HelloKt)"
-if [ "$doppio_output" != "hi" ]; then
+doppio_output="$(timeout -s INT "${run_timeout}s" node --no-deprecation "$runner" -cp "$runtime_cp" HelloKt)"
+if [ "$doppio_output" != "$expected_output" ]; then
   echo "Unexpected Doppio output: $doppio_output" >&2
   exit 1
 fi

@@ -178,6 +178,10 @@ Current verified checks:
   `ci/kotlin_smoke.sh` and the `Modern Java` GitHub Actions workflow. The
   workflow caches `kotlin-compiler@2.4.0` outside the repository tree and runs
   the generated class on both the host JVM and Doppio.
+- The CI smoke now compiles multiple Kotlin files covering a data class,
+  annotation class, interface default implementation, generic class, default
+  arguments, string templates, and a lambda. Runtime execution includes
+  `kotlin-stdlib.jar` and checks the same output on the host JVM and Doppio.
 
 Historical checks that led to this boundary:
 
@@ -363,9 +367,9 @@ minimal compile-and-run milestone is now passing.
 1. Keep the repo fixture for interface default-method specificity green.
 2. Keep `ci/kotlin_smoke.sh` green in CI while broadening the checked Kotlin
    sources.
-3. Build smaller Kotlin smokes that distinguish class declaration, function
-   declaration, metadata serialization, standard-library calls, lambdas,
-   generics, annotations, and JVM bytecode emission.
+3. Keep broadening the Kotlin smoke in small increments that distinguish
+   properties, collections, exceptions, object declarations, companion objects,
+   sealed/data hierarchy shapes, suspend metadata, and JVM bytecode emission.
 4. If a smoke is slow because of repeated Java exceptions, reduce the specific
    exception pattern to a Java fixture before optimizing Doppio. The generic
    lazy `Throwable` stack trace path is already covered.
