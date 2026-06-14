@@ -201,6 +201,13 @@ Observed checks:
     workloads. This leaves default VM behavior unchanged.
   - Instance invoke fast paths combine argument slicing with receiver stack
     dropping for non-zero-argument calls.
+  - Kotlin `Intrinsics` null-check helpers are trapped as VM natives for the
+    common no-op path. Coverage lives in
+    `classes/test/KotlinIntrinsicsNullCheck.java`.
+  - A precise `Intrinsics.areEqual(Object, Object)` trap was rejected after
+    testing. The non-null case must call dynamic Java `equals`, which requires
+    a callback/native-frame round trip; the empty Kotlin source smoke regressed
+    to about 120 seconds from the previous 77 second local measurement.
   - Empty Kotlin source still completes and writes `META-INF/main.kotlin_module`;
     with large `-Xresponsiveness` values it completed in the tens of seconds in
     local measurements.
