@@ -227,6 +227,12 @@ Observed checks:
     seconds. `class Foo` still timed out at 180 seconds with no output
     directory, so the remaining blocker is not just generic stack slicing in
     the fast invoke opcode.
+  - A native trap for the thin
+    `JvmSerializationBindings.get/put -> MutableSlicedMap.get/put` wrappers was
+    rejected. The wrapper trap still had to call back into JVM bytecode for the
+    underlying sliced map operation and added native/callback-frame overhead;
+    the empty-source smoke timed out at 120 seconds from the 62 second
+    fast-invoke baseline.
   - Empty Kotlin source still completes and writes `META-INF/main.kotlin_module`;
     with large `-Xresponsiveness` values it completed in the tens of seconds in
     local measurements.
