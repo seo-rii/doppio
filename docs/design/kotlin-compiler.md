@@ -315,6 +315,12 @@ Current verified checks:
   `setValue`, generated `$$delegatedProperties`, and mutable property-reference
   lowering through `MutablePropertyReference0Impl` and
   `MutablePropertyReference1Impl`.
+- A minimal captured-class shape smoke compiled in 72 seconds and both the host
+  JVM and Doppio printed `234:yx:true:11:45|89:yx:true:8:5`. The repo smoke now
+  includes the same path and completed in 233 seconds with the full classpath.
+  `javap` verified captured local-class fields, anonymous `Runnable` object
+  lowering, inner-class `this$0`, nested companion construction, and generated
+  `access$mix` / `access$getSecret$p` synthetic accessors.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering

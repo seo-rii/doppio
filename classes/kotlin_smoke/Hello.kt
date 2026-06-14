@@ -22,4 +22,5 @@ fun main() {
   println(inlineControlSummary())
   println(jvmInteropSummary())
   println(mutableDelegateSummary())
+  println(captureShapeSummary())
 }
