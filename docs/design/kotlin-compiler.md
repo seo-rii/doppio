@@ -174,6 +174,10 @@ Current verified checks:
   identity slot hit, and `OneElementFMap`, `PairElementsFMap`, and
   `ArrayBackedFMap` holders. Other cases defer to Kotlin's original bytecode
   implementation.
+- The minimal `Hello.kt` compile-and-run smoke is now tracked by
+  `ci/kotlin_smoke.sh` and the `Modern Java` GitHub Actions workflow. The
+  workflow caches `kotlin-compiler@2.4.0` outside the repository tree and runs
+  the generated class on both the host JVM and Doppio.
 
 Historical checks that led to this boundary:
 
@@ -357,9 +361,8 @@ minimal compile-and-run milestone is now passing.
 ## Implementation Plan
 
 1. Keep the repo fixture for interface default-method specificity green.
-2. Promote the current `/tmp` Kotlin smoke into a repeatable test harness once
-   the repository has a practical way to cache or fetch the Kotlin compiler
-   artifact in CI without bloating the tree.
+2. Keep `ci/kotlin_smoke.sh` green in CI while broadening the checked Kotlin
+   sources.
 3. Build smaller Kotlin smokes that distinguish class declaration, function
    declaration, metadata serialization, standard-library calls, lambdas,
    generics, annotations, and JVM bytecode emission.

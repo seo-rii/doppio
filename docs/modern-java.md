@@ -64,8 +64,9 @@ run.
 - Hard runtime features need a design document before implementation and tests
   for both success and failure paths.
 - Kotlin compiler bring-up uses a layered smoke: first `K2JVMCompiler -version`,
-  then a one-file Kotlin compile, while each discovered VM/class-library gap is
-  reduced to a focused Java fixture before being counted as supported.
+  then a CI-backed one-file Kotlin compile-and-run through
+  `ci/kotlin_smoke.sh`, while each discovered VM/class-library gap is reduced
+  to a focused Java fixture before being counted as supported.
 
 ## Kotlin Compiler Bring-Up
 
@@ -76,6 +77,8 @@ run.
   `fun main() { println("hi") }` now compile under Doppio with the minimal
   `kotlin-compiler.jar` classpath; the generated `HelloKt` class prints `hi`
   on both the host JVM and Doppio.
+- The minimal `Hello.kt` smoke runs in the `Modern Java` GitHub Actions
+  workflow via `ci/kotlin_smoke.sh`.
 - Next blocker: broaden the Kotlin compiler smoke to more source constructs,
   reduce remaining throughput variance, and stress the full `kotlinc/lib/*.jar`
   classpath. Current notes live in `docs/design/kotlin-compiler.md`.

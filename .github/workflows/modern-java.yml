@@ -37,3 +37,12 @@ jobs:
 
       - name: Run core array compatibility smoke
         run: node build/release-cli/console/test_runner.js classes/test/ArrayOps --makefile
+
+      - name: Cache Kotlin compiler
+        uses: actions/cache@v4
+        with:
+          path: build/kotlin-smoke-cache
+          key: kotlin-compiler-2.4.0
+
+      - name: Run Kotlin compiler smoke
+        run: ./ci/kotlin_smoke.sh
