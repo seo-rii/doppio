@@ -6,6 +6,7 @@ import kotlin.coroutines.suspendCoroutine
 
 private var delayedContinuation: Continuation<Int>? = null
 private var failingContinuation: Continuation<Int>? = null
+private var threadedContinuation: Continuation<Int>? = null
 
 suspend fun suspendValue(seed: Int): Int = seed + 2
 
@@ -95,5 +96,33 @@ fun stateExceptionSummary(): String {
   val continuation = failingContinuation ?: return "missing-failing"
   failingContinuation = null
   continuation.resume(3)
+  return beforeResume + "->" + outcome
+}
+
+suspend fun threadedStateValue(seed: Int): Int {
+  val resumed = suspendCoroutine<Int> { continuation ->
+    threadedContinuation = continuation
+  }
+  return seed * resumed
+}
+
+fun threadedStateSummary(): String {
+  var outcome = "pending"
+  val block: suspend () -> Int = { threadedStateValue(6) }
+  block.startCoroutine(object : Continuation<Int> {
+    override val context = EmptyCoroutineContext
+
+    override fun resumeWith(result: Result<Int>) {
+      outcome = "thread=" + result.getOrThrow()
+    }
+  })
+  val beforeResume = outcome
+  val thread = Thread {
+    val continuation = threadedContinuation ?: return@Thread
+    threadedContinuation = null
+    continuation.resume(4)
+  }
+  thread.start()
+  thread.join()
   return beforeResume + "->" + outcome
 }

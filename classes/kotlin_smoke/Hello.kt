@@ -9,4 +9,5 @@ fun main() {
   println(delayedStateSummary())
   println(stateExceptionSummary())
   println(bytecodeSummary())
+  println(threadedStateSummary())
 }
