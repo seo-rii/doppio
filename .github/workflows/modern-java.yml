@@ -45,4 +45,6 @@ jobs:
           key: kotlin-compiler-2.4.0
 
       - name: Run Kotlin compiler smoke
+        env:
+          KOTLIN_SMOKE_CLASSPATH_MODE: full
         run: ./ci/kotlin_smoke.sh

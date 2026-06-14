@@ -182,6 +182,14 @@ Current verified checks:
   annotation class, interface default implementation, generic class, default
   arguments, string templates, and a lambda. Runtime execution includes
   `kotlin-stdlib.jar` and checks the same output on the host JVM and Doppio.
+- The same smoke now passes with the full `kotlinc/lib/*.jar` classpath. A
+  local 2026-06-14 run completed in 83 seconds and produced `HelloKt`,
+  `ConstructsKt`, `SmokePoint`, `SmokeNamed`, `SmokeBox`, `SmokeTag`, and
+  `META-INF/main.kotlin_module`; both the host JVM and Doppio printed
+  `hi` / `name=2,4:5`. A follow-up run through `ci/kotlin_smoke.sh` completed
+  in 183 seconds, so runtime variance is still a real tracking point. The
+  `Modern Java` workflow runs this full-classpath mode with
+  `KOTLIN_SMOKE_CLASSPATH_MODE=full`.
 
 Historical checks that led to this boundary:
 
@@ -300,8 +308,9 @@ Historical checks that led to this boundary:
     signature parsing. This suggests the slow path is broad compiler throughput
     with several hot phases, not one permanently stuck frame.
 
-- Full `kotlinc/lib/*.jar` classpath: exceeded five minutes, CPU active, no
-  class output.
+- Earlier full `kotlinc/lib/*.jar` classpath checks exceeded five minutes with
+  CPU active and no class output. This has been superseded for the current
+  CI smoke by the 2026-06-14 full-classpath success above.
 - Minimal `kotlin-compiler.jar` classpath: exceeded fifteen minutes, CPU active,
   no class output.
 - Empty Kotlin source file: completed under Doppio and produced only
@@ -356,11 +365,12 @@ Historical checks that led to this boundary:
   codegen, but it is still far too slow or cycling before writing class files.
 
 The next reduction should broaden the compiler smoke rather than keep treating
-minimal `Hello.kt` as the primary blocker. Focus on repeated variance checks,
-small source files that add calls, properties, data classes, lambdas, generics,
-and annotations, then the full `kotlinc/lib/*.jar` classpath as a stress case.
-The current evidence still points at broad compiler throughput, but the first
-minimal compile-and-run milestone is now passing.
+minimal `Hello.kt` or full classpath startup as the primary blocker. Focus on
+repeated variance checks and small source files that add properties,
+collections, exceptions, object declarations, companion objects, sealed/data
+hierarchy shapes, suspend metadata, and JVM bytecode emission. The current
+evidence still points at broad compiler throughput, but the first
+compile-and-run milestone now passes in both minimal and full-classpath modes.
 
 ## Implementation Plan
 
@@ -377,8 +387,8 @@ minimal compile-and-run milestone is now passing.
    where possible. If it is Kotlin-compiler-internal behavior, keep a small
    `/tmp` Kotlin smoke and document the exact class/method path before changing
    VM semantics.
-6. Rerun the full `kotlinc/lib/*.jar` classpath as a stress check after each
-   throughput change that helps the minimal smoke.
+6. Keep the full `kotlinc/lib/*.jar` classpath stress path in CI and compare
+   elapsed time after each throughput change.
 
 ## Done Criteria For The First Goal
 

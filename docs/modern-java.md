@@ -82,9 +82,12 @@ run.
   set with a data class, annotation class, interface default implementation,
   generic class, default arguments, string templates, and a lambda, then runs
   the generated code on both the host JVM and Doppio with `kotlin-stdlib.jar`.
+- The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
+  covering the full `kotlinc/lib/*.jar` classpath rather than only
+  `kotlin-compiler.jar`.
 - Next blocker: broaden the Kotlin compiler smoke to more source constructs,
-  reduce remaining throughput variance, and stress the full `kotlinc/lib/*.jar`
-  classpath. Current notes live in `docs/design/kotlin-compiler.md`.
+  reduce remaining throughput variance, and compare full-classpath elapsed time.
+  Current notes live in `docs/design/kotlin-compiler.md`.
 
 ## Current Test Targets
 

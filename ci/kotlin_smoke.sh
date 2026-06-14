@@ -7,6 +7,8 @@ cache_dir="${KOTLIN_SMOKE_CACHE_DIR:-"$repo_root/build/kotlin-smoke-cache"}"
 work_dir="${KOTLIN_SMOKE_WORK_DIR:-"$repo_root/build/kotlin-smoke"}"
 compiler_jar="${KOTLIN_COMPILER_JAR:-}"
 stdlib_jar="${KOTLIN_STDLIB_JAR:-}"
+classpath_mode="${KOTLIN_SMOKE_CLASSPATH_MODE:-minimal}"
+compiler_cp="${KOTLIN_COMPILER_CLASSPATH:-}"
 
 if [ -z "$compiler_jar" ]; then
   dist_dir="$cache_dir/kotlin-compiler-$version"
@@ -39,6 +41,22 @@ if [ -z "$stdlib_jar" ] || [ ! -f "$stdlib_jar" ]; then
   echo "Kotlin stdlib jar not found; set KOTLIN_STDLIB_JAR or use the kotlin-compiler package layout." >&2
   exit 1
 fi
+if [ -z "$compiler_cp" ]; then
+  case "$classpath_mode" in
+    minimal)
+      compiler_cp="$compiler_jar"
+      ;;
+    full)
+      compiler_lib_dir="$(dirname "$compiler_jar")"
+      compiler_cp="$(printf ':%s' "$compiler_lib_dir"/*.jar)"
+      compiler_cp="${compiler_cp#:}"
+      ;;
+    *)
+      echo "Invalid KOTLIN_SMOKE_CLASSPATH_MODE: $classpath_mode" >&2
+      exit 1
+      ;;
+  esac
+fi
 
 runner="$repo_root/build/release-cli/console/runner.js"
 source_dir="$repo_root/classes/kotlin_smoke"
@@ -55,7 +73,7 @@ compile_start="$(date +%s)"
 timeout -s INT "${compile_timeout}s" \
   node --max-old-space-size=4096 --no-deprecation "$runner" \
   "-Xresponsiveness:$responsiveness" \
-  -cp "$compiler_jar" \
+  -cp "$compiler_cp" \
   org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
   -no-reflect \
   -d "$out_dir" \
@@ -82,4 +100,4 @@ if [ "$doppio_output" != "$expected_output" ]; then
   exit 1
 fi
 
-echo "Kotlin compiler smoke passed in $((compile_end - compile_start))s."
+echo "Kotlin compiler smoke passed in $((compile_end - compile_start))s using $classpath_mode classpath."
