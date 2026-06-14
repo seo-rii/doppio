@@ -119,8 +119,11 @@ run.
   references, and runtime-visible receiver-parameter annotations, plus tailrec
   lowering, labeled loops, local default-vararg helpers, spread-array calls,
   inline `Result` control flow, labeled `return@`, exception tables, and
-  `StackMapTable` metadata, then runs the generated code on both the host JVM
-  and Doppio with `kotlin-stdlib.jar`.
+  `StackMapTable` metadata, plus `lateinit` property accessors,
+  `LazyThreadSafetyMode.NONE` lazy initialization, `notNull`/`observable`/
+  `vetoable` delegates, delegated-property references, and companion/nested
+  object initialization, then runs the generated code on both the host JVM and
+  Doppio with `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only
   `kotlin-compiler.jar`.

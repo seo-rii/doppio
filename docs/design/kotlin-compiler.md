@@ -363,6 +363,16 @@ Current verified checks:
   lowering, local default-vararg helpers, spread-array calls, inline
   `runCatching` / `fold`, labeled `return@` lowering, `Exception table`
   entries, and `StackMapTable` metadata.
+- A minimal initialization/delegate smoke compiled in 72 seconds and both the
+  host JVM and Doppio printed
+  `false/true|KT:5:1|KT:5:1|kt|2/9/6|companion>observed:start->kt>guarded:2?1>guarded:2?9>lazy>nested`.
+  The repo smoke now includes the same path and completed in 284 seconds with
+  the full classpath. `javap` verified `lateinit` accessors and
+  `throwUninitializedPropertyAccessException`, `Delegates.notNull`,
+  `observable`, `vetoable`, `LazyThreadSafetyMode.NONE`, `LazyKt.lazy`,
+  `$$delegatedProperties`, `MutablePropertyReference1Impl`, inlined delegate
+  classes, companion/nested object initialization, and `StackMapTable`
+  metadata.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering
