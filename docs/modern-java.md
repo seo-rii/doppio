@@ -143,8 +143,12 @@ run.
   same-file checks, plus Kotlin source-level use of concurrent cache
   primitives covering `ConcurrentHashMap` compute/merge paths, atomics,
   `CopyOnWriteArrayList`, `ThreadLocal`, `ReentrantLock.withLock`,
-  synchronized maps, and one-shot thread-local isolation, then runs the
-  generated code on both the host JVM and Doppio with `kotlin-stdlib.jar`.
+  synchronized maps, and one-shot thread-local isolation, plus Kotlin
+  classpath resource lookup covering `Class.getResource`,
+  `ClassLoader.getResource`, `ClassLoader.getResources`,
+  `ClassLoader.getSystemResource`, context classloader swap/restore, and class
+  and module resource byte reads, then runs the generated code on both the host
+  JVM and Doppio with `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only
   `kotlin-compiler.jar`.

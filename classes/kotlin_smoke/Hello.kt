@@ -36,4 +36,5 @@ fun main() {
   println(fileIoSummary())
   println(nioPathSummary())
   println(concurrentCacheSummary())
+  println(resourceLookupSummary())
 }

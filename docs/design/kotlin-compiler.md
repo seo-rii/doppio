@@ -438,6 +438,17 @@ Current verified checks:
   `ReentrantLock` lowered through `Lock.lock` / `unlock`, synchronized map
   `monitorenter` / `monitorexit`, `LambdaMetafactory`, `StackMapTable`, and
   `kotlin.Metadata`.
+- A minimal classpath resource lookup smoke compiled with the repo suite in
+  387 seconds and both the host JVM and Doppio printed
+  `ffffff|4:cafebabe|1:1:true|true:true:true`. This covers Kotlin-generated
+  class and module resource discovery while avoiding environment-specific
+  absolute paths in the expected output. `javap` verified
+  `Class.getClassLoader`, `ClassLoader.getSystemClassLoader`, thread context
+  classloader get/set/restore, `ClassLoader.getResource`,
+  `ClassLoader.getSystemResource`, `ClassLoader.getResources`,
+  `Class.getResource`, `URL.openStream`, `Collections.list`,
+  `URL.toExternalForm`, exception-table-backed context restoration,
+  `LambdaMetafactory`, `StackMapTable`, and `kotlin.Metadata`.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering
