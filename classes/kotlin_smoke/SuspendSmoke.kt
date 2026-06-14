@@ -1,3 +1,4 @@
+import java.util.concurrent.Executors
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.resume
@@ -7,6 +8,7 @@ import kotlin.coroutines.suspendCoroutine
 private var delayedContinuation: Continuation<Int>? = null
 private var failingContinuation: Continuation<Int>? = null
 private var threadedContinuation: Continuation<Int>? = null
+private var executorContinuation: Continuation<Int>? = null
 
 suspend fun suspendValue(seed: Int): Int = seed + 2
 
@@ -125,4 +127,36 @@ fun threadedStateSummary(): String {
   thread.start()
   thread.join()
   return beforeResume + "->" + outcome
+}
+
+suspend fun executorStateValue(seed: Int): Int {
+  val resumed = suspendCoroutine<Int> { continuation ->
+    executorContinuation = continuation
+  }
+  return seed + resumed
+}
+
+fun executorStateSummary(): String {
+  var outcome = "pending"
+  val executor = Executors.newSingleThreadExecutor()
+  try {
+    val block: suspend () -> Int = { executorStateValue(5) }
+    block.startCoroutine(object : Continuation<Int> {
+      override val context = EmptyCoroutineContext
+
+      override fun resumeWith(result: Result<Int>) {
+        outcome = "executor=" + result.getOrThrow()
+      }
+    })
+    val beforeResume = outcome
+    val future = executor.submit {
+      val continuation = executorContinuation ?: return@submit
+      executorContinuation = null
+      continuation.resume(8)
+    }
+    future.get()
+    return beforeResume + "->" + outcome
+  } finally {
+    executor.shutdown()
+  }
 }

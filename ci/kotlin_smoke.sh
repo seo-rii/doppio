@@ -65,7 +65,7 @@ out_dir="$work_dir/out-hello"
 rm -rf "$out_dir"
 mkdir -p "$out_dir"
 
-compile_timeout="${KOTLIN_SMOKE_COMPILE_TIMEOUT_SECONDS:-600}"
+compile_timeout="${KOTLIN_SMOKE_COMPILE_TIMEOUT_SECONDS:-900}"
 run_timeout="${KOTLIN_SMOKE_RUN_TIMEOUT_SECONDS:-60}"
 responsiveness="${DOPPIO_KOTLIN_RESPONSIVENESS:-100000}"
 
@@ -96,7 +96,7 @@ test -f "$out_dir/META-INF/main.kotlin_module"
 
 runtime_cp="$out_dir"
 runtime_cp="$runtime_cp:$stdlib_jar"
-default_expected_output="$(printf 'hi\nname=2,4:5\nmode-FAST:3:2,3:caught\nOK:FALLBACK:3:9:2:1:accbbb:4:4:7\nsuspend=7\ndelegate:answer:DelegatedOwner|local:local:top\nstate=14\npending->delayed=15\npending->fail=resume3\ntry>catch>finally:boom:8:true:x3:10:12:4:sync\npending->thread=24')"
+default_expected_output="$(printf 'hi\nname=2,4:5\nmode-FAST:3:2,3:caught\nOK:FALLBACK:3:9:2:1:accbbb:4:4:7\nsuspend=7\ndelegate:answer:DelegatedOwner|local:local:top\nstate=14\npending->delayed=15\npending->fail=resume3\ntry>catch>finally:boom:8:true:x3:10:12:4:sync\npending->thread=24\npending->executor=13')"
 expected_output="${KOTLIN_SMOKE_EXPECTED_OUTPUT:-"$default_expected_output"}"
 
 native_output="$(java -cp "$runtime_cp" HelloKt)"

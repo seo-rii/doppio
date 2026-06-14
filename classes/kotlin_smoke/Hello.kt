@@ -10,4 +10,5 @@ fun main() {
   println(stateExceptionSummary())
   println(bytecodeSummary())
   println(threadedStateSummary())
+  println(executorStateSummary())
 }

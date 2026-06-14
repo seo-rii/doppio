@@ -224,6 +224,12 @@ Current verified checks:
   saving a continuation on the main thread, resuming it from a Java `Thread`,
   joining that thread, and observing the coroutine result after cross-thread
   completion.
+- A minimal executor-resume smoke compiled in 388 seconds and both the host JVM
+  and Doppio printed `pending->executor=13`. The full smoke with the same
+  executor path is now included in the repo smoke and completed in 522 seconds
+  after the compile timeout was raised to 900 seconds. This covers
+  `Executors.newSingleThreadExecutor()`, `submit`, `Future.get()`, `shutdown`,
+  and continuation resume from an executor worker.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering
@@ -406,7 +412,7 @@ Historical checks that led to this boundary:
 
 The next reduction should broaden the compiler smoke rather than keep treating
 minimal `Hello.kt` or full classpath startup as the primary blocker. Focus on
-repeated variance checks and small source files that add executor/event-loop
+repeated variance checks and small source files that add event-loop
 asynchronous resumption, more complex control-flow bytecode, and broader JVM
 bytecode emission. The current evidence still points at broad compiler
 throughput, but the first compile-and-run milestone now passes in both minimal
@@ -418,8 +424,8 @@ and full-classpath modes.
 2. Keep `ci/kotlin_smoke.sh` green in CI while broadening the checked Kotlin
    sources.
 3. Keep broadening the Kotlin smoke in small increments that distinguish
-   executor/event-loop asynchronous resumption, more complex control-flow
-   bytecode, and broader JVM bytecode emission.
+   event-loop asynchronous resumption, more complex control-flow bytecode, and
+   broader JVM bytecode emission.
 4. If a smoke is slow because of repeated Java exceptions, reduce the specific
    exception pattern to a Java fixture before optimizing Doppio. The generic
    lazy `Throwable` stack trace path is already covered.
