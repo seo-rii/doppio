@@ -245,6 +245,13 @@ Current verified checks:
   constructor, and companion-object callable references combined with
   `generateSequence`, `map`, `filter`, `flatMap`, `zip`, `joinToString`, and
   `fold`.
+- A minimal `@JvmInline value class` smoke compiled in 106 seconds and both the
+  host JVM and Doppio printed `v1,v4,v7:22:box4:v7:none|v11:a`. The repo smoke
+  now includes the same path and completed in 354 seconds with the full
+  classpath. It covers a value class implementing `Comparable` and a custom
+  interface, plus operator dispatch, property access, nullable boxing, `Any`
+  boxing, `Map` key equality/hash behavior, sorted-list comparison, and the
+  generated `box-impl`/`unbox-impl`/`equals-impl`/`hashCode-impl` methods.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering

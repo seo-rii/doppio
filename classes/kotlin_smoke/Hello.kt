@@ -13,4 +13,5 @@ fun main() {
   println(executorStateSummary())
   println(dispatchedStateSummary())
   println(referenceSequenceSummary())
+  println(valueClassSummary())
 }
