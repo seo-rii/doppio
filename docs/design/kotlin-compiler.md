@@ -220,6 +220,13 @@ Observed checks:
     120 seconds in the same run, while the restored baseline completed in 64
     seconds. Coverage for the existing JIT null exception behavior lives in
     `classes/test/JITNullChecks.java`.
+  - Fast virtual/interface invoke opcodes now specialize receiver and argument
+    stack extraction for common parameter counts instead of calling both
+    `fromTop` and `sliceAndDropFromTop`. The empty-source smoke completed in 62
+    seconds in the same environment where the restored baseline completed in 64
+    seconds. `class Foo` still timed out at 180 seconds with no output
+    directory, so the remaining blocker is not just generic stack slicing in
+    the fast invoke opcode.
   - Empty Kotlin source still completes and writes `META-INF/main.kotlin_module`;
     with large `-Xresponsiveness` values it completed in the tens of seconds in
     local measurements.

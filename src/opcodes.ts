@@ -1599,12 +1599,33 @@ export class Opcodes {
       methodReference = <MethodReference | InterfaceMethodReference> method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1)),
       opStack = frame.opStack,
       paramSize = methodReference.paramWordSize,
-      obj: JVMTypes.java_lang_Object = opStack.fromTop(paramSize);
+      rawStack = <any> opStack,
+      store = rawStack.store,
+      curr = rawStack.curr,
+      obj: JVMTypes.java_lang_Object = store[curr - (paramSize + 1)];
 
     if (!isNull(thread, frame, obj)) {
-      var args = paramSize > 0 ? opStack.sliceAndDropFromTop(paramSize, 1) : emptyArgs;
-      if (paramSize === 0) {
-        opStack.dropFromTop(1);
+      var args: any[];
+      rawStack.curr = curr - (paramSize + 1);
+      switch (paramSize) {
+        case 0:
+          args = emptyArgs;
+          break;
+        case 1:
+          args = [store[curr - 1]];
+          break;
+        case 2:
+          args = [store[curr - 2], store[curr - 1]];
+          break;
+        case 3:
+          args = [store[curr - 3], store[curr - 2], store[curr - 1]];
+          break;
+        case 4:
+          args = [store[curr - 4], store[curr - 3], store[curr - 2], store[curr - 1]];
+          break;
+        default:
+          args = store.slice(curr - paramSize, curr);
+          break;
       }
       assert(typeof (<any> obj)[methodReference.fullSignature] === 'function', `Resolved method ${methodReference.fullSignature} isn't defined?!`, thread);
       (<any> obj)[methodReference.fullSignature](thread, args);
@@ -1631,14 +1652,36 @@ export class Opcodes {
       methodReference = <MethodReference | InterfaceMethodReference> method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1)),
       count = methodReference.paramWordSize,
       opStack = frame.opStack,
-      obj: JVMTypes.java_lang_Object = opStack.fromTop(count);
+      rawStack = <any> opStack,
+      store = rawStack.store,
+      curr = rawStack.curr,
+      obj: JVMTypes.java_lang_Object = store[curr - (count + 1)];
     if (!isNull(thread, frame, obj)) {
+      var args: any[];
+      rawStack.curr = curr - (count + 1);
+      switch (count) {
+        case 0:
+          args = emptyArgs;
+          break;
+        case 1:
+          args = [store[curr - 1]];
+          break;
+        case 2:
+          args = [store[curr - 2], store[curr - 1]];
+          break;
+        case 3:
+          args = [store[curr - 3], store[curr - 2], store[curr - 1]];
+          break;
+        case 4:
+          args = [store[curr - 4], store[curr - 3], store[curr - 2], store[curr - 1]];
+          break;
+        default:
+          args = store.slice(curr - count, curr);
+          break;
+      }
       // Use the class of the *object*.
       assert(typeof (<any> obj)[methodReference.signature] === 'function', `Resolved method ${methodReference.signature} isn't defined?!`);
-      (<any> obj)[methodReference.signature](thread, count > 0 ? opStack.sliceAndDropFromTop(count, 1) : emptyArgs);
-      if (count === 0) {
-        opStack.dropFromTop(1);
-      }
+      (<any> obj)[methodReference.signature](thread, args);
       frame.returnToThreadLoop = true;
     }
     // Object is NULL; NPE has been thrown.
