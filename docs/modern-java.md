@@ -94,8 +94,10 @@ run.
   `synchronized`, plus top-level, bound, unbound, constructor, and companion
   callable references used through lazy `Sequence` pipelines, plus
   `@JvmInline value class` boxing, interface dispatch, nullable handling, map
-  keys, and sorting, then runs the generated code on both the host JVM and
-  Doppio with
+  keys, and sorting, plus reified generic type checks, `T::class.java`,
+  primitive/object arrays, spread varargs, copied arrays, typed arrays, and
+  component-type reflection, then runs the generated code on both the host JVM
+  and Doppio with
   `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only

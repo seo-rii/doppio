@@ -14,4 +14,5 @@ fun main() {
   println(dispatchedStateSummary())
   println(referenceSequenceSummary())
   println(valueClassSummary())
+  println(reifiedArraySummary())
 }
