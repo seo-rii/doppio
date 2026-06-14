@@ -15,4 +15,5 @@ fun main() {
   println(referenceSequenceSummary())
   println(valueClassSummary())
   println(reifiedArraySummary())
+  println(annotationReflectionSummary())
 }

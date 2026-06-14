@@ -261,6 +261,15 @@ Current verified checks:
   `toTypedArray`, `IntArray` construction, component-type reflection, and the
   generated `reifiedOperationMarker`/`instanceof`/`checkcast`/`newarray`/
   `anewarray` bytecode shape.
+- A minimal runtime-annotation reflection smoke compiled with
+  `-java-parameters` in 105 seconds and both the host JVM and Doppio printed
+  `class:field:getter:ctor,_:method:arg:kt3`. The repo smoke now includes the
+  same Kotlin compiler option and completed in 184 seconds with the full
+  classpath. It covers runtime-retained annotations with class, field, getter,
+  constructor-parameter, function, and function-parameter use-site targets
+  observed through `java.lang.reflect`, plus generated
+  `RuntimeVisibleAnnotations`, `RuntimeVisibleParameterAnnotations`, and
+  `MethodParameters` attributes.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering
