@@ -158,12 +158,15 @@ run.
   `Proxy.getInvocationHandler`, plus Kotlin source-level use of
   `java.lang.invoke.MethodHandles` covering static, virtual, constructor, and
   field handle lookup, `invokeWithArguments`, `MethodHandle.asType`, primitive
-  boxing/unboxing/widening, selected `MethodHandles` combinators (`identity`,
-  `constant`, `bindTo`, `insertArguments`, `dropArguments`, `filterArguments`,
-  `filterReturnValue`, `permuteArguments`, `guardWithTest`, `catchException`,
-  `exactInvoker`, `invoker`, `collectArguments`, `foldArguments`,
-  `explicitCastArguments`, `arrayElementGetter`, `arrayElementSetter`, and
-  `throwException`), and method-type descriptor reporting, plus Kotlin unsigned
+  boxing/unboxing/widening, selected reflection-backed `Lookup.unreflect`,
+  `unreflectConstructor`, `unreflectGetter`, and `unreflectSetter` success
+  paths plus a private member access-failure path, selected `MethodHandles`
+  combinators (`identity`, `constant`, `bindTo`, `insertArguments`,
+  `dropArguments`, `filterArguments`, `filterReturnValue`, `permuteArguments`,
+  `guardWithTest`, `catchException`, `exactInvoker`, `invoker`,
+  `collectArguments`, `foldArguments`, `explicitCastArguments`,
+  `arrayElementGetter`, `arrayElementSetter`, and `throwException`), and
+  method-type descriptor reporting, plus Kotlin unsigned
   primitives and unsigned arrays covering wraparound arithmetic, unsigned
   sorting, filtering, map keys, and hexadecimal byte rendering, then runs the
   generated code on both the host JVM and Doppio with `kotlin-stdlib.jar`.

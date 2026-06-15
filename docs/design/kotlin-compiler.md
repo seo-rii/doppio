@@ -343,7 +343,9 @@ Current verified checks:
   This covers Kotlin-compiled calls to `findStatic`, `findConstructor`,
   `findVirtual`, `findGetter`, `findSetter`, `invokeWithArguments`,
   `MethodHandle.asType`, reference casts, primitive unboxing/widening, boxed
-  return adaptation, and `MethodType.toMethodDescriptorString()`.
+  return adaptation, `Lookup.unreflect`, `unreflectConstructor`,
+  `unreflectGetter`, and `unreflectSetter` public success paths, private member
+  access-failure behavior, and `MethodType.toMethodDescriptorString()`.
 - The same Kotlin MethodHandles smoke now includes selected combinators:
   `identity`, `constant`, `bindTo`, `insertArguments`, `dropArguments`,
   `filterArguments`, `filterReturnValue`, `permuteArguments`,

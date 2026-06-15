@@ -6,6 +6,8 @@ class MethodHandleOwner(@JvmField var text: String) {
 
   fun lengthPlus(delta: Int): Int = text.length + delta
 
+  private fun secretSuffix(suffix: String): String = "secret:$suffix"
+
   companion object {
     @JvmStatic
     fun join(prefix: String, value: Int): String = prefix + (value + 1)
@@ -70,6 +72,15 @@ fun methodHandleSummary(): String {
   )
   val getter = lookup.findGetter(ownerClass, "text", stringClass)
   val setter = lookup.findSetter(ownerClass, "text", stringClass)
+  val reflectedJoin = ownerClass.getDeclaredMethod("join", stringClass, intClass)
+  val reflectedConstructor = ownerClass.getConstructor(stringClass)
+  val reflectedAppend = ownerClass.getDeclaredMethod("append", stringClass)
+  val reflectedText = ownerClass.getDeclaredField("text")
+  val unreflectedJoin = lookup.unreflect(reflectedJoin)
+  val unreflectedConstructor = lookup.unreflectConstructor(reflectedConstructor)
+  val unreflectedAppend = lookup.unreflect(reflectedAppend)
+  val unreflectedGetter = lookup.unreflectGetter(reflectedText)
+  val unreflectedSetter = lookup.unreflectSetter(reflectedText)
 
   val owner = constructor.invokeWithArguments("mh") as MethodHandleOwner
   val before = getter.invokeWithArguments(owner).toString()
@@ -86,6 +97,22 @@ fun methodHandleSummary(): String {
   val boxedReturn = lengthPlus.asType(
     MethodType.methodType(Any::class.java, ownerClass, intClass)
   ).invokeWithArguments(owner, 1).toString()
+  val unreflectOwner = unreflectedConstructor.invokeWithArguments("ur") as MethodHandleOwner
+  val unreflectBefore = unreflectedGetter.invokeWithArguments(unreflectOwner).toString()
+  unreflectedSetter.invokeWithArguments(unreflectOwner, "reflect")
+  val unreflectAfter = unreflectedAppend.invokeWithArguments(unreflectOwner, "?").toString()
+  val unreflectStatic = unreflectedJoin.invokeWithArguments("u", 6).toString()
+  val unreflectPrivateFailure = try {
+    lookup.unreflect(ownerClass.getDeclaredMethod("secretSuffix", stringClass))
+    "private-ok"
+  } catch (e: IllegalAccessException) {
+    e.javaClass.simpleName
+  }
+  val unreflectValues = listOf(
+    unreflectStatic,
+    unreflectBefore + ">" + unreflectAfter,
+    unreflectPrivateFailure
+  ).joinToString("/")
   val identity = MethodHandles.identity(stringClass)
   val constant = MethodHandles.constant(stringClass, "const")
   val boundStatic = staticJoin.bindTo("bound")
@@ -242,6 +269,7 @@ fun methodHandleSummary(): String {
     combinators,
     combinatorTypes,
     extraCombinators,
+    unreflectValues,
     extraCombinatorTypes
   ).joinToString("|")
 }
