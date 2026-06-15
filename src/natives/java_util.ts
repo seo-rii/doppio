@@ -11,6 +11,7 @@ import * as BrowserFS from 'browserfs';
 import * as path from 'path';
 import * as fs from 'fs';
 import ThreadStatus = DoppioJVM.VM.Enums.ThreadStatus;
+import StackFrameType = DoppioJVM.VM.Enums.StackFrameType;
 import ArrayClassData = DoppioJVM.VM.ClassFile.ArrayClassData;
 import PrimitiveClassData = DoppioJVM.VM.ClassFile.PrimitiveClassData;
 import assert = DoppioJVM.Debug.Assert;
@@ -45,7 +46,7 @@ if (typeof Int8Array !== "undefined") {
 export default function (): any {
   let ZipFiles: {[id: number]: TZipFS} = {};
   let ZipMultiReleaseVersions: {[id: number]: number[]} = {};
-  let ZipFileCache: {[name: string]: {modified: string; zipfs: TZipFS; versions: number[]}} = {};
+  let ZipFileCache: {[name: string]: {modified: string; zipfs: TZipFS}} = {};
   let ZipEntries: {[id: number]: TCentralDirectory} = {};
   let ZStreams: {[id: number]: ZStream} = {};
   // Start at 1, as 0 is interpreted as an error.
@@ -68,15 +69,8 @@ export default function (): any {
     delete map[id];
   }
 
-  function OpenZipFile(zfile: TZipFS, versions?: number[]): number {
+  function OpenZipFile(zfile: TZipFS, versions: number[] = []): number {
     let id = OpenItem(zfile, ZipFiles);
-    if (versions === undefined) {
-      versions = (<any> zfile).__doppioMultiReleaseVersions;
-      if (versions === undefined) {
-        versions = GetMultiReleaseVersions(zfile);
-        (<any> zfile).__doppioMultiReleaseVersions = versions;
-      }
-    }
     ZipMultiReleaseVersions[id] = versions;
     return id;
   }
@@ -104,6 +98,14 @@ export default function (): any {
     } catch (e) {
       return [];
     }
+  }
+  function GetCachedMultiReleaseVersions(zipfs: TZipFS): number[] {
+    let versions = (<any> zipfs).__doppioMultiReleaseVersions;
+    if (versions === undefined) {
+      versions = GetMultiReleaseVersions(zipfs);
+      (<any> zipfs).__doppioMultiReleaseVersions = versions;
+    }
+    return versions;
   }
   function GetCentralDirectoryEntry(zipfs: TZipFS, versions: number[], name: string): TCentralDirectory {
     if (versions.length > 0 && name.indexOf('/META-INF/') !== 0) {
@@ -608,13 +610,42 @@ export default function (): any {
       // Ignore mmap option.
       let name = nameObj.toString();
       let resolvedName = path.resolve(name);
+      // This is on ZipFile.open's hot path, so inspect frames without allocating
+      // the language-visible stack trace array. The first non-Zip/Jar caller
+      // decides the mode and is stable for repeated opens from the same helper.
+      let multiReleaseEntries = false;
+      let stack = (<any> thread).stack;
+      for (let i = stack.length - 1; i >= 0; i--) {
+        let frame = stack[i];
+        if (frame.type === StackFrameType.INTERNAL || frame.method === undefined) {
+          continue;
+        }
+        let clsName = frame.method.cls.getInternalName();
+        if (clsName.indexOf('Ljava/util/zip/ZipFile') === 0 ||
+            clsName.indexOf('Ljava/util/jar/JarFile') === 0 ||
+            clsName.indexOf('Ljava/security/AccessController') === 0) {
+          continue;
+        }
+        let cached = (<any> frame.method).__doppioMultiReleaseZipOpen;
+        if (cached !== undefined) {
+          multiReleaseEntries = cached;
+          break;
+        }
+        multiReleaseEntries = clsName.indexOf('Lsun/misc/URLClassPath') === 0 ||
+          clsName.indexOf('Ljdk/internal/loader/URLClassPath') === 0 ||
+          clsName.indexOf('Ljava/net/URLClassLoader') === 0 ||
+          clsName.indexOf('Lsun/net/www/protocol/jar/') === 0;
+        (<any> frame.method).__doppioMultiReleaseZipOpen = multiReleaseEntries;
+        break;
+      }
       // Optimization: Check if this is a JAR file on the classpath.
       let cpath = thread.getBsCl().getClassPathItems();
       for (let i = 0; i < cpath.length; i++) {
         let cpathItem = cpath[i];
         if (cpathItem instanceof AbstractClasspathJar) {
           if (path.resolve(cpathItem.getPath()) === resolvedName) {
-            return Long.fromNumber(OpenZipFile((<AbstractClasspathJar> <any> cpathItem).getFS()));
+            let zipfs = (<AbstractClasspathJar> <any> cpathItem).getFS();
+            return Long.fromNumber(OpenZipFile(zipfs, multiReleaseEntries ? GetCachedMultiReleaseVersions(zipfs) : []));
           }
         }
       }
@@ -624,7 +655,8 @@ export default function (): any {
       let modifiedKey = modified.toString();
       let cached = ZipFileCache[resolvedName];
       if (cached !== undefined && cached.modified === modifiedKey) {
-        thread.asyncReturn(Long.fromNumber(OpenZipFile(cached.zipfs, cached.versions)), null);
+        let versions = multiReleaseEntries ? GetCachedMultiReleaseVersions(cached.zipfs) : [];
+        thread.asyncReturn(Long.fromNumber(OpenZipFile(cached.zipfs, versions)), null);
         return;
       }
       fs.readFile(name, (err, data) => {
@@ -632,9 +664,8 @@ export default function (): any {
           thread.throwNewException("Ljava/io/IOException;", err.message);
         } else {
           let zipfs = new BrowserFS.FileSystem.ZipFS(data, name);
-          let versions = GetMultiReleaseVersions(zipfs);
-          (<any> zipfs).__doppioMultiReleaseVersions = versions;
-          ZipFileCache[resolvedName] = {modified: modifiedKey, zipfs: zipfs, versions: versions};
+          let versions = multiReleaseEntries ? GetCachedMultiReleaseVersions(zipfs) : [];
+          ZipFileCache[resolvedName] = {modified: modifiedKey, zipfs: zipfs};
           thread.asyncReturn(Long.fromNumber(OpenZipFile(zipfs, versions)), null);
         }
       });

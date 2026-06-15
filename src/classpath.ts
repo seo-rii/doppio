@@ -242,15 +242,24 @@ export abstract class AbstractClasspathJar {
     this._wrapOp(() => {
       let paths = this._getClassEntryPaths(type),
         i = 0,
+        completed = false,
         nextPath = (): void => {
+          if (completed) {
+            return;
+          }
           if (i === paths.length) {
+            completed = true;
             cb(new Error(`Class ${type} not found in JAR.`));
           } else {
             // Path must be absolute to avoid relative path issues.
             this._fs.readFile(paths[i++], (err: Error, data?: Buffer) => {
+              if (completed) {
+                return;
+              }
               if (err) {
                 nextPath();
               } else {
+                completed = true;
                 cb(null, data);
               }
             });
