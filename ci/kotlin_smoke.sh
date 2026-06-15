@@ -151,6 +151,9 @@ test -f "$out_dir/ResultSmokeException.class"
 test -f "$out_dir/RuntimeSmokeTag.class"
 test -f "$out_dir/AlphaServiceLookupPlugin.class"
 test -f "$out_dir/BetaServiceLookupPlugin.class"
+test -f "$out_dir/ProxyReflectionService.class"
+test -f "$out_dir/ProxyReflectionSmokeKt.class"
+test -f "$out_dir/ProxyReflectionTag.class"
 test -f "$out_dir/RichTag.class"
 test -f "$out_dir/ServiceLoaderSmokeKt.class"
 test -f "$out_dir/ServiceLookupPlugin.class"
@@ -217,6 +220,8 @@ default_expected_output="${default_expected_output}
 alpha=7,beta=11|2|alpha=7,beta=11|AlphaServiceLookupPlugin>BetaServiceLookupPlugin|true"
 default_expected_output="${default_expected_output}
 jarzip:false:META-INF/MANIFEST.MF,META-INF/services/example.Service,META-INF/versions/17/pkg/data.txt,pkg/data.txt:alpha/beta:pkg.Provider:11:6e30506e:6e30506e:true|META-INF/MANIFEST.MF=META-INF,META-INF/services/example.Service=META-INF,META-INF/versions/17/pkg/data.txt=META-INF,pkg/data.txt=alpha|jar:jar:alpha/beta:pkg.Provider:true"
+default_expected_output="${default_expected_output}
+iface/transform/value|dyn|KT5|XY3|cba|null|ProxyReflectionService(dyn)|321|true|true|true|transform:2,getLabel:0,transform:2,maybe:1,maybe:1,toString:0,hashCode:0,equals:1"
 default_expected_output="${default_expected_output}
 3:4:0fa0ff:2,9,18446744073709551615:4294967295,4:wrap:true:true"
 expected_output="${KOTLIN_SMOKE_EXPECTED_OUTPUT:-"$default_expected_output"}"

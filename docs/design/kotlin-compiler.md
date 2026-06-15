@@ -316,6 +316,16 @@ Current verified checks:
   `@JvmName`, `@JvmStatic`, `@JvmField`, `const val`, `@Throws`, `@Volatile`,
   and `@Synchronized` lowering into static members, exception metadata,
   volatile fields, and synchronized methods.
+- A dynamic-proxy/reflection smoke is now included in the repo source set. A
+  local run through `ci/kotlin_smoke.sh` completed in 484 seconds with the
+  minimal compiler classpath and 474 seconds with the full `kotlinc/lib/*.jar`
+  classpath; both the host JVM and Doppio printed
+  `iface/transform/value|dyn|KT5|XY3|cba|null|ProxyReflectionService(dyn)|321|true|true|true|transform:2,getLabel:0,transform:2,maybe:1,maybe:1,toString:0,hashCode:0,equals:1`.
+  This covers `Proxy.newProxyInstance` for a Kotlin interface, property getter
+  dispatch through `InvocationHandler`, direct and reflective proxy method
+  invocation, runtime method and parameter annotations compiled with
+  `-java-parameters`, proxy `toString`/`hashCode`/`equals` dispatch,
+  `Proxy.isProxyClass`, and `Proxy.getInvocationHandler`.
 - A minimal mutable delegated-property smoke compiled in 104 seconds and both
   the host JVM and Doppio printed
   `bind:primary:MutableDelegateOwner:primary:0|bind:primary:MutableDelegateOwner:primary:30|alt:secondary:MutableDelegateOwner:secondary:30|local:local:top:local:0|local:local:top:local:10`.
