@@ -99,7 +99,8 @@ run.
   component-type reflection, plus runtime-retained annotation use-site targets
   observed through Java reflection, repeatable annotation containers, and
   annotation enum/class/array elements, plus Kotlin `fun interface`, sealed
-  interface exhaustiveness, `data object`, `Enum.entries`, property references,
+  interface exhaustiveness, `data object`, `Enum.entries`, enum constant class
+  bodies with overridden members, property references,
   class literals, default-argument `$default` methods, `@JvmOverloads`,
   interface `DefaultImpls`, data-class `copy$default`, enum `when`
   `$WhenMappings`, string `when` hash switching, and subjectless `when`

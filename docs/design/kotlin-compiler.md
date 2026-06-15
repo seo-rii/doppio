@@ -524,6 +524,11 @@ Current verified checks:
   filtering, map lookup by unsigned keys, and byte-to-hex rendering. Both the
   host JVM and Doppio print
   `3:4:0fa0ff:2,9,18446744073709551615:4294967295,4:wrap:true:true`.
+- A minimal enum-polymorphism smoke covers enum constants with class bodies,
+  overridden properties and methods, `Enum.entries`, `enumValues`,
+  `enumValueOf`, `valueOf`, and `when` dispatch over those constants. Both the
+  host JVM and Doppio print
+  `A1B3G5|tk2|X1,x2,xxx3|low/high/high|IllegalArgumentException`.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering
