@@ -1896,6 +1896,341 @@ function modernJava(grunt: IGrunt) {
     grunt.log.ok('Generated ' + runoutPath);
   });
 
+  grunt.registerTask('generate_java21_sorted_set_sequenced', 'Generate a Java 21 sorted-set sequenced-collection fixture.', function() {
+    var bytes: number[] = [],
+      cpEntries: number[][] = [null],
+      utf8Cache: { [key: string]: number } = {},
+      classCache: { [key: string]: number } = {},
+      stringCache: { [key: string]: number } = {},
+      nameAndTypeCache: { [key: string]: number } = {},
+      refCache: { [key: string]: number } = {},
+      outPath = 'classes/modern_test/Java21SortedSetSequenced.class',
+      runoutPath = 'classes/modern_test/Java21SortedSetSequenced.runout',
+      expectedOutput = [
+        'true',
+        'true',
+        'a',
+        'c',
+        'c',
+        'a',
+        'a',
+        'c',
+        '1',
+        'nse-first',
+        'uoe-addfirst'
+      ].join('\n') + '\n';
+
+    function u1(value: number): void {
+      bytes.push(value & 0xff);
+    }
+
+    function u2(value: number): void {
+      bytes.push((value >>> 8) & 0xff, value & 0xff);
+    }
+
+    function u4(value: number): void {
+      bytes.push((value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff);
+    }
+
+    function addCp(entry: number[]): number {
+      cpEntries.push(entry);
+      return cpEntries.length - 1;
+    }
+
+    function cpUtf8(value: string): number {
+      var cached = utf8Cache[value],
+        buf: Buffer,
+        entry: number[],
+        i: number;
+      if (cached) {
+        return cached;
+      }
+      buf = Buffer.from(value, 'utf8');
+      entry = [1, (buf.length >>> 8) & 0xff, buf.length & 0xff];
+      for (i = 0; i < buf.length; i++) {
+        entry.push(buf[i]);
+      }
+      cached = addCp(entry);
+      utf8Cache[value] = cached;
+      return cached;
+    }
+
+    function cpClass(name: string): number {
+      var cached = classCache[name],
+        nameIndex: number;
+      if (cached) {
+        return cached;
+      }
+      nameIndex = cpUtf8(name);
+      cached = addCp([7, (nameIndex >>> 8) & 0xff, nameIndex & 0xff]);
+      classCache[name] = cached;
+      return cached;
+    }
+
+    function cpString(value: string): number {
+      var cached = stringCache[value],
+        stringIndex: number;
+      if (cached) {
+        return cached;
+      }
+      stringIndex = cpUtf8(value);
+      cached = addCp([8, (stringIndex >>> 8) & 0xff, stringIndex & 0xff]);
+      stringCache[value] = cached;
+      return cached;
+    }
+
+    function cpNameAndType(name: string, descriptor: string): number {
+      var key = name + '\n' + descriptor,
+        cached = nameAndTypeCache[key],
+        nameIndex: number,
+        descriptorIndex: number;
+      if (cached) {
+        return cached;
+      }
+      nameIndex = cpUtf8(name);
+      descriptorIndex = cpUtf8(descriptor);
+      cached = addCp([12, (nameIndex >>> 8) & 0xff, nameIndex & 0xff,
+        (descriptorIndex >>> 8) & 0xff, descriptorIndex & 0xff]);
+      nameAndTypeCache[key] = cached;
+      return cached;
+    }
+
+    function cpRef(tag: number, className: string, name: string, descriptor: string): number {
+      var key = tag + '\n' + className + '\n' + name + '\n' + descriptor,
+        cached = refCache[key],
+        classIndex: number,
+        nameAndTypeIndex: number;
+      if (cached) {
+        return cached;
+      }
+      classIndex = cpClass(className);
+      nameAndTypeIndex = cpNameAndType(name, descriptor);
+      cached = addCp([tag, (classIndex >>> 8) & 0xff, classIndex & 0xff,
+        (nameAndTypeIndex >>> 8) & 0xff, nameAndTypeIndex & 0xff]);
+      refCache[key] = cached;
+      return cached;
+    }
+
+    function writeCp(): void {
+      var i: number,
+        j: number,
+        entry: number[];
+      u2(cpEntries.length);
+      for (i = 1; i < cpEntries.length; i++) {
+        entry = cpEntries[i];
+        for (j = 0; j < entry.length; j++) {
+          u1(entry[j]);
+        }
+      }
+    }
+
+    function codeAttr(code: number[], codeNameIndex: number, maxStack: number, maxLocals: number, exceptions?: number[][]): void {
+      var exceptionTable = exceptions || [];
+      u2(codeNameIndex);
+      u4(12 + code.length + (exceptionTable.length * 8));
+      u2(maxStack);
+      u2(maxLocals);
+      u4(code.length);
+      code.forEach(u1);
+      u2(exceptionTable.length);
+      exceptionTable.forEach(function(entry: number[]): void {
+        u2(entry[0]);
+        u2(entry[1]);
+        u2(entry[2]);
+        u2(entry[3]);
+      });
+      u2(0);
+    }
+
+    function patchU2(code: number[], offset: number, value: number): void {
+      code[offset] = (value >>> 8) & 0xff;
+      code[offset + 1] = value & 0xff;
+    }
+
+    function emitU2Operand(code: number[], opcode: number, index: number): void {
+      code.push(opcode, (index >>> 8) & 0xff, index & 0xff);
+    }
+
+    function emitLdc(code: number[], index: number): void {
+      if (index > 0xff) {
+        grunt.fail.fatal('Java21SortedSetSequenced constant pool grew past ldc range.');
+      }
+      code.push(0x12, index);
+    }
+
+    function emitInvokeInterface(code: number[], methodRef: number, argCount: number): void {
+      code.push(0xb9, (methodRef >>> 8) & 0xff, methodRef & 0xff, argCount, 0x00);
+    }
+
+    function emitPrintString(code: number[], outField: number, printlnString: number, stringIndex: number): void {
+      emitU2Operand(code, 0xb2, outField);
+      emitLdc(code, stringIndex);
+      emitU2Operand(code, 0xb6, printlnString);
+    }
+
+    function emitPrintSetValue(code: number[], outField: number, printlnString: number, stringClass: number, loadOpcode: number, methodRef: number): void {
+      emitU2Operand(code, 0xb2, outField);
+      code.push(loadOpcode);
+      emitInvokeInterface(code, methodRef, 1);
+      emitU2Operand(code, 0xc0, stringClass);
+      emitU2Operand(code, 0xb6, printlnString);
+    }
+
+    var thisClass = cpClass('classes/modern_test/Java21SortedSetSequenced'),
+      objectClass = cpClass('java/lang/Object'),
+      codeName = cpUtf8('Code'),
+      initName = cpUtf8('<init>'),
+      voidDescriptor = cpUtf8('()V'),
+      objectInit = cpRef(10, 'java/lang/Object', '<init>', '()V'),
+      mainName = cpUtf8('main'),
+      mainDescriptor = cpUtf8('([Ljava/lang/String;)V'),
+      systemOut = cpRef(9, 'java/lang/System', 'out', 'Ljava/io/PrintStream;'),
+      printlnString = cpRef(10, 'java/io/PrintStream', 'println', '(Ljava/lang/String;)V'),
+      printlnBoolean = cpRef(10, 'java/io/PrintStream', 'println', '(Z)V'),
+      printlnInt = cpRef(10, 'java/io/PrintStream', 'println', '(I)V'),
+      treeSetClass = cpClass('java/util/TreeSet'),
+      treeSetInit = cpRef(10, 'java/util/TreeSet', '<init>', '()V'),
+      setClass = cpClass('java/util/Set'),
+      sortedSetClass = cpClass('java/util/SortedSet'),
+      sequencedSetClass = cpClass('java/util/SequencedSet'),
+      sequencedCollectionClass = cpClass('java/util/SequencedCollection'),
+      stringClass = cpClass('java/lang/String'),
+      noSuchElementClass = cpClass('java/util/NoSuchElementException'),
+      unsupportedOperationClass = cpClass('java/lang/UnsupportedOperationException'),
+      stringA = cpString('a'),
+      stringB = cpString('b'),
+      stringC = cpString('c'),
+      missedFirst = cpString('missed-first'),
+      nseFirst = cpString('nse-first'),
+      missedAddFirst = cpString('missed-addfirst'),
+      uoeAddFirst = cpString('uoe-addfirst'),
+      setAdd = cpRef(11, 'java/util/Set', 'add', '(Ljava/lang/Object;)Z'),
+      setSize = cpRef(11, 'java/util/Set', 'size', '()I'),
+      sequencedGetFirst = cpRef(11, 'java/util/SequencedSet', 'getFirst', '()Ljava/lang/Object;'),
+      sequencedGetLast = cpRef(11, 'java/util/SequencedSet', 'getLast', '()Ljava/lang/Object;'),
+      sequencedReversed = cpRef(11, 'java/util/SequencedSet', 'reversed', '()Ljava/util/SequencedSet;'),
+      sortedGetFirst = cpRef(11, 'java/util/SortedSet', 'getFirst', '()Ljava/lang/Object;'),
+      sortedRemoveFirst = cpRef(11, 'java/util/SortedSet', 'removeFirst', '()Ljava/lang/Object;'),
+      sortedRemoveLast = cpRef(11, 'java/util/SortedSet', 'removeLast', '()Ljava/lang/Object;'),
+      sortedAddFirst = cpRef(11, 'java/util/SortedSet', 'addFirst', '(Ljava/lang/Object;)V'),
+      mainCode: number[] = [],
+      firstTryStart: number,
+      firstTryEnd: number,
+      firstCatchStart: number,
+      firstAfterCatch: number,
+      firstGotoOffset: number,
+      addFirstTryStart: number,
+      addFirstTryEnd: number,
+      addFirstCatchStart: number,
+      addFirstAfterCatch: number,
+      addFirstGotoOffset: number;
+
+    emitU2Operand(mainCode, 0xbb, treeSetClass);
+    mainCode.push(0x59);
+    emitU2Operand(mainCode, 0xb7, treeSetInit);
+    mainCode.push(0x4c);
+    mainCode.push(0x2b);
+    emitLdc(mainCode, stringB);
+    emitInvokeInterface(mainCode, setAdd, 2);
+    mainCode.push(0x57);
+    mainCode.push(0x2b);
+    emitLdc(mainCode, stringA);
+    emitInvokeInterface(mainCode, setAdd, 2);
+    mainCode.push(0x57);
+    mainCode.push(0x2b);
+    emitLdc(mainCode, stringC);
+    emitInvokeInterface(mainCode, setAdd, 2);
+    mainCode.push(0x57);
+
+    emitU2Operand(mainCode, 0xb2, systemOut);
+    mainCode.push(0x2b);
+    emitU2Operand(mainCode, 0xc1, sequencedSetClass);
+    emitU2Operand(mainCode, 0xb6, printlnBoolean);
+    emitU2Operand(mainCode, 0xb2, systemOut);
+    mainCode.push(0x2b);
+    emitU2Operand(mainCode, 0xc1, sequencedCollectionClass);
+    emitU2Operand(mainCode, 0xb6, printlnBoolean);
+    emitPrintSetValue(mainCode, systemOut, printlnString, stringClass, 0x2b, sequencedGetFirst);
+    emitPrintSetValue(mainCode, systemOut, printlnString, stringClass, 0x2b, sequencedGetLast);
+
+    mainCode.push(0x2b);
+    emitInvokeInterface(mainCode, sequencedReversed, 1);
+    mainCode.push(0x4d);
+    emitPrintSetValue(mainCode, systemOut, printlnString, stringClass, 0x2c, sequencedGetFirst);
+    emitPrintSetValue(mainCode, systemOut, printlnString, stringClass, 0x2c, sequencedGetLast);
+    emitPrintSetValue(mainCode, systemOut, printlnString, stringClass, 0x2b, sortedRemoveFirst);
+    emitPrintSetValue(mainCode, systemOut, printlnString, stringClass, 0x2b, sortedRemoveLast);
+
+    emitU2Operand(mainCode, 0xb2, systemOut);
+    mainCode.push(0x2b);
+    emitInvokeInterface(mainCode, setSize, 1);
+    emitU2Operand(mainCode, 0xb6, printlnInt);
+
+    emitU2Operand(mainCode, 0xbb, treeSetClass);
+    mainCode.push(0x59);
+    emitU2Operand(mainCode, 0xb7, treeSetInit);
+    mainCode.push(0x4e);
+    firstTryStart = mainCode.length;
+    mainCode.push(0x2d);
+    emitInvokeInterface(mainCode, sortedGetFirst, 1);
+    mainCode.push(0x57);
+    firstTryEnd = mainCode.length;
+    emitPrintString(mainCode, systemOut, printlnString, missedFirst);
+    firstGotoOffset = mainCode.length;
+    mainCode.push(0xa7, 0x00, 0x00);
+    firstCatchStart = mainCode.length;
+    mainCode.push(0x4e);
+    emitPrintString(mainCode, systemOut, printlnString, nseFirst);
+    firstAfterCatch = mainCode.length;
+    patchU2(mainCode, firstGotoOffset + 1, firstAfterCatch - firstGotoOffset);
+
+    addFirstTryStart = mainCode.length;
+    mainCode.push(0x2b);
+    emitLdc(mainCode, stringA);
+    emitInvokeInterface(mainCode, sortedAddFirst, 2);
+    addFirstTryEnd = mainCode.length;
+    emitPrintString(mainCode, systemOut, printlnString, missedAddFirst);
+    addFirstGotoOffset = mainCode.length;
+    mainCode.push(0xa7, 0x00, 0x00);
+    addFirstCatchStart = mainCode.length;
+    mainCode.push(0x4e);
+    emitPrintString(mainCode, systemOut, printlnString, uoeAddFirst);
+    addFirstAfterCatch = mainCode.length;
+    patchU2(mainCode, addFirstGotoOffset + 1, addFirstAfterCatch - addFirstGotoOffset);
+    mainCode.push(0xb1);
+
+    u4(0xcafebabe);
+    u2(0);
+    u2(65);
+    writeCp();
+
+    u2(0x0021);
+    u2(thisClass);
+    u2(objectClass);
+    u2(0);
+    u2(0);
+    u2(2);
+    u2(0x0001);
+    u2(initName);
+    u2(voidDescriptor);
+    u2(1);
+    codeAttr([0x2a, 0xb7, (objectInit >>> 8) & 0xff, objectInit & 0xff, 0xb1], codeName, 1, 1);
+    u2(0x0009);
+    u2(mainName);
+    u2(mainDescriptor);
+    u2(1);
+    codeAttr(mainCode, codeName, 4, 4, [
+      [firstTryStart, firstTryEnd, firstCatchStart, noSuchElementClass],
+      [addFirstTryStart, addFirstTryEnd, addFirstCatchStart, unsupportedOperationClass]
+    ]);
+    u2(0);
+
+    grunt.file.write(outPath, Buffer.from(bytes));
+    grunt.log.ok('Generated ' + outPath);
+    grunt.file.write(runoutPath, expectedOutput);
+    grunt.log.ok('Generated ' + runoutPath);
+  });
+
   grunt.registerTask('generate_return_top_modern', 'Generate a fixture where return values are above unused operand-stack entries.', function() {
     var bytes: number[] = [],
       outPath = 'classes/modern_test/ReturnTopOfStackGenerated.class';
@@ -3983,6 +4318,22 @@ function modernJava(grunt: IGrunt) {
           grunt.fail.fatal('Java 21 Deque sequenced-collection Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
         }
         grunt.log.ok('Java 21 Deque sequenced-collection output matched expected output.');
+        done();
+      });
+  });
+
+  grunt.registerTask('unit_test_java21_sorted_set_sequenced', 'Run the Java 21 sorted-set sequenced-collection fixture on Doppio.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      mainClass = 'classes.modern_test.Java21SortedSetSequenced',
+      outPath = 'classes/modern_test/Java21SortedSetSequenced.runout';
+    child_process.exec('node --no-deprecation build/release-cli/console/runner.js -classpath . ' + mainClass,
+      function(err?: any, stdout?: Buffer, stderr?: Buffer) {
+        var actual = stdout.toString() + stderr.toString(),
+          expected = fs.readFileSync(outPath, 'utf8');
+        if (err || actual !== expected) {
+          grunt.fail.fatal('Java 21 sorted-set sequenced-collection Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
+        }
+        grunt.log.ok('Java 21 sorted-set sequenced-collection output matched expected output.');
         done();
       });
   });
