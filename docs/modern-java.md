@@ -191,8 +191,10 @@ smoke. Full control-flow combinator parity is still not claimed.
   `kotlin-stdlib.jar` and `kotlin-reflect.jar` source classpath, then both the
   host JVM and Doppio run the generated class with `kotlin-reflect.jar`. The
   smoke covers `KClass.primaryConstructor`, `KClass.memberProperties`,
-  mutable property set/get through `KMutableProperty1`, and
-  `KClass.memberFunctions` invocation.
+  mutable property set/get through `KMutableProperty1`,
+  `KClass.memberFunctions` invocation, runtime annotation lookup,
+  companion-object dispatch, `KCallable.callBy` default constructor and method
+  arguments, sealed subclass enumeration, and object-instance lookup.
 - Next blocker: broaden the Kotlin compiler smoke to more source constructs,
   reduce remaining throughput variance, and compare full-classpath elapsed time.
   Current notes live in `docs/design/kotlin-compiler.md`.
