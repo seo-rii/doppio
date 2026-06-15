@@ -9,6 +9,29 @@ class MethodHandleOwner(@JvmField var text: String) {
   companion object {
     @JvmStatic
     fun join(prefix: String, value: Int): String = prefix + (value + 1)
+
+    @JvmStatic
+    fun doubleValue(value: Int): Int = value * 2
+
+    @JvmStatic
+    fun bracket(value: String): String = "[$value]"
+
+    @JvmStatic
+    fun triple(first: String, second: String, third: String): String = "$first/$second/$third"
+
+    @JvmStatic
+    fun isEmpty(value: String): Boolean = value.isEmpty()
+
+    @JvmStatic
+    fun throwOnNegative(value: Int): String {
+      if (value < 0) {
+        throw IllegalArgumentException("neg:$value")
+      }
+      return "pos:$value"
+    }
+
+    @JvmStatic
+    fun handleNegative(e: IllegalArgumentException, value: Int): String = e.message + "/" + value
   }
 }
 
@@ -54,6 +77,89 @@ fun methodHandleSummary(): String {
   val boxedReturn = lengthPlus.asType(
     MethodType.methodType(Any::class.java, ownerClass, intClass)
   ).invokeWithArguments(owner, 1).toString()
+  val identity = MethodHandles.identity(stringClass)
+  val constant = MethodHandles.constant(stringClass, "const")
+  val boundStatic = staticJoin.bindTo("bound")
+  val boundVirtual = append.bindTo(owner)
+  val inserted = MethodHandles.insertArguments(staticJoin, 1, 8)
+  val droppedIdentity = MethodHandles.dropArguments(
+    identity,
+    0,
+    intClass,
+    java.lang.Long.TYPE
+  )
+  val doubleValue = lookup.findStatic(
+    ownerClass,
+    "doubleValue",
+    MethodType.methodType(intClass, intClass)
+  )
+  val filteredArgument = MethodHandles.filterArguments(staticJoin, 1, doubleValue)
+  val bracket = lookup.findStatic(
+    ownerClass,
+    "bracket",
+    MethodType.methodType(stringClass, stringClass)
+  )
+  val filteredReturn = MethodHandles.filterReturnValue(staticJoin, bracket)
+  val triple = lookup.findStatic(
+    ownerClass,
+    "triple",
+    MethodType.methodType(stringClass, stringClass, stringClass, stringClass)
+  )
+  val permuted = MethodHandles.permuteArguments(
+    triple,
+    MethodType.methodType(stringClass, stringClass, stringClass, stringClass),
+    2,
+    0,
+    1
+  )
+  val isEmpty = lookup.findStatic(
+    ownerClass,
+    "isEmpty",
+    MethodType.methodType(java.lang.Boolean.TYPE, stringClass)
+  )
+  val emptyConstant = MethodHandles.dropArguments(
+    MethodHandles.constant(stringClass, "empty"),
+    0,
+    stringClass
+  )
+  val guarded = MethodHandles.guardWithTest(isEmpty, emptyConstant, identity)
+  val throwOnNegative = lookup.findStatic(
+    ownerClass,
+    "throwOnNegative",
+    MethodType.methodType(stringClass, intClass)
+  )
+  val handleNegative = lookup.findStatic(
+    ownerClass,
+    "handleNegative",
+    MethodType.methodType(stringClass, IllegalArgumentException::class.java, intClass)
+  )
+  val caught = MethodHandles.catchException(
+    throwOnNegative,
+    IllegalArgumentException::class.java,
+    handleNegative
+  )
+  val combinators = listOf(
+    identity.invokeWithArguments("id").toString(),
+    constant.invokeWithArguments().toString(),
+    boundStatic.invokeWithArguments(5).toString(),
+    boundVirtual.invokeWithArguments("?").toString(),
+    inserted.invokeWithArguments("ins").toString(),
+    droppedIdentity.invokeWithArguments(2, java.lang.Long.valueOf(3), "drop").toString(),
+    filteredArgument.invokeWithArguments("flt", 4).toString(),
+    filteredReturn.invokeWithArguments("ret", 3).toString(),
+    permuted.invokeWithArguments("a", "b", "c").toString(),
+    guarded.invokeWithArguments("").toString(),
+    guarded.invokeWithArguments("word").toString(),
+    caught.invokeWithArguments(7).toString(),
+    caught.invokeWithArguments(-2).toString()
+  ).joinToString("|")
+  val combinatorTypes = listOf(
+    boundStatic,
+    droppedIdentity,
+    filteredArgument,
+    guarded,
+    caught
+  ).joinToString("|") { it.type().toMethodDescriptorString() }
 
   return listOf(
     directStatic,
@@ -63,6 +169,8 @@ fun methodHandleSummary(): String {
     widenedReturn,
     boxedReturn,
     staticJoin.type().toMethodDescriptorString(),
-    append.type().toMethodDescriptorString()
+    append.type().toMethodDescriptorString(),
+    combinators,
+    combinatorTypes
   ).joinToString("|")
 }

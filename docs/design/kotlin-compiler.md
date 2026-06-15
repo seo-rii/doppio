@@ -328,13 +328,19 @@ Current verified checks:
   `Proxy.isProxyClass`, and `Proxy.getInvocationHandler`.
 - A Kotlin source-level `java.lang.invoke.MethodHandles` smoke is now included
   in the repo source set. A local run through `ci/kotlin_smoke.sh` completed in
-  508 seconds with the minimal compiler classpath and 522 seconds with the full
+  636 seconds with the minimal compiler classpath and 568 seconds with the full
   `kotlinc/lib/*.jar` classpath; both the host JVM and Doppio printed
-  `v5|a3|mh>handle|handle!|11|7|(Ljava/lang/String;I)Ljava/lang/String;|(LMethodHandleOwner;Ljava/lang/String;)Ljava/lang/String;`.
+  `v5|a3|mh>handle|handle!|11|7|(Ljava/lang/String;I)Ljava/lang/String;|(LMethodHandleOwner;Ljava/lang/String;)Ljava/lang/String;|id|const|bound6|handle?|ins9|drop|flt9|[ret4]|c/a/b|empty|word|pos:7|neg:-2/-2|(I)Ljava/lang/String;|(IJLjava/lang/String;)Ljava/lang/String;|(Ljava/lang/String;I)Ljava/lang/String;|(Ljava/lang/String;)Ljava/lang/String;|(I)Ljava/lang/String;`.
   This covers Kotlin-compiled calls to `findStatic`, `findConstructor`,
   `findVirtual`, `findGetter`, `findSetter`, `invokeWithArguments`,
   `MethodHandle.asType`, reference casts, primitive unboxing/widening, boxed
   return adaptation, and `MethodType.toMethodDescriptorString()`.
+- The same Kotlin MethodHandles smoke now includes selected combinators:
+  `identity`, `constant`, `bindTo`, `insertArguments`, `dropArguments`,
+  `filterArguments`, `filterReturnValue`, `permuteArguments`,
+  `guardWithTest`, and `catchException`, with descriptor-string checks for
+  the adapted shapes. This extends the source-level Kotlin coverage after the
+  matching Java 17 fixture passed native-JVM and Doppio comparison.
 - A minimal mutable delegated-property smoke compiled in 104 seconds and both
   the host JVM and Doppio printed
   `bind:primary:MutableDelegateOwner:primary:0|bind:primary:MutableDelegateOwner:primary:30|alt:secondary:MutableDelegateOwner:secondary:30|local:local:top:local:0|local:local:top:local:10`.

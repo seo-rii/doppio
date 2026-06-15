@@ -158,11 +158,13 @@ run.
   `Proxy.getInvocationHandler`, plus Kotlin source-level use of
   `java.lang.invoke.MethodHandles` covering static, virtual, constructor, and
   field handle lookup, `invokeWithArguments`, `MethodHandle.asType`, primitive
-  boxing/unboxing/widening, and method-type descriptor reporting, plus Kotlin
-  unsigned primitives and unsigned arrays covering wraparound arithmetic,
-  unsigned sorting, filtering, map keys, and hexadecimal byte rendering, then
-  runs the generated code on both the host JVM and Doppio with
-  `kotlin-stdlib.jar`.
+  boxing/unboxing/widening, selected `MethodHandles` combinators (`identity`,
+  `constant`, `bindTo`, `insertArguments`, `dropArguments`, `filterArguments`,
+  `filterReturnValue`, `permuteArguments`, `guardWithTest`, and
+  `catchException`), and method-type descriptor reporting, plus Kotlin unsigned
+  primitives and unsigned arrays covering wraparound arithmetic, unsigned
+  sorting, filtering, map keys, and hexadecimal byte rendering, then runs the
+  generated code on both the host JVM and Doppio with `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only
   `kotlin-compiler.jar`.

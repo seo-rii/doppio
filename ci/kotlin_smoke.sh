@@ -226,7 +226,7 @@ jarzip:false:META-INF/MANIFEST.MF,META-INF/services/example.Service,META-INF/ver
 default_expected_output="${default_expected_output}
 iface/transform/value|dyn|KT5|XY3|cba|null|ProxyReflectionService(dyn)|321|true|true|true|transform:2,getLabel:0,transform:2,maybe:1,maybe:1,toString:0,hashCode:0,equals:1"
 default_expected_output="${default_expected_output}
-v5|a3|mh>handle|handle!|11|7|(Ljava/lang/String;I)Ljava/lang/String;|(LMethodHandleOwner;Ljava/lang/String;)Ljava/lang/String;"
+v5|a3|mh>handle|handle!|11|7|(Ljava/lang/String;I)Ljava/lang/String;|(LMethodHandleOwner;Ljava/lang/String;)Ljava/lang/String;|id|const|bound6|handle?|ins9|drop|flt9|[ret4]|c/a/b|empty|word|pos:7|neg:-2/-2|(I)Ljava/lang/String;|(IJLjava/lang/String;)Ljava/lang/String;|(Ljava/lang/String;I)Ljava/lang/String;|(Ljava/lang/String;)Ljava/lang/String;|(I)Ljava/lang/String;"
 default_expected_output="${default_expected_output}
 3:4:0fa0ff:2,9,18446744073709551615:4294967295,4:wrap:true:true"
 expected_output="${KOTLIN_SMOKE_EXPECTED_OUTPUT:-"$default_expected_output"}"
