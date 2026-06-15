@@ -4352,7 +4352,8 @@ function modernJava(grunt: IGrunt) {
       inputFiles = grunt.file.expand([srcDir + '/**/*.java']),
       specialInputFiles = inputFiles.filter(function(src: string): boolean {
         return src === srcDir + '/java/lang/System$Logger.java' ||
-          src === srcDir + '/java/lang/System$DoppioLogger.java';
+          src === srcDir + '/java/lang/System$DoppioLogger.java' ||
+          src === srcDir + '/sun/invoke/util/VerifyAccess.java';
       }),
       normalInputFiles = inputFiles.filter(function(src: string): boolean {
         return specialInputFiles.indexOf(src) === -1;

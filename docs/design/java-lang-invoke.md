@@ -65,6 +65,7 @@ The fixture matrix tracks the covered smoke tests and the next fixtures to add:
 | Nestmate access | Covered | Lookup from a nestmate to private static and private instance methods/fields | Private static/instance method and field lookup succeeds for nestmates and still fails for non-nestmates | `MethodHandleNatives.resolve` nestmate flag bridge |
 | Field lookup | Covered | `findStaticGetter`/`findStaticSetter` and `findGetter`/`findSetter` for selected reference and primitive fields | Getter result and setter side effect match the native JVM for public, package-private, and nestmate-private `String` fields plus public static/instance `int` and `long` fields; public final static/instance setter lookup fails with `IllegalAccessException` | `MethodHandleNatives` field offset/base plus `Unsafe` field access |
 | Constructor lookup | Covered | `findConstructor` for public, package-private, and nestmate-private constructors | Constructed receiver state and handle type match the native JVM; non-nestmate private lookup fails | `MethodHandleNatives.resolve` plus constructor bridge path |
+| Reflective unreflect lookup | Covered | `unreflect`, `unreflectConstructor`, `unreflectGetter`, and `unreflectSetter` for public members plus private non-nestmate and nestmate members | Public reflective method/constructor/field handles invoke and report native-compatible types; private non-nestmate reflective members fail with `IllegalAccessException`; private nestmate method, constructor, and field unreflect succeeds | `sun.invoke.util.VerifyAccess` nestmate shim plus `MethodHandleNatives.init` |
 | `asType` adaptation | Partial | Adapt public static and virtual method handles across selected reference and primitive signatures | Reference cast, return widening to `Object`, non-void return dropping to `void`, `void` return adaptation to `null` reference, primitive argument and return widening, primitive return boxing, unboxing, arity mismatch, and runtime cast failure match the native JVM | existing Java 8 method-handle adapter path |
 | Method-handle combinators | Partial | Compose same-class method handles with selected JDK combinators | `identity`, `constant`, `bindTo`, `insertArguments`, `dropArguments`, `filterArguments`, `filterReturnValue`, `permuteArguments`, `guardWithTest`, `catchException`, `exactInvoker`, `invoker`, `collectArguments`, `foldArguments`, `explicitCastArguments`, `arrayElementGetter`, `arrayElementSetter`, and `throwException` produce native-compatible results and descriptor strings for the tested shapes | existing Java 8 method-handle adapter/combinator path |
 | Nominal method-handle descriptors | Partial | `MethodHandleDesc.resolveConstantDesc` and `DirectMethodHandleDesc.resolveConstantDesc` for public same-class and selected JDK-class static/virtual methods, constructors, static/instance fields, and `asType` | Resolved handles invoke, report native-compatible types, mutate fields, and propagate missing-method failures | class-library shim delegating to `MethodHandles.Lookup` |
@@ -118,12 +119,16 @@ handles, dynamic constants, and record object-method linkage:
   static/instance `int` and `long` fields. It also covers public final
   static/instance setter lookup rejection. Constructor
   lookup is covered for public, package-private, non-nestmate private failure,
-  and nestmate-private success paths. Selected `MethodHandle.asType` success
-  paths are covered for reference casts, return widening to `Object`, non-void
-  return dropping to `void`, `void` return adaptation to `null` reference,
-  primitive argument and return widening, primitive return boxing, and
-  `Integer` to `int` unboxing. Selected failure paths cover arity mismatch at
-  adaptation time and runtime cast failure. The fixture also covers selected
+  and nestmate-private success paths. A separate reflective lookup fixture
+  covers `Lookup.unreflect`, `unreflectConstructor`, `unreflectGetter`, and
+  `unreflectSetter` for public members, private non-nestmate access failures,
+  and private nestmate method, constructor, static field, and instance field
+  success paths. Selected `MethodHandle.asType` success paths are covered for
+  reference casts, return widening to `Object`, non-void return dropping to
+  `void`, `void` return adaptation to `null` reference, primitive argument and
+  return widening, primitive return boxing, and `Integer` to `int` unboxing.
+  Selected failure paths cover arity mismatch at adaptation time and runtime
+  cast failure. The fixture also covers selected
   combinators: `identity`, `constant`, `bindTo`, `insertArguments`,
   `dropArguments`, `filterArguments`, `filterReturnValue`, `permuteArguments`,
   `guardWithTest`, `catchException`, `exactInvoker`, `invoker`,
@@ -232,10 +237,10 @@ handles, dynamic constants, and record object-method linkage:
 - How much of the Java 17 JDK `java.lang.invoke` implementation can be reused
   with the existing Java 8 class library image.
 - `MethodHandleNatives.resolve` currently bridges Java 11 nestmate private
-  lookup through `MemberName` access-flag adjustment because the Java 8
-  `MethodHandles.Lookup` implementation in the current class-library image does
-  not understand nestmates. Revisit this once the lookup class-library layer is
-  replaced or a shared Java 17 access helper exists.
+  `find*` lookup through `MemberName` access-flag adjustment, and the modern
+  `sun.invoke.util.VerifyAccess` shim bridges `unreflect*` lookup access
+  checks. Revisit both once the lookup class-library layer is replaced or a
+  shared Java 17 access helper exists.
 - Whether dynamic constants beyond the selected `ConstantBootstraps` fast paths
   should resolve through a shared bootstrap path or through more per-bootstrap
   fast paths until the class library has Java 11 `ConstantBootstraps`.
