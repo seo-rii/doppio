@@ -180,6 +180,7 @@ test -f "$out_dir/Sink.class"
 test -f "$out_dir/StringCell.class"
 test -f "$out_dir/TextRegexSmokeKt.class"
 test -f "$out_dir/TextStep.class"
+test -f "$out_dir/UnsignedSmokeKt.class"
 test -f "$out_dir/VarianceBox.class"
 test -f "$out_dir/ValueClassSmokeKt.class"
 test -f "$out_dir/ValueStage.class"
@@ -216,6 +217,8 @@ default_expected_output="${default_expected_output}
 alpha=7,beta=11|2|alpha=7,beta=11|AlphaServiceLookupPlugin>BetaServiceLookupPlugin|true"
 default_expected_output="${default_expected_output}
 jarzip:false:META-INF/MANIFEST.MF,META-INF/services/example.Service,META-INF/versions/17/pkg/data.txt,pkg/data.txt:alpha/beta:pkg.Provider:11:6e30506e:6e30506e:true|META-INF/MANIFEST.MF=META-INF,META-INF/services/example.Service=META-INF,META-INF/versions/17/pkg/data.txt=META-INF,pkg/data.txt=alpha|jar:jar:alpha/beta:pkg.Provider:true"
+default_expected_output="${default_expected_output}
+3:4:0fa0ff:2,9,18446744073709551615:4294967295,4:wrap:true:true"
 expected_output="${KOTLIN_SMOKE_EXPECTED_OUTPUT:-"$default_expected_output"}"
 
 native_output="$(java -cp "$runtime_cp" HelloKt)"

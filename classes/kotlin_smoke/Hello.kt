@@ -39,4 +39,5 @@ fun main() {
   println(resourceLookupSummary())
   println(serviceLoaderSummary())
   println(jarZipSummary())
+  println(unsignedSummary())
 }

@@ -474,6 +474,11 @@ Current verified checks:
   deliberately uses `Multi-Release: false` so it proves ordinary
   jar/zip/resource behavior first. 2026-06-15 full-classpath regression runs
   after the multi-release `JarFile` parity fix completed in 518-855 seconds.
+- A minimal unsigned Kotlin smoke covers `UInt`, `ULong`, `UByte`,
+  unsigned-array construction, wraparound arithmetic, unsigned sorting,
+  filtering, map lookup by unsigned keys, and byte-to-hex rendering. Both the
+  host JVM and Doppio print
+  `3:4:0fa0ff:2,9,18446744073709551615:4294967295,4:wrap:true:true`.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering
