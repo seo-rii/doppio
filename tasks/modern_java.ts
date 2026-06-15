@@ -2231,6 +2231,353 @@ function modernJava(grunt: IGrunt) {
     grunt.log.ok('Generated ' + runoutPath);
   });
 
+  grunt.registerTask('generate_java21_sorted_map_sequenced', 'Generate a Java 21 sorted-map sequenced-map fixture.', function() {
+    var bytes: number[] = [],
+      cpEntries: number[][] = [null],
+      utf8Cache: { [key: string]: number } = {},
+      classCache: { [key: string]: number } = {},
+      stringCache: { [key: string]: number } = {},
+      nameAndTypeCache: { [key: string]: number } = {},
+      refCache: { [key: string]: number } = {},
+      outPath = 'classes/modern_test/Java21SortedMapSequenced.class',
+      runoutPath = 'classes/modern_test/Java21SortedMapSequenced.runout',
+      expectedOutput = [
+        'true',
+        'true',
+        'a=1',
+        'c=3',
+        'c=3',
+        'a=1',
+        'a',
+        '3',
+        'c=3',
+        'a',
+        'c',
+        'a=1',
+        'c=3',
+        '1',
+        'uoe-putfirst'
+      ].join('\n') + '\n';
+
+    function u1(value: number): void {
+      bytes.push(value & 0xff);
+    }
+
+    function u2(value: number): void {
+      bytes.push((value >>> 8) & 0xff, value & 0xff);
+    }
+
+    function u4(value: number): void {
+      bytes.push((value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff);
+    }
+
+    function addCp(entry: number[]): number {
+      cpEntries.push(entry);
+      return cpEntries.length - 1;
+    }
+
+    function cpUtf8(value: string): number {
+      var cached = utf8Cache[value],
+        buf: Buffer,
+        entry: number[],
+        i: number;
+      if (cached) {
+        return cached;
+      }
+      buf = Buffer.from(value, 'utf8');
+      entry = [1, (buf.length >>> 8) & 0xff, buf.length & 0xff];
+      for (i = 0; i < buf.length; i++) {
+        entry.push(buf[i]);
+      }
+      cached = addCp(entry);
+      utf8Cache[value] = cached;
+      return cached;
+    }
+
+    function cpClass(name: string): number {
+      var cached = classCache[name],
+        nameIndex: number;
+      if (cached) {
+        return cached;
+      }
+      nameIndex = cpUtf8(name);
+      cached = addCp([7, (nameIndex >>> 8) & 0xff, nameIndex & 0xff]);
+      classCache[name] = cached;
+      return cached;
+    }
+
+    function cpString(value: string): number {
+      var cached = stringCache[value],
+        stringIndex: number;
+      if (cached) {
+        return cached;
+      }
+      stringIndex = cpUtf8(value);
+      cached = addCp([8, (stringIndex >>> 8) & 0xff, stringIndex & 0xff]);
+      stringCache[value] = cached;
+      return cached;
+    }
+
+    function cpNameAndType(name: string, descriptor: string): number {
+      var key = name + '\n' + descriptor,
+        cached = nameAndTypeCache[key],
+        nameIndex: number,
+        descriptorIndex: number;
+      if (cached) {
+        return cached;
+      }
+      nameIndex = cpUtf8(name);
+      descriptorIndex = cpUtf8(descriptor);
+      cached = addCp([12, (nameIndex >>> 8) & 0xff, nameIndex & 0xff,
+        (descriptorIndex >>> 8) & 0xff, descriptorIndex & 0xff]);
+      nameAndTypeCache[key] = cached;
+      return cached;
+    }
+
+    function cpRef(tag: number, className: string, name: string, descriptor: string): number {
+      var key = tag + '\n' + className + '\n' + name + '\n' + descriptor,
+        cached = refCache[key],
+        classIndex: number,
+        nameAndTypeIndex: number;
+      if (cached) {
+        return cached;
+      }
+      classIndex = cpClass(className);
+      nameAndTypeIndex = cpNameAndType(name, descriptor);
+      cached = addCp([tag, (classIndex >>> 8) & 0xff, classIndex & 0xff,
+        (nameAndTypeIndex >>> 8) & 0xff, nameAndTypeIndex & 0xff]);
+      refCache[key] = cached;
+      return cached;
+    }
+
+    function writeCp(): void {
+      var i: number,
+        j: number,
+        entry: number[];
+      u2(cpEntries.length);
+      for (i = 1; i < cpEntries.length; i++) {
+        entry = cpEntries[i];
+        for (j = 0; j < entry.length; j++) {
+          u1(entry[j]);
+        }
+      }
+    }
+
+    function codeAttr(code: number[], codeNameIndex: number, maxStack: number, maxLocals: number, exceptions?: number[][]): void {
+      var exceptionTable = exceptions || [];
+      u2(codeNameIndex);
+      u4(12 + code.length + (exceptionTable.length * 8));
+      u2(maxStack);
+      u2(maxLocals);
+      u4(code.length);
+      code.forEach(u1);
+      u2(exceptionTable.length);
+      exceptionTable.forEach(function(entry: number[]): void {
+        u2(entry[0]);
+        u2(entry[1]);
+        u2(entry[2]);
+        u2(entry[3]);
+      });
+      u2(0);
+    }
+
+    function patchU2(code: number[], offset: number, value: number): void {
+      code[offset] = (value >>> 8) & 0xff;
+      code[offset + 1] = value & 0xff;
+    }
+
+    function emitU2Operand(code: number[], opcode: number, index: number): void {
+      code.push(opcode, (index >>> 8) & 0xff, index & 0xff);
+    }
+
+    function emitLdc(code: number[], index: number): void {
+      if (index > 0xff) {
+        grunt.fail.fatal('Java21SortedMapSequenced constant pool grew past ldc range.');
+      }
+      code.push(0x12, index);
+    }
+
+    function emitInvokeInterface(code: number[], methodRef: number, argCount: number): void {
+      code.push(0xb9, (methodRef >>> 8) & 0xff, methodRef & 0xff, argCount, 0x00);
+    }
+
+    function emitPrintString(code: number[], outField: number, printlnString: number, stringIndex: number): void {
+      emitU2Operand(code, 0xb2, outField);
+      emitLdc(code, stringIndex);
+      emitU2Operand(code, 0xb6, printlnString);
+    }
+
+    function emitPrintInterfaceObject(code: number[], outField: number, printlnObject: number, loadOpcode: number, methodRef: number): void {
+      emitU2Operand(code, 0xb2, outField);
+      code.push(loadOpcode);
+      emitInvokeInterface(code, methodRef, 1);
+      emitU2Operand(code, 0xb6, printlnObject);
+    }
+
+    var thisClass = cpClass('classes/modern_test/Java21SortedMapSequenced'),
+      objectClass = cpClass('java/lang/Object'),
+      codeName = cpUtf8('Code'),
+      initName = cpUtf8('<init>'),
+      voidDescriptor = cpUtf8('()V'),
+      objectInit = cpRef(10, 'java/lang/Object', '<init>', '()V'),
+      mainName = cpUtf8('main'),
+      mainDescriptor = cpUtf8('([Ljava/lang/String;)V'),
+      systemOut = cpRef(9, 'java/lang/System', 'out', 'Ljava/io/PrintStream;'),
+      printlnObject = cpRef(10, 'java/io/PrintStream', 'println', '(Ljava/lang/Object;)V'),
+      printlnString = cpRef(10, 'java/io/PrintStream', 'println', '(Ljava/lang/String;)V'),
+      printlnBoolean = cpRef(10, 'java/io/PrintStream', 'println', '(Z)V'),
+      printlnInt = cpRef(10, 'java/io/PrintStream', 'println', '(I)V'),
+      treeMapClass = cpClass('java/util/TreeMap'),
+      treeMapInit = cpRef(10, 'java/util/TreeMap', '<init>', '()V'),
+      mapClass = cpClass('java/util/Map'),
+      sortedMapClass = cpClass('java/util/SortedMap'),
+      sequencedMapClass = cpClass('java/util/SequencedMap'),
+      sequencedSetClass = cpClass('java/util/SequencedSet'),
+      sequencedCollectionClass = cpClass('java/util/SequencedCollection'),
+      unsupportedOperationClass = cpClass('java/lang/UnsupportedOperationException'),
+      stringA = cpString('a'),
+      stringB = cpString('b'),
+      stringC = cpString('c'),
+      string1 = cpString('1'),
+      string2 = cpString('2'),
+      string3 = cpString('3'),
+      missedPutFirst = cpString('missed-putfirst'),
+      uoePutFirst = cpString('uoe-putfirst'),
+      mapPut = cpRef(11, 'java/util/Map', 'put', '(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;'),
+      mapSize = cpRef(11, 'java/util/Map', 'size', '()I'),
+      sequencedFirstEntry = cpRef(11, 'java/util/SequencedMap', 'firstEntry', '()Ljava/util/Map$Entry;'),
+      sequencedLastEntry = cpRef(11, 'java/util/SequencedMap', 'lastEntry', '()Ljava/util/Map$Entry;'),
+      sequencedReversed = cpRef(11, 'java/util/SequencedMap', 'reversed', '()Ljava/util/SequencedMap;'),
+      sequencedKeySet = cpRef(11, 'java/util/SequencedMap', 'sequencedKeySet', '()Ljava/util/SequencedSet;'),
+      sequencedValues = cpRef(11, 'java/util/SequencedMap', 'sequencedValues', '()Ljava/util/SequencedCollection;'),
+      sequencedEntrySet = cpRef(11, 'java/util/SequencedMap', 'sequencedEntrySet', '()Ljava/util/SequencedSet;'),
+      sequencedPollFirstEntry = cpRef(11, 'java/util/SequencedMap', 'pollFirstEntry', '()Ljava/util/Map$Entry;'),
+      sequencedPollLastEntry = cpRef(11, 'java/util/SequencedMap', 'pollLastEntry', '()Ljava/util/Map$Entry;'),
+      sortedFirstKey = cpRef(11, 'java/util/SortedMap', 'firstKey', '()Ljava/lang/Object;'),
+      sortedLastKey = cpRef(11, 'java/util/SortedMap', 'lastKey', '()Ljava/lang/Object;'),
+      sortedPutFirst = cpRef(11, 'java/util/SortedMap', 'putFirst', '(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;'),
+      sequencedSetGetFirst = cpRef(11, 'java/util/SequencedSet', 'getFirst', '()Ljava/lang/Object;'),
+      sequencedSetReversed = cpRef(11, 'java/util/SequencedSet', 'reversed', '()Ljava/util/SequencedSet;'),
+      sequencedCollectionGetLast = cpRef(11, 'java/util/SequencedCollection', 'getLast', '()Ljava/lang/Object;'),
+      mainCode: number[] = [],
+      putFirstTryStart: number,
+      putFirstTryEnd: number,
+      putFirstCatchStart: number,
+      putFirstAfterCatch: number,
+      putFirstGotoOffset: number;
+
+    emitU2Operand(mainCode, 0xbb, treeMapClass);
+    mainCode.push(0x59);
+    emitU2Operand(mainCode, 0xb7, treeMapInit);
+    mainCode.push(0x4c);
+    mainCode.push(0x2b);
+    emitLdc(mainCode, stringB);
+    emitLdc(mainCode, string2);
+    emitInvokeInterface(mainCode, mapPut, 3);
+    mainCode.push(0x57);
+    mainCode.push(0x2b);
+    emitLdc(mainCode, stringA);
+    emitLdc(mainCode, string1);
+    emitInvokeInterface(mainCode, mapPut, 3);
+    mainCode.push(0x57);
+    mainCode.push(0x2b);
+    emitLdc(mainCode, stringC);
+    emitLdc(mainCode, string3);
+    emitInvokeInterface(mainCode, mapPut, 3);
+    mainCode.push(0x57);
+
+    emitU2Operand(mainCode, 0xb2, systemOut);
+    mainCode.push(0x2b);
+    emitU2Operand(mainCode, 0xc1, sequencedMapClass);
+    emitU2Operand(mainCode, 0xb6, printlnBoolean);
+    emitU2Operand(mainCode, 0xb2, systemOut);
+    mainCode.push(0x2b);
+    emitU2Operand(mainCode, 0xc1, sortedMapClass);
+    emitU2Operand(mainCode, 0xb6, printlnBoolean);
+    emitPrintInterfaceObject(mainCode, systemOut, printlnObject, 0x2b, sequencedFirstEntry);
+    emitPrintInterfaceObject(mainCode, systemOut, printlnObject, 0x2b, sequencedLastEntry);
+
+    mainCode.push(0x2b);
+    emitInvokeInterface(mainCode, sequencedReversed, 1);
+    mainCode.push(0x4d);
+    emitPrintInterfaceObject(mainCode, systemOut, printlnObject, 0x2c, sequencedFirstEntry);
+    emitPrintInterfaceObject(mainCode, systemOut, printlnObject, 0x2c, sequencedLastEntry);
+
+    emitU2Operand(mainCode, 0xb2, systemOut);
+    mainCode.push(0x2b);
+    emitInvokeInterface(mainCode, sequencedKeySet, 1);
+    emitInvokeInterface(mainCode, sequencedSetGetFirst, 1);
+    emitU2Operand(mainCode, 0xb6, printlnObject);
+    emitU2Operand(mainCode, 0xb2, systemOut);
+    mainCode.push(0x2b);
+    emitInvokeInterface(mainCode, sequencedValues, 1);
+    emitInvokeInterface(mainCode, sequencedCollectionGetLast, 1);
+    emitU2Operand(mainCode, 0xb6, printlnObject);
+    emitU2Operand(mainCode, 0xb2, systemOut);
+    mainCode.push(0x2b);
+    emitInvokeInterface(mainCode, sequencedEntrySet, 1);
+    emitInvokeInterface(mainCode, sequencedSetReversed, 1);
+    emitInvokeInterface(mainCode, sequencedSetGetFirst, 1);
+    emitU2Operand(mainCode, 0xb6, printlnObject);
+
+    emitPrintInterfaceObject(mainCode, systemOut, printlnObject, 0x2b, sortedFirstKey);
+    emitPrintInterfaceObject(mainCode, systemOut, printlnObject, 0x2b, sortedLastKey);
+    emitPrintInterfaceObject(mainCode, systemOut, printlnObject, 0x2b, sequencedPollFirstEntry);
+    emitPrintInterfaceObject(mainCode, systemOut, printlnObject, 0x2b, sequencedPollLastEntry);
+
+    emitU2Operand(mainCode, 0xb2, systemOut);
+    mainCode.push(0x2b);
+    emitInvokeInterface(mainCode, mapSize, 1);
+    emitU2Operand(mainCode, 0xb6, printlnInt);
+
+    putFirstTryStart = mainCode.length;
+    mainCode.push(0x2b);
+    emitLdc(mainCode, stringA);
+    emitLdc(mainCode, string1);
+    emitInvokeInterface(mainCode, sortedPutFirst, 3);
+    mainCode.push(0x57);
+    putFirstTryEnd = mainCode.length;
+    emitPrintString(mainCode, systemOut, printlnString, missedPutFirst);
+    putFirstGotoOffset = mainCode.length;
+    mainCode.push(0xa7, 0x00, 0x00);
+    putFirstCatchStart = mainCode.length;
+    mainCode.push(0x4e);
+    emitPrintString(mainCode, systemOut, printlnString, uoePutFirst);
+    putFirstAfterCatch = mainCode.length;
+    patchU2(mainCode, putFirstGotoOffset + 1, putFirstAfterCatch - putFirstGotoOffset);
+    mainCode.push(0xb1);
+
+    u4(0xcafebabe);
+    u2(0);
+    u2(65);
+    writeCp();
+
+    u2(0x0021);
+    u2(thisClass);
+    u2(objectClass);
+    u2(0);
+    u2(0);
+    u2(2);
+    u2(0x0001);
+    u2(initName);
+    u2(voidDescriptor);
+    u2(1);
+    codeAttr([0x2a, 0xb7, (objectInit >>> 8) & 0xff, objectInit & 0xff, 0xb1], codeName, 1, 1);
+    u2(0x0009);
+    u2(mainName);
+    u2(mainDescriptor);
+    u2(1);
+    codeAttr(mainCode, codeName, 3, 4, [
+      [putFirstTryStart, putFirstTryEnd, putFirstCatchStart, unsupportedOperationClass]
+    ]);
+    u2(0);
+
+    grunt.file.write(outPath, Buffer.from(bytes));
+    grunt.log.ok('Generated ' + outPath);
+    grunt.file.write(runoutPath, expectedOutput);
+    grunt.log.ok('Generated ' + runoutPath);
+  });
+
   grunt.registerTask('generate_return_top_modern', 'Generate a fixture where return values are above unused operand-stack entries.', function() {
     var bytes: number[] = [],
       outPath = 'classes/modern_test/ReturnTopOfStackGenerated.class';
@@ -4334,6 +4681,22 @@ function modernJava(grunt: IGrunt) {
           grunt.fail.fatal('Java 21 sorted-set sequenced-collection Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
         }
         grunt.log.ok('Java 21 sorted-set sequenced-collection output matched expected output.');
+        done();
+      });
+  });
+
+  grunt.registerTask('unit_test_java21_sorted_map_sequenced', 'Run the Java 21 sorted-map sequenced-map fixture on Doppio.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      mainClass = 'classes.modern_test.Java21SortedMapSequenced',
+      outPath = 'classes/modern_test/Java21SortedMapSequenced.runout';
+    child_process.exec('node --no-deprecation build/release-cli/console/runner.js -classpath . ' + mainClass,
+      function(err?: any, stdout?: Buffer, stderr?: Buffer) {
+        var actual = stdout.toString() + stderr.toString(),
+          expected = fs.readFileSync(outPath, 'utf8');
+        if (err || actual !== expected) {
+          grunt.fail.fatal('Java 21 sorted-map sequenced-map Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
+        }
+        grunt.log.ok('Java 21 sorted-map sequenced-map output matched expected output.');
         done();
       });
   });

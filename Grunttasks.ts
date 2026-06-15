@@ -579,7 +579,7 @@ export function setup(grunt: IGrunt) {
       modern_java17: {
         files: [{
           expand: true,
-          src: ['classes/modern_test/Java9*.runout', 'classes/modern_test/Java10*.runout', 'classes/modern_test/Java11*.runout', 'classes/modern_test/Java12*.runout', 'classes/modern_test/Java13*.runout', 'classes/modern_test/Java14*.runout', 'classes/modern_test/Java15*.runout', 'classes/modern_test/Java16*.runout', 'classes/modern_test/Java17*.runout', 'classes/modern_test/Java18UnsignedMultiplyHigh.runout', 'classes/modern_test/Java18DefaultCharset.runout', 'classes/modern_test/Java19ThreadId.runout', 'classes/modern_test/Java19ThreadSleepDuration.runout', 'classes/modern_test/Java19ThreadSleepDurationInterrupt.runout', 'classes/modern_test/Java2*ClassFileRuntime.runout', 'classes/modern_test/Java21ThreadIsVirtual.runout', 'classes/modern_test/Java21ListSequenced.runout', 'classes/modern_test/Java21DequeSequenced.runout', 'classes/modern_test/Java21SortedSetSequenced.runout', 'classes/modern_test/SealedViolation.runout', 'classes/modern_test/ReflectParameters.runout']
+          src: ['classes/modern_test/Java9*.runout', 'classes/modern_test/Java10*.runout', 'classes/modern_test/Java11*.runout', 'classes/modern_test/Java12*.runout', 'classes/modern_test/Java13*.runout', 'classes/modern_test/Java14*.runout', 'classes/modern_test/Java15*.runout', 'classes/modern_test/Java16*.runout', 'classes/modern_test/Java17*.runout', 'classes/modern_test/Java18UnsignedMultiplyHigh.runout', 'classes/modern_test/Java18DefaultCharset.runout', 'classes/modern_test/Java19ThreadId.runout', 'classes/modern_test/Java19ThreadSleepDuration.runout', 'classes/modern_test/Java19ThreadSleepDurationInterrupt.runout', 'classes/modern_test/Java2*ClassFileRuntime.runout', 'classes/modern_test/Java21ThreadIsVirtual.runout', 'classes/modern_test/Java21ListSequenced.runout', 'classes/modern_test/Java21DequeSequenced.runout', 'classes/modern_test/Java21SortedSetSequenced.runout', 'classes/modern_test/Java21SortedMapSequenced.runout', 'classes/modern_test/SealedViolation.runout', 'classes/modern_test/ReflectParameters.runout']
         }]
       }
     },
@@ -662,6 +662,7 @@ export function setup(grunt: IGrunt) {
             'classes/modern_test/Java21ListSequenced.class',
             'classes/modern_test/Java21DequeSequenced.class',
             'classes/modern_test/Java21SortedSetSequenced.class',
+            'classes/modern_test/Java21SortedMapSequenced.class',
             'classes/modern_test/Java21ThreadIsVirtual.class',
             'classes/modern_test/Java21ThreadIsVirtualWorker.class',
             'classes/modern_test/Java22ClassFileVersion.class',
@@ -1082,6 +1083,7 @@ export function setup(grunt: IGrunt) {
     'generate_java21_list_sequenced',
     'generate_java21_deque_sequenced',
     'generate_java21_sorted_set_sequenced',
+    'generate_java21_sorted_map_sequenced',
     'parse_classfile_modern:classfile_versions',
     'unit_test_java18_unsigned_multiply_high',
     'unit_test_java18_default_charset',
@@ -1092,6 +1094,7 @@ export function setup(grunt: IGrunt) {
     'unit_test_java21_list_sequenced',
     'unit_test_java21_deque_sequenced',
     'unit_test_java21_sorted_set_sequenced',
+    'unit_test_java21_sorted_map_sequenced',
     'unit_test_modern_classfile_runtime_versions',
     'run_java_modern:java17',
     'run_java_modern:reflect_parameters',

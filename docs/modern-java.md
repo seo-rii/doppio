@@ -28,7 +28,7 @@ run.
 | 18 | 62 | UTF-8-by-default expectations, simple web server tooling output, `Math`/`StrictMath` unsigned multiplication helper | Partial: simple class-file container, selected UTF-8 default charset behavior for `file.encoding`, `Charset.defaultCharset()`, default `String` byte conversion, and default `InputStreamReader`/`OutputStreamWriter` byte conversion, plus selected `Math.unsignedMultiplyHigh(long, long)` and `StrictMath.unsignedMultiplyHigh(long, long)` behavior for zero, power-of-two, negative-bit-pattern, `Long.MIN_VALUE`, and mixed-sign unsigned products | Medium |
 | 19 | 63 | virtual threads preview dependencies, record pattern preview output, `Thread.threadId()`, `Thread.sleep(Duration)` | Partial: simple class-file container, selected `Thread.threadId()` current-thread behavior matching the existing positive `Thread.getId()` identifier, and selected `Thread.sleep(Duration)` behavior for negative no-op, zero duration, short positive duration, null rejection, and interrupt delivery | High |
 | 20 | 64 | scoped values preview dependencies, pattern matching output | Partial: simple class-file container plus runnable print fixture | High |
-| 21 | 65 | virtual threads, sequenced collections, string templates preview | Partial: simple class-file container, runnable print fixture, selected `Thread.isVirtual()` platform-thread behavior for current, unstarted, and started platform threads, and selected `SequencedCollection`/`List`/`Deque`/`SequencedSet` endpoint and reverse-view behavior | Very high |
+| 21 | 65 | virtual threads, sequenced collections, string templates preview | Partial: simple class-file container, runnable print fixture, selected `Thread.isVirtual()` platform-thread behavior for current, unstarted, and started platform threads, and selected `SequencedCollection`/`List`/`Deque`/`SequencedSet`/`SequencedMap` endpoint, view, and reverse-view behavior | Very high |
 | 22 | 66 | class-file API ecosystem expectations, unnamed variables | Partial: simple class-file container plus runnable print fixture | Medium |
 | 23 | 67 | primitive patterns preview, module/JDK library drift | Partial: simple class-file container plus runnable print fixture | High |
 | 24 | 68 | stream gatherers, compact object headers ecosystem assumptions | Partial: simple class-file container plus runnable print fixture | High |
@@ -765,10 +765,16 @@ run.
   `SortedSet` first/last endpoint access, `NavigableSet.reversed()` via
   reverse-order views, endpoint removals, size after endpoint removals, empty
   `SortedSet.getFirst()` exception behavior, and unsupported explicit
-  positioning on sorted sets. Broader sequenced collection surfaces,
-  including `SequencedMap`, `LinkedHashSet`/insertion-order set hierarchy
-  updates, and fully specified reverse-view mutation semantics beyond the
-  tested list/deque/sorted-set paths, are not implemented.
+  positioning on sorted sets. It also covers `TreeMap` assignability to
+  `SequencedMap` through the `SortedMap`/`NavigableMap` hierarchy, selected
+  `SequencedMap` first/last entry access, `NavigableMap.reversed()` via
+  descending views, sequenced key/value/entry view endpoint access, sorted
+  first/last key access, endpoint entry removals, size after removals, and
+  unsupported explicit front insertion on sorted maps. Broader sequenced
+  collection surfaces, including `LinkedHashSet`/insertion-order set
+  hierarchy updates, insertion-order map hierarchy updates, and fully
+  specified reverse-view mutation semantics beyond the tested
+  list/deque/sorted-set/sorted-map paths, are not implemented.
 - Selected Java 11 `String` additions are covered for `isBlank`, `strip`,
   `stripLeading`, `stripTrailing`, `repeat`, and `lines`, including negative
   repeat count validation and line splitting for LF, CRLF, CR, empty input,
@@ -1131,7 +1137,9 @@ run.
   plus selected endpoint and `reversed()` default behavior. `java.util.TreeSet`
   now exposes tested Java 21 `SequencedSet`/`SequencedCollection` inheritance
   through the `SortedSet`/`NavigableSet` hierarchy plus selected endpoint and
-  `reversed()` behavior. Empty
+  `reversed()` behavior, and `java.util.TreeMap` exposes tested Java 21
+  `SequencedMap` inheritance through the `SortedMap`/`NavigableMap` hierarchy
+  plus selected endpoint entry, sequenced view, and `reversed()` behavior. Empty
   varargs factory calls reuse the same empty singletons as the fixed empty
   factories, and factory-created immutable collections reject tested null
   lookup probes such as `List.contains(null)`, `Set.contains(null)`,
