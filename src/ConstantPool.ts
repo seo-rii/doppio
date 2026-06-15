@@ -746,6 +746,43 @@ export class MethodReference implements IConstantPoolItem {
             }
           };
           method = <Method> syntheticMethod;
+        } else if (syntheticCls.getInternalName() === 'Ljava/lang/Thread;' && this.signature === 'isVirtual()Z') {
+          syntheticMethod = {
+            cls: syntheticCls,
+            slot: -1,
+            accessFlags: new util.Flags(util.FlagMasks.PUBLIC | util.FlagMasks.FINAL | util.FlagMasks.NATIVE),
+            name: this.nameAndTypeInfo.name,
+            rawDescriptor: this.nameAndTypeInfo.descriptor,
+            attrs: [],
+            signature: this.signature,
+            fullSignature: syntheticFullSignature,
+            parameterTypes: [],
+            returnType: 'Z',
+            getParamWordSize: function(): number {
+              return 0;
+            },
+            convertArgs: function(thread: JVMThread, params: any[]): any[] {
+              return [thread, params[0]];
+            },
+            getNativeFunction: function(): Function {
+              return function(thread: JVMThread, javaThis: JVMTypes.java_lang_Thread): number {
+                return 0;
+              };
+            },
+            isSignaturePolymorphic: function(): boolean {
+              return false;
+            },
+            isHidden: function(): boolean {
+              return false;
+            },
+            isCallerSensitive: function(): boolean {
+              return false;
+            },
+            getFullSignature: function(): string {
+              return syntheticCls.getExternalName() + '.' + this.signature;
+            }
+          };
+          method = <Method> syntheticMethod;
         } else if (syntheticCls.getInternalName() === 'Ljava/lang/Thread;' && this.signature === 'onSpinWait()V') {
           syntheticMethod = {
             cls: syntheticCls,
@@ -3884,7 +3921,8 @@ export class MethodReference implements IConstantPoolItem {
 	        (<any> thread).stack.push(new NativeStackFrame(syntheticMethod, args));
 	        thread.setStatus(ThreadStatus.RUNNABLE);
 	      };
-	    } else if (this.fullSignature === 'java/lang/Thread/threadId()J' &&
+	    } else if ((this.fullSignature === 'java/lang/Thread/threadId()J' ||
+	        this.fullSignature === 'java/lang/Thread/isVirtual()Z') &&
 	        typeof this.jsConstructor.prototype[this.fullSignature] !== 'function') {
 	      var syntheticThreadMethod = this.method;
 	      this.jsConstructor.prototype[this.fullSignature] = this.jsConstructor.prototype[this.signature] = function(thread: JVMThread, args: any[], cb?: (e?: JVMTypes.java_lang_Throwable, rv?: any) => void): void {
