@@ -113,6 +113,33 @@ fun methodHandleSummary(): String {
     unreflectBefore + ">" + unreflectAfter,
     unreflectPrivateFailure
   ).joinToString("/")
+  val privateLookupMethod = MethodHandles::class.java.getMethod(
+    "privateLookupIn",
+    Class::class.java,
+    MethodHandles.Lookup::class.java
+  )
+  val privateLookup = privateLookupMethod.invoke(null, ownerClass, lookup) as MethodHandles.Lookup
+  val privateLookupSecret = privateLookup.findVirtual(
+    ownerClass,
+    "secretSuffix",
+    MethodType.methodType(stringClass, stringClass)
+  )
+  val privateLookupFailure = try {
+    privateLookupMethod.invoke(null, ownerClass, MethodHandles.publicLookup())
+    "public-ok"
+  } catch (e: java.lang.reflect.InvocationTargetException) {
+    e.cause?.javaClass?.simpleName ?: e.javaClass.simpleName
+  } catch (e: IllegalAccessException) {
+    e.javaClass.simpleName
+  }
+  val privateLookupModes = privateLookup.lookupModes()
+  val privateLookupValues = listOf(
+    privateLookup.lookupClass().name,
+    ((privateLookupModes and 2) != 0).toString() + ":" +
+      ((privateLookupModes and 8) != 0).toString(),
+    privateLookupSecret.invokeWithArguments(owner, "pl").toString(),
+    privateLookupFailure
+  ).joinToString("/")
   val identity = MethodHandles.identity(stringClass)
   val constant = MethodHandles.constant(stringClass, "const")
   val boundStatic = staticJoin.bindTo("bound")
@@ -270,6 +297,7 @@ fun methodHandleSummary(): String {
     combinatorTypes,
     extraCombinators,
     unreflectValues,
+    privateLookupValues,
     extraCombinatorTypes
   ).joinToString("|")
 }

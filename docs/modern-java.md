@@ -160,8 +160,10 @@ run.
   field handle lookup, `invokeWithArguments`, `MethodHandle.asType`, primitive
   boxing/unboxing/widening, selected reflection-backed `Lookup.unreflect`,
   `unreflectConstructor`, `unreflectGetter`, and `unreflectSetter` success
-  paths plus a private member access-failure path, selected `MethodHandles`
-  combinators (`identity`, `constant`, `bindTo`, `insertArguments`,
+  paths plus a private member access-failure path, selected
+  `MethodHandles.privateLookupIn` private method access plus public-lookup
+  failure behavior, selected `MethodHandles` combinators (`identity`,
+  `constant`, `bindTo`, `insertArguments`,
   `dropArguments`, `filterArguments`, `filterReturnValue`, `permuteArguments`,
   `guardWithTest`, `catchException`, `exactInvoker`, `invoker`,
   `collectArguments`, `foldArguments`, `explicitCastArguments`,
