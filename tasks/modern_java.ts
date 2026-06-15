@@ -524,6 +524,213 @@ function modernJava(grunt: IGrunt) {
     grunt.log.ok('Generated ' + runoutPath);
   });
 
+  grunt.registerTask('generate_java19_thread_sleep_duration', 'Generate a Java 19 Thread.sleep(Duration) fixture.', function() {
+    var bytes: number[] = [],
+      outPath = 'classes/modern_test/Java19ThreadSleepDuration.class',
+      runoutPath = 'classes/modern_test/Java19ThreadSleepDuration.runout',
+      expectedOutput = [
+        'negative',
+        'zero',
+        'tiny',
+        'npe'
+      ].join('\n') + '\n';
+
+    function u1(value: number): void {
+      bytes.push(value & 0xff);
+    }
+
+    function u2(value: number): void {
+      bytes.push((value >>> 8) & 0xff, value & 0xff);
+    }
+
+    function u4(value: number): void {
+      bytes.push((value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff);
+    }
+
+    function utf8(value: string): void {
+      var buf = Buffer.from(value, 'utf8');
+      u1(1);
+      u2(buf.length);
+      for (var i = 0; i < buf.length; i++) {
+        u1(buf[i]);
+      }
+    }
+
+    function cls(nameIndex: number): void {
+      u1(7);
+      u2(nameIndex);
+    }
+
+    function nameAndType(nameIndex: number, descriptorIndex: number): void {
+      u1(12);
+      u2(nameIndex);
+      u2(descriptorIndex);
+    }
+
+    function ref(tag: number, classIndex: number, nameAndTypeIndex: number): void {
+      u1(tag);
+      u2(classIndex);
+      u2(nameAndTypeIndex);
+    }
+
+    function str(stringIndex: number): void {
+      u1(8);
+      u2(stringIndex);
+    }
+
+    function codeAttr(code: number[], maxStack: number, maxLocals: number, exceptions?: number[][]): void {
+      var exceptionTable = exceptions || [];
+      u2(7);
+      u4(12 + code.length + (exceptionTable.length * 8));
+      u2(maxStack);
+      u2(maxLocals);
+      u4(code.length);
+      code.forEach(u1);
+      u2(exceptionTable.length);
+      exceptionTable.forEach(function(entry: number[]): void {
+        u2(entry[0]);
+        u2(entry[1]);
+        u2(entry[2]);
+        u2(entry[3]);
+      });
+      u2(0);
+    }
+
+    function patchU2(code: number[], offset: number, value: number): void {
+      code[offset] = (value >>> 8) & 0xff;
+      code[offset + 1] = value & 0xff;
+    }
+
+    function emitU2Operand(code: number[], opcode: number, index: number): void {
+      code.push(opcode, (index >>> 8) & 0xff, index & 0xff);
+    }
+
+    function emitPrintString(code: number[], stringIndex: number): void {
+      emitU2Operand(code, 0xb2, 14);
+      code.push(0x12, stringIndex);
+      emitU2Operand(code, 0xb6, 20);
+    }
+
+    var mainCode: number[] = [],
+      tryStart: number,
+      tryEnd: number,
+      catchStart: number,
+      afterCatch: number,
+      gotoOffset: number;
+
+    mainCode.push(0x0a);
+    emitU2Operand(mainCode, 0xb8, 31);
+    emitU2Operand(mainCode, 0xb6, 38);
+    emitU2Operand(mainCode, 0xb8, 42);
+    emitPrintString(mainCode, 47);
+    emitU2Operand(mainCode, 0xb2, 43);
+    emitU2Operand(mainCode, 0xb8, 42);
+    emitPrintString(mainCode, 49);
+    mainCode.push(0x0a);
+    emitU2Operand(mainCode, 0xb8, 34);
+    emitU2Operand(mainCode, 0xb8, 42);
+    emitPrintString(mainCode, 51);
+    tryStart = mainCode.length;
+    mainCode.push(0x01);
+    emitU2Operand(mainCode, 0xb8, 42);
+    tryEnd = mainCode.length;
+    emitPrintString(mainCode, 53);
+    gotoOffset = mainCode.length;
+    mainCode.push(0xa7, 0x00, 0x00);
+    catchStart = mainCode.length;
+    mainCode.push(0x4c);
+    emitPrintString(mainCode, 55);
+    afterCatch = mainCode.length;
+    patchU2(mainCode, gotoOffset + 1, afterCatch - gotoOffset);
+    mainCode.push(0xb1);
+
+    u4(0xcafebabe);
+    u2(0);
+    u2(63);
+    u2(59);
+    cls(2);
+    utf8('classes/modern_test/Java19ThreadSleepDuration');
+    cls(4);
+    utf8('java/lang/Object');
+    utf8('<init>');
+    utf8('()V');
+    utf8('Code');
+    ref(10, 3, 9);
+    nameAndType(5, 6);
+    utf8('main');
+    utf8('([Ljava/lang/String;)V');
+    cls(13);
+    utf8('java/lang/System');
+    ref(9, 12, 15);
+    nameAndType(16, 17);
+    utf8('out');
+    utf8('Ljava/io/PrintStream;');
+    cls(19);
+    utf8('java/io/PrintStream');
+    ref(10, 18, 21);
+    nameAndType(22, 23);
+    utf8('println');
+    utf8('(Ljava/lang/String;)V');
+    cls(25);
+    utf8('java/lang/Thread');
+    cls(27);
+    utf8('java/time/Duration');
+    nameAndType(29, 30);
+    utf8('ofMillis');
+    utf8('(J)Ljava/time/Duration;');
+    ref(10, 26, 28);
+    nameAndType(33, 30);
+    utf8('ofNanos');
+    ref(10, 26, 32);
+    nameAndType(36, 37);
+    utf8('negated');
+    utf8('()Ljava/time/Duration;');
+    ref(10, 26, 35);
+    nameAndType(40, 41);
+    utf8('sleep');
+    utf8('(Ljava/time/Duration;)V');
+    ref(10, 24, 39);
+    ref(9, 26, 44);
+    nameAndType(45, 46);
+    utf8('ZERO');
+    utf8('Ljava/time/Duration;');
+    str(48);
+    utf8('negative');
+    str(50);
+    utf8('zero');
+    str(52);
+    utf8('tiny');
+    str(54);
+    utf8('null-missed');
+    str(56);
+    utf8('npe');
+    cls(58);
+    utf8('java/lang/NullPointerException');
+
+    u2(0x0021);
+    u2(1);
+    u2(3);
+    u2(0);
+    u2(0);
+    u2(2);
+    u2(0x0001);
+    u2(5);
+    u2(6);
+    u2(1);
+    codeAttr([0x2a, 0xb7, 0x00, 0x08, 0xb1], 1, 1);
+    u2(0x0009);
+    u2(10);
+    u2(11);
+    u2(1);
+    codeAttr(mainCode, 2, 2, [[tryStart, tryEnd, catchStart, 57]]);
+    u2(0);
+
+    grunt.file.write(outPath, Buffer.from(bytes));
+    grunt.log.ok('Generated ' + outPath);
+    grunt.file.write(runoutPath, expectedOutput);
+    grunt.log.ok('Generated ' + runoutPath);
+  });
+
   grunt.registerTask('generate_java21_thread_is_virtual', 'Generate a Java 21 Thread.isVirtual fixture.', function() {
     var bytes: number[] = [],
       outPath = 'classes/modern_test/Java21ThreadIsVirtual.class',
@@ -2670,6 +2877,22 @@ function modernJava(grunt: IGrunt) {
           grunt.fail.fatal('Java 19 threadId Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
         }
         grunt.log.ok('Java 19 threadId output matched expected output.');
+        done();
+      });
+  });
+
+  grunt.registerTask('unit_test_java19_thread_sleep_duration', 'Run the Java 19 Thread.sleep(Duration) fixture on Doppio.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      mainClass = 'classes.modern_test.Java19ThreadSleepDuration',
+      outPath = 'classes/modern_test/Java19ThreadSleepDuration.runout';
+    child_process.exec('node --no-deprecation build/release-cli/console/runner.js -classpath . ' + mainClass,
+      function(err?: any, stdout?: Buffer, stderr?: Buffer) {
+        var actual = stdout.toString() + stderr.toString(),
+          expected = fs.readFileSync(outPath, 'utf8');
+        if (err || actual !== expected) {
+          grunt.fail.fatal('Java 19 Thread.sleep(Duration) Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
+        }
+        grunt.log.ok('Java 19 Thread.sleep(Duration) output matched expected output.');
         done();
       });
   });

@@ -783,6 +783,65 @@ export class MethodReference implements IConstantPoolItem {
             }
           };
           method = <Method> syntheticMethod;
+        } else if (syntheticCls.getInternalName() === 'Ljava/lang/Thread;' && this.signature === 'sleep(Ljava/time/Duration;)V') {
+          syntheticMethod = {
+            cls: syntheticCls,
+            slot: -1,
+            accessFlags: syntheticAccessFlags,
+            name: this.nameAndTypeInfo.name,
+            rawDescriptor: this.nameAndTypeInfo.descriptor,
+            attrs: [],
+            signature: this.signature,
+            fullSignature: syntheticFullSignature,
+            parameterTypes: ['Ljava/time/Duration;'],
+            returnType: 'V',
+            getParamWordSize: function(): number {
+              return 1;
+            },
+            convertArgs: function(thread: JVMThread, params: any[]): any[] {
+              return [thread, params[0]];
+            },
+            getNativeFunction: function(): Function {
+              return function(thread: JVMThread, duration: JVMTypes.java_lang_Object): void {
+                if (duration === null) {
+                  thread.throwNewException('Ljava/lang/NullPointerException;', 'duration');
+                  return;
+                }
+                var seconds = <gLong> (<any> duration)['java/time/Duration/seconds'],
+                  nanos = <number> (<any> duration)['java/time/Duration/nanos'],
+                  beforeMethod: Method,
+                  millis: number;
+                if (seconds.isNegative() || (seconds.isZero() && nanos === 0)) {
+                  return;
+                }
+                millis = (seconds.toNumber() * 1000) + Math.floor(nanos / 1000000);
+                if (nanos % 1000000 !== 0) {
+                  millis++;
+                }
+                beforeMethod = thread.currentMethod();
+                thread.setStatus(ThreadStatus.ASYNC_WAITING);
+                setTimeout(() => {
+                  if (beforeMethod === thread.currentMethod()) {
+                    thread.setStatus(ThreadStatus.RUNNABLE);
+                    thread.asyncReturn();
+                  }
+                }, millis);
+              };
+            },
+            isSignaturePolymorphic: function(): boolean {
+              return false;
+            },
+            isHidden: function(): boolean {
+              return false;
+            },
+            isCallerSensitive: function(): boolean {
+              return false;
+            },
+            getFullSignature: function(): string {
+              return syntheticCls.getExternalName() + '.' + this.signature;
+            }
+          };
+          method = <Method> syntheticMethod;
         } else if (syntheticCls.getInternalName() === 'Ljava/lang/Thread;' && this.signature === 'onSpinWait()V') {
           syntheticMethod = {
             cls: syntheticCls,
@@ -3889,6 +3948,7 @@ export class MethodReference implements IConstantPoolItem {
         this.fullSignature === 'java/nio/file/FileSystems/newFileSystem(Ljava/nio/file/Path;Ljava/lang/ClassLoader;)Ljava/nio/file/FileSystem;' ||
         this.fullSignature === 'java/nio/file/FileSystems/newFileSystem(Ljava/nio/file/Path;Ljava/util/Map;Ljava/lang/ClassLoader;)Ljava/nio/file/FileSystem;';
 	    if ((this.fullSignature === 'java/lang/Thread/onSpinWait()V' ||
+	        this.fullSignature === 'java/lang/Thread/sleep(Ljava/time/Duration;)V' ||
 	        this.fullSignature === 'java/lang/ref/Reference/reachabilityFence(Ljava/lang/Object;)V' ||
 	        this.fullSignature === 'java/lang/Math/multiplyFull(II)J' ||
 	        this.fullSignature === 'java/lang/StrictMath/multiplyFull(II)J' ||
