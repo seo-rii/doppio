@@ -449,6 +449,17 @@ Current verified checks:
   `Class.getResource`, `URL.openStream`, `Collections.list`,
   `URL.toExternalForm`, exception-table-backed context restoration,
   `LambdaMetafactory`, `StackMapTable`, and `kotlin.Metadata`.
+- A minimal `ServiceLoader` smoke compiled with the repo suite in 392 seconds
+  and both the host JVM and Doppio printed
+  `alpha=7,beta=11|2|alpha=7,beta=11|AlphaServiceLookupPlugin>BetaServiceLookupPlugin|true`.
+  The CI script now creates a generated `META-INF/services/ServiceLookupPlugin`
+  resource next to the compiled Kotlin classes, including a comment and a
+  duplicate provider line. `javap` verified `ServiceLoader.load`,
+  `ServiceLoader.iterator`, `ServiceLoader.reload`, iterator-to-sequence
+  lowering through `SequencesKt.asSequence` / `toList`, provider interface
+  dispatch, public no-arg provider constructors, duplicate-provider collapse,
+  fresh instances after `reload`, `LambdaMetafactory`, `StackMapTable`, and
+  `kotlin.Metadata`.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering

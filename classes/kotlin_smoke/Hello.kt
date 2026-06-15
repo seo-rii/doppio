@@ -37,4 +37,5 @@ fun main() {
   println(nioPathSummary())
   println(concurrentCacheSummary())
   println(resourceLookupSummary())
+  println(serviceLoaderSummary())
 }
