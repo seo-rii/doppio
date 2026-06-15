@@ -1734,7 +1734,7 @@ export default function (): any {
   }
 
   class java_lang_invoke_MethodHandles {
-    private static callDoppioHelper(
+    public static callDoppioHelper(
       thread: JVMThread,
       signature: string,
       args: any[]
@@ -2184,6 +2184,34 @@ export default function (): any {
   }
 
   class java_lang_invoke_MethodHandle {
+    public static 'asCollector(ILjava/lang/Class;I)Ljava/lang/invoke/MethodHandle;'(
+      thread: JVMThread,
+      mh: JVMTypes.java_lang_invoke_MethodHandle,
+      pos: number,
+      arrayType: JVMTypes.java_lang_Class,
+      arrayLength: number
+    ): void {
+      java_lang_invoke_MethodHandles.callDoppioHelper(
+        thread,
+        'java/lang/invoke/DoppioMethodHandles/asCollector(Ljava/lang/invoke/MethodHandle;ILjava/lang/Class;I)Ljava/lang/invoke/MethodHandle;',
+        [mh, pos, arrayType, arrayLength]
+      );
+    }
+
+    public static 'asSpreader(ILjava/lang/Class;I)Ljava/lang/invoke/MethodHandle;'(
+      thread: JVMThread,
+      mh: JVMTypes.java_lang_invoke_MethodHandle,
+      pos: number,
+      arrayType: JVMTypes.java_lang_Class,
+      arrayLength: number
+    ): void {
+      java_lang_invoke_MethodHandles.callDoppioHelper(
+        thread,
+        'java/lang/invoke/DoppioMethodHandles/asSpreader(Ljava/lang/invoke/MethodHandle;ILjava/lang/Class;I)Ljava/lang/invoke/MethodHandle;',
+        [mh, pos, arrayType, arrayLength]
+      );
+    }
+
     /**
      * Invokes the method handle, allowing any caller type descriptor, but requiring an exact type match.
      *

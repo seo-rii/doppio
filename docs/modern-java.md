@@ -172,11 +172,13 @@ smoke. Full control-flow combinator parity is still not claimed.
   `constant`, `bindTo`, `insertArguments`,
   `dropArguments`, `filterArguments`, `filterReturnValue`, `permuteArguments`,
   `guardWithTest`, `catchException`, `exactInvoker`, `invoker`,
-  `collectArguments`, zero-position and selected nonzero-position
-  `foldArguments`, `explicitCastArguments`, `arrayElementGetter`,
-  `arrayElementSetter`, `throwException`, and Java 17 public overlays `zero`,
-  `empty`, `arrayLength`, `arrayConstructor`, `dropArgumentsToMatch`,
-  `dropReturn`, and selected `tryFinally` flows), and
+  `spreadInvoker`, `collectArguments`, zero-position and selected
+  nonzero-position `foldArguments`, `explicitCastArguments`,
+  `arrayElementGetter`, `arrayElementSetter`, `throwException`, selected
+  `MethodHandle.asCollector`, `asSpreader`, `asVarargsCollector`, and
+  `asFixedArity` adapter flows, and Java 17 public overlays `zero`, `empty`,
+  `arrayLength`, `arrayConstructor`, `dropArgumentsToMatch`, `dropReturn`, and
+  selected `tryFinally` flows), and
   method-type descriptor reporting, plus Kotlin unsigned
   primitives and unsigned arrays covering wraparound arithmetic, unsigned
   sorting, filtering, map keys, and hexadecimal byte rendering, then runs the
@@ -652,11 +654,13 @@ smoke. Full control-flow combinator parity is still not claimed.
   combinators covering `identity`, `constant`, `bindTo`, `insertArguments`,
   `dropArguments`, `filterArguments`, `filterReturnValue`, `permuteArguments`,
   `guardWithTest`, `catchException`, `exactInvoker`, `invoker`,
-  `collectArguments`, zero-position and selected nonzero-position
-  `foldArguments`, `explicitCastArguments`, `arrayElementGetter`,
-  `arrayElementSetter`, `throwException`, and Java 17 public overlays `zero`,
-  `empty`, `arrayLength`, `arrayConstructor`, `dropArgumentsToMatch`,
-  `dropReturn`, and selected `tryFinally` flows with
+  `spreadInvoker`, `collectArguments`, zero-position and selected
+  nonzero-position `foldArguments`, `explicitCastArguments`,
+  `arrayElementGetter`, `arrayElementSetter`, `throwException`, selected
+  `MethodHandle.asCollector`, `asSpreader`, `asVarargsCollector`, and
+  `asFixedArity` adapter flows, and Java 17 public overlays `zero`, `empty`,
+  `arrayLength`, `arrayConstructor`, `dropArgumentsToMatch`, `dropReturn`, and
+  selected `tryFinally` flows with
   descriptor checks, sealed
   metadata, and
   illegal direct subtype rejection; Java 18-26 simple parser-only class-file

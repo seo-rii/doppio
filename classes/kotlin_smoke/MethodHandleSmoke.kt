@@ -26,6 +26,17 @@ class MethodHandleOwner(@JvmField var text: String) {
     fun triple(first: String, second: String, third: String): String = "$first/$second/$third"
 
     @JvmStatic
+    fun joinArray(prefix: String, values: Array<String>): String = prefix + ":" + values.joinToString(",")
+
+    @JvmStatic
+    fun mixArray(prefix: String, values: Array<String>, suffix: String): String =
+      joinArray(prefix, values) + ":$suffix"
+
+    @JvmStatic
+    fun four(first: String, second: String, third: String, fourth: String): String =
+      "$first/$second/$third/$fourth"
+
+    @JvmStatic
     fun longLabel(value: Long): String = "long:$value"
 
     @JvmStatic
@@ -293,6 +304,18 @@ fun methodHandleSummary(): String {
     intClass,
     MethodHandle::class.java
   )
+  val asCollectorAtMethod = MethodHandle::class.java.getMethod(
+    "asCollector",
+    intClass,
+    Class::class.java,
+    intClass
+  )
+  val asSpreaderAtMethod = MethodHandle::class.java.getMethod(
+    "asSpreader",
+    intClass,
+    Class::class.java,
+    intClass
+  )
   val tryFinallyMethod = MethodHandles::class.java.getMethod(
     "tryFinally",
     MethodHandle::class.java,
@@ -326,6 +349,63 @@ fun methodHandleSummary(): String {
     MethodType.methodType(stringClass, intClass)
   )
   val foldedAtOne = foldArgumentsAtMethod.invoke(null, foldAtTarget, 1, foldAtCombiner) as MethodHandle
+  val joinArray = lookup.findStatic(
+    ownerClass,
+    "joinArray",
+    MethodType.methodType(stringClass, stringClass, Array<String>::class.java)
+  )
+  val collectedArray = joinArray.asCollector(Array<String>::class.java, 3)
+  val collectedArrayAt = asCollectorAtMethod.invoke(
+    joinArray,
+    1,
+    Array<String>::class.java,
+    2
+  ) as MethodHandle
+  val mixArray = lookup.findStatic(
+    ownerClass,
+    "mixArray",
+    MethodType.methodType(stringClass, stringClass, Array<String>::class.java, stringClass)
+  )
+  val collectedArrayMiddle = asCollectorAtMethod.invoke(
+    mixArray,
+    1,
+    Array<String>::class.java,
+    2
+  ) as MethodHandle
+  val spreadArray = collectedArray.asSpreader(Array<String>::class.java, 3)
+  val spreadArrayAt = asSpreaderAtMethod.invoke(
+    collectedArray,
+    1,
+    Array<String>::class.java,
+    3
+  ) as MethodHandle
+  val four = lookup.findStatic(
+    ownerClass,
+    "four",
+    MethodType.methodType(stringClass, stringClass, stringClass, stringClass, stringClass)
+  )
+  val spreadArrayMiddle = asSpreaderAtMethod.invoke(
+    four,
+    1,
+    Array<String>::class.java,
+    2
+  ) as MethodHandle
+  val varargsArray = joinArray.asVarargsCollector(Array<String>::class.java)
+  val fixedArray = varargsArray.asFixedArity()
+  val spreadInvoker = MethodHandles.spreadInvoker(staticJoin.type(), 1)
+  val spreadVarargs = listOf(
+    collectedArray.invokeWithArguments("collect", "a", "b", "c").toString(),
+    collectedArrayAt.invokeWithArguments("collectAt", "x", "y").toString(),
+    collectedArrayMiddle.invokeWithArguments("collectMid", "m", "n", "tail").toString(),
+    spreadArray.invokeWithArguments("spread", arrayOf("d", "e", "f")).toString(),
+    spreadArrayAt.invokeWithArguments("spreadAt", arrayOf("g", "h", "i")).toString(),
+    spreadArrayMiddle.invokeWithArguments("spreadMid", arrayOf("o", "p"), "tail").toString(),
+    varargsArray.isVarargsCollector.toString(),
+    varargsArray.invokeWithArguments("var", "j", "k").toString(),
+    fixedArray.isVarargsCollector.toString(),
+    fixedArray.invokeWithArguments("fixed", arrayOf("l", "m")).toString(),
+    spreadInvoker.invokeWithArguments(staticJoin, "spreadInvoker", arrayOf(Integer.valueOf(10))).toString()
+  ).joinToString("~")
   val tryTarget = lookup.findStatic(
     ownerClass,
     "tryTarget",
@@ -405,6 +485,7 @@ fun methodHandleSummary(): String {
     (droppedReturn.invokeWithArguments("drop", 5) == null).toString(),
     matchedDrop.invokeWithArguments(2, "matched").toString(),
     foldedAtOne.invokeWithArguments("fold", 6).toString(),
+    spreadVarargs,
     tryFinallyValues
   ).joinToString("|")
   val combinatorTypes = listOf(
@@ -432,6 +513,13 @@ fun methodHandleSummary(): String {
     droppedReturn,
     matchedDrop,
     foldedAtOne,
+    collectedArray,
+    collectedArrayAt,
+    collectedArrayMiddle,
+    spreadArray,
+    spreadArrayAt,
+    spreadArrayMiddle,
+    spreadInvoker,
     tried,
     triedVoid
   ).joinToString("|") { it.type().toMethodDescriptorString() }

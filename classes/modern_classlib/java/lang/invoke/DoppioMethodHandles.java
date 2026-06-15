@@ -148,6 +148,107 @@ public final class DoppioMethodHandles {
     return MethodHandles.permuteArguments(collected, desiredType, reorder);
   }
 
+  public static MethodHandle asCollector(MethodHandle target, int pos, Class<?> arrayType, int arrayLength) {
+    Objects.requireNonNull(target);
+    Objects.requireNonNull(arrayType);
+
+    MethodType targetType = target.type();
+    int parameterCount = targetType.parameterCount();
+    if (pos == parameterCount - 1) {
+      return target.asCollector(arrayType, arrayLength);
+    }
+    if (pos < 0 || pos >= parameterCount) {
+      throw new IllegalArgumentException("bad collect position");
+    }
+
+    List<Class<?>> targetTypes = targetType.parameterList();
+    List<Class<?>> movedTypes = new ArrayList<Class<?>>();
+    movedTypes.addAll(targetTypes.subList(0, pos));
+    movedTypes.addAll(targetTypes.subList(pos + 1, parameterCount));
+    movedTypes.add(arrayType);
+    MethodType movedType = MethodType.methodType(targetType.returnType(), movedTypes);
+    int[] moveReorder = new int[parameterCount];
+    for (int i = 0; i < pos; i++) {
+      moveReorder[i] = i;
+    }
+    moveReorder[pos] = parameterCount - 1;
+    int afterCount = parameterCount - pos - 1;
+    for (int i = 0; i < afterCount; i++) {
+      moveReorder[pos + 1 + i] = pos + i;
+    }
+
+    MethodHandle moved = MethodHandles.permuteArguments(target, movedType, moveReorder);
+    MethodHandle collectedMoved = moved.asCollector(arrayType, arrayLength);
+    Class<?> componentType = arrayType.getComponentType();
+    List<Class<?>> desiredTypes = new ArrayList<Class<?>>();
+    desiredTypes.addAll(targetTypes.subList(0, pos));
+    for (int i = 0; i < arrayLength; i++) {
+      desiredTypes.add(componentType);
+    }
+    desiredTypes.addAll(targetTypes.subList(pos + 1, parameterCount));
+    MethodType desiredType = MethodType.methodType(targetType.returnType(), desiredTypes);
+    int[] restoreReorder = new int[collectedMoved.type().parameterCount()];
+    for (int i = 0; i < pos; i++) {
+      restoreReorder[i] = i;
+    }
+    for (int i = 0; i < afterCount; i++) {
+      restoreReorder[pos + i] = pos + arrayLength + i;
+    }
+    for (int i = 0; i < arrayLength; i++) {
+      restoreReorder[pos + afterCount + i] = pos + i;
+    }
+    return MethodHandles.permuteArguments(collectedMoved, desiredType, restoreReorder);
+  }
+
+  public static MethodHandle asSpreader(MethodHandle target, int pos, Class<?> arrayType, int arrayLength) {
+    Objects.requireNonNull(target);
+    Objects.requireNonNull(arrayType);
+
+    MethodType targetType = target.type();
+    int parameterCount = targetType.parameterCount();
+    if (pos == parameterCount - arrayLength) {
+      return target.asSpreader(arrayType, arrayLength);
+    }
+    if (pos < 0 || arrayLength < 0 || pos + arrayLength > parameterCount) {
+      throw new IllegalArgumentException("bad spread position");
+    }
+
+    List<Class<?>> targetTypes = targetType.parameterList();
+    int afterCount = parameterCount - pos - arrayLength;
+    List<Class<?>> movedTypes = new ArrayList<Class<?>>();
+    movedTypes.addAll(targetTypes.subList(0, pos));
+    movedTypes.addAll(targetTypes.subList(pos + arrayLength, parameterCount));
+    movedTypes.addAll(targetTypes.subList(pos, pos + arrayLength));
+    MethodType movedType = MethodType.methodType(targetType.returnType(), movedTypes);
+    int[] moveReorder = new int[parameterCount];
+    for (int i = 0; i < pos; i++) {
+      moveReorder[i] = i;
+    }
+    for (int i = 0; i < arrayLength; i++) {
+      moveReorder[pos + i] = pos + afterCount + i;
+    }
+    for (int i = 0; i < afterCount; i++) {
+      moveReorder[pos + arrayLength + i] = pos + i;
+    }
+
+    MethodHandle moved = MethodHandles.permuteArguments(target, movedType, moveReorder);
+    MethodHandle spreadMoved = moved.asSpreader(arrayType, arrayLength);
+    List<Class<?>> desiredTypes = new ArrayList<Class<?>>();
+    desiredTypes.addAll(targetTypes.subList(0, pos));
+    desiredTypes.add(arrayType);
+    desiredTypes.addAll(targetTypes.subList(pos + arrayLength, parameterCount));
+    MethodType desiredType = MethodType.methodType(targetType.returnType(), desiredTypes);
+    int[] restoreReorder = new int[spreadMoved.type().parameterCount()];
+    for (int i = 0; i < pos; i++) {
+      restoreReorder[i] = i;
+    }
+    for (int i = 0; i < afterCount; i++) {
+      restoreReorder[pos + i] = pos + 1 + i;
+    }
+    restoreReorder[pos + afterCount] = pos;
+    return MethodHandles.permuteArguments(spreadMoved, desiredType, restoreReorder);
+  }
+
   public static MethodHandle tryFinally(MethodHandle target, MethodHandle cleanup)
       throws NoSuchMethodException, IllegalAccessException {
     Objects.requireNonNull(target);

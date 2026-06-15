@@ -352,12 +352,13 @@ Current verified checks:
   `identity`, `constant`, `bindTo`, `insertArguments`, `dropArguments`,
   `filterArguments`, `filterReturnValue`, `permuteArguments`,
   `guardWithTest`, `catchException`, `exactInvoker`, `invoker`,
-  `collectArguments`, zero-position and selected nonzero-position
+  `spreadInvoker`, `collectArguments`, zero-position and selected nonzero-position
   `foldArguments`, `explicitCastArguments`, `arrayElementGetter`,
-  `arrayElementSetter`, `throwException`, and Java 17 public overlays `zero`,
-  `empty`, `arrayLength`, `arrayConstructor`, `dropArgumentsToMatch`,
-  `dropReturn`, and selected `tryFinally` flows, with descriptor-string checks
-  for the adapted shapes. The
+  `arrayElementSetter`, `throwException`, selected `MethodHandle.asCollector`,
+  `asSpreader`, `asVarargsCollector`, and `asFixedArity` adapter flows, and
+  Java 17 public overlays `zero`, `empty`, `arrayLength`, `arrayConstructor`,
+  `dropArgumentsToMatch`, `dropReturn`, and selected `tryFinally` flows, with
+  descriptor-string checks for the adapted shapes. The
   Java 17 overlays are reached by reflection so the smoke exercises runtime
   discovery and invocation without requiring the Kotlin source frontend to
   hard-code those signatures. This extends the source-level Kotlin coverage

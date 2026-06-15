@@ -20,6 +20,22 @@ public class Java17MethodHandleExtraCombinators {
     return first + "/" + second + "/" + third;
   }
 
+  public static String joinArray(String prefix, String[] values) {
+    StringBuilder builder = new StringBuilder(prefix);
+    for (int i = 0; i < values.length; i++) {
+      builder.append(i == 0 ? ":" : ",").append(values[i]);
+    }
+    return builder.toString();
+  }
+
+  public static String mixArray(String prefix, String[] values, String suffix) {
+    return joinArray(prefix, values) + ":" + suffix;
+  }
+
+  public static String four(String first, String second, String third, String fourth) {
+    return first + "/" + second + "/" + third + "/" + fourth;
+  }
+
   public static String foldPrefix(String first, String second) {
     return first + ":" + second;
   }
@@ -214,5 +230,45 @@ public class Java17MethodHandleExtraCombinators {
     triedVoid.invokeExact("void");
     System.out.println(cleanupLog);
     System.out.println(triedVoid.type().toMethodDescriptorString());
+
+    MethodHandle joinArray = lookup.findStatic(
+        Java17MethodHandleExtraCombinators.class,
+        "joinArray",
+        MethodType.methodType(String.class, String.class, String[].class));
+    MethodHandle collectedArray = joinArray.asCollector(String[].class, 3);
+    System.out.println((String) collectedArray.invokeExact("collect", "a", "b", "c"));
+    System.out.println(collectedArray.type().toMethodDescriptorString());
+    MethodHandle collectedArrayAt = joinArray.asCollector(1, String[].class, 2);
+    System.out.println((String) collectedArrayAt.invokeExact("collectAt", "x", "y"));
+    System.out.println(collectedArrayAt.type().toMethodDescriptorString());
+    MethodHandle mixArray = lookup.findStatic(
+        Java17MethodHandleExtraCombinators.class,
+        "mixArray",
+        MethodType.methodType(String.class, String.class, String[].class, String.class));
+    MethodHandle collectedArrayMiddle = mixArray.asCollector(1, String[].class, 2);
+    System.out.println((String) collectedArrayMiddle.invokeExact("collectMid", "m", "n", "tail"));
+    System.out.println(collectedArrayMiddle.type().toMethodDescriptorString());
+    MethodHandle spreadArray = collectedArray.asSpreader(String[].class, 3);
+    System.out.println((String) spreadArray.invokeExact("spread", new String[] { "d", "e", "f" }));
+    System.out.println(spreadArray.type().toMethodDescriptorString());
+    MethodHandle spreadArrayAt = collectedArray.asSpreader(1, String[].class, 3);
+    System.out.println((String) spreadArrayAt.invokeExact("spreadAt", new String[] { "g", "h", "i" }));
+    System.out.println(spreadArrayAt.type().toMethodDescriptorString());
+    MethodHandle four = lookup.findStatic(
+        Java17MethodHandleExtraCombinators.class,
+        "four",
+        MethodType.methodType(String.class, String.class, String.class, String.class, String.class));
+    MethodHandle spreadArrayMiddle = four.asSpreader(1, String[].class, 2);
+    System.out.println((String) spreadArrayMiddle.invokeExact("spreadMid", new String[] { "o", "p" }, "tail"));
+    System.out.println(spreadArrayMiddle.type().toMethodDescriptorString());
+    MethodHandle varargsArray = joinArray.asVarargsCollector(String[].class);
+    System.out.println(varargsArray.isVarargsCollector());
+    System.out.println((String) varargsArray.invokeWithArguments("var", "j", "k"));
+    MethodHandle fixedArray = varargsArray.asFixedArity();
+    System.out.println(fixedArray.isVarargsCollector());
+    System.out.println((String) fixedArray.invokeWithArguments("fixed", new String[] { "l", "m" }));
+    MethodHandle spreadInvoker = MethodHandles.spreadInvoker(join.type(), 1);
+    System.out.println((String) spreadInvoker.invokeExact(join, "spreadInvoker", new Object[] { Integer.valueOf(10) }));
+    System.out.println(spreadInvoker.type().toMethodDescriptorString());
   }
 }
