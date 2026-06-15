@@ -20,6 +20,15 @@ class MethodHandleOwner(@JvmField var text: String) {
     fun triple(first: String, second: String, third: String): String = "$first/$second/$third"
 
     @JvmStatic
+    fun longLabel(value: Long): String = "long:$value"
+
+    @JvmStatic
+    fun foldPrefix(first: String, second: String): String = "$first:$second"
+
+    @JvmStatic
+    fun foldTarget(prefix: String, first: String, second: String): String = "$prefix|$first|$second"
+
+    @JvmStatic
     fun isEmpty(value: String): Boolean = value.isEmpty()
 
     @JvmStatic
@@ -138,6 +147,45 @@ fun methodHandleSummary(): String {
     IllegalArgumentException::class.java,
     handleNegative
   )
+  val exactInvoker = MethodHandles.exactInvoker(staticJoin.type())
+  val looseInvoker = MethodHandles.invoker(staticJoin.type())
+  val collected = MethodHandles.collectArguments(triple, 1, staticJoin)
+  val foldPrefix = lookup.findStatic(
+    ownerClass,
+    "foldPrefix",
+    MethodType.methodType(stringClass, stringClass, stringClass)
+  )
+  val foldTarget = lookup.findStatic(
+    ownerClass,
+    "foldTarget",
+    MethodType.methodType(stringClass, stringClass, stringClass, stringClass)
+  )
+  val folded = MethodHandles.foldArguments(foldTarget, foldPrefix)
+  val longLabel = lookup.findStatic(
+    ownerClass,
+    "longLabel",
+    MethodType.methodType(stringClass, java.lang.Long.TYPE)
+  )
+  val explicitDoubleToLong = MethodHandles.explicitCastArguments(
+    longLabel,
+    MethodType.methodType(stringClass, java.lang.Double.TYPE)
+  )
+  val stringGetter = MethodHandles.arrayElementGetter(Array<String>::class.java)
+  val stringSetter = MethodHandles.arrayElementSetter(Array<String>::class.java)
+  val strings = arrayOf("zero", "one")
+  val stringBefore = stringGetter.invokeWithArguments(strings, 1).toString()
+  stringSetter.invokeWithArguments(strings, 1, "changed")
+  val intGetter = MethodHandles.arrayElementGetter(IntArray::class.java)
+  val intSetter = MethodHandles.arrayElementSetter(IntArray::class.java)
+  val ints = intArrayOf(7, 8)
+  val intBefore = intGetter.invokeWithArguments(ints, 0).toString()
+  intSetter.invokeWithArguments(ints, 0, 9)
+  val throwing = MethodHandles.throwException(stringClass, IllegalStateException::class.java)
+  val thrown = try {
+    throwing.invokeWithArguments(IllegalStateException("boom")).toString()
+  } catch (e: IllegalStateException) {
+    e.message ?: "missing"
+  }
   val combinators = listOf(
     identity.invokeWithArguments("id").toString(),
     constant.invokeWithArguments().toString(),
@@ -153,12 +201,33 @@ fun methodHandleSummary(): String {
     caught.invokeWithArguments(7).toString(),
     caught.invokeWithArguments(-2).toString()
   ).joinToString("|")
+  val extraCombinators = listOf(
+    exactInvoker.invokeWithArguments(staticJoin, "exact", 2).toString(),
+    looseInvoker.invokeWithArguments(staticJoin, "loose", Integer.valueOf(3)).toString(),
+    collected.invokeWithArguments("A", "B", 5, "C").toString(),
+    folded.invokeWithArguments("left", "right").toString(),
+    explicitDoubleToLong.invokeWithArguments(java.lang.Double.valueOf(12.75)).toString(),
+    stringBefore,
+    strings[1],
+    intBefore,
+    ints[0].toString(),
+    thrown
+  ).joinToString("|")
   val combinatorTypes = listOf(
     boundStatic,
     droppedIdentity,
     filteredArgument,
     guarded,
     caught
+  ).joinToString("|") { it.type().toMethodDescriptorString() }
+  val extraCombinatorTypes = listOf(
+    exactInvoker,
+    collected,
+    folded,
+    explicitDoubleToLong,
+    stringGetter,
+    intSetter,
+    throwing
   ).joinToString("|") { it.type().toMethodDescriptorString() }
 
   return listOf(
@@ -171,6 +240,8 @@ fun methodHandleSummary(): String {
     staticJoin.type().toMethodDescriptorString(),
     append.type().toMethodDescriptorString(),
     combinators,
-    combinatorTypes
+    combinatorTypes,
+    extraCombinators,
+    extraCombinatorTypes
   ).joinToString("|")
 }
