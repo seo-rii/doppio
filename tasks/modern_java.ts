@@ -9,7 +9,7 @@ function shellEscape(str: string): string {
 }
 
 function modernJava(grunt: IGrunt) {
-  function generateEmptyClass(className: string, majorVersion: number): Buffer {
+  function generateSimpleClass(className: string, majorVersion: number, mainOutput?: string): Buffer {
     var bytes: number[] = [];
 
     function u1(value: number): void {
@@ -50,6 +50,11 @@ function modernJava(grunt: IGrunt) {
       u2(nameAndTypeIndex);
     }
 
+    function str(stringIndex: number): void {
+      u1(8);
+      u2(stringIndex);
+    }
+
     function codeAttr(code: number[], maxStack: number, maxLocals: number): void {
       u2(7);
       u4(12 + code.length);
@@ -64,7 +69,7 @@ function modernJava(grunt: IGrunt) {
     u4(0xcafebabe);
     u2(0);
     u2(majorVersion);
-    u2(10);
+    u2(mainOutput === undefined ? 10 : 26);
     cls(2);
     utf8(className);
     cls(4);
@@ -74,18 +79,48 @@ function modernJava(grunt: IGrunt) {
     utf8('Code');
     ref(10, 3, 9);
     nameAndType(5, 6);
+    if (mainOutput !== undefined) {
+      utf8('main');
+      utf8('([Ljava/lang/String;)V');
+      cls(13);
+      utf8('java/lang/System');
+      ref(9, 12, 15);
+      nameAndType(16, 17);
+      utf8('out');
+      utf8('Ljava/io/PrintStream;');
+      cls(19);
+      utf8('java/io/PrintStream');
+      ref(10, 18, 21);
+      nameAndType(22, 23);
+      utf8('println');
+      utf8('(Ljava/lang/String;)V');
+      str(25);
+      utf8(mainOutput);
+    }
 
     u2(0x0021);
     u2(1);
-    u2(4);
+    u2(3);
     u2(0);
     u2(0);
-    u2(1);
+    u2(mainOutput === undefined ? 1 : 2);
     u2(0x0001);
     u2(4);
     u2(6);
     u2(1);
     codeAttr([0x2a, 0xb7, 0x00, 0x08, 0xb1], 1, 1);
+    if (mainOutput !== undefined) {
+      u2(0x0009);
+      u2(10);
+      u2(11);
+      u2(1);
+      codeAttr([
+        0xb2, 0x00, 0x0e,
+        0x12, 0x18,
+        0xb6, 0x00, 0x14,
+        0xb1
+      ], 2, 1);
+    }
     u2(0);
 
     return Buffer.from(bytes);
@@ -103,8 +138,26 @@ function modernJava(grunt: IGrunt) {
       ['classes/modern_test/Java25ClassFileVersion.class', 'classes/modern_test/Java25ClassFileVersion', 69],
       ['classes/modern_test/Java26ClassFileVersion.class', 'classes/modern_test/Java26ClassFileVersion', 70]
     ].forEach(function(spec: [string, string, number]) {
-      grunt.file.write(spec[0], generateEmptyClass(spec[1], spec[2]));
+      grunt.file.write(spec[0], generateSimpleClass(spec[1], spec[2]));
       grunt.log.ok('Generated ' + spec[0]);
+    });
+  });
+
+  grunt.registerTask('generate_modern_classfile_runtime_versions', 'Generate runnable Java 20+ class-file fixtures.', function() {
+    [
+      ['classes/modern_test/Java20ClassFileRuntime.class', 'classes/modern_test/Java20ClassFileRuntime', 64, 'java20-runtime'],
+      ['classes/modern_test/Java21ClassFileRuntime.class', 'classes/modern_test/Java21ClassFileRuntime', 65, 'java21-runtime'],
+      ['classes/modern_test/Java22ClassFileRuntime.class', 'classes/modern_test/Java22ClassFileRuntime', 66, 'java22-runtime'],
+      ['classes/modern_test/Java23ClassFileRuntime.class', 'classes/modern_test/Java23ClassFileRuntime', 67, 'java23-runtime'],
+      ['classes/modern_test/Java24ClassFileRuntime.class', 'classes/modern_test/Java24ClassFileRuntime', 68, 'java24-runtime'],
+      ['classes/modern_test/Java25ClassFileRuntime.class', 'classes/modern_test/Java25ClassFileRuntime', 69, 'java25-runtime'],
+      ['classes/modern_test/Java26ClassFileRuntime.class', 'classes/modern_test/Java26ClassFileRuntime', 70, 'java26-runtime']
+    ].forEach(function(spec: [string, string, number, string]) {
+      var runoutPath = spec[0].replace(/\.class$/, '.runout');
+      grunt.file.write(spec[0], generateSimpleClass(spec[1], spec[2], spec[3]));
+      grunt.log.ok('Generated ' + spec[0]);
+      grunt.file.write(runoutPath, spec[3] + '\n');
+      grunt.log.ok('Generated ' + runoutPath);
     });
   });
 
@@ -2478,6 +2531,39 @@ function modernJava(grunt: IGrunt) {
           grunt.fail.fatal('Java 19 threadId Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
         }
         grunt.log.ok('Java 19 threadId output matched expected output.');
+        done();
+      });
+  });
+
+  grunt.registerTask('unit_test_modern_classfile_runtime_versions', 'Run runnable Java 20+ class-file fixtures on Doppio.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      specs = [
+        ['classes.modern_test.Java20ClassFileRuntime', 'classes/modern_test/Java20ClassFileRuntime.runout'],
+        ['classes.modern_test.Java21ClassFileRuntime', 'classes/modern_test/Java21ClassFileRuntime.runout'],
+        ['classes.modern_test.Java22ClassFileRuntime', 'classes/modern_test/Java22ClassFileRuntime.runout'],
+        ['classes.modern_test.Java23ClassFileRuntime', 'classes/modern_test/Java23ClassFileRuntime.runout'],
+        ['classes.modern_test.Java24ClassFileRuntime', 'classes/modern_test/Java24ClassFileRuntime.runout'],
+        ['classes.modern_test.Java25ClassFileRuntime', 'classes/modern_test/Java25ClassFileRuntime.runout'],
+        ['classes.modern_test.Java26ClassFileRuntime', 'classes/modern_test/Java26ClassFileRuntime.runout']
+      ];
+    async.eachSeries(specs,
+      function(spec: string[], next: (err?: any) => void): void {
+        child_process.exec('node --no-deprecation build/release-cli/console/runner.js -classpath . ' + spec[0],
+          function(err?: any, stdout?: Buffer, stderr?: Buffer) {
+            var actual = stdout.toString() + stderr.toString(),
+              expected = fs.readFileSync(spec[1], 'utf8');
+            if (err || actual !== expected) {
+              next(new Error('Modern class-file runtime output does not match expected output for ' + spec[0] + '.\nDoppio:\n' + actual + '\nExpected:\n' + expected));
+              return;
+            }
+            grunt.log.ok(spec[0] + ' output matched expected output.');
+            next();
+          });
+      },
+      function(err?: any): void {
+        if (err) {
+          grunt.fail.fatal(err.message);
+        }
         done();
       });
   });
