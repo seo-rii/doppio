@@ -2,7 +2,7 @@ package java.util;
 
 import java.util.function.UnaryOperator;
 
-public interface List<E> extends Collection<E> {
+public interface List<E> extends SequencedCollection<E> {
   int size();
 
   boolean isEmpty();
@@ -56,6 +56,14 @@ public interface List<E> extends Collection<E> {
 
   E get(int index);
 
+  default void addFirst(E e) {
+    add(0, e);
+  }
+
+  default void addLast(E e) {
+    add(e);
+  }
+
   default E getFirst() {
     if (isEmpty()) {
       throw new NoSuchElementException();
@@ -68,6 +76,49 @@ public interface List<E> extends Collection<E> {
       throw new NoSuchElementException();
     }
     return get(size() - 1);
+  }
+
+  default E removeFirst() {
+    if (isEmpty()) {
+      throw new NoSuchElementException();
+    }
+    return remove(0);
+  }
+
+  default E removeLast() {
+    if (isEmpty()) {
+      throw new NoSuchElementException();
+    }
+    return remove(size() - 1);
+  }
+
+  default List<E> reversed() {
+    List<E> forward = this;
+    return new AbstractList<E>() {
+      public E get(int index) {
+        return forward.get(forward.size() - 1 - index);
+      }
+
+      public int size() {
+        return forward.size();
+      }
+
+      public E set(int index, E element) {
+        return forward.set(forward.size() - 1 - index, element);
+      }
+
+      public void add(int index, E element) {
+        forward.add(forward.size() - index, element);
+      }
+
+      public E remove(int index) {
+        return forward.remove(forward.size() - 1 - index);
+      }
+
+      public List<E> reversed() {
+        return forward;
+      }
+    };
   }
 
   E set(int index, E element);

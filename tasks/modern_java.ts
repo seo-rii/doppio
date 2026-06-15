@@ -1216,7 +1216,16 @@ function modernJava(grunt: IGrunt) {
         'b',
         'true',
         'nse-first',
-        'nse-last'
+        'nse-last',
+        'true',
+        'b',
+        'a',
+        'true',
+        'a',
+        'c',
+        'a',
+        'c',
+        '1'
       ].join('\n') + '\n';
 
     function u1(value: number): void {
@@ -1323,7 +1332,11 @@ function modernJava(grunt: IGrunt) {
       lastTryEnd: number,
       lastCatchStart: number,
       lastAfterCatch: number,
-      lastGotoOffset: number;
+      lastGotoOffset: number,
+      doubleReversedFalseOffset: number,
+      doubleReversedAfterOffset: number,
+      doubleReversedFalse: number,
+      doubleReversedAfter: number;
 
     emitPrintListValue(mainCode, 40);
     emitPrintListValue(mainCode, 43);
@@ -1376,12 +1389,91 @@ function modernJava(grunt: IGrunt) {
     lastAfterCatch = mainCode.length;
     patchU2(mainCode, lastGotoOffset + 1, lastAfterCatch - lastGotoOffset);
 
+    emitU2Operand(mainCode, 0xb2, 14);
+    mainCode.push(0x12, 29);
+    mainCode.push(0x12, 31);
+    emitU2Operand(mainCode, 0xb8, 36);
+    emitU2Operand(mainCode, 0xc1, 66);
+    emitU2Operand(mainCode, 0xb6, 24);
+
+    mainCode.push(0x12, 29);
+    mainCode.push(0x12, 31);
+    emitU2Operand(mainCode, 0xb8, 36);
+    mainCode.push(0x4d);
+    emitU2Operand(mainCode, 0xb2, 14);
+    mainCode.push(0x2c);
+    emitInvokeInterface(mainCode, 71);
+    emitInvokeInterface(mainCode, 40);
+    emitU2Operand(mainCode, 0xc0, 44);
+    emitU2Operand(mainCode, 0xb6, 20);
+    emitU2Operand(mainCode, 0xb2, 14);
+    mainCode.push(0x2c);
+    emitInvokeInterface(mainCode, 71);
+    emitInvokeInterface(mainCode, 43);
+    emitU2Operand(mainCode, 0xc0, 44);
+    emitU2Operand(mainCode, 0xb6, 20);
+    emitU2Operand(mainCode, 0xb2, 14);
+    mainCode.push(0x2c);
+    emitInvokeInterface(mainCode, 71);
+    emitInvokeInterface(mainCode, 71);
+    mainCode.push(0x2c);
+    doubleReversedFalseOffset = mainCode.length;
+    mainCode.push(0xa6, 0x00, 0x00);
+    mainCode.push(0x04);
+    doubleReversedAfterOffset = mainCode.length;
+    mainCode.push(0xa7, 0x00, 0x00);
+    doubleReversedFalse = mainCode.length;
+    mainCode.push(0x03);
+    doubleReversedAfter = mainCode.length;
+    patchU2(mainCode, doubleReversedFalseOffset + 1, doubleReversedFalse - doubleReversedFalseOffset);
+    patchU2(mainCode, doubleReversedAfterOffset + 1, doubleReversedAfter - doubleReversedAfterOffset);
+    emitU2Operand(mainCode, 0xb6, 24);
+
+    emitU2Operand(mainCode, 0xbb, 72);
+    mainCode.push(0x59);
+    emitU2Operand(mainCode, 0xb7, 74);
+    mainCode.push(0x4e);
+    mainCode.push(0x2d);
+    mainCode.push(0x12, 31);
+    mainCode.push(0xb9, 0x00, 0x4e, 0x02, 0x00);
+    mainCode.push(0x57);
+    mainCode.push(0x2d);
+    mainCode.push(0x12, 29);
+    mainCode.push(0xb9, 0x00, 0x52, 0x02, 0x00);
+    mainCode.push(0x2d);
+    mainCode.push(0x12, 64);
+    mainCode.push(0xb9, 0x00, 0x55, 0x02, 0x00);
+    emitU2Operand(mainCode, 0xb2, 14);
+    mainCode.push(0x2d);
+    emitInvokeInterface(mainCode, 40);
+    emitU2Operand(mainCode, 0xc0, 44);
+    emitU2Operand(mainCode, 0xb6, 20);
+    emitU2Operand(mainCode, 0xb2, 14);
+    mainCode.push(0x2d);
+    emitInvokeInterface(mainCode, 43);
+    emitU2Operand(mainCode, 0xc0, 44);
+    emitU2Operand(mainCode, 0xb6, 20);
+    emitU2Operand(mainCode, 0xb2, 14);
+    mainCode.push(0x2d);
+    emitInvokeInterface(mainCode, 88);
+    emitU2Operand(mainCode, 0xc0, 44);
+    emitU2Operand(mainCode, 0xb6, 20);
+    emitU2Operand(mainCode, 0xb2, 14);
+    mainCode.push(0x2d);
+    emitInvokeInterface(mainCode, 91);
+    emitU2Operand(mainCode, 0xc0, 44);
+    emitU2Operand(mainCode, 0xb6, 20);
+    emitU2Operand(mainCode, 0xb2, 14);
+    mainCode.push(0x2d);
+    emitInvokeInterface(mainCode, 95);
+    emitU2Operand(mainCode, 0xb6, 98);
+
     mainCode.push(0xb1);
 
     u4(0xcafebabe);
     u2(0);
     u2(65);
-    u2(64);
+    u2(99);
     cls(2);
     utf8('classes/modern_test/Java21ListSequenced');
     cls(4);
@@ -1445,6 +1537,41 @@ function modernJava(grunt: IGrunt) {
     utf8('nse-last');
     cls(63);
     utf8('java/util/NoSuchElementException');
+    str(65);
+    utf8('c');
+    cls(67);
+    utf8('java/util/SequencedCollection');
+    utf8('reversed');
+    utf8('()Ljava/util/List;');
+    nameAndType(68, 69);
+    ref(11, 27, 70);
+    cls(73);
+    utf8('java/util/ArrayList');
+    ref(10, 72, 9);
+    utf8('add');
+    utf8('(Ljava/lang/Object;)Z');
+    nameAndType(75, 76);
+    ref(11, 27, 77);
+    utf8('addFirst');
+    utf8('(Ljava/lang/Object;)V');
+    nameAndType(79, 80);
+    ref(11, 27, 81);
+    utf8('addLast');
+    nameAndType(83, 80);
+    ref(11, 27, 84);
+    utf8('removeFirst');
+    nameAndType(86, 38);
+    ref(11, 27, 87);
+    utf8('removeLast');
+    nameAndType(89, 38);
+    ref(11, 27, 90);
+    utf8('size');
+    utf8('()I');
+    nameAndType(92, 93);
+    ref(11, 27, 94);
+    utf8('(I)V');
+    nameAndType(22, 96);
+    ref(10, 18, 97);
 
     u2(0x0021);
     u2(1);
@@ -1461,7 +1588,7 @@ function modernJava(grunt: IGrunt) {
     u2(10);
     u2(11);
     u2(1);
-    codeAttr(mainCode, 4, 2, [
+    codeAttr(mainCode, 4, 4, [
       [firstTryStart, firstTryEnd, firstCatchStart, 62],
       [lastTryStart, lastTryEnd, lastCatchStart, 62]
     ]);
@@ -3532,7 +3659,7 @@ function modernJava(grunt: IGrunt) {
       });
   });
 
-  grunt.registerTask('unit_test_java21_list_sequenced', 'Run the Java 21 List.getFirst/getLast fixture on Doppio.', function() {
+  grunt.registerTask('unit_test_java21_list_sequenced', 'Run the Java 21 List sequenced-collection fixture on Doppio.', function() {
     var done: (status?: boolean) => void = this.async(),
       mainClass = 'classes.modern_test.Java21ListSequenced',
       outPath = 'classes/modern_test/Java21ListSequenced.runout';
@@ -3541,9 +3668,9 @@ function modernJava(grunt: IGrunt) {
         var actual = stdout.toString() + stderr.toString(),
           expected = fs.readFileSync(outPath, 'utf8');
         if (err || actual !== expected) {
-          grunt.fail.fatal('Java 21 List.getFirst/getLast Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
+          grunt.fail.fatal('Java 21 List sequenced-collection Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
         }
-        grunt.log.ok('Java 21 List.getFirst/getLast output matched expected output.');
+        grunt.log.ok('Java 21 List sequenced-collection output matched expected output.');
         done();
       });
   });

@@ -28,7 +28,7 @@ run.
 | 18 | 62 | UTF-8-by-default expectations, simple web server tooling output, `Math`/`StrictMath` unsigned multiplication helper | Partial: simple class-file container, selected UTF-8 default charset behavior for `file.encoding`, `Charset.defaultCharset()`, default `String` byte conversion, and default `InputStreamReader`/`OutputStreamWriter` byte conversion, plus selected `Math.unsignedMultiplyHigh(long, long)` and `StrictMath.unsignedMultiplyHigh(long, long)` behavior for zero, power-of-two, negative-bit-pattern, `Long.MIN_VALUE`, and mixed-sign unsigned products | Medium |
 | 19 | 63 | virtual threads preview dependencies, record pattern preview output, `Thread.threadId()`, `Thread.sleep(Duration)` | Partial: simple class-file container, selected `Thread.threadId()` current-thread behavior matching the existing positive `Thread.getId()` identifier, and selected `Thread.sleep(Duration)` behavior for negative no-op, zero duration, short positive duration, null rejection, and interrupt delivery | High |
 | 20 | 64 | scoped values preview dependencies, pattern matching output | Partial: simple class-file container plus runnable print fixture | High |
-| 21 | 65 | virtual threads, sequenced collections, string templates preview | Partial: simple class-file container, runnable print fixture, selected `Thread.isVirtual()` platform-thread behavior for current, unstarted, and started platform threads, and selected `List.getFirst()`/`getLast()` behavior over `List.of` | Very high |
+| 21 | 65 | virtual threads, sequenced collections, string templates preview | Partial: simple class-file container, runnable print fixture, selected `Thread.isVirtual()` platform-thread behavior for current, unstarted, and started platform threads, and selected `SequencedCollection`/`List` endpoint and reverse-view behavior | Very high |
 | 22 | 66 | class-file API ecosystem expectations, unnamed variables | Partial: simple class-file container plus runnable print fixture | Medium |
 | 23 | 67 | primitive patterns preview, module/JDK library drift | Partial: simple class-file container plus runnable print fixture | High |
 | 24 | 68 | stream gatherers, compact object headers ecosystem assumptions | Partial: simple class-file container plus runnable print fixture | High |
@@ -751,11 +751,15 @@ run.
   unstarted platform `Thread`, and a started platform `Thread`.
   `Thread.ofVirtual()` and
   `Thread.startVirtualThread(...)` are not implemented.
-- Selected Java 21 `List.getFirst()` and `List.getLast()` behavior is covered
-  for `List.of(...)` non-empty lists, singleton first/last identity, and
-  empty-list `NoSuchElementException` paths. Broader sequenced collection
-  surfaces, including `SequencedCollection`, `List.reversed()`, and
-  add/remove first/last operations, are not implemented.
+- Selected Java 21 `SequencedCollection`/`List` behavior is covered for
+  `List` assignability to `SequencedCollection`, `List.of(...)`
+  non-empty and empty endpoint access, singleton first/last identity,
+  `List.reversed()` first/last access and double-reverse identity, and
+  mutable-list `addFirst`, `addLast`, `removeFirst`, and `removeLast` default
+  methods. Broader sequenced collection surfaces, including `SequencedSet`,
+  `SequencedMap`, `Deque`/`SortedSet` hierarchy updates, and fully specified
+  reverse-view mutation semantics beyond the tested list paths, are not
+  implemented.
 - Selected Java 11 `String` additions are covered for `isBlank`, `strip`,
   `stripLeading`, `stripTrailing`, `repeat`, and `lines`, including negative
   repeat count validation and line splitting for LF, CRLF, CR, empty input,
@@ -1111,11 +1115,13 @@ run.
 - `java.util.List`, `java.util.Set`, and `java.util.Map` now expose tested
   Java 9 factory methods, Java 10 `copyOf` methods, and Java 17
   `Map.Entry.copyOf` through minimal class-library shims. `java.util.List`
-  also exposes tested Java 21 `getFirst()`/`getLast()` default methods over
-  the immutable factory lists. Empty varargs factory calls reuse the same
-  empty singletons as the fixed empty factories, and factory-created immutable
-  collections reject tested null lookup probes such as `List.contains(null)`,
-  `Set.contains(null)`, `Map.get(null)`, and non-empty
+  also exposes tested Java 21 `SequencedCollection` inheritance plus selected
+  `getFirst()`/`getLast()`, `addFirst()`/`addLast()`,
+  `removeFirst()`/`removeLast()`, and `reversed()` default methods. Empty
+  varargs factory calls reuse the same empty singletons as the fixed empty
+  factories, and factory-created immutable collections reject tested null
+  lookup probes such as `List.contains(null)`, `Set.contains(null)`,
+  `Map.get(null)`, and non-empty
   `Map.entrySet().contains(null)`, while empty `Map.entrySet().contains(null)`
   returns false like native Java.
   `Map.entry` uses a
