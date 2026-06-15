@@ -352,11 +352,15 @@ Current verified checks:
   `identity`, `constant`, `bindTo`, `insertArguments`, `dropArguments`,
   `filterArguments`, `filterReturnValue`, `permuteArguments`,
   `guardWithTest`, `catchException`, `exactInvoker`, `invoker`,
-  `collectArguments`, `foldArguments`, `explicitCastArguments`,
-  `arrayElementGetter`, `arrayElementSetter`, and `throwException`, with
-  descriptor-string checks for the adapted shapes. This extends the
-  source-level Kotlin coverage after the matching Java 17 fixtures passed
-  native-JVM and Doppio comparison.
+  `collectArguments`, zero-position and selected nonzero-position
+  `foldArguments`, `explicitCastArguments`, `arrayElementGetter`,
+  `arrayElementSetter`, `throwException`, and Java 17 public overlays `zero`,
+  `empty`, `arrayLength`, `arrayConstructor`, `dropArgumentsToMatch`, and
+  `dropReturn`, with descriptor-string checks for the adapted shapes. The
+  Java 17 overlays are reached by reflection so the smoke exercises runtime
+  discovery and invocation without requiring the Kotlin source frontend to
+  hard-code those signatures. This extends the source-level Kotlin coverage
+  after the matching Java 17 fixtures passed native-JVM and Doppio comparison.
 - A minimal mutable delegated-property smoke compiled in 104 seconds and both
   the host JVM and Doppio printed
   `bind:primary:MutableDelegateOwner:primary:0|bind:primary:MutableDelegateOwner:primary:30|alt:secondary:MutableDelegateOwner:secondary:30|local:local:top:local:0|local:local:top:local:10`.

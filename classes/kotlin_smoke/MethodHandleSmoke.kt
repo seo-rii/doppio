@@ -1,3 +1,4 @@
+import java.lang.invoke.MethodHandle
 import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodType
 
@@ -29,6 +30,12 @@ class MethodHandleOwner(@JvmField var text: String) {
 
     @JvmStatic
     fun foldTarget(prefix: String, first: String, second: String): String = "$prefix|$first|$second"
+
+    @JvmStatic
+    fun foldAtTarget(first: String, folded: String, value: Int): String = "$first:$folded:$value"
+
+    @JvmStatic
+    fun foldAtCombiner(value: Int): String = "n$value"
 
     @JvmStatic
     fun isEmpty(value: String): Boolean = value.isEmpty()
@@ -240,6 +247,52 @@ fun methodHandleSummary(): String {
   } catch (e: IllegalStateException) {
     e.message ?: "missing"
   }
+  val zeroMethod = MethodHandles::class.java.getMethod("zero", Class::class.java)
+  val emptyMethod = MethodHandles::class.java.getMethod("empty", MethodType::class.java)
+  val arrayLengthMethod = MethodHandles::class.java.getMethod("arrayLength", Class::class.java)
+  val arrayConstructorMethod = MethodHandles::class.java.getMethod("arrayConstructor", Class::class.java)
+  val dropArgumentsToMatchMethod = MethodHandles::class.java.getMethod(
+    "dropArgumentsToMatch",
+    MethodHandle::class.java,
+    intClass,
+    List::class.java,
+    intClass
+  )
+  val dropReturnMethod = MethodHandles::class.java.getMethod("dropReturn", MethodHandle::class.java)
+  val foldArgumentsAtMethod = MethodHandles::class.java.getMethod(
+    "foldArguments",
+    MethodHandle::class.java,
+    intClass,
+    MethodHandle::class.java
+  )
+  val zeroInt = zeroMethod.invoke(null, intClass) as MethodHandle
+  val zeroString = zeroMethod.invoke(null, stringClass) as MethodHandle
+  val emptyString = emptyMethod.invoke(
+    null,
+    MethodType.methodType(stringClass, intClass, stringClass)
+  ) as MethodHandle
+  val arrayLength = arrayLengthMethod.invoke(null, Array<String>::class.java) as MethodHandle
+  val arrayConstructor = arrayConstructorMethod.invoke(null, Array<String>::class.java) as MethodHandle
+  val constructed = arrayConstructor.invokeWithArguments(3) as Array<*>
+  val matchedDrop = dropArgumentsToMatchMethod.invoke(
+    null,
+    MethodHandles.identity(stringClass),
+    0,
+    listOf(intClass, stringClass),
+    1
+  ) as MethodHandle
+  val droppedReturn = dropReturnMethod.invoke(null, staticJoin) as MethodHandle
+  val foldAtTarget = lookup.findStatic(
+    ownerClass,
+    "foldAtTarget",
+    MethodType.methodType(stringClass, stringClass, stringClass, intClass)
+  )
+  val foldAtCombiner = lookup.findStatic(
+    ownerClass,
+    "foldAtCombiner",
+    MethodType.methodType(stringClass, intClass)
+  )
+  val foldedAtOne = foldArgumentsAtMethod.invoke(null, foldAtTarget, 1, foldAtCombiner) as MethodHandle
   val combinators = listOf(
     identity.invokeWithArguments("id").toString(),
     constant.invokeWithArguments().toString(),
@@ -267,6 +320,16 @@ fun methodHandleSummary(): String {
     ints[0].toString(),
     thrown
   ).joinToString("|")
+  val publicOverlayCombinators = listOf(
+    zeroInt.invokeWithArguments().toString(),
+    (zeroString.invokeWithArguments() == null).toString(),
+    (emptyString.invokeWithArguments(4, "empty") == null).toString(),
+    arrayLength.invokeWithArguments(arrayOf("a", "b", "c", "d")).toString(),
+    constructed.size.toString() + ":" + (constructed[0] == null).toString(),
+    (droppedReturn.invokeWithArguments("drop", 5) == null).toString(),
+    matchedDrop.invokeWithArguments(2, "matched").toString(),
+    foldedAtOne.invokeWithArguments("fold", 6).toString()
+  ).joinToString("|")
   val combinatorTypes = listOf(
     boundStatic,
     droppedIdentity,
@@ -283,6 +346,16 @@ fun methodHandleSummary(): String {
     intSetter,
     throwing
   ).joinToString("|") { it.type().toMethodDescriptorString() }
+  val publicOverlayCombinatorTypes = listOf(
+    zeroInt,
+    zeroString,
+    emptyString,
+    arrayLength,
+    arrayConstructor,
+    droppedReturn,
+    matchedDrop,
+    foldedAtOne
+  ).joinToString("|") { it.type().toMethodDescriptorString() }
 
   return listOf(
     directStatic,
@@ -296,8 +369,10 @@ fun methodHandleSummary(): String {
     combinators,
     combinatorTypes,
     extraCombinators,
+    publicOverlayCombinators,
     unreflectValues,
     privateLookupValues,
-    extraCombinatorTypes
+    extraCombinatorTypes,
+    publicOverlayCombinatorTypes
   ).joinToString("|")
 }

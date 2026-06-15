@@ -3,6 +3,7 @@ package classes.modern_test;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.util.Arrays;
 
 public class Java17MethodHandleExtraCombinators {
   public static String join(String text, int value) {
@@ -23,6 +24,14 @@ public class Java17MethodHandleExtraCombinators {
 
   public static String foldTarget(String prefix, String first, String second) {
     return prefix + "|" + first + "|" + second;
+  }
+
+  public static String foldAtTarget(String first, String folded, int value) {
+    return first + ":" + folded + ":" + value;
+  }
+
+  public static String foldAtCombiner(int value) {
+    return "n" + value;
   }
 
   public static String fail(String text) {
@@ -96,5 +105,50 @@ public class Java17MethodHandleExtraCombinators {
       System.out.println(e.getMessage());
     }
     System.out.println(throwing.type().toMethodDescriptorString());
+
+    MethodHandle zeroInt = MethodHandles.zero(int.class);
+    MethodHandle zeroString = MethodHandles.zero(String.class);
+    System.out.println((int) zeroInt.invokeExact());
+    System.out.println(((String) zeroString.invokeExact()) == null);
+    System.out.println(zeroInt.type().toMethodDescriptorString());
+    System.out.println(zeroString.type().toMethodDescriptorString());
+
+    MethodHandle emptyString = MethodHandles.empty(
+        MethodType.methodType(String.class, int.class, String.class));
+    System.out.println(((String) emptyString.invokeExact(4, "empty")) == null);
+    System.out.println(emptyString.type().toMethodDescriptorString());
+
+    MethodHandle arrayLength = MethodHandles.arrayLength(String[].class);
+    MethodHandle arrayConstructor = MethodHandles.arrayConstructor(String[].class);
+    String[] constructed = (String[]) arrayConstructor.invokeExact(3);
+    System.out.println((int) arrayLength.invokeExact(new String[] { "a", "b", "c", "d" }));
+    System.out.println(constructed.length + ":" + (constructed[0] == null));
+    System.out.println(arrayLength.type().toMethodDescriptorString());
+    System.out.println(arrayConstructor.type().toMethodDescriptorString());
+
+    MethodHandle droppedReturn = MethodHandles.dropReturn(join);
+    droppedReturn.invokeExact("drop", 5);
+    System.out.println("drop-return");
+    System.out.println(droppedReturn.type().toMethodDescriptorString());
+
+    MethodHandle matchedDrop = MethodHandles.dropArgumentsToMatch(
+        MethodHandles.identity(String.class),
+        0,
+        Arrays.<Class<?>>asList(int.class, String.class),
+        1);
+    System.out.println((String) matchedDrop.invokeExact(2, "matched"));
+    System.out.println(matchedDrop.type().toMethodDescriptorString());
+
+    MethodHandle foldAtTarget = lookup.findStatic(
+        Java17MethodHandleExtraCombinators.class,
+        "foldAtTarget",
+        MethodType.methodType(String.class, String.class, String.class, int.class));
+    MethodHandle foldAtCombiner = lookup.findStatic(
+        Java17MethodHandleExtraCombinators.class,
+        "foldAtCombiner",
+        MethodType.methodType(String.class, int.class));
+    MethodHandle foldedAtOne = MethodHandles.foldArguments(foldAtTarget, 1, foldAtCombiner);
+    System.out.println((String) foldedAtOne.invokeExact("fold", 6));
+    System.out.println(foldedAtOne.type().toMethodDescriptorString());
   }
 }

@@ -1734,6 +1734,27 @@ export default function (): any {
   }
 
   class java_lang_invoke_MethodHandles {
+    private static callDoppioHelper(
+      thread: JVMThread,
+      signature: string,
+      args: any[]
+    ): void {
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      thread.getBsCl().initializeClass(thread, 'Ljava/lang/invoke/DoppioMethodHandles;', (cdata: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+        if (cdata === null) {
+          thread.throwNewException('Ljava/lang/NoClassDefFoundError;', 'java.lang.invoke.DoppioMethodHandles');
+          return;
+        }
+        (<any> cdata.getConstructor(thread))[signature](thread, args, (e?: JVMTypes.java_lang_Throwable, rv?: any) => {
+          if (e) {
+            thread.throwException(e);
+          } else {
+            thread.asyncReturn(rv);
+          }
+        });
+      });
+    }
+
     public static 'privateLookupIn(Ljava/lang/Class;Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/invoke/MethodHandles$Lookup;'(
       thread: JVMThread,
       targetClass: JVMTypes.java_lang_Class,
@@ -1768,6 +1789,88 @@ export default function (): any {
       rv['java/lang/invoke/MethodHandles$Lookup/lookupClass'] = targetClass;
       rv['java/lang/invoke/MethodHandles$Lookup/allowedModes'] = 0x000f;
       return rv;
+    }
+
+    public static 'zero(Ljava/lang/Class;)Ljava/lang/invoke/MethodHandle;'(
+      thread: JVMThread,
+      type: JVMTypes.java_lang_Class
+    ): void {
+      java_lang_invoke_MethodHandles.callDoppioHelper(
+        thread,
+        'java/lang/invoke/DoppioMethodHandles/zero(Ljava/lang/Class;)Ljava/lang/invoke/MethodHandle;',
+        [type]
+      );
+    }
+
+    public static 'empty(Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;'(
+      thread: JVMThread,
+      type: JVMTypes.java_lang_invoke_MethodType
+    ): void {
+      java_lang_invoke_MethodHandles.callDoppioHelper(
+        thread,
+        'java/lang/invoke/DoppioMethodHandles/empty(Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;',
+        [type]
+      );
+    }
+
+    public static 'arrayLength(Ljava/lang/Class;)Ljava/lang/invoke/MethodHandle;'(
+      thread: JVMThread,
+      arrayClass: JVMTypes.java_lang_Class
+    ): void {
+      java_lang_invoke_MethodHandles.callDoppioHelper(
+        thread,
+        'java/lang/invoke/DoppioMethodHandles/arrayLength(Ljava/lang/Class;)Ljava/lang/invoke/MethodHandle;',
+        [arrayClass]
+      );
+    }
+
+    public static 'arrayConstructor(Ljava/lang/Class;)Ljava/lang/invoke/MethodHandle;'(
+      thread: JVMThread,
+      arrayClass: JVMTypes.java_lang_Class
+    ): void {
+      java_lang_invoke_MethodHandles.callDoppioHelper(
+        thread,
+        'java/lang/invoke/DoppioMethodHandles/arrayConstructor(Ljava/lang/Class;)Ljava/lang/invoke/MethodHandle;',
+        [arrayClass]
+      );
+    }
+
+    public static 'dropArgumentsToMatch(Ljava/lang/invoke/MethodHandle;ILjava/util/List;I)Ljava/lang/invoke/MethodHandle;'(
+      thread: JVMThread,
+      target: JVMTypes.java_lang_invoke_MethodHandle,
+      skip: number,
+      newTypes: JVMTypes.java_util_List,
+      pos: number
+    ): void {
+      java_lang_invoke_MethodHandles.callDoppioHelper(
+        thread,
+        'java/lang/invoke/DoppioMethodHandles/dropArgumentsToMatch(Ljava/lang/invoke/MethodHandle;ILjava/util/List;I)Ljava/lang/invoke/MethodHandle;',
+        [target, skip, newTypes, pos]
+      );
+    }
+
+    public static 'dropReturn(Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;'(
+      thread: JVMThread,
+      target: JVMTypes.java_lang_invoke_MethodHandle
+    ): void {
+      java_lang_invoke_MethodHandles.callDoppioHelper(
+        thread,
+        'java/lang/invoke/DoppioMethodHandles/dropReturn(Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;',
+        [target]
+      );
+    }
+
+    public static 'foldArguments(Ljava/lang/invoke/MethodHandle;ILjava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;'(
+      thread: JVMThread,
+      target: JVMTypes.java_lang_invoke_MethodHandle,
+      pos: number,
+      combiner: JVMTypes.java_lang_invoke_MethodHandle
+    ): void {
+      java_lang_invoke_MethodHandles.callDoppioHelper(
+        thread,
+        'java/lang/invoke/DoppioMethodHandles/foldArguments(Ljava/lang/invoke/MethodHandle;ILjava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;',
+        [target, pos, combiner]
+      );
     }
   }
 

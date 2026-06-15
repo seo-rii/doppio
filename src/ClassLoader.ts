@@ -135,34 +135,46 @@ function addJavaLangClassGetModule(data: Buffer): Buffer {
   ]);
 }
 
-function addJavaLangInvokeMethodHandlesPrivateLookupIn(data: Buffer): Buffer {
+function addJavaLangInvokeMethodHandlesModernOverlays(data: Buffer): Buffer {
   var cp = constantPoolEnd(data),
-    nameIndex = cp.count,
-    descriptorIndex = cp.count + 1,
-    extraConstants = Buffer.concat([
-      utf8Constant('privateLookupIn'),
-      utf8Constant('(Ljava/lang/Class;Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/invoke/MethodHandles$Lookup;')
-    ]),
+    overlays = [
+      ['privateLookupIn', '(Ljava/lang/Class;Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/invoke/MethodHandles$Lookup;'],
+      ['zero', '(Ljava/lang/Class;)Ljava/lang/invoke/MethodHandle;'],
+      ['empty', '(Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;'],
+      ['arrayLength', '(Ljava/lang/Class;)Ljava/lang/invoke/MethodHandle;'],
+      ['arrayConstructor', '(Ljava/lang/Class;)Ljava/lang/invoke/MethodHandle;'],
+      ['dropArgumentsToMatch', '(Ljava/lang/invoke/MethodHandle;ILjava/util/List;I)Ljava/lang/invoke/MethodHandle;'],
+      ['dropReturn', '(Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;'],
+      ['foldArguments', '(Ljava/lang/invoke/MethodHandle;ILjava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;']
+    ],
+    extraConstants = Buffer.concat(overlays.reduce((constants: Buffer[], overlay: string[]) => {
+      constants.push(utf8Constant(overlay[0]), utf8Constant(overlay[1]));
+      return constants;
+    }, [])),
     withConstants = Buffer.concat([
       data.slice(0, 8),
-      u2(cp.count + 2),
+      u2(cp.count + overlays.length * 2),
       data.slice(10, cp.offset),
       extraConstants,
       data.slice(cp.offset)
     ]),
     methods = methodsInfo(withConstants, cp.offset + extraConstants.length),
-    method = Buffer.concat([
-      u2(0x0109),
-      u2(nameIndex),
-      u2(descriptorIndex),
-      u2(0)
-    ]);
+    methodData = Buffer.concat(overlays.map((overlay: string[], index: number) => {
+      var nameIndex = cp.count + index * 2,
+        descriptorIndex = nameIndex + 1;
+      return Buffer.concat([
+        u2(0x0109),
+        u2(nameIndex),
+        u2(descriptorIndex),
+        u2(0)
+      ]);
+    }));
 
   return Buffer.concat([
     withConstants.slice(0, methods.countOffset),
-    u2(methods.count + 1),
+    u2(methods.count + overlays.length),
     withConstants.slice(methods.countOffset + 2, methods.endOffset),
-    method,
+    methodData,
     withConstants.slice(methods.endOffset)
   ]);
 }
@@ -624,7 +636,7 @@ export class BootstrapClassLoader extends ClassLoader {
           clsData = addJavaLangClassGetModule(clsData);
         }
         if (typeStr === 'Ljava/lang/invoke/MethodHandles;') {
-          clsData = addJavaLangInvokeMethodHandlesPrivateLookupIn(clsData);
+          clsData = addJavaLangInvokeMethodHandlesModernOverlays(clsData);
         }
         let cls = this.defineClass(thread, typeStr, clsData, null);
         if (cls !== null) {
