@@ -168,6 +168,13 @@ run.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only
   `kotlin-compiler.jar`.
+- The workflow also runs `ci/kotlin_reflect_smoke.sh`, a smaller
+  `kotlin-reflect.jar` runtime smoke. Doppio compiles the source with explicit
+  `kotlin-stdlib.jar` and `kotlin-reflect.jar` source classpath, then both the
+  host JVM and Doppio run the generated class with `kotlin-reflect.jar`. The
+  smoke covers `KClass.primaryConstructor`, `KClass.memberProperties`,
+  mutable property set/get through `KMutableProperty1`, and
+  `KClass.memberFunctions` invocation.
 - Next blocker: broaden the Kotlin compiler smoke to more source constructs,
   reduce remaining throughput variance, and compare full-classpath elapsed time.
   Current notes live in `docs/design/kotlin-compiler.md`.

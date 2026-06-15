@@ -279,6 +279,15 @@ Current verified checks:
   elements. `javap` verified `MultiTag$Container`, Java `@Repeatable`,
   `RuntimeVisibleAnnotations`, `RuntimeVisibleParameterAnnotations`, and
   `AnnotationDefault` metadata.
+- A standalone `kotlin-reflect.jar` smoke now lives in
+  `ci/kotlin_reflect_smoke.sh`, separate from the large `ci/kotlin_smoke.sh`
+  suite so reflection regressions are isolated. Doppio compiled the source in
+  76 seconds with explicit `kotlin-stdlib.jar` and `kotlin-reflect.jar` source
+  classpath; both the host JVM and Doppio printed
+  `ReflectSmokeBox|count,name|5|r:box:5`. This covers
+  `KClass.primaryConstructor`, `KClass.memberProperties`, mutable property
+  set/get through `KMutableProperty1`, and `KClass.memberFunctions` invocation
+  through the real `kotlin-reflect.jar` runtime.
 - A minimal modern-construct smoke compiled in 77 seconds and both the host JVM
   and Doppio printed `ABG:1:15:kt5:StagePayload:EmptyStage:true`. The repo
   smoke now includes the same path and completed in 185 seconds with the full

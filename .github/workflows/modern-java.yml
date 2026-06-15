@@ -48,3 +48,6 @@ jobs:
         env:
           KOTLIN_SMOKE_CLASSPATH_MODE: full
         run: ./ci/kotlin_smoke.sh
+
+      - name: Run Kotlin reflect smoke
+        run: ./ci/kotlin_reflect_smoke.sh
