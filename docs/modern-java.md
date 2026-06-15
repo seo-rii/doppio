@@ -155,10 +155,14 @@ run.
   interop covering a Kotlin interface proxy, `InvocationHandler` dispatch,
   reflective proxy-method invocation, runtime method and parameter
   annotations, proxy `Object` method dispatch, `Proxy.isProxyClass`, and
-  `Proxy.getInvocationHandler`, plus Kotlin unsigned primitives and unsigned
-  arrays covering wraparound arithmetic, unsigned sorting, filtering, map keys,
-  and hexadecimal byte rendering, then runs the generated code on both the
-  host JVM and Doppio with `kotlin-stdlib.jar`.
+  `Proxy.getInvocationHandler`, plus Kotlin source-level use of
+  `java.lang.invoke.MethodHandles` covering static, virtual, constructor, and
+  field handle lookup, `invokeWithArguments`, `MethodHandle.asType`, primitive
+  boxing/unboxing/widening, and method-type descriptor reporting, plus Kotlin
+  unsigned primitives and unsigned arrays covering wraparound arithmetic,
+  unsigned sorting, filtering, map keys, and hexadecimal byte rendering, then
+  runs the generated code on both the host JVM and Doppio with
+  `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only
   `kotlin-compiler.jar`.

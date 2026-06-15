@@ -326,6 +326,15 @@ Current verified checks:
   invocation, runtime method and parameter annotations compiled with
   `-java-parameters`, proxy `toString`/`hashCode`/`equals` dispatch,
   `Proxy.isProxyClass`, and `Proxy.getInvocationHandler`.
+- A Kotlin source-level `java.lang.invoke.MethodHandles` smoke is now included
+  in the repo source set. A local run through `ci/kotlin_smoke.sh` completed in
+  508 seconds with the minimal compiler classpath and 522 seconds with the full
+  `kotlinc/lib/*.jar` classpath; both the host JVM and Doppio printed
+  `v5|a3|mh>handle|handle!|11|7|(Ljava/lang/String;I)Ljava/lang/String;|(LMethodHandleOwner;Ljava/lang/String;)Ljava/lang/String;`.
+  This covers Kotlin-compiled calls to `findStatic`, `findConstructor`,
+  `findVirtual`, `findGetter`, `findSetter`, `invokeWithArguments`,
+  `MethodHandle.asType`, reference casts, primitive unboxing/widening, boxed
+  return adaptation, and `MethodType.toMethodDescriptorString()`.
 - A minimal mutable delegated-property smoke compiled in 104 seconds and both
   the host JVM and Doppio printed
   `bind:primary:MutableDelegateOwner:primary:0|bind:primary:MutableDelegateOwner:primary:30|alt:secondary:MutableDelegateOwner:secondary:30|local:local:top:local:0|local:local:top:local:10`.
