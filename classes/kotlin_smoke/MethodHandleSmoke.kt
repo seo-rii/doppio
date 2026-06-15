@@ -159,6 +159,38 @@ fun methodHandleSummary(): String {
     unreflectBefore + ">" + unreflectAfter,
     unreflectPrivateFailure
   ).joinToString("/")
+  val reflectAsMethod = MethodHandles::class.java.getMethod(
+    "reflectAs",
+    Class::class.java,
+    MethodHandle::class.java
+  )
+  val reflectedStaticMember = reflectAsMethod.invoke(
+    null,
+    java.lang.reflect.Method::class.java,
+    staticJoin
+  ) as java.lang.reflect.Method
+  val reflectedConstructorMember = reflectAsMethod.invoke(
+    null,
+    java.lang.reflect.Constructor::class.java,
+    constructor
+  ) as java.lang.reflect.Constructor<*>
+  val reflectedGetterMember = reflectAsMethod.invoke(
+    null,
+    java.lang.reflect.Field::class.java,
+    getter
+  ) as java.lang.reflect.Field
+  val reflectedSetterMember = reflectAsMethod.invoke(
+    null,
+    java.lang.reflect.Field::class.java,
+    setter
+  ) as java.lang.reflect.Field
+  val reflectAsValues = listOf(
+    reflectedStaticMember.name + ":" + reflectedStaticMember.parameterTypes.size,
+    reflectedConstructorMember.declaringClass.simpleName + ":" +
+      reflectedConstructorMember.parameterTypes[0].simpleName,
+    reflectedGetterMember.name + ":" + reflectedGetterMember.type.simpleName,
+    reflectedSetterMember.name + ":" + reflectedSetterMember.type.simpleName
+  ).joinToString("/")
   val privateLookupMethod = MethodHandles::class.java.getMethod(
     "privateLookupIn",
     Class::class.java,
@@ -538,6 +570,7 @@ fun methodHandleSummary(): String {
     extraCombinators,
     publicOverlayCombinators,
     unreflectValues,
+    reflectAsValues,
     privateLookupValues,
     extraCombinatorTypes,
     publicOverlayCombinatorTypes

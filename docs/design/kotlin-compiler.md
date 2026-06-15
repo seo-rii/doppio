@@ -349,8 +349,9 @@ Current verified checks:
   `MethodHandle.asType`, reference casts, primitive unboxing/widening, boxed
   return adaptation, `Lookup.unreflect`, `unreflectConstructor`,
   `unreflectGetter`, and `unreflectSetter` public success paths, private member
-  access-failure behavior, `MethodHandles.privateLookupIn` private method
-  access plus public-lookup failure behavior, and
+  access-failure behavior, selected `MethodHandles.reflectAs` method,
+  constructor, getter, and setter round-trips, `MethodHandles.privateLookupIn`
+  private method access plus public-lookup failure behavior, and
   `MethodType.toMethodDescriptorString()`.
 - The same Kotlin MethodHandles smoke now includes selected combinators:
   `identity`, `constant`, `bindTo`, `insertArguments`, `dropArguments`,

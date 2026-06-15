@@ -166,8 +166,9 @@ smoke. Full control-flow combinator parity is still not claimed.
   field handle lookup, `invokeWithArguments`, `MethodHandle.asType`, primitive
   boxing/unboxing/widening, selected reflection-backed `Lookup.unreflect`,
   `unreflectConstructor`, `unreflectGetter`, and `unreflectSetter` success
-  paths plus a private member access-failure path, selected
-  `MethodHandles.privateLookupIn` private method access plus public-lookup
+  paths plus a private member access-failure path,
+  `MethodHandles.reflectAs` method, constructor, getter, and setter round-trips,
+  and selected `MethodHandles.privateLookupIn` private method access plus public-lookup
   failure behavior, selected `MethodHandles` combinators (`identity`,
   `constant`, `bindTo`, `insertArguments`,
   `dropArguments`, `filterArguments`, `filterReturnValue`, `permuteArguments`,
@@ -645,6 +646,8 @@ smoke. Full control-flow combinator parity is still not claimed.
   non-nestmate private failure paths, selected `Lookup.unreflect`,
   `unreflectConstructor`, `unreflectGetter`, and `unreflectSetter` public
   success, non-nestmate private failure, and nestmate-private success paths,
+  selected `MethodHandles.reflectAs` method, constructor, getter, and setter
+  round-trips,
   selected `MethodHandles.privateLookupIn` same-package target lookup,
   caller/peer private constructor, method, and field access, public lookup
   rejection, and primitive/array target rejection,

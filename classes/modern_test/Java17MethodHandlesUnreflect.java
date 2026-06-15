@@ -48,6 +48,8 @@ public class Java17MethodHandlesUnreflect {
     MethodHandle publicStatic = lookup.unreflect(publicStaticMethod);
     System.out.println((String) publicStatic.invokeExact("s", 7));
     System.out.println(publicStatic.type().toMethodDescriptorString());
+    Method reflectedPublicStatic = MethodHandles.reflectAs(Method.class, publicStatic);
+    System.out.println(reflectedPublicStatic.getName() + ":" + reflectedPublicStatic.getParameterTypes().length);
 
     Constructor<Java17MethodHandlesUnreflect> publicConstructor =
         Java17MethodHandlesUnreflect.class.getConstructor(String.class);
@@ -56,6 +58,9 @@ public class Java17MethodHandlesUnreflect {
         (Java17MethodHandlesUnreflect) constructor.invokeExact("r");
     System.out.println(receiver.label);
     System.out.println(constructor.type().toMethodDescriptorString());
+    Constructor<?> reflectedConstructor = MethodHandles.reflectAs(Constructor.class, constructor);
+    System.out.println(reflectedConstructor.getDeclaringClass().getSimpleName() + ":" +
+        reflectedConstructor.getParameterTypes()[0].getName());
 
     Method publicVirtualMethod = Java17MethodHandlesUnreflect.class.getDeclaredMethod(
         "append",
@@ -63,6 +68,9 @@ public class Java17MethodHandlesUnreflect {
     MethodHandle publicVirtual = lookup.unreflect(publicVirtualMethod);
     System.out.println((String) publicVirtual.invokeExact(receiver, "v"));
     System.out.println(publicVirtual.type().toMethodDescriptorString());
+    Method reflectedPublicVirtual = MethodHandles.reflectAs(Method.class, publicVirtual);
+    System.out.println(reflectedPublicVirtual.getName() + ":" +
+        reflectedPublicVirtual.getReturnType().getName());
 
     Field staticField = Java17MethodHandlesUnreflect.class.getDeclaredField("publicStaticField");
     MethodHandle staticGetter = lookup.unreflectGetter(staticField);
@@ -70,6 +78,8 @@ public class Java17MethodHandlesUnreflect {
     System.out.println((String) staticGetter.invokeExact());
     staticSetter.invokeExact("static:updated");
     System.out.println(publicStaticField);
+    Field reflectedStaticField = MethodHandles.reflectAs(Field.class, staticGetter);
+    System.out.println(reflectedStaticField.getName() + ":" + reflectedStaticField.getType().getName());
 
     Field instanceField = Java17MethodHandlesUnreflect.class.getDeclaredField("publicInstanceField");
     MethodHandle instanceGetter = lookup.unreflectGetter(instanceField);
@@ -77,6 +87,8 @@ public class Java17MethodHandlesUnreflect {
     System.out.println((String) instanceGetter.invokeExact(receiver));
     instanceSetter.invokeExact(receiver, "instance:updated");
     System.out.println(receiver.publicInstanceField);
+    Field reflectedInstanceField = MethodHandles.reflectAs(Field.class, instanceSetter);
+    System.out.println(reflectedInstanceField.getName() + ":" + reflectedInstanceField.getType().getName());
 
     Java17MethodHandlesUnreflectPeer.run();
     Nestmate.run();
