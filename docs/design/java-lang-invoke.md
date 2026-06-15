@@ -66,6 +66,7 @@ The fixture matrix tracks the covered smoke tests and the next fixtures to add:
 | Field lookup | Covered | `findStaticGetter`/`findStaticSetter` and `findGetter`/`findSetter` for selected reference and primitive fields | Getter result and setter side effect match the native JVM for public, package-private, and nestmate-private `String` fields plus public static/instance `int` and `long` fields; public final static/instance setter lookup fails with `IllegalAccessException` | `MethodHandleNatives` field offset/base plus `Unsafe` field access |
 | Constructor lookup | Covered | `findConstructor` for public, package-private, and nestmate-private constructors | Constructed receiver state and handle type match the native JVM; non-nestmate private lookup fails | `MethodHandleNatives.resolve` plus constructor bridge path |
 | `asType` adaptation | Partial | Adapt public static and virtual method handles across selected reference and primitive signatures | Reference cast, return widening to `Object`, non-void return dropping to `void`, `void` return adaptation to `null` reference, primitive argument and return widening, primitive return boxing, unboxing, arity mismatch, and runtime cast failure match the native JVM | existing Java 8 method-handle adapter path |
+| Method-handle combinators | Partial | Compose same-class method handles with selected JDK combinators | `identity`, `constant`, `bindTo`, `insertArguments`, `dropArguments`, `filterArguments`, `filterReturnValue`, `permuteArguments`, `guardWithTest`, and `catchException` produce native-compatible results and descriptor strings for the tested shapes | existing Java 8 method-handle adapter/combinator path |
 | Nominal method-handle descriptors | Partial | `MethodHandleDesc.resolveConstantDesc` and `DirectMethodHandleDesc.resolveConstantDesc` for public same-class and selected JDK-class static/virtual methods, constructors, static/instance fields, and `asType` | Resolved handles invoke, report native-compatible types, mutate fields, and propagate missing-method failures | class-library shim delegating to `MethodHandles.Lookup` |
 | VarHandle descriptors | Covered | `ConstantDescs.CD_VarHandle`, nested `CD_VarHandleDesc`, plus VarHandle bootstrap descriptor constants | Descriptor metadata only, no execution claim | class-library shim |
 | Nominal dynamic-constant descriptors | Partial | `DynamicConstantDesc.resolveConstantDesc` for selected `ConstantBootstraps` descriptors | `nullConstant`, `primitiveClass`, `enumConstant`, `getStaticFinal`, reference `explicitCast`, selected primitive-target `explicitCast` numeric conversion, and selected descriptor-level `invoke` public-static method-handle targets resolve to native-compatible values, including tested primitive return widening; selected bad primitive name, missing enum, bad explicit-cast, and bad invoke result-cast failures use native-style `BootstrapMethodError` wrapping; selected `getStaticFinal` field lookup failures use `NoSuchFieldError` | class-library shim |
@@ -122,10 +123,15 @@ handles, dynamic constants, and record object-method linkage:
   return dropping to `void`, `void` return adaptation to `null` reference,
   primitive argument and return widening, primitive return boxing, and
   `Integer` to `int` unboxing. Selected failure paths cover arity mismatch at
-  adaptation time and runtime cast failure. This does not yet claim every
+  adaptation time and runtime cast failure. The fixture also covers selected
+  combinators: `identity`, `constant`, `bindTo`, `insertArguments`,
+  `dropArguments`, `filterArguments`, `filterReturnValue`, `permuteArguments`,
+  `guardWithTest`, and `catchException`, including descriptor-string checks for
+  the adapted shapes. This does not yet claim every
   protected receiver shape,
   every cross-package class-visibility edge, broad `asType` coverage across every primitive/reference conversion,
-  or executable VarHandle behavior.
+  broad combinator composition beyond the listed fixture shapes, or executable
+  VarHandle behavior.
 - Java 12 nominal method-handle descriptors now resolve selected direct
   descriptor shapes by delegating to the existing `MethodHandles.Lookup`
   surface: public same-class static and virtual methods, constructors,

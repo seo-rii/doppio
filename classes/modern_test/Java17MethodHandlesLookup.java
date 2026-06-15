@@ -49,6 +49,33 @@ public class Java17MethodHandlesLookup {
     builder.append("void");
   }
 
+  public static int doubleValue(int value) {
+    return value * 2;
+  }
+
+  public static String bracket(String value) {
+    return "[" + value + "]";
+  }
+
+  public static String triple(String first, String second, String third) {
+    return first + "/" + second + "/" + third;
+  }
+
+  public static boolean isEmpty(String value) {
+    return value.isEmpty();
+  }
+
+  public static String throwOnNegative(int value) {
+    if (value < 0) {
+      throw new IllegalArgumentException("neg:" + value);
+    }
+    return "pos:" + value;
+  }
+
+  public static String handleNegative(IllegalArgumentException e, int value) {
+    return e.getMessage() + "/" + value;
+  }
+
   static String packageJoin(String text) {
     return "package:" + text;
   }
@@ -134,6 +161,72 @@ public class Java17MethodHandlesLookup {
     System.out.println(voidBuilder.toString());
     System.out.println(voidResult == null);
     System.out.println(voidToObject.type());
+
+    MethodHandle identity = MethodHandles.identity(String.class);
+    MethodHandle constant = MethodHandles.constant(String.class, "const");
+    MethodHandle boundStatic = staticHandle.bindTo("bound");
+    MethodHandle boundVirtual = virtualHandle.bindTo(receiver);
+    MethodHandle inserted = MethodHandles.insertArguments(staticHandle, 1, 5);
+    MethodHandle droppedIdentity = MethodHandles.dropArguments(identity, 0, int.class, long.class);
+    MethodHandle doubleValue = lookup.findStatic(
+        Java17MethodHandlesLookup.class,
+        "doubleValue",
+        MethodType.methodType(int.class, int.class));
+    MethodHandle filteredArgument = MethodHandles.filterArguments(staticHandle, 1, doubleValue);
+    MethodHandle bracket = lookup.findStatic(
+        Java17MethodHandlesLookup.class,
+        "bracket",
+        MethodType.methodType(String.class, String.class));
+    MethodHandle filteredReturn = MethodHandles.filterReturnValue(staticHandle, bracket);
+    MethodHandle triple = lookup.findStatic(
+        Java17MethodHandlesLookup.class,
+        "triple",
+        MethodType.methodType(String.class, String.class, String.class, String.class));
+    MethodHandle permuted = MethodHandles.permuteArguments(
+        triple,
+        MethodType.methodType(String.class, String.class, String.class, String.class),
+        2, 0, 1);
+    MethodHandle isEmpty = lookup.findStatic(
+        Java17MethodHandlesLookup.class,
+        "isEmpty",
+        MethodType.methodType(boolean.class, String.class));
+    MethodHandle emptyConstant = MethodHandles.dropArguments(
+        MethodHandles.constant(String.class, "empty"),
+        0,
+        String.class);
+    MethodHandle guarded = MethodHandles.guardWithTest(isEmpty, emptyConstant, identity);
+    MethodHandle throwOnNegative = lookup.findStatic(
+        Java17MethodHandlesLookup.class,
+        "throwOnNegative",
+        MethodType.methodType(String.class, int.class));
+    MethodHandle handleNegative = lookup.findStatic(
+        Java17MethodHandlesLookup.class,
+        "handleNegative",
+        MethodType.methodType(String.class, IllegalArgumentException.class, int.class));
+    MethodHandle caught = MethodHandles.catchException(
+        throwOnNegative,
+        IllegalArgumentException.class,
+        handleNegative);
+    System.out.println(
+        (String) identity.invokeExact("id") + "|" +
+        (String) constant.invokeExact() + "|" +
+        (String) boundStatic.invokeExact(6) + "|" +
+        (String) boundVirtual.invokeExact("bv") + "|" +
+        (String) inserted.invokeExact("ins") + "|" +
+        (String) droppedIdentity.invokeExact(2, 3L, "drop") + "|" +
+        (String) filteredArgument.invokeExact("flt", 4) + "|" +
+        (String) filteredReturn.invokeExact("ret", 3) + "|" +
+        (String) permuted.invokeExact("a", "b", "c") + "|" +
+        (String) guarded.invokeExact("") + "|" +
+        (String) guarded.invokeExact("word") + "|" +
+        (String) caught.invokeExact(7) + "|" +
+        (String) caught.invokeExact(-2));
+    System.out.println(
+        boundStatic.type().toMethodDescriptorString() + "|" +
+        droppedIdentity.type().toMethodDescriptorString() + "|" +
+        filteredArgument.type().toMethodDescriptorString() + "|" +
+        guarded.type().toMethodDescriptorString() + "|" +
+        caught.type().toMethodDescriptorString());
 
     try {
       staticHandle.asType(MethodType.methodType(String.class, String.class));
