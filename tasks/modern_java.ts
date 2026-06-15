@@ -1600,6 +1600,302 @@ function modernJava(grunt: IGrunt) {
     grunt.log.ok('Generated ' + runoutPath);
   });
 
+  grunt.registerTask('generate_java21_deque_sequenced', 'Generate a Java 21 Deque sequenced-collection fixture.', function() {
+    var bytes: number[] = [],
+      outPath = 'classes/modern_test/Java21DequeSequenced.class',
+      runoutPath = 'classes/modern_test/Java21DequeSequenced.runout',
+      expectedOutput = [
+        'true',
+        'a',
+        'c',
+        'c',
+        'a',
+        'true',
+        'a',
+        'c',
+        '1',
+        'nse-first'
+      ].join('\n') + '\n';
+
+    function u1(value: number): void {
+      bytes.push(value & 0xff);
+    }
+
+    function u2(value: number): void {
+      bytes.push((value >>> 8) & 0xff, value & 0xff);
+    }
+
+    function u4(value: number): void {
+      bytes.push((value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff);
+    }
+
+    function utf8(value: string): void {
+      var buf = Buffer.from(value, 'utf8');
+      u1(1);
+      u2(buf.length);
+      for (var i = 0; i < buf.length; i++) {
+        u1(buf[i]);
+      }
+    }
+
+    function cls(nameIndex: number): void {
+      u1(7);
+      u2(nameIndex);
+    }
+
+    function nameAndType(nameIndex: number, descriptorIndex: number): void {
+      u1(12);
+      u2(nameIndex);
+      u2(descriptorIndex);
+    }
+
+    function ref(tag: number, classIndex: number, nameAndTypeIndex: number): void {
+      u1(tag);
+      u2(classIndex);
+      u2(nameAndTypeIndex);
+    }
+
+    function str(stringIndex: number): void {
+      u1(8);
+      u2(stringIndex);
+    }
+
+    function codeAttr(code: number[], maxStack: number, maxLocals: number, exceptions?: number[][]): void {
+      var exceptionTable = exceptions || [];
+      u2(7);
+      u4(12 + code.length + (exceptionTable.length * 8));
+      u2(maxStack);
+      u2(maxLocals);
+      u4(code.length);
+      code.forEach(u1);
+      u2(exceptionTable.length);
+      exceptionTable.forEach(function(entry: number[]): void {
+        u2(entry[0]);
+        u2(entry[1]);
+        u2(entry[2]);
+        u2(entry[3]);
+      });
+      u2(0);
+    }
+
+    function patchU2(code: number[], offset: number, value: number): void {
+      code[offset] = (value >>> 8) & 0xff;
+      code[offset + 1] = value & 0xff;
+    }
+
+    function emitU2Operand(code: number[], opcode: number, index: number): void {
+      code.push(opcode, (index >>> 8) & 0xff, index & 0xff);
+    }
+
+    function emitInvokeInterface(code: number[], methodRef: number, argCount: number): void {
+      code.push(0xb9, (methodRef >>> 8) & 0xff, methodRef & 0xff, argCount, 0x00);
+    }
+
+    function emitPrintString(code: number[], stringIndex: number): void {
+      emitU2Operand(code, 0xb2, 14);
+      code.push(0x12, stringIndex);
+      emitU2Operand(code, 0xb6, 20);
+    }
+
+    function emitPrintDequeValue(code: number[], loadOpcode: number, methodRef: number): void {
+      emitU2Operand(code, 0xb2, 14);
+      code.push(loadOpcode);
+      emitInvokeInterface(code, methodRef, 1);
+      emitU2Operand(code, 0xc0, 65);
+      emitU2Operand(code, 0xb6, 20);
+    }
+
+    var mainCode: number[] = [],
+      doubleReversedFalseOffset: number,
+      doubleReversedAfterOffset: number,
+      doubleReversedFalse: number,
+      doubleReversedAfter: number,
+      firstTryStart: number,
+      firstTryEnd: number,
+      firstCatchStart: number,
+      firstAfterCatch: number,
+      firstGotoOffset: number;
+
+    emitU2Operand(mainCode, 0xbb, 30);
+    mainCode.push(0x59);
+    emitU2Operand(mainCode, 0xb7, 32);
+    mainCode.push(0x4c);
+    mainCode.push(0x2b, 0x12, 39);
+    emitInvokeInterface(mainCode, 46, 2);
+    mainCode.push(0x57);
+    mainCode.push(0x2b, 0x12, 37);
+    emitInvokeInterface(mainCode, 50, 2);
+    mainCode.push(0x2b, 0x12, 41);
+    emitInvokeInterface(mainCode, 53, 2);
+
+    emitU2Operand(mainCode, 0xb2, 14);
+    mainCode.push(0x2b);
+    emitU2Operand(mainCode, 0xc1, 35);
+    emitU2Operand(mainCode, 0xb6, 24);
+    emitPrintDequeValue(mainCode, 0x2b, 57);
+    emitPrintDequeValue(mainCode, 0x2b, 60);
+
+    mainCode.push(0x2b);
+    emitInvokeInterface(mainCode, 64, 1);
+    mainCode.push(0x4d);
+    emitPrintDequeValue(mainCode, 0x2c, 57);
+    emitPrintDequeValue(mainCode, 0x2c, 60);
+
+    emitU2Operand(mainCode, 0xb2, 14);
+    mainCode.push(0x2c);
+    emitInvokeInterface(mainCode, 64, 1);
+    mainCode.push(0x2b);
+    doubleReversedFalseOffset = mainCode.length;
+    mainCode.push(0xa6, 0x00, 0x00);
+    mainCode.push(0x04);
+    doubleReversedAfterOffset = mainCode.length;
+    mainCode.push(0xa7, 0x00, 0x00);
+    doubleReversedFalse = mainCode.length;
+    mainCode.push(0x03);
+    doubleReversedAfter = mainCode.length;
+    patchU2(mainCode, doubleReversedFalseOffset + 1, doubleReversedFalse - doubleReversedFalseOffset);
+    patchU2(mainCode, doubleReversedAfterOffset + 1, doubleReversedAfter - doubleReversedAfterOffset);
+    emitU2Operand(mainCode, 0xb6, 24);
+
+    emitPrintDequeValue(mainCode, 0x2b, 69);
+    emitPrintDequeValue(mainCode, 0x2b, 72);
+    emitU2Operand(mainCode, 0xb2, 14);
+    mainCode.push(0x2b);
+    emitInvokeInterface(mainCode, 76, 1);
+    emitU2Operand(mainCode, 0xb6, 27);
+
+    emitU2Operand(mainCode, 0xbb, 30);
+    mainCode.push(0x59);
+    emitU2Operand(mainCode, 0xb7, 32);
+    mainCode.push(0x4e);
+    firstTryStart = mainCode.length;
+    mainCode.push(0x2d);
+    emitInvokeInterface(mainCode, 57, 1);
+    mainCode.push(0x57);
+    firstTryEnd = mainCode.length;
+    emitPrintString(mainCode, 77);
+    firstGotoOffset = mainCode.length;
+    mainCode.push(0xa7, 0x00, 0x00);
+    firstCatchStart = mainCode.length;
+    mainCode.push(0x4e);
+    emitPrintString(mainCode, 79);
+    firstAfterCatch = mainCode.length;
+    patchU2(mainCode, firstGotoOffset + 1, firstAfterCatch - firstGotoOffset);
+    mainCode.push(0xb1);
+
+    u4(0xcafebabe);
+    u2(0);
+    u2(65);
+    u2(83);
+    cls(2);
+    utf8('classes/modern_test/Java21DequeSequenced');
+    cls(4);
+    utf8('java/lang/Object');
+    utf8('<init>');
+    utf8('()V');
+    utf8('Code');
+    ref(10, 3, 9);
+    nameAndType(5, 6);
+    utf8('main');
+    utf8('([Ljava/lang/String;)V');
+    cls(13);
+    utf8('java/lang/System');
+    ref(9, 12, 15);
+    nameAndType(16, 17);
+    utf8('out');
+    utf8('Ljava/io/PrintStream;');
+    cls(19);
+    utf8('java/io/PrintStream');
+    ref(10, 18, 21);
+    nameAndType(22, 23);
+    utf8('println');
+    utf8('(Ljava/lang/String;)V');
+    ref(10, 18, 25);
+    nameAndType(22, 26);
+    utf8('(Z)V');
+    ref(10, 18, 28);
+    nameAndType(22, 29);
+    utf8('(I)V');
+    cls(31);
+    utf8('java/util/ArrayDeque');
+    ref(10, 30, 9);
+    cls(34);
+    utf8('java/util/Deque');
+    cls(36);
+    utf8('java/util/SequencedCollection');
+    str(38);
+    utf8('a');
+    str(40);
+    utf8('b');
+    str(42);
+    utf8('c');
+    utf8('add');
+    utf8('(Ljava/lang/Object;)Z');
+    nameAndType(43, 44);
+    ref(11, 33, 45);
+    utf8('addFirst');
+    utf8('(Ljava/lang/Object;)V');
+    nameAndType(47, 48);
+    ref(11, 33, 49);
+    utf8('addLast');
+    nameAndType(51, 48);
+    ref(11, 33, 52);
+    utf8('getFirst');
+    utf8('()Ljava/lang/Object;');
+    nameAndType(54, 55);
+    ref(11, 33, 56);
+    utf8('getLast');
+    nameAndType(58, 55);
+    ref(11, 33, 59);
+    utf8('reversed');
+    utf8('()Ljava/util/Deque;');
+    nameAndType(61, 62);
+    ref(11, 33, 63);
+    cls(66);
+    utf8('java/lang/String');
+    utf8('removeFirst');
+    nameAndType(67, 55);
+    ref(11, 33, 68);
+    utf8('removeLast');
+    nameAndType(70, 55);
+    ref(11, 33, 71);
+    utf8('size');
+    utf8('()I');
+    nameAndType(73, 74);
+    ref(11, 33, 75);
+    str(78);
+    utf8('missed-first');
+    str(80);
+    utf8('nse-first');
+    cls(82);
+    utf8('java/util/NoSuchElementException');
+
+    u2(0x0021);
+    u2(1);
+    u2(3);
+    u2(0);
+    u2(0);
+    u2(2);
+    u2(0x0001);
+    u2(5);
+    u2(6);
+    u2(1);
+    codeAttr([0x2a, 0xb7, 0x00, 0x08, 0xb1], 1, 1);
+    u2(0x0009);
+    u2(10);
+    u2(11);
+    u2(1);
+    codeAttr(mainCode, 4, 4, [
+      [firstTryStart, firstTryEnd, firstCatchStart, 81]
+    ]);
+    u2(0);
+
+    grunt.file.write(outPath, Buffer.from(bytes));
+    grunt.log.ok('Generated ' + outPath);
+    grunt.file.write(runoutPath, expectedOutput);
+    grunt.log.ok('Generated ' + runoutPath);
+  });
+
   grunt.registerTask('generate_return_top_modern', 'Generate a fixture where return values are above unused operand-stack entries.', function() {
     var bytes: number[] = [],
       outPath = 'classes/modern_test/ReturnTopOfStackGenerated.class';
@@ -3671,6 +3967,22 @@ function modernJava(grunt: IGrunt) {
           grunt.fail.fatal('Java 21 List sequenced-collection Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
         }
         grunt.log.ok('Java 21 List sequenced-collection output matched expected output.');
+        done();
+      });
+  });
+
+  grunt.registerTask('unit_test_java21_deque_sequenced', 'Run the Java 21 Deque sequenced-collection fixture on Doppio.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      mainClass = 'classes.modern_test.Java21DequeSequenced',
+      outPath = 'classes/modern_test/Java21DequeSequenced.runout';
+    child_process.exec('node --no-deprecation build/release-cli/console/runner.js -classpath . ' + mainClass,
+      function(err?: any, stdout?: Buffer, stderr?: Buffer) {
+        var actual = stdout.toString() + stderr.toString(),
+          expected = fs.readFileSync(outPath, 'utf8');
+        if (err || actual !== expected) {
+          grunt.fail.fatal('Java 21 Deque sequenced-collection Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
+        }
+        grunt.log.ok('Java 21 Deque sequenced-collection output matched expected output.');
         done();
       });
   });
