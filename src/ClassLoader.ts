@@ -145,7 +145,8 @@ function addJavaLangInvokeMethodHandlesModernOverlays(data: Buffer): Buffer {
       ['arrayConstructor', '(Ljava/lang/Class;)Ljava/lang/invoke/MethodHandle;'],
       ['dropArgumentsToMatch', '(Ljava/lang/invoke/MethodHandle;ILjava/util/List;I)Ljava/lang/invoke/MethodHandle;'],
       ['dropReturn', '(Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;'],
-      ['foldArguments', '(Ljava/lang/invoke/MethodHandle;ILjava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;']
+      ['foldArguments', '(Ljava/lang/invoke/MethodHandle;ILjava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;'],
+      ['tryFinally', '(Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;']
     ],
     extraConstants = Buffer.concat(overlays.reduce((constants: Buffer[], overlay: string[]) => {
       constants.push(utf8Constant(overlay[0]), utf8Constant(overlay[1]));

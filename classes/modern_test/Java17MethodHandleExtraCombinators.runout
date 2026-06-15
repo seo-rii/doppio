@@ -31,3 +31,10 @@ matched
 (ILjava/lang/String;)Ljava/lang/String;
 fold:n6:6
 (Ljava/lang/String;I)Ljava/lang/String;
+cleanup:none|target:try:7|try
+none|target:try:7|try
+try-fail:bad:8
+IllegalArgumentException:try-fail:bad:8|null|bad
+(Ljava/lang/String;I)Ljava/lang/String;
+void-none|void|void-target:void
+(Ljava/lang/String;)V

@@ -337,7 +337,7 @@ Current verified checks:
   `Proxy.isProxyClass`, and `Proxy.getInvocationHandler`.
 - A Kotlin source-level `java.lang.invoke.MethodHandles` smoke is now included
   in the repo source set. A 2026-06-16 local run through
-  `ci/kotlin_smoke.sh` completed in 458 seconds with the full
+  `ci/kotlin_smoke.sh` completed in 435 seconds with the full
   `kotlinc/lib/*.jar` classpath; the host JVM and Doppio matched the scripted
   expected output.
   This covers Kotlin-compiled calls to `findStatic`, `findConstructor`,
@@ -355,8 +355,9 @@ Current verified checks:
   `collectArguments`, zero-position and selected nonzero-position
   `foldArguments`, `explicitCastArguments`, `arrayElementGetter`,
   `arrayElementSetter`, `throwException`, and Java 17 public overlays `zero`,
-  `empty`, `arrayLength`, `arrayConstructor`, `dropArgumentsToMatch`, and
-  `dropReturn`, with descriptor-string checks for the adapted shapes. The
+  `empty`, `arrayLength`, `arrayConstructor`, `dropArgumentsToMatch`,
+  `dropReturn`, and selected `tryFinally` flows, with descriptor-string checks
+  for the adapted shapes. The
   Java 17 overlays are reached by reflection so the smoke exercises runtime
   discovery and invocation without requiring the Kotlin source frontend to
   hard-code those signatures. This extends the source-level Kotlin coverage

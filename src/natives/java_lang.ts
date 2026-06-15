@@ -1872,6 +1872,18 @@ export default function (): any {
         [target, pos, combiner]
       );
     }
+
+    public static 'tryFinally(Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;'(
+      thread: JVMThread,
+      target: JVMTypes.java_lang_invoke_MethodHandle,
+      cleanup: JVMTypes.java_lang_invoke_MethodHandle
+    ): void {
+      java_lang_invoke_MethodHandles.callDoppioHelper(
+        thread,
+        'java/lang/invoke/DoppioMethodHandles/tryFinally(Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;',
+        [target, cleanup]
+      );
+    }
   }
 
   class java_lang_invoke_MethodHandleNatives {

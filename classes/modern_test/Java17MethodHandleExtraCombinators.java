@@ -6,6 +6,8 @@ import java.lang.invoke.MethodType;
 import java.util.Arrays;
 
 public class Java17MethodHandleExtraCombinators {
+  private static String cleanupLog = "";
+
   public static String join(String text, int value) {
     return text + ":" + value;
   }
@@ -36,6 +38,29 @@ public class Java17MethodHandleExtraCombinators {
 
   public static String fail(String text) {
     throw new IllegalStateException("fail:" + text);
+  }
+
+  public static String tryTarget(String text, int value) {
+    return "target:" + text + ":" + value;
+  }
+
+  public static String tryFail(String text, int value) {
+    throw new IllegalArgumentException("try-fail:" + text + ":" + value);
+  }
+
+  public static String tryCleanup(Throwable throwable, String result, String text) {
+    cleanupLog = (throwable == null ? "none" : throwable.getClass().getSimpleName() + ":" + throwable.getMessage()) +
+        "|" + result + "|" + text;
+    return "cleanup:" + cleanupLog;
+  }
+
+  public static void tryVoidTarget(String text) {
+    cleanupLog = "void-target:" + text;
+  }
+
+  public static void tryVoidCleanup(Throwable throwable, String text) {
+    cleanupLog = (throwable == null ? "void-none" : throwable.getClass().getSimpleName()) +
+        "|" + text + "|" + cleanupLog;
   }
 
   public static void main(String[] args) throws Throwable {
@@ -150,5 +175,44 @@ public class Java17MethodHandleExtraCombinators {
     MethodHandle foldedAtOne = MethodHandles.foldArguments(foldAtTarget, 1, foldAtCombiner);
     System.out.println((String) foldedAtOne.invokeExact("fold", 6));
     System.out.println(foldedAtOne.type().toMethodDescriptorString());
+
+    MethodHandle tryTarget = lookup.findStatic(
+        Java17MethodHandleExtraCombinators.class,
+        "tryTarget",
+        MethodType.methodType(String.class, String.class, int.class));
+    MethodHandle tryFail = lookup.findStatic(
+        Java17MethodHandleExtraCombinators.class,
+        "tryFail",
+        MethodType.methodType(String.class, String.class, int.class));
+    MethodHandle tryCleanup = lookup.findStatic(
+        Java17MethodHandleExtraCombinators.class,
+        "tryCleanup",
+        MethodType.methodType(String.class, Throwable.class, String.class, String.class));
+    MethodHandle tried = MethodHandles.tryFinally(tryTarget, tryCleanup);
+    System.out.println((String) tried.invokeExact("try", 7));
+    System.out.println(cleanupLog);
+    MethodHandle triedFail = MethodHandles.tryFinally(tryFail, tryCleanup);
+    try {
+      String value = (String) triedFail.invokeExact("bad", 8);
+      System.out.println(value);
+    } catch (IllegalArgumentException e) {
+      System.out.println(e.getMessage());
+      System.out.println(cleanupLog);
+    }
+    System.out.println(tried.type().toMethodDescriptorString());
+
+    MethodHandle tryVoidTarget = lookup.findStatic(
+        Java17MethodHandleExtraCombinators.class,
+        "tryVoidTarget",
+        MethodType.methodType(void.class, String.class));
+    MethodHandle tryVoidCleanup = lookup.findStatic(
+        Java17MethodHandleExtraCombinators.class,
+        "tryVoidCleanup",
+        MethodType.methodType(void.class, Throwable.class, String.class));
+    MethodHandle triedVoid = MethodHandles.tryFinally(tryVoidTarget, tryVoidCleanup);
+    cleanupLog = "before-void";
+    triedVoid.invokeExact("void");
+    System.out.println(cleanupLog);
+    System.out.println(triedVoid.type().toMethodDescriptorString());
   }
 }

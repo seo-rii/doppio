@@ -10,6 +10,9 @@ class MethodHandleOwner(@JvmField var text: String) {
   private fun secretSuffix(suffix: String): String = "secret:$suffix"
 
   companion object {
+    @JvmField
+    var cleanupLog: String = ""
+
     @JvmStatic
     fun join(prefix: String, value: Int): String = prefix + (value + 1)
 
@@ -50,6 +53,31 @@ class MethodHandleOwner(@JvmField var text: String) {
 
     @JvmStatic
     fun handleNegative(e: IllegalArgumentException, value: Int): String = e.message + "/" + value
+
+    @JvmStatic
+    fun tryTarget(text: String, value: Int): String = "target:$text:$value"
+
+    @JvmStatic
+    fun tryFail(text: String, value: Int): String {
+      throw IllegalArgumentException("try-fail:$text:$value")
+    }
+
+    @JvmStatic
+    fun tryCleanup(throwable: Throwable?, result: String?, text: String): String {
+      cleanupLog = (throwable?.let { it.javaClass.simpleName + ":" + it.message } ?: "none") +
+        ",$result,$text"
+      return "cleanup:$cleanupLog"
+    }
+
+    @JvmStatic
+    fun tryVoidTarget(text: String) {
+      cleanupLog = "void-target:$text"
+    }
+
+    @JvmStatic
+    fun tryVoidCleanup(throwable: Throwable?, text: String) {
+      cleanupLog = (throwable?.javaClass?.simpleName ?: "void-none") + ",$text,$cleanupLog"
+    }
   }
 }
 
@@ -265,6 +293,11 @@ fun methodHandleSummary(): String {
     intClass,
     MethodHandle::class.java
   )
+  val tryFinallyMethod = MethodHandles::class.java.getMethod(
+    "tryFinally",
+    MethodHandle::class.java,
+    MethodHandle::class.java
+  )
   val zeroInt = zeroMethod.invoke(null, intClass) as MethodHandle
   val zeroString = zeroMethod.invoke(null, stringClass) as MethodHandle
   val emptyString = emptyMethod.invoke(
@@ -293,6 +326,49 @@ fun methodHandleSummary(): String {
     MethodType.methodType(stringClass, intClass)
   )
   val foldedAtOne = foldArgumentsAtMethod.invoke(null, foldAtTarget, 1, foldAtCombiner) as MethodHandle
+  val tryTarget = lookup.findStatic(
+    ownerClass,
+    "tryTarget",
+    MethodType.methodType(stringClass, stringClass, intClass)
+  )
+  val tryFail = lookup.findStatic(
+    ownerClass,
+    "tryFail",
+    MethodType.methodType(stringClass, stringClass, intClass)
+  )
+  val tryCleanup = lookup.findStatic(
+    ownerClass,
+    "tryCleanup",
+    MethodType.methodType(stringClass, Throwable::class.java, stringClass, stringClass)
+  )
+  val tried = tryFinallyMethod.invoke(null, tryTarget, tryCleanup) as MethodHandle
+  val tryValue = tried.invokeWithArguments("try", 7).toString()
+  val tryNormalLog = MethodHandleOwner.cleanupLog
+  val triedFail = tryFinallyMethod.invoke(null, tryFail, tryCleanup) as MethodHandle
+  val tryFailure = try {
+    triedFail.invokeWithArguments("bad", 8).toString()
+  } catch (e: IllegalArgumentException) {
+    (e.message ?: "missing") + "/" + MethodHandleOwner.cleanupLog
+  }
+  val tryVoidTarget = lookup.findStatic(
+    ownerClass,
+    "tryVoidTarget",
+    MethodType.methodType(java.lang.Void.TYPE, stringClass)
+  )
+  val tryVoidCleanup = lookup.findStatic(
+    ownerClass,
+    "tryVoidCleanup",
+    MethodType.methodType(java.lang.Void.TYPE, Throwable::class.java, stringClass)
+  )
+  val triedVoid = tryFinallyMethod.invoke(null, tryVoidTarget, tryVoidCleanup) as MethodHandle
+  MethodHandleOwner.cleanupLog = "before-void"
+  triedVoid.invokeWithArguments("void")
+  val tryFinallyValues = listOf(
+    tryValue,
+    tryNormalLog,
+    tryFailure,
+    MethodHandleOwner.cleanupLog
+  ).joinToString("~")
   val combinators = listOf(
     identity.invokeWithArguments("id").toString(),
     constant.invokeWithArguments().toString(),
@@ -328,7 +404,8 @@ fun methodHandleSummary(): String {
     constructed.size.toString() + ":" + (constructed[0] == null).toString(),
     (droppedReturn.invokeWithArguments("drop", 5) == null).toString(),
     matchedDrop.invokeWithArguments(2, "matched").toString(),
-    foldedAtOne.invokeWithArguments("fold", 6).toString()
+    foldedAtOne.invokeWithArguments("fold", 6).toString(),
+    tryFinallyValues
   ).joinToString("|")
   val combinatorTypes = listOf(
     boundStatic,
@@ -354,7 +431,9 @@ fun methodHandleSummary(): String {
     arrayConstructor,
     droppedReturn,
     matchedDrop,
-    foldedAtOne
+    foldedAtOne,
+    tried,
+    triedVoid
   ).joinToString("|") { it.type().toMethodDescriptorString() }
 
   return listOf(

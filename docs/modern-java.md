@@ -35,6 +35,11 @@ run.
 | 25 | 69 | current LTS class-file and library surface | Partial: simple class-file container plus runnable print fixture | Very high |
 | 26 | 70 | current feature-release class-file and library surface | Partial: simple class-file container plus runnable print fixture | Very high |
 
+Java 17 `java.lang.invoke` note: the compatibility row above now also includes
+selected `MethodHandles.tryFinally` support through a public overlay, covering
+normal, exceptional, and `void` target flows in the Java fixture and Kotlin
+smoke. Full control-flow combinator parity is still not claimed.
+
 ## Implementation Order
 
 1. Accept and test simple Java 17-26 class-file containers that do not need new
@@ -170,8 +175,8 @@ run.
   `collectArguments`, zero-position and selected nonzero-position
   `foldArguments`, `explicitCastArguments`, `arrayElementGetter`,
   `arrayElementSetter`, `throwException`, and Java 17 public overlays `zero`,
-  `empty`, `arrayLength`, `arrayConstructor`, `dropArgumentsToMatch`, and
-  `dropReturn`), and
+  `empty`, `arrayLength`, `arrayConstructor`, `dropArgumentsToMatch`,
+  `dropReturn`, and selected `tryFinally` flows), and
   method-type descriptor reporting, plus Kotlin unsigned
   primitives and unsigned arrays covering wraparound arithmetic, unsigned
   sorting, filtering, map keys, and hexadecimal byte rendering, then runs the
@@ -650,8 +655,8 @@ run.
   `collectArguments`, zero-position and selected nonzero-position
   `foldArguments`, `explicitCastArguments`, `arrayElementGetter`,
   `arrayElementSetter`, `throwException`, and Java 17 public overlays `zero`,
-  `empty`, `arrayLength`, `arrayConstructor`, `dropArgumentsToMatch`, and
-  `dropReturn` with
+  `empty`, `arrayLength`, `arrayConstructor`, `dropArgumentsToMatch`,
+  `dropReturn`, and selected `tryFinally` flows with
   descriptor checks, sealed
   metadata, and
   illegal direct subtype rejection; Java 18-26 simple parser-only class-file

@@ -148,12 +148,112 @@ public final class DoppioMethodHandles {
     return MethodHandles.permuteArguments(collected, desiredType, reorder);
   }
 
+  public static MethodHandle tryFinally(MethodHandle target, MethodHandle cleanup)
+      throws NoSuchMethodException, IllegalAccessException {
+    Objects.requireNonNull(target);
+    Objects.requireNonNull(cleanup);
+
+    MethodType targetType = target.type();
+    MethodType cleanupType = cleanup.type();
+    Class<?> returnType = targetType.returnType();
+    int leadingCleanupParameters = returnType == void.class ? 1 : 2;
+    if (cleanupType.parameterCount() < leadingCleanupParameters ||
+        cleanupType.parameterCount() > leadingCleanupParameters + targetType.parameterCount()) {
+      throw new IllegalArgumentException("cleanup parameter count does not match target");
+    }
+    if (!Throwable.class.isAssignableFrom(cleanupType.parameterType(0))) {
+      throw new IllegalArgumentException("cleanup first parameter must accept a throwable");
+    }
+    if (cleanupType.returnType() != returnType) {
+      throw new IllegalArgumentException("target and cleanup return types do not match");
+    }
+    if (returnType != void.class && cleanupType.parameterType(1) != returnType) {
+      throw new IllegalArgumentException("cleanup result parameter does not match target return type");
+    }
+
+    int cleanupArgumentCount = cleanupType.parameterCount() - leadingCleanupParameters;
+    for (int i = 0; i < cleanupArgumentCount; i++) {
+      if (cleanupType.parameterType(leadingCleanupParameters + i) != targetType.parameterType(i)) {
+        throw new IllegalArgumentException("target and cleanup parameter types do not match");
+      }
+    }
+
+    MethodHandle adapter = MethodHandles.publicLookup().findStatic(
+        DoppioMethodHandles.class,
+        "tryFinallyTarget",
+        MethodType.methodType(
+            Object.class,
+            MethodHandle.class,
+            MethodHandle.class,
+            Class.class,
+            int.class,
+            Object[].class));
+    return MethodHandles.insertArguments(
+            adapter,
+            0,
+            target,
+            cleanup,
+            returnType,
+            Integer.valueOf(cleanupArgumentCount))
+        .asCollector(Object[].class, targetType.parameterCount())
+        .asType(targetType);
+  }
+
   public static int arrayLengthTarget(Object array) {
     return Array.getLength(array);
   }
 
   public static Object arrayConstructorTarget(Class<?> arrayClass, int length) {
     return Array.newInstance(arrayClass.getComponentType(), length);
+  }
+
+  public static Object tryFinallyTarget(
+      MethodHandle target,
+      MethodHandle cleanup,
+      Class<?> returnType,
+      int cleanupArgumentCount,
+      Object[] args) throws Throwable {
+    Object result = null;
+    if (returnType == boolean.class) {
+      result = Boolean.FALSE;
+    } else if (returnType == byte.class) {
+      result = Byte.valueOf((byte) 0);
+    } else if (returnType == char.class) {
+      result = Character.valueOf((char) 0);
+    } else if (returnType == short.class) {
+      result = Short.valueOf((short) 0);
+    } else if (returnType == int.class) {
+      result = Integer.valueOf(0);
+    } else if (returnType == long.class) {
+      result = Long.valueOf(0L);
+    } else if (returnType == float.class) {
+      result = Float.valueOf(0f);
+    } else if (returnType == double.class) {
+      result = Double.valueOf(0d);
+    }
+
+    Throwable throwable = null;
+    try {
+      result = target.invokeWithArguments(args);
+    } catch (Throwable t) {
+      throwable = t;
+      throw t;
+    } finally {
+      int leadingCleanupParameters = returnType == void.class ? 1 : 2;
+      Object[] cleanupArgs = new Object[leadingCleanupParameters + cleanupArgumentCount];
+      cleanupArgs[0] = throwable;
+      if (returnType != void.class) {
+        cleanupArgs[1] = result;
+      }
+      for (int i = 0; i < cleanupArgumentCount; i++) {
+        cleanupArgs[leadingCleanupParameters + i] = args[i];
+      }
+      Object cleanupResult = cleanup.invokeWithArguments(cleanupArgs);
+      if (throwable == null && returnType != void.class) {
+        result = cleanupResult;
+      }
+    }
+    return result;
   }
 
   private static void checkArrayClass(Class<?> arrayClass) {
