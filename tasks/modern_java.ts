@@ -973,8 +973,11 @@ function modernJava(grunt: IGrunt) {
   grunt.registerTask('generate_java21_thread_is_virtual', 'Generate a Java 21 Thread.isVirtual fixture.', function() {
     var bytes: number[] = [],
       outPath = 'classes/modern_test/Java21ThreadIsVirtual.class',
+      workerPath = 'classes/modern_test/Java21ThreadIsVirtualWorker.class',
       runoutPath = 'classes/modern_test/Java21ThreadIsVirtual.runout',
+      codeAttributeIndex = 9,
       expectedOutput = [
+        'false',
         'false',
         'false'
       ].join('\n') + '\n';
@@ -1018,7 +1021,7 @@ function modernJava(grunt: IGrunt) {
     }
 
     function codeAttr(code: number[], maxStack: number, maxLocals: number): void {
-      u2(7);
+      u2(codeAttributeIndex);
       u4(12 + code.length);
       u2(maxStack);
       u2(maxLocals);
@@ -1027,6 +1030,76 @@ function modernJava(grunt: IGrunt) {
       u2(0);
       u2(0);
     }
+
+    var workerCode = [
+      0xb8, 0x00, 0x0f,
+      0xb6, 0x00, 0x13,
+      0x3c,
+      0xb2, 0x00, 0x19,
+      0x1b,
+      0xb6, 0x00, 0x1f,
+      0xb1
+    ];
+
+    u4(0xcafebabe);
+    u2(0);
+    u2(65);
+    u2(35);
+    cls(2);
+    utf8('classes/modern_test/Java21ThreadIsVirtualWorker');
+    cls(4);
+    utf8('java/lang/Object');
+    cls(6);
+    utf8('java/lang/Runnable');
+    utf8('<init>');
+    utf8('()V');
+    utf8('Code');
+    ref(10, 3, 11);
+    nameAndType(7, 8);
+    utf8('run');
+    cls(14);
+    utf8('java/lang/Thread');
+    ref(10, 13, 16);
+    nameAndType(17, 18);
+    utf8('currentThread');
+    utf8('()Ljava/lang/Thread;');
+    ref(10, 13, 20);
+    nameAndType(21, 22);
+    utf8('isVirtual');
+    utf8('()Z');
+    cls(24);
+    utf8('java/lang/System');
+    ref(9, 23, 26);
+    nameAndType(27, 28);
+    utf8('out');
+    utf8('Ljava/io/PrintStream;');
+    cls(30);
+    utf8('java/io/PrintStream');
+    ref(10, 29, 32);
+    nameAndType(33, 34);
+    utf8('println');
+    utf8('(Z)V');
+
+    u2(0x0021);
+    u2(1);
+    u2(3);
+    u2(1);
+    u2(5);
+    u2(0);
+    u2(2);
+    u2(0x0001);
+    u2(7);
+    u2(8);
+    u2(1);
+    codeAttr([0x2a, 0xb7, 0x00, 0x0a, 0xb1], 1, 1);
+    u2(0x0001);
+    u2(12);
+    u2(8);
+    u2(1);
+    codeAttr(workerCode, 2, 2);
+    u2(0);
+    grunt.file.write(workerPath, Buffer.from(bytes));
+    grunt.log.ok('Generated ' + workerPath);
 
     var mainCode = [
       0xb8, 0x00, 0x1a,
@@ -1043,13 +1116,26 @@ function modernJava(grunt: IGrunt) {
       0xb2, 0x00, 0x0e,
       0x1b,
       0xb6, 0x00, 0x14,
+      0xbb, 0x00, 0x18,
+      0x59,
+      0xbb, 0x00, 0x23,
+      0x59,
+      0xb7, 0x00, 0x25,
+      0xb7, 0x00, 0x28,
+      0x4d,
+      0x2c,
+      0xb6, 0x00, 0x2b,
+      0x2c,
+      0xb6, 0x00, 0x2e,
       0xb1
     ];
 
+    bytes = [];
+    codeAttributeIndex = 7;
     u4(0xcafebabe);
     u2(0);
     u2(65);
-    u2(35);
+    u2(47);
     cls(2);
     utf8('classes/modern_test/Java21ThreadIsVirtual');
     cls(4);
@@ -1084,6 +1170,18 @@ function modernJava(grunt: IGrunt) {
     utf8('isVirtual');
     utf8('()Z');
     ref(10, 24, 9);
+    cls(36);
+    utf8('classes/modern_test/Java21ThreadIsVirtualWorker');
+    ref(10, 35, 9);
+    utf8('(Ljava/lang/Runnable;)V');
+    nameAndType(5, 38);
+    ref(10, 24, 39);
+    utf8('start');
+    nameAndType(41, 6);
+    ref(10, 24, 42);
+    utf8('join');
+    nameAndType(44, 6);
+    ref(10, 24, 45);
 
     u2(0x0021);
     u2(1);
@@ -1100,7 +1198,7 @@ function modernJava(grunt: IGrunt) {
     u2(10);
     u2(11);
     u2(1);
-    codeAttr(mainCode, 2, 2);
+    codeAttr(mainCode, 4, 3);
     u2(0);
 
     grunt.file.write(outPath, Buffer.from(bytes));

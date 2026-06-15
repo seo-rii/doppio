@@ -660,6 +660,7 @@ export function setup(grunt: IGrunt) {
             'classes/modern_test/Java21ClassFileVersion.class',
             'classes/modern_test/Java21ClassFileRuntime.class',
             'classes/modern_test/Java21ThreadIsVirtual.class',
+            'classes/modern_test/Java21ThreadIsVirtualWorker.class',
             'classes/modern_test/Java22ClassFileVersion.class',
             'classes/modern_test/Java22ClassFileRuntime.class',
             'classes/modern_test/Java23ClassFileVersion.class',
