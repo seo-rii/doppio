@@ -731,6 +731,245 @@ function modernJava(grunt: IGrunt) {
     grunt.log.ok('Generated ' + runoutPath);
   });
 
+  grunt.registerTask('generate_java19_thread_sleep_duration_interrupt', 'Generate a Java 19 Thread.sleep(Duration) interrupt fixture.', function() {
+    var bytes: number[] = [],
+      mainPath = 'classes/modern_test/Java19ThreadSleepDurationInterrupt.class',
+      sleeperPath = 'classes/modern_test/Java19ThreadSleepDurationInterruptSleeper.class',
+      runoutPath = 'classes/modern_test/Java19ThreadSleepDurationInterrupt.runout',
+      expectedOutput = 'interrupted\n',
+      codeAttributeIndex = 9;
+
+    function u1(value: number): void {
+      bytes.push(value & 0xff);
+    }
+
+    function u2(value: number): void {
+      bytes.push((value >>> 8) & 0xff, value & 0xff);
+    }
+
+    function u4(value: number): void {
+      bytes.push((value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff);
+    }
+
+    function utf8(value: string): void {
+      var buf = Buffer.from(value, 'utf8');
+      u1(1);
+      u2(buf.length);
+      for (var i = 0; i < buf.length; i++) {
+        u1(buf[i]);
+      }
+    }
+
+    function cls(nameIndex: number): void {
+      u1(7);
+      u2(nameIndex);
+    }
+
+    function nameAndType(nameIndex: number, descriptorIndex: number): void {
+      u1(12);
+      u2(nameIndex);
+      u2(descriptorIndex);
+    }
+
+    function ref(tag: number, classIndex: number, nameAndTypeIndex: number): void {
+      u1(tag);
+      u2(classIndex);
+      u2(nameAndTypeIndex);
+    }
+
+    function str(stringIndex: number): void {
+      u1(8);
+      u2(stringIndex);
+    }
+
+    function longConst(value: number): void {
+      var high = Math.floor(value / 0x100000000),
+        low = value >>> 0;
+      u1(5);
+      u4(high);
+      u4(low);
+    }
+
+    function codeAttr(code: number[], maxStack: number, maxLocals: number, exceptions?: number[][]): void {
+      var exceptionTable = exceptions || [];
+      u2(codeAttributeIndex);
+      u4(12 + code.length + (exceptionTable.length * 8));
+      u2(maxStack);
+      u2(maxLocals);
+      u4(code.length);
+      code.forEach(u1);
+      u2(exceptionTable.length);
+      exceptionTable.forEach(function(entry: number[]): void {
+        u2(entry[0]);
+        u2(entry[1]);
+        u2(entry[2]);
+        u2(entry[3]);
+      });
+      u2(0);
+    }
+
+    var sleeperCode = [
+      0x14, 0x00, 0x2b,
+      0xb8, 0x00, 0x12,
+      0xb8, 0x00, 0x18,
+      0xb2, 0x00, 0x1e,
+      0x12, 0x25,
+      0xb6, 0x00, 0x24,
+      0xa7, 0x00, 0x0c,
+      0x4c,
+      0xb2, 0x00, 0x1e,
+      0x12, 0x27,
+      0xb6, 0x00, 0x24,
+      0xb1
+    ];
+
+    u4(0xcafebabe);
+    u2(0);
+    u2(63);
+    u2(45);
+    cls(2);
+    utf8('classes/modern_test/Java19ThreadSleepDurationInterruptSleeper');
+    cls(4);
+    utf8('java/lang/Object');
+    cls(6);
+    utf8('java/lang/Runnable');
+    utf8('<init>');
+    utf8('()V');
+    utf8('Code');
+    ref(10, 3, 11);
+    nameAndType(7, 8);
+    utf8('run');
+    cls(14);
+    utf8('java/time/Duration');
+    nameAndType(16, 17);
+    utf8('ofMillis');
+    utf8('(J)Ljava/time/Duration;');
+    ref(10, 13, 15);
+    cls(20);
+    utf8('java/lang/Thread');
+    nameAndType(22, 23);
+    utf8('sleep');
+    utf8('(Ljava/time/Duration;)V');
+    ref(10, 19, 21);
+    cls(26);
+    utf8('java/lang/System');
+    nameAndType(28, 29);
+    utf8('out');
+    utf8('Ljava/io/PrintStream;');
+    ref(9, 25, 27);
+    cls(32);
+    utf8('java/io/PrintStream');
+    nameAndType(34, 35);
+    utf8('println');
+    utf8('(Ljava/lang/String;)V');
+    ref(10, 31, 33);
+    str(38);
+    utf8('missed');
+    str(40);
+    utf8('interrupted');
+    cls(42);
+    utf8('java/lang/InterruptedException');
+    longConst(2000);
+    u2(0x0021);
+    u2(1);
+    u2(3);
+    u2(1);
+    u2(5);
+    u2(0);
+    u2(2);
+    u2(0x0001);
+    u2(7);
+    u2(8);
+    u2(1);
+    codeAttr([0x2a, 0xb7, 0x00, 0x0a, 0xb1], 1, 1);
+    u2(0x0001);
+    u2(12);
+    u2(8);
+    u2(1);
+    codeAttr(sleeperCode, 2, 2, [[0, 9, 20, 41]]);
+    u2(0);
+    grunt.file.write(sleeperPath, Buffer.from(bytes));
+    grunt.log.ok('Generated ' + sleeperPath);
+
+    bytes = [];
+    codeAttributeIndex = 7;
+    u4(0xcafebabe);
+    u2(0);
+    u2(63);
+    u2(35);
+    cls(2);
+    utf8('classes/modern_test/Java19ThreadSleepDurationInterrupt');
+    cls(4);
+    utf8('java/lang/Object');
+    utf8('<init>');
+    utf8('()V');
+    utf8('Code');
+    ref(10, 3, 9);
+    nameAndType(5, 6);
+    utf8('main');
+    utf8('([Ljava/lang/String;)V');
+    cls(13);
+    utf8('java/lang/Thread');
+    cls(15);
+    utf8('classes/modern_test/Java19ThreadSleepDurationInterruptSleeper');
+    ref(10, 14, 9);
+    utf8('(Ljava/lang/Runnable;)V');
+    nameAndType(5, 17);
+    ref(10, 12, 18);
+    utf8('start');
+    nameAndType(20, 6);
+    ref(10, 12, 21);
+    longConst(50);
+    utf8('sleep');
+    utf8('(J)V');
+    nameAndType(25, 26);
+    ref(10, 12, 27);
+    utf8('interrupt');
+    nameAndType(29, 6);
+    ref(10, 12, 30);
+    utf8('join');
+    nameAndType(32, 6);
+    ref(10, 12, 33);
+    u2(0x0021);
+    u2(1);
+    u2(3);
+    u2(0);
+    u2(0);
+    u2(2);
+    u2(0x0001);
+    u2(5);
+    u2(6);
+    u2(1);
+    codeAttr([0x2a, 0xb7, 0x00, 0x08, 0xb1], 1, 1);
+    u2(0x0009);
+    u2(10);
+    u2(11);
+    u2(1);
+    codeAttr([
+      0xbb, 0x00, 0x0c,
+      0x59,
+      0xbb, 0x00, 0x0e,
+      0x59,
+      0xb7, 0x00, 0x10,
+      0xb7, 0x00, 0x13,
+      0x4c,
+      0x2b,
+      0xb6, 0x00, 0x16,
+      0x14, 0x00, 0x17,
+      0xb8, 0x00, 0x1c,
+      0x2b,
+      0xb6, 0x00, 0x1f,
+      0x2b,
+      0xb6, 0x00, 0x22,
+      0xb1
+    ], 4, 2);
+    u2(0);
+    grunt.file.write(mainPath, Buffer.from(bytes));
+    grunt.log.ok('Generated ' + mainPath);
+    grunt.file.write(runoutPath, expectedOutput);
+    grunt.log.ok('Generated ' + runoutPath);
+  });
+
   grunt.registerTask('generate_java21_thread_is_virtual', 'Generate a Java 21 Thread.isVirtual fixture.', function() {
     var bytes: number[] = [],
       outPath = 'classes/modern_test/Java21ThreadIsVirtual.class',
@@ -2893,6 +3132,22 @@ function modernJava(grunt: IGrunt) {
           grunt.fail.fatal('Java 19 Thread.sleep(Duration) Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
         }
         grunt.log.ok('Java 19 Thread.sleep(Duration) output matched expected output.');
+        done();
+      });
+  });
+
+  grunt.registerTask('unit_test_java19_thread_sleep_duration_interrupt', 'Run the Java 19 Thread.sleep(Duration) interrupt fixture on Doppio.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      mainClass = 'classes.modern_test.Java19ThreadSleepDurationInterrupt',
+      outPath = 'classes/modern_test/Java19ThreadSleepDurationInterrupt.runout';
+    child_process.exec('node --no-deprecation build/release-cli/console/runner.js -classpath . ' + mainClass,
+      function(err?: any, stdout?: Buffer, stderr?: Buffer) {
+        var actual = stdout.toString() + stderr.toString(),
+          expected = fs.readFileSync(outPath, 'utf8');
+        if (err || actual !== expected) {
+          grunt.fail.fatal('Java 19 Thread.sleep(Duration) interrupt Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
+        }
+        grunt.log.ok('Java 19 Thread.sleep(Duration) interrupt output matched expected output.');
         done();
       });
   });

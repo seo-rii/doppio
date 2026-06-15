@@ -579,7 +579,7 @@ export function setup(grunt: IGrunt) {
       modern_java17: {
         files: [{
           expand: true,
-          src: ['classes/modern_test/Java9*.runout', 'classes/modern_test/Java10*.runout', 'classes/modern_test/Java11*.runout', 'classes/modern_test/Java12*.runout', 'classes/modern_test/Java13*.runout', 'classes/modern_test/Java14*.runout', 'classes/modern_test/Java15*.runout', 'classes/modern_test/Java16*.runout', 'classes/modern_test/Java17*.runout', 'classes/modern_test/Java18UnsignedMultiplyHigh.runout', 'classes/modern_test/Java18DefaultCharset.runout', 'classes/modern_test/Java19ThreadId.runout', 'classes/modern_test/Java19ThreadSleepDuration.runout', 'classes/modern_test/Java2*ClassFileRuntime.runout', 'classes/modern_test/Java21ThreadIsVirtual.runout', 'classes/modern_test/SealedViolation.runout', 'classes/modern_test/ReflectParameters.runout']
+          src: ['classes/modern_test/Java9*.runout', 'classes/modern_test/Java10*.runout', 'classes/modern_test/Java11*.runout', 'classes/modern_test/Java12*.runout', 'classes/modern_test/Java13*.runout', 'classes/modern_test/Java14*.runout', 'classes/modern_test/Java15*.runout', 'classes/modern_test/Java16*.runout', 'classes/modern_test/Java17*.runout', 'classes/modern_test/Java18UnsignedMultiplyHigh.runout', 'classes/modern_test/Java18DefaultCharset.runout', 'classes/modern_test/Java19ThreadId.runout', 'classes/modern_test/Java19ThreadSleepDuration.runout', 'classes/modern_test/Java19ThreadSleepDurationInterrupt.runout', 'classes/modern_test/Java2*ClassFileRuntime.runout', 'classes/modern_test/Java21ThreadIsVirtual.runout', 'classes/modern_test/SealedViolation.runout', 'classes/modern_test/ReflectParameters.runout']
         }]
       }
     },
@@ -653,6 +653,8 @@ export function setup(grunt: IGrunt) {
             'classes/modern_test/Java19ClassFileVersion.class',
             'classes/modern_test/Java19ThreadId.class',
             'classes/modern_test/Java19ThreadSleepDuration.class',
+            'classes/modern_test/Java19ThreadSleepDurationInterrupt.class',
+            'classes/modern_test/Java19ThreadSleepDurationInterruptSleeper.class',
             'classes/modern_test/Java20ClassFileVersion.class',
             'classes/modern_test/Java20ClassFileRuntime.class',
             'classes/modern_test/Java21ClassFileVersion.class',
@@ -1071,12 +1073,14 @@ export function setup(grunt: IGrunt) {
     'generate_java18_default_charset',
     'generate_java19_thread_id',
     'generate_java19_thread_sleep_duration',
+    'generate_java19_thread_sleep_duration_interrupt',
     'generate_java21_thread_is_virtual',
     'parse_classfile_modern:classfile_versions',
     'unit_test_java18_unsigned_multiply_high',
     'unit_test_java18_default_charset',
     'unit_test_java19_thread_id',
     'unit_test_java19_thread_sleep_duration',
+    'unit_test_java19_thread_sleep_duration_interrupt',
     'unit_test_java21_thread_is_virtual',
     'unit_test_modern_classfile_runtime_versions',
     'run_java_modern:java17',

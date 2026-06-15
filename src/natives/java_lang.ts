@@ -1540,8 +1540,10 @@ export default function (): any {
                   threadCls.methodLookup('sleep(JI)V') // * Thread.sleep(long, int)
                 ],
                 stackTrace = nativeThreadObj.getStackTrace(),
-                currentMethod = stackTrace[stackTrace.length - 1].method;
-              if (interruptMethods.indexOf(currentMethod) !== -1) {
+                currentMethod = stackTrace[stackTrace.length - 1].method,
+                currentFullSignature = currentMethod.fullSignature;
+              if (interruptMethods.indexOf(currentMethod) !== -1 ||
+                  currentFullSignature === 'java/lang/Thread/sleep(Ljava/time/Duration;)V') {
                 // Clear interrupt state before throwing the exception.
                 nativeThreadObj.setInterrupted(false);
                 nativeThreadObj.throwNewException('Ljava/lang/InterruptedException;', 'interrupt0 called');
