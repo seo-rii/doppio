@@ -1,0 +1,15 @@
+classes.modern_test.Java17MethodHandlesPrivateLookupIn
+true:true
+ctor
+(Ljava/lang/String;)Lclasses/modern_test/Java17MethodHandlesPrivateLookupIn;
+static:m
+ctor:v
+static:initial
+static:updated
+instance:initial
+instance:updated
+static:peer
+static:updated
+public:java.lang.IllegalAccessException
+primitive:java.lang.IllegalArgumentException
+array:java.lang.IllegalArgumentException

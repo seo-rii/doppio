@@ -1733,6 +1733,44 @@ export default function (): any {
     return flags;
   }
 
+  class java_lang_invoke_MethodHandles {
+    public static 'privateLookupIn(Ljava/lang/Class;Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/invoke/MethodHandles$Lookup;'(
+      thread: JVMThread,
+      targetClass: JVMTypes.java_lang_Class,
+      callerLookup: JVMTypes.java_lang_invoke_MethodHandles$Lookup
+    ): JVMTypes.java_lang_invoke_MethodHandles$Lookup {
+      var targetClassData: ClassData,
+        callerModes: number,
+        lookupClass: ReferenceClassData<JVMTypes.java_lang_Object>,
+        lookupCons: any,
+        rv: JVMTypes.java_lang_invoke_MethodHandles$Lookup;
+
+      if (targetClass === null || callerLookup === null) {
+        thread.throwNewException('Ljava/lang/NullPointerException;', '');
+        return;
+      }
+
+      targetClassData = targetClass.$cls;
+      if (targetClassData instanceof PrimitiveClassData || targetClassData instanceof ArrayClassData) {
+        thread.throwNewException('Ljava/lang/IllegalArgumentException;', 'target class is not a reference class');
+        return;
+      }
+
+      callerModes = callerLookup['java/lang/invoke/MethodHandles$Lookup/allowedModes'];
+      if (callerModes !== -1 && (callerModes & 0x0002) === 0) {
+        thread.throwNewException('Ljava/lang/IllegalAccessException;', 'caller does not have private lookup access');
+        return;
+      }
+
+      lookupClass = <ReferenceClassData<JVMTypes.java_lang_Object>> callerLookup.getClass();
+      lookupCons = lookupClass.getConstructor(thread);
+      rv = new lookupCons(thread);
+      rv['java/lang/invoke/MethodHandles$Lookup/lookupClass'] = targetClass;
+      rv['java/lang/invoke/MethodHandles$Lookup/allowedModes'] = 0x000f;
+      return rv;
+    }
+  }
+
   class java_lang_invoke_MethodHandleNatives {
     /**
      * I'm going by JAMVM's implementation of this method, which is very easy
@@ -2119,6 +2157,7 @@ export default function (): any {
     'java/lang/Thread': java_lang_Thread,
     'java/lang/Throwable': java_lang_Throwable,
     'java/lang/UNIXProcess': java_lang_UNIXProcess,
+    'java/lang/invoke/MethodHandles': java_lang_invoke_MethodHandles,
     'java/lang/invoke/MethodHandleNatives': java_lang_invoke_MethodHandleNatives,
     'java/lang/invoke/MethodHandle': java_lang_invoke_MethodHandle
   };

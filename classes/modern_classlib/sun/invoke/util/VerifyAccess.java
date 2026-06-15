@@ -4,6 +4,9 @@ import java.lang.invoke.MethodType;
 import java.lang.reflect.Modifier;
 
 public class VerifyAccess {
+  private static final int UNCONDITIONAL_ALLOWED = 0x0020;
+  private static final int ORIGINAL_ALLOWED = 0x0040;
+  private static final int MODULE_ALLOWED = 0x0010;
   private static final int PACKAGE_ONLY = 0;
   private static final int PACKAGE_ALLOWED = 0x0008;
   private static final int PROTECTED_OR_PACKAGE_ALLOWED = Modifier.PROTECTED | PACKAGE_ALLOWED;
@@ -14,7 +17,13 @@ public class VerifyAccess {
 
   public static boolean isMemberAccessible(
       Class<?> refc, Class<?> defc, int mods, Class<?> lookupClass, int allowedModes) {
-    if (allowedModes == 0 || !isClassAccessible(refc, lookupClass, allowedModes)) {
+    return isMemberAccessible(refc, defc, mods, lookupClass, null, allowedModes);
+  }
+
+  public static boolean isMemberAccessible(
+      Class<?> refc, Class<?> defc, int mods, Class<?> lookupClass,
+      Class<?> previousLookupClass, int allowedModes) {
+    if (allowedModes == 0 || !isClassAccessible(refc, lookupClass, previousLookupClass, allowedModes)) {
       return false;
     }
 
@@ -62,15 +71,39 @@ public class VerifyAccess {
   }
 
   public static boolean isClassAccessible(Class<?> refc, Class<?> lookupClass, int allowedModes) {
+    return isClassAccessible(refc, lookupClass, null, allowedModes);
+  }
+
+  public static boolean isClassAccessible(
+      Class<?> refc, Class<?> lookupClass, Class<?> previousLookupClass, int allowedModes) {
     if (allowedModes == 0) {
       return false;
     }
 
     int mods = getClassModifiers(refc);
     if (Modifier.isPublic(mods)) {
-      return true;
+      Module lookupModule = lookupClass == null ? null : lookupClass.getModule();
+      Module previousLookupModule = previousLookupClass == null ? null : previousLookupClass.getModule();
+      return isModuleAccessible(refc, lookupModule, previousLookupModule);
     }
     return (allowedModes & PACKAGE_ALLOWED) != 0 && isSamePackage(lookupClass, refc);
+  }
+
+  public static boolean isModuleAccessible(
+      Class<?> refc, Module lookupModule, Module previousLookupModule) {
+    Module refModule = refc.getModule();
+    if (lookupModule == refModule) {
+      return true;
+    }
+    String packageName = getPackageName(refc);
+    if (lookupModule == null ||
+        !lookupModule.canRead(refModule) ||
+        !refModule.isExported(packageName, lookupModule)) {
+      return false;
+    }
+    return previousLookupModule == null ||
+        (previousLookupModule.canRead(refModule) &&
+         refModule.isExported(packageName, previousLookupModule));
   }
 
   public static boolean isTypeVisible(Class<?> type, Class<?> lookupClass) {
@@ -123,6 +156,10 @@ public class VerifyAccess {
       return false;
     }
     return getPackageName(first).equals(getPackageName(second));
+  }
+
+  public static boolean isSameModule(Class<?> first, Class<?> second) {
+    return first.getModule() == second.getModule();
   }
 
   public static String getPackageName(Class<?> c) {
