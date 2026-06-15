@@ -460,6 +460,17 @@ Current verified checks:
   dispatch, public no-arg provider constructors, duplicate-provider collapse,
   fresh instances after `reload`, `LambdaMetafactory`, `StackMapTable`, and
   `kotlin.Metadata`.
+- A minimal jar/zip classpath smoke compiled with the repo suite in 412
+  seconds and both the host JVM and Doppio printed
+  `jarzip:false:META-INF/MANIFEST.MF,META-INF/services/example.Service,META-INF/versions/17/pkg/data.txt,pkg/data.txt:alpha/beta:pkg.Provider:11:6e30506e:6e30506e:true|META-INF/MANIFEST.MF=META-INF,META-INF/services/example.Service=META-INF,META-INF/versions/17/pkg/data.txt=META-INF,pkg/data.txt=alpha|jar:jar:alpha/beta:pkg.Provider:true`.
+  This covers runtime jar creation and classpath-style reads while avoiding
+  absolute paths in the expected output. `javap` verified `JarOutputStream`,
+  `JarEntry`, `JarFile`, `Manifest`, `Attributes`, `ZipInputStream`, `CRC32`,
+  `URLClassLoader`, jar URL `openStream`, Kotlin `readBytes`, and
+  `CloseableKt.closeFinally` paths. An initial `Multi-Release: true` probe
+  showed that default `JarFile(File)` entry selection needs a separate parity
+  fixture; this smoke deliberately uses `Multi-Release: false` so it proves
+  ordinary jar/zip/resource behavior first.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering

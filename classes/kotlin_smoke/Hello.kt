@@ -38,4 +38,5 @@ fun main() {
   println(concurrentCacheSummary())
   println(resourceLookupSummary())
   println(serviceLoaderSummary())
+  println(jarZipSummary())
 }

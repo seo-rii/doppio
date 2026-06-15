@@ -128,6 +128,7 @@ test -f "$out_dir/InitializationDelegateOwner\$special\$\$inlined\$vetoable\$1.c
 test -f "$out_dir/InitializationDelegateSmokeKt.class"
 test -f "$out_dir/InitializationRecorder.class"
 test -f "$out_dir/InteropKt.class"
+test -f "$out_dir/JarZipSmokeKt.class"
 test -f "$out_dir/JvmInteropOwner.class"
 test -f "$out_dir/JvmInteropOwner\$Companion.class"
 test -f "$out_dir/JvmInteropSingleton.class"
@@ -213,6 +214,8 @@ default_expected_output="${default_expected_output}
 ffffff|4:cafebabe|1:1:true|true:true:true"
 default_expected_output="${default_expected_output}
 alpha=7,beta=11|2|alpha=7,beta=11|AlphaServiceLookupPlugin>BetaServiceLookupPlugin|true"
+default_expected_output="${default_expected_output}
+jarzip:false:META-INF/MANIFEST.MF,META-INF/services/example.Service,META-INF/versions/17/pkg/data.txt,pkg/data.txt:alpha/beta:pkg.Provider:11:6e30506e:6e30506e:true|META-INF/MANIFEST.MF=META-INF,META-INF/services/example.Service=META-INF,META-INF/versions/17/pkg/data.txt=META-INF,pkg/data.txt=alpha|jar:jar:alpha/beta:pkg.Provider:true"
 expected_output="${KOTLIN_SMOKE_EXPECTED_OUTPUT:-"$default_expected_output"}"
 
 native_output="$(java -cp "$runtime_cp" HelloKt)"

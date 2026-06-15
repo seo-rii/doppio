@@ -149,8 +149,10 @@ run.
   `ClassLoader.getSystemResource`, context classloader swap/restore, and class
   and module resource byte reads, plus `ServiceLoader` provider discovery from
   generated `META-INF/services` metadata, duplicate-provider collapse, reload,
-  and provider instantiation, then runs the generated code on both the host JVM
-  and Doppio with `kotlin-stdlib.jar`.
+  and provider instantiation, plus runtime jar creation and classpath-style
+  reads through `JarOutputStream`, `JarFile`, `Manifest`, `ZipInputStream`,
+  `CRC32`, `URLClassLoader`, and jar URL streams, then runs the generated code
+  on both the host JVM and Doppio with `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only
   `kotlin-compiler.jar`.
