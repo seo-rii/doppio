@@ -1,0 +1,100 @@
+package classes.modern_test;
+
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+
+public class Java17MethodHandleExtraCombinators {
+  public static String join(String text, int value) {
+    return text + ":" + value;
+  }
+
+  public static String longLabel(long value) {
+    return "long:" + value;
+  }
+
+  public static String triple(String first, String second, String third) {
+    return first + "/" + second + "/" + third;
+  }
+
+  public static String foldPrefix(String first, String second) {
+    return first + ":" + second;
+  }
+
+  public static String foldTarget(String prefix, String first, String second) {
+    return prefix + "|" + first + "|" + second;
+  }
+
+  public static String fail(String text) {
+    throw new IllegalStateException("fail:" + text);
+  }
+
+  public static void main(String[] args) throws Throwable {
+    MethodHandles.Lookup lookup = MethodHandles.lookup();
+
+    MethodHandle join = lookup.findStatic(
+        Java17MethodHandleExtraCombinators.class,
+        "join",
+        MethodType.methodType(String.class, String.class, int.class));
+    MethodHandle exactInvoker = MethodHandles.exactInvoker(join.type());
+    MethodHandle looseInvoker = MethodHandles.invoker(join.type());
+    System.out.println((String) exactInvoker.invokeExact(join, "exact", 3));
+    System.out.println((String) looseInvoker.invoke(join, "loose", Integer.valueOf(4)));
+    System.out.println(exactInvoker.type().toMethodDescriptorString());
+
+    MethodHandle triple = lookup.findStatic(
+        Java17MethodHandleExtraCombinators.class,
+        "triple",
+        MethodType.methodType(String.class, String.class, String.class, String.class));
+    MethodHandle collected = MethodHandles.collectArguments(triple, 1, join);
+    System.out.println((String) collected.invokeExact("A", "B", 5, "C"));
+    System.out.println(collected.type().toMethodDescriptorString());
+
+    MethodHandle foldPrefix = lookup.findStatic(
+        Java17MethodHandleExtraCombinators.class,
+        "foldPrefix",
+        MethodType.methodType(String.class, String.class, String.class));
+    MethodHandle foldTarget = lookup.findStatic(
+        Java17MethodHandleExtraCombinators.class,
+        "foldTarget",
+        MethodType.methodType(String.class, String.class, String.class, String.class));
+    MethodHandle folded = MethodHandles.foldArguments(foldTarget, foldPrefix);
+    System.out.println((String) folded.invokeExact("left", "right"));
+    System.out.println(folded.type().toMethodDescriptorString());
+
+    MethodHandle longLabel = lookup.findStatic(
+        Java17MethodHandleExtraCombinators.class,
+        "longLabel",
+        MethodType.methodType(String.class, long.class));
+    MethodHandle explicitDoubleToLong = MethodHandles.explicitCastArguments(
+        longLabel,
+        MethodType.methodType(String.class, double.class));
+    System.out.println((String) explicitDoubleToLong.invokeExact(12.75d));
+    System.out.println(explicitDoubleToLong.type().toMethodDescriptorString());
+
+    MethodHandle stringGetter = MethodHandles.arrayElementGetter(String[].class);
+    MethodHandle stringSetter = MethodHandles.arrayElementSetter(String[].class);
+    String[] strings = new String[] { "zero", "one" };
+    System.out.println((String) stringGetter.invokeExact(strings, 1));
+    stringSetter.invokeExact(strings, 1, "changed");
+    System.out.println(strings[1]);
+    System.out.println(stringGetter.type().toMethodDescriptorString());
+
+    MethodHandle intGetter = MethodHandles.arrayElementGetter(int[].class);
+    MethodHandle intSetter = MethodHandles.arrayElementSetter(int[].class);
+    int[] ints = new int[] { 7, 8 };
+    System.out.println((int) intGetter.invokeExact(ints, 0));
+    intSetter.invokeExact(ints, 0, 9);
+    System.out.println(ints[0]);
+    System.out.println(intSetter.type().toMethodDescriptorString());
+
+    MethodHandle throwing = MethodHandles.throwException(String.class, IllegalStateException.class);
+    try {
+      String value = (String) throwing.invokeExact(new IllegalStateException("boom"));
+      System.out.println(value);
+    } catch (IllegalStateException e) {
+      System.out.println(e.getMessage());
+    }
+    System.out.println(throwing.type().toMethodDescriptorString());
+  }
+}
