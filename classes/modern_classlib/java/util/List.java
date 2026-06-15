@@ -56,6 +56,20 @@ public interface List<E> extends Collection<E> {
 
   E get(int index);
 
+  default E getFirst() {
+    if (isEmpty()) {
+      throw new NoSuchElementException();
+    }
+    return get(0);
+  }
+
+  default E getLast() {
+    if (isEmpty()) {
+      throw new NoSuchElementException();
+    }
+    return get(size() - 1);
+  }
+
   E set(int index, E element);
 
   void add(int index, E element);

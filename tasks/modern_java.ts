@@ -1207,6 +1207,272 @@ function modernJava(grunt: IGrunt) {
     grunt.log.ok('Generated ' + runoutPath);
   });
 
+  grunt.registerTask('generate_java21_list_sequenced', 'Generate a Java 21 List.getFirst/getLast fixture.', function() {
+    var bytes: number[] = [],
+      outPath = 'classes/modern_test/Java21ListSequenced.class',
+      runoutPath = 'classes/modern_test/Java21ListSequenced.runout',
+      expectedOutput = [
+        'a',
+        'b',
+        'true',
+        'nse-first',
+        'nse-last'
+      ].join('\n') + '\n';
+
+    function u1(value: number): void {
+      bytes.push(value & 0xff);
+    }
+
+    function u2(value: number): void {
+      bytes.push((value >>> 8) & 0xff, value & 0xff);
+    }
+
+    function u4(value: number): void {
+      bytes.push((value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff);
+    }
+
+    function utf8(value: string): void {
+      var buf = Buffer.from(value, 'utf8');
+      u1(1);
+      u2(buf.length);
+      for (var i = 0; i < buf.length; i++) {
+        u1(buf[i]);
+      }
+    }
+
+    function cls(nameIndex: number): void {
+      u1(7);
+      u2(nameIndex);
+    }
+
+    function nameAndType(nameIndex: number, descriptorIndex: number): void {
+      u1(12);
+      u2(nameIndex);
+      u2(descriptorIndex);
+    }
+
+    function ref(tag: number, classIndex: number, nameAndTypeIndex: number): void {
+      u1(tag);
+      u2(classIndex);
+      u2(nameAndTypeIndex);
+    }
+
+    function str(stringIndex: number): void {
+      u1(8);
+      u2(stringIndex);
+    }
+
+    function codeAttr(code: number[], maxStack: number, maxLocals: number, exceptions?: number[][]): void {
+      var exceptionTable = exceptions || [];
+      u2(7);
+      u4(12 + code.length + (exceptionTable.length * 8));
+      u2(maxStack);
+      u2(maxLocals);
+      u4(code.length);
+      code.forEach(u1);
+      u2(exceptionTable.length);
+      exceptionTable.forEach(function(entry: number[]): void {
+        u2(entry[0]);
+        u2(entry[1]);
+        u2(entry[2]);
+        u2(entry[3]);
+      });
+      u2(0);
+    }
+
+    function patchU2(code: number[], offset: number, value: number): void {
+      code[offset] = (value >>> 8) & 0xff;
+      code[offset + 1] = value & 0xff;
+    }
+
+    function emitU2Operand(code: number[], opcode: number, index: number): void {
+      code.push(opcode, (index >>> 8) & 0xff, index & 0xff);
+    }
+
+    function emitInvokeInterface(code: number[], methodRef: number): void {
+      code.push(0xb9, (methodRef >>> 8) & 0xff, methodRef & 0xff, 0x01, 0x00);
+    }
+
+    function emitPrintString(code: number[], stringIndex: number): void {
+      emitU2Operand(code, 0xb2, 14);
+      code.push(0x12, stringIndex);
+      emitU2Operand(code, 0xb6, 20);
+    }
+
+    function emitPrintListValue(code: number[], methodRef: number): void {
+      emitU2Operand(code, 0xb2, 14);
+      code.push(0x12, 29);
+      code.push(0x12, 31);
+      emitU2Operand(code, 0xb8, 36);
+      emitInvokeInterface(code, methodRef);
+      emitU2Operand(code, 0xc0, 44);
+      emitU2Operand(code, 0xb6, 20);
+    }
+
+    var mainCode: number[] = [],
+      falseBranchOffset: number,
+      afterBooleanOffset: number,
+      booleanFalse: number,
+      booleanAfter: number,
+      firstTryStart: number,
+      firstTryEnd: number,
+      firstCatchStart: number,
+      firstAfterCatch: number,
+      firstGotoOffset: number,
+      lastTryStart: number,
+      lastTryEnd: number,
+      lastCatchStart: number,
+      lastAfterCatch: number,
+      lastGotoOffset: number;
+
+    emitPrintListValue(mainCode, 40);
+    emitPrintListValue(mainCode, 43);
+
+    mainCode.push(0x12, 46);
+    emitU2Operand(mainCode, 0xb8, 50);
+    mainCode.push(0x4c);
+    emitU2Operand(mainCode, 0xb2, 14);
+    mainCode.push(0x2b);
+    emitInvokeInterface(mainCode, 40);
+    mainCode.push(0x2b);
+    emitInvokeInterface(mainCode, 43);
+    falseBranchOffset = mainCode.length;
+    mainCode.push(0xa6, 0x00, 0x00);
+    mainCode.push(0x04);
+    afterBooleanOffset = mainCode.length;
+    mainCode.push(0xa7, 0x00, 0x00);
+    booleanFalse = mainCode.length;
+    mainCode.push(0x03);
+    booleanAfter = mainCode.length;
+    patchU2(mainCode, falseBranchOffset + 1, booleanFalse - falseBranchOffset);
+    patchU2(mainCode, afterBooleanOffset + 1, booleanAfter - afterBooleanOffset);
+    emitU2Operand(mainCode, 0xb6, 24);
+
+    firstTryStart = mainCode.length;
+    emitU2Operand(mainCode, 0xb8, 53);
+    emitInvokeInterface(mainCode, 40);
+    mainCode.push(0x57);
+    firstTryEnd = mainCode.length;
+    emitPrintString(mainCode, 54);
+    firstGotoOffset = mainCode.length;
+    mainCode.push(0xa7, 0x00, 0x00);
+    firstCatchStart = mainCode.length;
+    mainCode.push(0x4c);
+    emitPrintString(mainCode, 56);
+    firstAfterCatch = mainCode.length;
+    patchU2(mainCode, firstGotoOffset + 1, firstAfterCatch - firstGotoOffset);
+
+    lastTryStart = mainCode.length;
+    emitU2Operand(mainCode, 0xb8, 53);
+    emitInvokeInterface(mainCode, 43);
+    mainCode.push(0x57);
+    lastTryEnd = mainCode.length;
+    emitPrintString(mainCode, 58);
+    lastGotoOffset = mainCode.length;
+    mainCode.push(0xa7, 0x00, 0x00);
+    lastCatchStart = mainCode.length;
+    mainCode.push(0x4c);
+    emitPrintString(mainCode, 60);
+    lastAfterCatch = mainCode.length;
+    patchU2(mainCode, lastGotoOffset + 1, lastAfterCatch - lastGotoOffset);
+
+    mainCode.push(0xb1);
+
+    u4(0xcafebabe);
+    u2(0);
+    u2(65);
+    u2(64);
+    cls(2);
+    utf8('classes/modern_test/Java21ListSequenced');
+    cls(4);
+    utf8('java/lang/Object');
+    utf8('<init>');
+    utf8('()V');
+    utf8('Code');
+    ref(10, 3, 9);
+    nameAndType(5, 6);
+    utf8('main');
+    utf8('([Ljava/lang/String;)V');
+    cls(13);
+    utf8('java/lang/System');
+    ref(9, 12, 15);
+    nameAndType(16, 17);
+    utf8('out');
+    utf8('Ljava/io/PrintStream;');
+    cls(19);
+    utf8('java/io/PrintStream');
+    ref(10, 18, 21);
+    nameAndType(22, 23);
+    utf8('println');
+    utf8('(Ljava/lang/String;)V');
+    ref(10, 18, 25);
+    nameAndType(22, 26);
+    utf8('(Z)V');
+    cls(28);
+    utf8('java/util/List');
+    str(30);
+    utf8('a');
+    str(32);
+    utf8('b');
+    utf8('of');
+    utf8('(Ljava/lang/Object;Ljava/lang/Object;)Ljava/util/List;');
+    nameAndType(33, 34);
+    ref(11, 27, 35);
+    utf8('getFirst');
+    utf8('()Ljava/lang/Object;');
+    nameAndType(37, 38);
+    ref(11, 27, 39);
+    utf8('getLast');
+    nameAndType(41, 38);
+    ref(11, 27, 42);
+    cls(45);
+    utf8('java/lang/String');
+    str(47);
+    utf8('solo');
+    utf8('(Ljava/lang/Object;)Ljava/util/List;');
+    nameAndType(33, 48);
+    ref(11, 27, 49);
+    utf8('()Ljava/util/List;');
+    nameAndType(33, 51);
+    ref(11, 27, 52);
+    str(55);
+    utf8('missed-first');
+    str(57);
+    utf8('nse-first');
+    str(59);
+    utf8('missed-last');
+    str(61);
+    utf8('nse-last');
+    cls(63);
+    utf8('java/util/NoSuchElementException');
+
+    u2(0x0021);
+    u2(1);
+    u2(3);
+    u2(0);
+    u2(0);
+    u2(2);
+    u2(0x0001);
+    u2(5);
+    u2(6);
+    u2(1);
+    codeAttr([0x2a, 0xb7, 0x00, 0x08, 0xb1], 1, 1);
+    u2(0x0009);
+    u2(10);
+    u2(11);
+    u2(1);
+    codeAttr(mainCode, 4, 2, [
+      [firstTryStart, firstTryEnd, firstCatchStart, 62],
+      [lastTryStart, lastTryEnd, lastCatchStart, 62]
+    ]);
+    u2(0);
+
+    grunt.file.write(outPath, Buffer.from(bytes));
+    grunt.log.ok('Generated ' + outPath);
+    grunt.file.write(runoutPath, expectedOutput);
+    grunt.log.ok('Generated ' + runoutPath);
+  });
+
   grunt.registerTask('generate_return_top_modern', 'Generate a fixture where return values are above unused operand-stack entries.', function() {
     var bytes: number[] = [],
       outPath = 'classes/modern_test/ReturnTopOfStackGenerated.class';
@@ -3262,6 +3528,22 @@ function modernJava(grunt: IGrunt) {
           grunt.fail.fatal('Java 21 isVirtual Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
         }
         grunt.log.ok('Java 21 isVirtual output matched expected output.');
+        done();
+      });
+  });
+
+  grunt.registerTask('unit_test_java21_list_sequenced', 'Run the Java 21 List.getFirst/getLast fixture on Doppio.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      mainClass = 'classes.modern_test.Java21ListSequenced',
+      outPath = 'classes/modern_test/Java21ListSequenced.runout';
+    child_process.exec('node --no-deprecation build/release-cli/console/runner.js -classpath . ' + mainClass,
+      function(err?: any, stdout?: Buffer, stderr?: Buffer) {
+        var actual = stdout.toString() + stderr.toString(),
+          expected = fs.readFileSync(outPath, 'utf8');
+        if (err || actual !== expected) {
+          grunt.fail.fatal('Java 21 List.getFirst/getLast Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
+        }
+        grunt.log.ok('Java 21 List.getFirst/getLast output matched expected output.');
         done();
       });
   });
