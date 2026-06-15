@@ -314,6 +314,163 @@ function modernJava(grunt: IGrunt) {
       });
   });
 
+  grunt.registerTask('generate_java19_thread_id', 'Generate a Java 19 Thread.threadId fixture.', function() {
+    var bytes: number[] = [],
+      outPath = 'classes/modern_test/Java19ThreadId.class',
+      runoutPath = 'classes/modern_test/Java19ThreadId.runout',
+      expectedOutput = [
+        'true',
+        'true'
+      ].join('\n') + '\n';
+
+    function u1(value: number): void {
+      bytes.push(value & 0xff);
+    }
+
+    function u2(value: number): void {
+      bytes.push((value >>> 8) & 0xff, value & 0xff);
+    }
+
+    function u4(value: number): void {
+      bytes.push((value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff);
+    }
+
+    function utf8(value: string): void {
+      var buf = Buffer.from(value, 'utf8');
+      u1(1);
+      u2(buf.length);
+      for (var i = 0; i < buf.length; i++) {
+        u1(buf[i]);
+      }
+    }
+
+    function cls(nameIndex: number): void {
+      u1(7);
+      u2(nameIndex);
+    }
+
+    function nameAndType(nameIndex: number, descriptorIndex: number): void {
+      u1(12);
+      u2(nameIndex);
+      u2(descriptorIndex);
+    }
+
+    function ref(tag: number, classIndex: number, nameAndTypeIndex: number): void {
+      u1(tag);
+      u2(classIndex);
+      u2(nameAndTypeIndex);
+    }
+
+    function codeAttr(code: number[], maxStack: number, maxLocals: number): void {
+      u2(7);
+      u4(12 + code.length);
+      u2(maxStack);
+      u2(maxLocals);
+      u4(code.length);
+      code.forEach(u1);
+      u2(0);
+      u2(0);
+    }
+
+    var mainCode = [
+      0xb8, 0x00, 0x1d,
+      0x4c,
+      0x2b,
+      0xb6, 0x00, 0x21,
+      0x09,
+      0x94,
+      0x9e, 0x00, 0x07,
+      0x04,
+      0xa7, 0x00, 0x04,
+      0x03,
+      0x3d,
+      0xb2, 0x00, 0x0e,
+      0x1c,
+      0xb6, 0x00, 0x14,
+      0x2b,
+      0xb6, 0x00, 0x21,
+      0x2b,
+      0xb6, 0x00, 0x25,
+      0x94,
+      0x9a, 0x00, 0x07,
+      0x04,
+      0xa7, 0x00, 0x04,
+      0x03,
+      0x3d,
+      0xb2, 0x00, 0x0e,
+      0x1c,
+      0xb6, 0x00, 0x14,
+      0xb1
+    ];
+
+    u4(0xcafebabe);
+    u2(0);
+    u2(63);
+    u2(40);
+    cls(2);
+    utf8('classes/modern_test/Java19ThreadId');
+    cls(4);
+    utf8('java/lang/Object');
+    utf8('<init>');
+    utf8('()V');
+    utf8('Code');
+    ref(10, 3, 9);
+    nameAndType(5, 6);
+    utf8('main');
+    utf8('([Ljava/lang/String;)V');
+    cls(13);
+    utf8('java/lang/System');
+    ref(9, 12, 15);
+    nameAndType(16, 17);
+    utf8('out');
+    utf8('Ljava/io/PrintStream;');
+    cls(19);
+    utf8('java/io/PrintStream');
+    ref(10, 18, 21);
+    nameAndType(22, 23);
+    utf8('println');
+    utf8('(Z)V');
+    ref(10, 18, 25);
+    nameAndType(22, 26);
+    utf8('(J)V');
+    cls(28);
+    utf8('java/lang/Thread');
+    ref(10, 27, 30);
+    nameAndType(31, 32);
+    utf8('currentThread');
+    utf8('()Ljava/lang/Thread;');
+    ref(10, 27, 34);
+    nameAndType(35, 36);
+    utf8('threadId');
+    utf8('()J');
+    ref(10, 27, 38);
+    nameAndType(39, 36);
+    utf8('getId');
+
+    u2(0x0021);
+    u2(1);
+    u2(3);
+    u2(0);
+    u2(0);
+    u2(2);
+    u2(0x0001);
+    u2(5);
+    u2(6);
+    u2(1);
+    codeAttr([0x2a, 0xb7, 0x00, 0x08, 0xb1], 1, 1);
+    u2(0x0009);
+    u2(10);
+    u2(11);
+    u2(1);
+    codeAttr(mainCode, 4, 3);
+    u2(0);
+
+    grunt.file.write(outPath, Buffer.from(bytes));
+    grunt.log.ok('Generated ' + outPath);
+    grunt.file.write(runoutPath, expectedOutput);
+    grunt.log.ok('Generated ' + runoutPath);
+  });
+
   grunt.registerTask('generate_return_top_modern', 'Generate a fixture where return values are above unused operand-stack entries.', function() {
     var bytes: number[] = [],
       outPath = 'classes/modern_test/ReturnTopOfStackGenerated.class';
@@ -2305,6 +2462,22 @@ function modernJava(grunt: IGrunt) {
           grunt.fail.fatal('Java 18 default charset Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
         }
         grunt.log.ok('Java 18 default charset output matched expected output.');
+        done();
+      });
+  });
+
+  grunt.registerTask('unit_test_java19_thread_id', 'Run the Java 19 Thread.threadId fixture on Doppio.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      mainClass = 'classes.modern_test.Java19ThreadId',
+      outPath = 'classes/modern_test/Java19ThreadId.runout';
+    child_process.exec('node --no-deprecation build/release-cli/console/runner.js -classpath . ' + mainClass,
+      function(err?: any, stdout?: Buffer, stderr?: Buffer) {
+        var actual = stdout.toString() + stderr.toString(),
+          expected = fs.readFileSync(outPath, 'utf8');
+        if (err || actual !== expected) {
+          grunt.fail.fatal('Java 19 threadId Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
+        }
+        grunt.log.ok('Java 19 threadId output matched expected output.');
         done();
       });
   });

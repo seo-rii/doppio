@@ -8,6 +8,7 @@ import * as path from 'path';
 import * as buffer from 'buffer';
 import {JVMThread} from './threading';
 import {ThreadStatus, JVMStatus} from './enums';
+import gLong from './gLong';
 import Heap from './heap';
 import assert from './assert';
 import {JVMOptions} from './interfaces';
@@ -225,9 +226,11 @@ class JVM {
           firstThreadObj = new (threadCdata.getConstructor(null))(null);
           firstThreadObj.$thread = firstThread = this.firstThread = new JVMThread(this, this.threadPool, firstThreadObj);
           firstThreadObj.ref = 1;
+          firstThreadObj['java/lang/Thread/tid'] = gLong.ONE;
           firstThreadObj['java/lang/Thread/priority'] = 5;
           firstThreadObj['java/lang/Thread/name'] = initCarr(this.bsCl, 'main');
           firstThreadObj['java/lang/Thread/blockerLock'] = new ((<ReferenceClassData<JVMTypes.java_lang_Object>> this.bsCl.getResolvedClass('Ljava/lang/Object;')).getConstructor(firstThread))(firstThread);
+          (<any> threadCdata.getConstructor(firstThread))['java/lang/Thread/threadSeqNumber'] = gLong.ONE;
           next();
         }
       });

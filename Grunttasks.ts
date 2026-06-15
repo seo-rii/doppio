@@ -579,7 +579,7 @@ export function setup(grunt: IGrunt) {
       modern_java17: {
         files: [{
           expand: true,
-          src: ['classes/modern_test/Java9*.runout', 'classes/modern_test/Java10*.runout', 'classes/modern_test/Java11*.runout', 'classes/modern_test/Java12*.runout', 'classes/modern_test/Java13*.runout', 'classes/modern_test/Java14*.runout', 'classes/modern_test/Java15*.runout', 'classes/modern_test/Java16*.runout', 'classes/modern_test/Java17*.runout', 'classes/modern_test/Java18UnsignedMultiplyHigh.runout', 'classes/modern_test/Java18DefaultCharset.runout', 'classes/modern_test/SealedViolation.runout', 'classes/modern_test/ReflectParameters.runout']
+          src: ['classes/modern_test/Java9*.runout', 'classes/modern_test/Java10*.runout', 'classes/modern_test/Java11*.runout', 'classes/modern_test/Java12*.runout', 'classes/modern_test/Java13*.runout', 'classes/modern_test/Java14*.runout', 'classes/modern_test/Java15*.runout', 'classes/modern_test/Java16*.runout', 'classes/modern_test/Java17*.runout', 'classes/modern_test/Java18UnsignedMultiplyHigh.runout', 'classes/modern_test/Java18DefaultCharset.runout', 'classes/modern_test/Java19ThreadId.runout', 'classes/modern_test/SealedViolation.runout', 'classes/modern_test/ReflectParameters.runout']
         }]
       }
     },
@@ -651,6 +651,7 @@ export function setup(grunt: IGrunt) {
             'classes/modern_test/Java18DefaultCharset.class',
             'classes/modern_test/Java18UnsignedMultiplyHigh.class',
             'classes/modern_test/Java19ClassFileVersion.class',
+            'classes/modern_test/Java19ThreadId.class',
             'classes/modern_test/Java20ClassFileVersion.class',
             'classes/modern_test/Java21ClassFileVersion.class',
             'classes/modern_test/Java22ClassFileVersion.class',
@@ -1058,9 +1059,11 @@ export function setup(grunt: IGrunt) {
     'generate_modern_classfile_versions',
     'generate_java18_unsigned_multiply_high',
     'generate_java18_default_charset',
+    'generate_java19_thread_id',
     'parse_classfile_modern:classfile_versions',
     'unit_test_java18_unsigned_multiply_high',
     'unit_test_java18_default_charset',
+    'unit_test_java19_thread_id',
     'run_java_modern:java17',
     'run_java_modern:reflect_parameters',
     'lineending:modern_java17',

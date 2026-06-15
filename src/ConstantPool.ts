@@ -708,7 +708,45 @@ export class MethodReference implements IConstantPoolItem {
              this.signature === 'clear()' + syntheticCls.getInternalName() ||
              this.signature === 'flip()' + syntheticCls.getInternalName() ||
              this.signature === 'rewind()' + syntheticCls.getInternalName());
-        if (syntheticCls.getInternalName() === 'Ljava/lang/Thread;' && this.signature === 'onSpinWait()V') {
+        if (syntheticCls.getInternalName() === 'Ljava/lang/Thread;' && this.signature === 'threadId()J') {
+          syntheticMethod = {
+            cls: syntheticCls,
+            slot: -1,
+            accessFlags: new util.Flags(util.FlagMasks.PUBLIC | util.FlagMasks.FINAL | util.FlagMasks.NATIVE),
+            name: this.nameAndTypeInfo.name,
+            rawDescriptor: this.nameAndTypeInfo.descriptor,
+            attrs: [],
+            signature: this.signature,
+            fullSignature: syntheticFullSignature,
+            parameterTypes: [],
+            returnType: 'J',
+            getParamWordSize: function(): number {
+              return 0;
+            },
+            convertArgs: function(thread: JVMThread, params: any[]): any[] {
+              return [thread, params[0]];
+            },
+            getNativeFunction: function(): Function {
+              return function(thread: JVMThread, javaThis: JVMTypes.java_lang_Thread): gLong {
+                var tid = (<any> javaThis)['java/lang/Thread/tid'];
+                return tid !== null && tid !== undefined ? tid : gLong.fromNumber(javaThis.$thread.getRef());
+              };
+            },
+            isSignaturePolymorphic: function(): boolean {
+              return false;
+            },
+            isHidden: function(): boolean {
+              return false;
+            },
+            isCallerSensitive: function(): boolean {
+              return false;
+            },
+            getFullSignature: function(): string {
+              return syntheticCls.getExternalName() + '.' + this.signature;
+            }
+          };
+          method = <Method> syntheticMethod;
+        } else if (syntheticCls.getInternalName() === 'Ljava/lang/Thread;' && this.signature === 'onSpinWait()V') {
           syntheticMethod = {
             cls: syntheticCls,
             slot: -1,
@@ -3841,9 +3879,19 @@ export class MethodReference implements IConstantPoolItem {
 	        this.fullSignature === 'java/util/concurrent/CompletableFuture/failedStage(Ljava/lang/Throwable;)Ljava/util/concurrent/CompletionStage;' ||
 	        resolvedFileSystemsPathNewFileSystem)
 	        && (resolvedFileSystemsPathNewFileSystem || typeof this.jsConstructor[this.fullSignature] !== 'function')) {
-      var syntheticMethod = this.method;
+	      var syntheticMethod = this.method;
 	      this.jsConstructor[this.fullSignature] = this.jsConstructor[this.signature] = function(thread: JVMThread, args: any[]): void {
 	        (<any> thread).stack.push(new NativeStackFrame(syntheticMethod, args));
+	        thread.setStatus(ThreadStatus.RUNNABLE);
+	      };
+	    } else if (this.fullSignature === 'java/lang/Thread/threadId()J' &&
+	        typeof this.jsConstructor.prototype[this.fullSignature] !== 'function') {
+	      var syntheticThreadMethod = this.method;
+	      this.jsConstructor.prototype[this.fullSignature] = this.jsConstructor.prototype[this.signature] = function(thread: JVMThread, args: any[], cb?: (e?: JVMTypes.java_lang_Throwable, rv?: any) => void): void {
+	        if (typeof cb === 'function') {
+	          (<any> thread).stack.push(new InternalStackFrame(cb));
+	        }
+	        (<any> thread).stack.push(new NativeStackFrame(syntheticThreadMethod, [this].concat(args)));
 	        thread.setStatus(ThreadStatus.RUNNABLE);
 	      };
 	    } else if ((this.fullSignature === 'java/util/concurrent/CompletableFuture/completeAsync(Ljava/util/function/Supplier;)Ljava/util/concurrent/CompletableFuture;' ||
