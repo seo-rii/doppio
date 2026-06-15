@@ -110,7 +110,24 @@ function modernJava(grunt: IGrunt) {
 
   grunt.registerTask('generate_java18_unsigned_multiply_high', 'Generate a Java 18 Math.unsignedMultiplyHigh fixture.', function() {
     var bytes: number[] = [],
-      outPath = 'classes/modern_test/Java18UnsignedMultiplyHigh.class';
+      outPath = 'classes/modern_test/Java18UnsignedMultiplyHigh.class',
+      runoutPath = 'classes/modern_test/Java18UnsignedMultiplyHigh.runout',
+      expectedOutput = [
+        '0',
+        '1',
+        '-2',
+        '1',
+        '4611686018427387904',
+        '81662756506307415',
+        '921554509310949085',
+        '0',
+        '1',
+        '-2',
+        '1',
+        '4611686018427387904',
+        '81662756506307415',
+        '921554509310949085'
+      ].join('\n') + '\n';
 
     function u1(value: number): void {
       bytes.push(value & 0xff);
@@ -261,6 +278,8 @@ function modernJava(grunt: IGrunt) {
 
     grunt.file.write(outPath, Buffer.from(bytes));
     grunt.log.ok('Generated ' + outPath);
+    grunt.file.write(runoutPath, expectedOutput);
+    grunt.log.ok('Generated ' + runoutPath);
   });
 
   grunt.registerTask('generate_return_top_modern', 'Generate a fixture where return values are above unused operand-stack entries.', function() {
