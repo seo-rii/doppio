@@ -108,6 +108,161 @@ function modernJava(grunt: IGrunt) {
     });
   });
 
+  grunt.registerTask('generate_java18_unsigned_multiply_high', 'Generate a Java 18 Math.unsignedMultiplyHigh fixture.', function() {
+    var bytes: number[] = [],
+      outPath = 'classes/modern_test/Java18UnsignedMultiplyHigh.class';
+
+    function u1(value: number): void {
+      bytes.push(value & 0xff);
+    }
+
+    function u2(value: number): void {
+      bytes.push((value >>> 8) & 0xff, value & 0xff);
+    }
+
+    function u4(value: number): void {
+      bytes.push((value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff);
+    }
+
+    function utf8(value: string): void {
+      var buf = Buffer.from(value, 'utf8');
+      u1(1);
+      u2(buf.length);
+      for (var i = 0; i < buf.length; i++) {
+        u1(buf[i]);
+      }
+    }
+
+    function cls(nameIndex: number): void {
+      u1(7);
+      u2(nameIndex);
+    }
+
+    function nameAndType(nameIndex: number, descriptorIndex: number): void {
+      u1(12);
+      u2(nameIndex);
+      u2(descriptorIndex);
+    }
+
+    function ref(tag: number, classIndex: number, nameAndTypeIndex: number): void {
+      u1(tag);
+      u2(classIndex);
+      u2(nameAndTypeIndex);
+    }
+
+    function longConst(high: number, low: number): void {
+      u1(5);
+      u4(high);
+      u4(low);
+    }
+
+    function emitPrint(code: number[], methodRef: number, leftIndex: number, rightIndex: number): void {
+      code.push(0xb2, 0x00, 0x0e);
+      code.push(0x14, (leftIndex >>> 8) & 0xff, leftIndex & 0xff);
+      code.push(0x14, (rightIndex >>> 8) & 0xff, rightIndex & 0xff);
+      code.push(0xb8, (methodRef >>> 8) & 0xff, methodRef & 0xff);
+      code.push(0xb6, 0x00, 0x14);
+    }
+
+    function codeAttr(code: number[], maxStack: number, maxLocals: number): void {
+      u2(7);
+      u4(12 + code.length);
+      u2(maxStack);
+      u2(maxLocals);
+      u4(code.length);
+      code.forEach(u1);
+      u2(0);
+      u2(0);
+    }
+
+    var mainCode: number[] = [],
+      cases: number[][] = [
+        [33, 35],
+        [37, 37],
+        [39, 39],
+        [41, 43],
+        [41, 41],
+        [45, 47],
+        [49, 51]
+      ];
+
+    cases.forEach(function(spec: number[]): void {
+      emitPrint(mainCode, 26, spec[0], spec[1]);
+    });
+    cases.forEach(function(spec: number[]): void {
+      emitPrint(mainCode, 32, spec[0], spec[1]);
+    });
+    mainCode.push(0xb1);
+
+    u4(0xcafebabe);
+    u2(0);
+    u2(62);
+    u2(53);
+    cls(2);
+    utf8('classes/modern_test/Java18UnsignedMultiplyHigh');
+    cls(4);
+    utf8('java/lang/Object');
+    utf8('<init>');
+    utf8('()V');
+    utf8('Code');
+    ref(10, 3, 9);
+    nameAndType(5, 6);
+    utf8('main');
+    utf8('([Ljava/lang/String;)V');
+    cls(13);
+    utf8('java/lang/System');
+    ref(9, 12, 15);
+    nameAndType(16, 17);
+    utf8('out');
+    utf8('Ljava/io/PrintStream;');
+    cls(19);
+    utf8('java/io/PrintStream');
+    ref(10, 18, 21);
+    nameAndType(22, 23);
+    utf8('println');
+    utf8('(J)V');
+    cls(25);
+    utf8('java/lang/Math');
+    ref(10, 24, 27);
+    nameAndType(28, 29);
+    utf8('unsignedMultiplyHigh');
+    utf8('(JJ)J');
+    cls(31);
+    utf8('java/lang/StrictMath');
+    ref(10, 30, 27);
+    longConst(0, 0);
+    longConst(0, 123);
+    longConst(1, 0);
+    longConst(-1, -1);
+    longConst(-2147483648, 0);
+    longConst(0, 2);
+    longConst(0x01234567, 0x89abcdef);
+    longConst(-16909061, -84281096);
+    longConst(-287445237, -2112454933);
+    longConst(229956191, 1241035896);
+
+    u2(0x0021);
+    u2(1);
+    u2(3);
+    u2(0);
+    u2(0);
+    u2(2);
+    u2(0x0001);
+    u2(5);
+    u2(6);
+    u2(1);
+    codeAttr([0x2a, 0xb7, 0x00, 0x08, 0xb1], 1, 1);
+    u2(0x0009);
+    u2(10);
+    u2(11);
+    u2(1);
+    codeAttr(mainCode, 5, 1);
+    u2(0);
+
+    grunt.file.write(outPath, Buffer.from(bytes));
+    grunt.log.ok('Generated ' + outPath);
+  });
+
   grunt.registerTask('generate_return_top_modern', 'Generate a fixture where return values are above unused operand-stack entries.', function() {
     var bytes: number[] = [],
       outPath = 'classes/modern_test/ReturnTopOfStackGenerated.class';
@@ -2067,6 +2222,22 @@ function modernJava(grunt: IGrunt) {
           grunt.fail.fatal('multi-release Doppio output does not match native JVM.\nDoppio:\n' + actual + '\nJava:\n' + expected);
         }
         grunt.log.ok('multi-release JAR output matched native JVM.');
+        done();
+      });
+  });
+
+  grunt.registerTask('unit_test_java18_unsigned_multiply_high', 'Run the Java 18 unsigned multiply-high fixture on Doppio.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      mainClass = 'classes.modern_test.Java18UnsignedMultiplyHigh',
+      outPath = 'classes/modern_test/Java18UnsignedMultiplyHigh.runout';
+    child_process.exec('node --no-deprecation build/release-cli/console/runner.js -classpath . ' + mainClass,
+      function(err?: any, stdout?: Buffer, stderr?: Buffer) {
+        var actual = stdout.toString() + stderr.toString(),
+          expected = fs.readFileSync(outPath, 'utf8');
+        if (err || actual !== expected) {
+          grunt.fail.fatal('Java 18 unsignedMultiplyHigh Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
+        }
+        grunt.log.ok('Java 18 unsignedMultiplyHigh output matched expected output.');
         done();
       });
   });

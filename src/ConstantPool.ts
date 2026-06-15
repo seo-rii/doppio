@@ -782,7 +782,8 @@ export class MethodReference implements IConstantPoolItem {
         } else if ((syntheticCls.getInternalName() === 'Ljava/lang/Math;' ||
             syntheticCls.getInternalName() === 'Ljava/lang/StrictMath;') &&
             (this.signature === 'multiplyFull(II)J' ||
-             this.signature === 'multiplyHigh(JJ)J')) {
+             this.signature === 'multiplyHigh(JJ)J' ||
+             this.signature === 'unsignedMultiplyHigh(JJ)J')) {
           var mathMultiplySignature = this.signature;
           syntheticMethod = {
             cls: syntheticCls,
@@ -830,6 +831,9 @@ export class MethodReference implements IConstantPoolItem {
                 highProduct = gLong.fromBits(
                   (resultParts[4] | (resultParts[5] << 16)) | 0,
                   (resultParts[6] | (resultParts[7] << 16)) | 0);
+                if (mathMultiplySignature === 'unsignedMultiplyHigh(JJ)J') {
+                  return highProduct;
+                }
                 if ((<gLong> left).isNegative()) {
                   highProduct = highProduct.subtract(<gLong> right);
                 }
@@ -3815,6 +3819,8 @@ export class MethodReference implements IConstantPoolItem {
 	        this.fullSignature === 'java/lang/StrictMath/multiplyFull(II)J' ||
 	        this.fullSignature === 'java/lang/Math/multiplyHigh(JJ)J' ||
 	        this.fullSignature === 'java/lang/StrictMath/multiplyHigh(JJ)J' ||
+	        this.fullSignature === 'java/lang/Math/unsignedMultiplyHigh(JJ)J' ||
+	        this.fullSignature === 'java/lang/StrictMath/unsignedMultiplyHigh(JJ)J' ||
 	        this.fullSignature === 'java/lang/Math/floorDiv(JI)J' ||
 	        this.fullSignature === 'java/lang/StrictMath/floorDiv(JI)J' ||
 	        this.fullSignature === 'java/lang/Math/floorMod(JI)I' ||
