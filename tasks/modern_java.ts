@@ -282,6 +282,38 @@ function modernJava(grunt: IGrunt) {
     grunt.log.ok('Generated ' + runoutPath);
   });
 
+  grunt.registerTask('generate_java18_default_charset', 'Generate a Java 18 UTF-8 default charset fixture.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      sourcePath = 'classes/modern_test/Java18DefaultCharset.java',
+      classPath = 'classes/modern_test/Java18DefaultCharset.class',
+      runoutPath = 'classes/modern_test/Java18DefaultCharset.runout',
+      expectedOutput = [
+        'UTF-8',
+        'UTF-8',
+        '2',
+        'e9:20ac',
+        '[-61, -87, -30, -126, -84]',
+        '2:e9:20ac',
+        '[-61, -87, -30, -126, -84]'
+      ].join('\n') + '\n';
+
+    grunt.config.requires('build.javac');
+    child_process.exec(shellEscape(grunt.config('build.javac')) + ' -J-Dfile.encoding=UTF8 --release 17 -d . ' + shellEscape(sourcePath),
+      function(err?: any, stdout?: Buffer, stderr?: Buffer) {
+        if (err) {
+          grunt.fail.fatal('Error compiling Java 18 default charset fixture: ' + err + '\n' + stdout.toString() + stderr.toString());
+        }
+        var classData = fs.readFileSync(classPath);
+        classData[6] = 0;
+        classData[7] = 62;
+        fs.writeFileSync(classPath, classData);
+        fs.writeFileSync(runoutPath, expectedOutput);
+        grunt.log.ok('Generated ' + classPath);
+        grunt.log.ok('Generated ' + runoutPath);
+        done();
+      });
+  });
+
   grunt.registerTask('generate_return_top_modern', 'Generate a fixture where return values are above unused operand-stack entries.', function() {
     var bytes: number[] = [],
       outPath = 'classes/modern_test/ReturnTopOfStackGenerated.class';
@@ -2257,6 +2289,22 @@ function modernJava(grunt: IGrunt) {
           grunt.fail.fatal('Java 18 unsignedMultiplyHigh Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
         }
         grunt.log.ok('Java 18 unsignedMultiplyHigh output matched expected output.');
+        done();
+      });
+  });
+
+  grunt.registerTask('unit_test_java18_default_charset', 'Run the Java 18 default charset fixture on Doppio.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      mainClass = 'classes.modern_test.Java18DefaultCharset',
+      outPath = 'classes/modern_test/Java18DefaultCharset.runout';
+    child_process.exec('node --no-deprecation build/release-cli/console/runner.js -classpath . ' + mainClass,
+      function(err?: any, stdout?: Buffer, stderr?: Buffer) {
+        var actual = stdout.toString() + stderr.toString(),
+          expected = fs.readFileSync(outPath, 'utf8');
+        if (err || actual !== expected) {
+          grunt.fail.fatal('Java 18 default charset Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
+        }
+        grunt.log.ok('Java 18 default charset output matched expected output.');
         done();
       });
   });
