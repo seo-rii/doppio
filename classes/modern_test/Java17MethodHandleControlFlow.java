@@ -67,5 +67,19 @@ public class Java17MethodHandleControlFlow {
     MethodHandle text = MethodHandles.whileLoop(seed, keepAppending, appendDot);
     System.out.println((String) text.invokeExact("x", 3));
     System.out.println(text.type().toMethodDescriptorString());
+
+    MethodHandle doCounted = MethodHandles.doWhileLoop(zero, increment, below);
+    System.out.println((int) doCounted.invokeExact(5));
+    System.out.println(doCounted.type().toMethodDescriptorString());
+
+    MethodHandle doDefaultStart = MethodHandles.doWhileLoop(null, increment, below);
+    System.out.println((int) doDefaultStart.invokeExact(3));
+    System.out.println(doDefaultStart.type().toMethodDescriptorString());
+    System.out.println((int) doCounted.invokeExact(0));
+
+    MethodHandle doText = MethodHandles.doWhileLoop(seed, appendDot, keepAppending);
+    System.out.println((String) doText.invokeExact("x", 3));
+    System.out.println((String) doText.invokeExact("x", 0));
+    System.out.println(doText.type().toMethodDescriptorString());
   }
 }

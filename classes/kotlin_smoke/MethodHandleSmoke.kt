@@ -378,6 +378,12 @@ fun methodHandleSummary(): String {
     MethodHandle::class.java,
     MethodHandle::class.java
   )
+  val doWhileLoopMethod = MethodHandles::class.java.getMethod(
+    "doWhileLoop",
+    MethodHandle::class.java,
+    MethodHandle::class.java,
+    MethodHandle::class.java
+  )
   val zeroInt = zeroMethod.invoke(null, intClass) as MethodHandle
   val zeroString = zeroMethod.invoke(null, stringClass) as MethodHandle
   val emptyString = emptyMethod.invoke(
@@ -501,6 +507,16 @@ fun methodHandleSummary(): String {
     whileDefaultInt.invokeWithArguments(3).toString(),
     whileText.invokeWithArguments("x", 3).toString()
   ).joinToString("~")
+  val doWhileInt = doWhileLoopMethod.invoke(null, loopZero, loopIncrement, loopBelow) as MethodHandle
+  val doWhileDefaultInt = doWhileLoopMethod.invoke(null, null, loopIncrement, loopBelow) as MethodHandle
+  val doWhileText = doWhileLoopMethod.invoke(null, loopSeed, loopAppendDot, loopKeepAppending) as MethodHandle
+  val doWhileLoops = listOf(
+    doWhileInt.invokeWithArguments(5).toString(),
+    doWhileDefaultInt.invokeWithArguments(3).toString(),
+    doWhileInt.invokeWithArguments(0).toString(),
+    doWhileText.invokeWithArguments("x", 3).toString(),
+    doWhileText.invokeWithArguments("x", 0).toString()
+  ).joinToString("~")
   val tryTarget = lookup.findStatic(
     ownerClass,
     "tryTarget",
@@ -582,6 +598,7 @@ fun methodHandleSummary(): String {
     foldedAtOne.invokeWithArguments("fold", 6).toString(),
     spreadVarargs,
     whileLoops,
+    doWhileLoops,
     tryFinallyValues
   ).joinToString("|")
   val combinatorTypes = listOf(
@@ -619,6 +636,9 @@ fun methodHandleSummary(): String {
     whileInt,
     whileDefaultInt,
     whileText,
+    doWhileInt,
+    doWhileDefaultInt,
+    doWhileText,
     tried,
     triedVoid
   ).joinToString("|") { it.type().toMethodDescriptorString() }

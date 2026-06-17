@@ -251,13 +251,24 @@ public final class DoppioMethodHandles {
 
   public static MethodHandle whileLoop(MethodHandle init, MethodHandle pred, MethodHandle body)
       throws NoSuchMethodException, IllegalAccessException {
+    return stateLoop(init, pred, body, false);
+  }
+
+  public static MethodHandle doWhileLoop(MethodHandle init, MethodHandle body, MethodHandle pred)
+      throws NoSuchMethodException, IllegalAccessException {
+    return stateLoop(init, pred, body, true);
+  }
+
+  private static MethodHandle stateLoop(
+      MethodHandle init, MethodHandle pred, MethodHandle body, boolean bodyFirst)
+      throws NoSuchMethodException, IllegalAccessException {
     Objects.requireNonNull(pred);
     Objects.requireNonNull(body);
 
     MethodType bodyType = body.type();
     Class<?> returnType = bodyType.returnType();
     if (returnType == void.class) {
-      throw new IllegalArgumentException("void whileLoop body is not supported by this overlay");
+      throw new IllegalArgumentException("void state-loop body is not supported by this overlay");
     }
     if (bodyType.parameterCount() == 0 || bodyType.parameterType(0) != returnType) {
       throw new IllegalArgumentException("body must accept and return the loop state type");
@@ -294,9 +305,10 @@ public final class DoppioMethodHandles {
       }
     }
 
+    String targetName = bodyFirst ? "doWhileLoopTarget" : "whileLoopTarget";
     MethodHandle adapter = MethodHandles.publicLookup().findStatic(
         DoppioMethodHandles.class,
-        "whileLoopTarget",
+        targetName,
         MethodType.methodType(
             Object.class,
             MethodHandle.class,
@@ -427,19 +439,53 @@ public final class DoppioMethodHandles {
       state = init.invokeWithArguments(initArgs);
     }
 
-    Object[] predArgs = new Object[predArgumentCount];
-    Object[] bodyArgs = new Object[1 + args.length];
-    System.arraycopy(args, 0, bodyArgs, 1, args.length);
     while (true) {
-      for (int i = 0; i < predArgumentCount; i++) {
-        predArgs[i] = i == 0 ? state : args[i - 1];
-      }
-      if (!((Boolean) pred.invokeWithArguments(predArgs)).booleanValue()) {
+      if (!invokeLoopPredicate(pred, predArgumentCount, state, args)) {
         return state;
       }
-      bodyArgs[0] = state;
-      state = body.invokeWithArguments(bodyArgs);
+      state = invokeLoopBody(body, state, args);
     }
+  }
+
+  public static Object doWhileLoopTarget(
+      MethodHandle init,
+      MethodHandle pred,
+      MethodHandle body,
+      Class<?> returnType,
+      int initArgumentCount,
+      int predArgumentCount,
+      Object[] args) throws Throwable {
+    Object state;
+    if (init == null) {
+      state = defaultValue(returnType);
+    } else {
+      Object[] initArgs = new Object[initArgumentCount];
+      System.arraycopy(args, 0, initArgs, 0, initArgumentCount);
+      state = init.invokeWithArguments(initArgs);
+    }
+
+    while (true) {
+      state = invokeLoopBody(body, state, args);
+      if (!invokeLoopPredicate(pred, predArgumentCount, state, args)) {
+        return state;
+      }
+    }
+  }
+
+  private static boolean invokeLoopPredicate(
+      MethodHandle pred, int predArgumentCount, Object state, Object[] args) throws Throwable {
+    Object[] predArgs = new Object[predArgumentCount];
+    for (int i = 0; i < predArgumentCount; i++) {
+      predArgs[i] = i == 0 ? state : args[i - 1];
+    }
+    return ((Boolean) pred.invokeWithArguments(predArgs)).booleanValue();
+  }
+
+  private static Object invokeLoopBody(MethodHandle body, Object state, Object[] args) throws Throwable {
+    Object[] bodyArgs = new Object[1 + args.length];
+    System.arraycopy(args, 0, bodyArgs, 1, args.length);
+    bodyArgs[0] = state;
+    return body.invokeWithArguments(bodyArgs);
   }
 
   private static void checkArrayClass(Class<?> arrayClass) {
