@@ -37,6 +37,25 @@ class MethodHandleOwner(@JvmField var text: String) {
       "$first/$second/$third/$fourth"
 
     @JvmStatic
+    fun loopZero(limit: Int): Int = 0
+
+    @JvmStatic
+    fun loopBelow(value: Int, limit: Int): Boolean = value < limit
+
+    @JvmStatic
+    fun loopIncrement(value: Int, limit: Int): Int = value + 1
+
+    @JvmStatic
+    fun loopSeed(prefix: String, limit: Int): String = prefix
+
+    @JvmStatic
+    fun loopKeepAppending(value: String, prefix: String, limit: Int): Boolean =
+      value.length < prefix.length + limit
+
+    @JvmStatic
+    fun loopAppendDot(value: String, prefix: String, limit: Int): String = "$value."
+
+    @JvmStatic
     fun longLabel(value: Long): String = "long:$value"
 
     @JvmStatic
@@ -353,6 +372,12 @@ fun methodHandleSummary(): String {
     MethodHandle::class.java,
     MethodHandle::class.java
   )
+  val whileLoopMethod = MethodHandles::class.java.getMethod(
+    "whileLoop",
+    MethodHandle::class.java,
+    MethodHandle::class.java,
+    MethodHandle::class.java
+  )
   val zeroInt = zeroMethod.invoke(null, intClass) as MethodHandle
   val zeroString = zeroMethod.invoke(null, stringClass) as MethodHandle
   val emptyString = emptyMethod.invoke(
@@ -438,6 +463,44 @@ fun methodHandleSummary(): String {
     fixedArray.invokeWithArguments("fixed", arrayOf("l", "m")).toString(),
     spreadInvoker.invokeWithArguments(staticJoin, "spreadInvoker", arrayOf(Integer.valueOf(10))).toString()
   ).joinToString("~")
+  val loopZero = lookup.findStatic(
+    ownerClass,
+    "loopZero",
+    MethodType.methodType(intClass, intClass)
+  )
+  val loopBelow = lookup.findStatic(
+    ownerClass,
+    "loopBelow",
+    MethodType.methodType(java.lang.Boolean.TYPE, intClass, intClass)
+  )
+  val loopIncrement = lookup.findStatic(
+    ownerClass,
+    "loopIncrement",
+    MethodType.methodType(intClass, intClass, intClass)
+  )
+  val whileInt = whileLoopMethod.invoke(null, loopZero, loopBelow, loopIncrement) as MethodHandle
+  val whileDefaultInt = whileLoopMethod.invoke(null, null, loopBelow, loopIncrement) as MethodHandle
+  val loopSeed = lookup.findStatic(
+    ownerClass,
+    "loopSeed",
+    MethodType.methodType(stringClass, stringClass, intClass)
+  )
+  val loopKeepAppending = lookup.findStatic(
+    ownerClass,
+    "loopKeepAppending",
+    MethodType.methodType(java.lang.Boolean.TYPE, stringClass, stringClass, intClass)
+  )
+  val loopAppendDot = lookup.findStatic(
+    ownerClass,
+    "loopAppendDot",
+    MethodType.methodType(stringClass, stringClass, stringClass, intClass)
+  )
+  val whileText = whileLoopMethod.invoke(null, loopSeed, loopKeepAppending, loopAppendDot) as MethodHandle
+  val whileLoops = listOf(
+    whileInt.invokeWithArguments(5).toString(),
+    whileDefaultInt.invokeWithArguments(3).toString(),
+    whileText.invokeWithArguments("x", 3).toString()
+  ).joinToString("~")
   val tryTarget = lookup.findStatic(
     ownerClass,
     "tryTarget",
@@ -518,6 +581,7 @@ fun methodHandleSummary(): String {
     matchedDrop.invokeWithArguments(2, "matched").toString(),
     foldedAtOne.invokeWithArguments("fold", 6).toString(),
     spreadVarargs,
+    whileLoops,
     tryFinallyValues
   ).joinToString("|")
   val combinatorTypes = listOf(
@@ -552,6 +616,9 @@ fun methodHandleSummary(): String {
     spreadArrayAt,
     spreadArrayMiddle,
     spreadInvoker,
+    whileInt,
+    whileDefaultInt,
+    whileText,
     tried,
     triedVoid
   ).joinToString("|") { it.type().toMethodDescriptorString() }

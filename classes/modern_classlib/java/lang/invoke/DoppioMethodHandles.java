@@ -249,6 +249,76 @@ public final class DoppioMethodHandles {
     return MethodHandles.permuteArguments(spreadMoved, desiredType, restoreReorder);
   }
 
+  public static MethodHandle whileLoop(MethodHandle init, MethodHandle pred, MethodHandle body)
+      throws NoSuchMethodException, IllegalAccessException {
+    Objects.requireNonNull(pred);
+    Objects.requireNonNull(body);
+
+    MethodType bodyType = body.type();
+    Class<?> returnType = bodyType.returnType();
+    if (returnType == void.class) {
+      throw new IllegalArgumentException("void whileLoop body is not supported by this overlay");
+    }
+    if (bodyType.parameterCount() == 0 || bodyType.parameterType(0) != returnType) {
+      throw new IllegalArgumentException("body must accept and return the loop state type");
+    }
+
+    List<Class<?>> externalTypes = bodyType.parameterList().subList(1, bodyType.parameterCount());
+    int initArgumentCount = 0;
+    if (init != null) {
+      MethodType initType = init.type();
+      if (initType.returnType() != returnType) {
+        throw new IllegalArgumentException("init return type does not match body return type");
+      }
+      if (initType.parameterCount() > externalTypes.size()) {
+        throw new IllegalArgumentException("init has too many parameters");
+      }
+      for (int i = 0; i < initType.parameterCount(); i++) {
+        if (initType.parameterType(i) != externalTypes.get(i)) {
+          throw new IllegalArgumentException("init parameter types do not match loop parameters");
+        }
+      }
+      initArgumentCount = initType.parameterCount();
+    }
+
+    MethodType predType = pred.type();
+    if (predType.returnType() != boolean.class) {
+      throw new IllegalArgumentException("predicate must return boolean");
+    }
+    if (predType.parameterCount() > bodyType.parameterCount()) {
+      throw new IllegalArgumentException("predicate has too many parameters");
+    }
+    for (int i = 0; i < predType.parameterCount(); i++) {
+      if (predType.parameterType(i) != bodyType.parameterType(i)) {
+        throw new IllegalArgumentException("predicate parameter types do not match loop state");
+      }
+    }
+
+    MethodHandle adapter = MethodHandles.publicLookup().findStatic(
+        DoppioMethodHandles.class,
+        "whileLoopTarget",
+        MethodType.methodType(
+            Object.class,
+            MethodHandle.class,
+            MethodHandle.class,
+            MethodHandle.class,
+            Class.class,
+            int.class,
+            int.class,
+            Object[].class));
+    return MethodHandles.insertArguments(
+            adapter,
+            0,
+            init,
+            pred,
+            body,
+            returnType,
+            Integer.valueOf(initArgumentCount),
+            Integer.valueOf(predType.parameterCount()))
+        .asCollector(Object[].class, externalTypes.size())
+        .asType(MethodType.methodType(returnType, externalTypes));
+  }
+
   public static MethodHandle tryFinally(MethodHandle target, MethodHandle cleanup)
       throws NoSuchMethodException, IllegalAccessException {
     Objects.requireNonNull(target);
@@ -314,24 +384,7 @@ public final class DoppioMethodHandles {
       Class<?> returnType,
       int cleanupArgumentCount,
       Object[] args) throws Throwable {
-    Object result = null;
-    if (returnType == boolean.class) {
-      result = Boolean.FALSE;
-    } else if (returnType == byte.class) {
-      result = Byte.valueOf((byte) 0);
-    } else if (returnType == char.class) {
-      result = Character.valueOf((char) 0);
-    } else if (returnType == short.class) {
-      result = Short.valueOf((short) 0);
-    } else if (returnType == int.class) {
-      result = Integer.valueOf(0);
-    } else if (returnType == long.class) {
-      result = Long.valueOf(0L);
-    } else if (returnType == float.class) {
-      result = Float.valueOf(0f);
-    } else if (returnType == double.class) {
-      result = Double.valueOf(0d);
-    }
+    Object result = defaultValue(returnType);
 
     Throwable throwable = null;
     try {
@@ -357,10 +410,70 @@ public final class DoppioMethodHandles {
     return result;
   }
 
+  public static Object whileLoopTarget(
+      MethodHandle init,
+      MethodHandle pred,
+      MethodHandle body,
+      Class<?> returnType,
+      int initArgumentCount,
+      int predArgumentCount,
+      Object[] args) throws Throwable {
+    Object state;
+    if (init == null) {
+      state = defaultValue(returnType);
+    } else {
+      Object[] initArgs = new Object[initArgumentCount];
+      System.arraycopy(args, 0, initArgs, 0, initArgumentCount);
+      state = init.invokeWithArguments(initArgs);
+    }
+
+    Object[] predArgs = new Object[predArgumentCount];
+    Object[] bodyArgs = new Object[1 + args.length];
+    System.arraycopy(args, 0, bodyArgs, 1, args.length);
+    while (true) {
+      for (int i = 0; i < predArgumentCount; i++) {
+        predArgs[i] = i == 0 ? state : args[i - 1];
+      }
+      if (!((Boolean) pred.invokeWithArguments(predArgs)).booleanValue()) {
+        return state;
+      }
+      bodyArgs[0] = state;
+      state = body.invokeWithArguments(bodyArgs);
+    }
+  }
+
   private static void checkArrayClass(Class<?> arrayClass) {
     Objects.requireNonNull(arrayClass);
     if (!arrayClass.isArray()) {
       throw new IllegalArgumentException("not an array class");
     }
+  }
+
+  private static Object defaultValue(Class<?> type) {
+    if (type == boolean.class) {
+      return Boolean.FALSE;
+    }
+    if (type == byte.class) {
+      return Byte.valueOf((byte) 0);
+    }
+    if (type == char.class) {
+      return Character.valueOf((char) 0);
+    }
+    if (type == short.class) {
+      return Short.valueOf((short) 0);
+    }
+    if (type == int.class) {
+      return Integer.valueOf(0);
+    }
+    if (type == long.class) {
+      return Long.valueOf(0L);
+    }
+    if (type == float.class) {
+      return Float.valueOf(0f);
+    }
+    if (type == double.class) {
+      return Double.valueOf(0d);
+    }
+    return null;
   }
 }

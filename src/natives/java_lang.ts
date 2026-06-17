@@ -1873,6 +1873,19 @@ export default function (): any {
       );
     }
 
+    public static 'whileLoop(Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;'(
+      thread: JVMThread,
+      init: JVMTypes.java_lang_invoke_MethodHandle,
+      pred: JVMTypes.java_lang_invoke_MethodHandle,
+      body: JVMTypes.java_lang_invoke_MethodHandle
+    ): void {
+      java_lang_invoke_MethodHandles.callDoppioHelper(
+        thread,
+        'java/lang/invoke/DoppioMethodHandles/whileLoop(Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;',
+        [init, pred, body]
+      );
+    }
+
     public static 'tryFinally(Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;'(
       thread: JVMThread,
       target: JVMTypes.java_lang_invoke_MethodHandle,
