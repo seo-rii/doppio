@@ -782,20 +782,15 @@ export class JVMThread implements Thread {
    * Get the classloader for the current frame.
    */
   public getLoader(): ClassLoader {
-    let loader = this.stack[this.stack.length - 1].getLoader();
-    if (loader) {
-      return loader;
-    } else {
-      // Crawl stack until we find one.
-      let len = this.stack.length;
-      for (let i = 2; i <= len; i++) {
-        loader = this.stack[len - i].getLoader();
+    for (let i = this.stack.length - 1; i >= 0; i--) {
+      if (this.stack[i].type !== StackFrameType.INTERNAL) {
+        let loader = this.stack[i].getLoader();
         if (loader) {
           return loader;
         }
       }
-      throw new Error(`Unable to find loader.`);
     }
+    return this.bsCl;
   }
 
   /**
@@ -1239,7 +1234,8 @@ export class JVMThread implements Thread {
    * @param msg The message to include with the exception.
    */
   public throwNewException<T extends JVMTypes.java_lang_Throwable>(clsName: string, msg: string) {
-    var cls = <ReferenceClassData<T>> this.getLoader().getInitializedClass(this, clsName),
+    let loader = this.getLoader();
+    var cls = <ReferenceClassData<T>> loader.getInitializedClass(this, clsName),
       throwException = () => {
         var eCons = cls.getConstructor(this),
           e = new eCons(this);
@@ -1259,7 +1255,7 @@ export class JVMThread implements Thread {
     } else {
       // Initialization required.
       this.setStatus(ThreadStatus.ASYNC_WAITING);
-      this.getLoader().initializeClass(this, clsName, (cdata: ReferenceClassData<T>) => {
+      loader.initializeClass(this, clsName, (cdata: ReferenceClassData<T>) => {
         if (cdata != null) {
           cls = cdata;
           throwException();

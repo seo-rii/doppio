@@ -60,8 +60,9 @@ still not claimed.
    broaden `invokedynamic` linkage.
 6. Design and implement hard runtime surfaces separately: `java.lang.invoke`,
    reflection metadata, records, modules, and virtual-thread-facing APIs. Start
-   `java.lang.invoke` work from `docs/design/java-lang-invoke.md`, and track the
-   Kotlin compiler bring-up in `docs/design/kotlin-compiler.md`.
+   `java.lang.invoke` work from `docs/design/java-lang-invoke.md`, track the
+   Kotlin compiler bring-up in `docs/design/kotlin-compiler.md`, and track the
+   Scala compiler bring-up in `docs/design/scala-compiler.md`.
 
 ## Test Strategy
 
@@ -75,6 +76,9 @@ still not claimed.
   then a CI-backed one-file Kotlin compile-and-run through
   `ci/kotlin_smoke.sh`, while each discovered VM/class-library gap is reduced
   to a focused Java fixture before being counted as supported.
+- Scala compiler bring-up follows the same shape: run `scala.tools.nsc.Main`
+  under Doppio, compile a small Scala 2.13 source set, then compare the
+  generated program output on the host JVM and Doppio.
 
 ## Kotlin Compiler Bring-Up
 
@@ -203,6 +207,21 @@ still not claimed.
 - Next blocker: broaden the Kotlin compiler smoke to more source constructs,
   reduce remaining throughput variance, and compare full-classpath elapsed time.
   Current notes live in `docs/design/kotlin-compiler.md`.
+
+## Scala Compiler Bring-Up
+
+- Target: Scala compiler 2.13.18.
+- Current Doppio state: `ci/scala_smoke.sh` downloads `scala-compiler`,
+  `scala-library`, `scala-reflect`, `java-diff-utils`, and JLine from Maven
+  Central, runs `scala.tools.nsc.Main` under Doppio, and compiles
+  `classes/scala_smoke/*.scala`; the generated `Hello` class now prints the
+  expected output on both the host JVM and Doppio.
+- The initial fixture covers a small Scala 2.13 source slice with a sealed
+  trait, case objects, a generic case class, trait default method, anonymous
+  class, closures, collection pipelines, `Option`, `Either`, pattern matching,
+  and string interpolation, then runs the generated `Hello` class on both the
+  host JVM and Doppio.
+- Current notes live in `docs/design/scala-compiler.md`.
 
 ## Current Test Targets
 

@@ -820,7 +820,7 @@ if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.signature}'](t,a
         argMaker += `args${suffix}.push(${pops.slice().reverse().join(',')});`;
       }
       return argMaker + `var obj${suffix}=${(paramSize+1)===pops.length?pops[paramSize]:"f.opStack.pop()"};f.pc=${pc};
-if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.fullSignature}'](t, args${suffix});f.returnToThreadLoop=true;${onSuccess}}else{${onError}}`;
+	if(!u.isNull(t,f,obj${suffix})){var target${suffix}=obj${suffix}['${methodReference.fullSignature}'];if(typeof target${suffix}!=='function'&&methodReference.jsConstructor!==null){target${suffix}=methodReference.jsConstructor.prototype[methodReference.fullSignature];}target${suffix}.call(obj${suffix},t,args${suffix});f.returnToThreadLoop=true;${onSuccess}}else{${onError}}`;
     }};
   }
 

@@ -1627,8 +1627,12 @@ export class Opcodes {
           args = store.slice(curr - paramSize, curr);
           break;
       }
-      assert(typeof (<any> obj)[methodReference.fullSignature] === 'function', `Resolved method ${methodReference.fullSignature} isn't defined?!`, thread);
-      (<any> obj)[methodReference.fullSignature](thread, args);
+      var target = (<any> obj)[methodReference.fullSignature];
+      if (typeof target !== 'function' && methodReference.jsConstructor != null) {
+        target = methodReference.jsConstructor.prototype[methodReference.fullSignature];
+      }
+      assert(typeof target === 'function', `Resolved method ${methodReference.fullSignature} isn't defined?!`, thread);
+      target.call(obj, thread, args);
       frame.returnToThreadLoop = true;
     }
   }

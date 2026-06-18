@@ -227,6 +227,20 @@ export default function (): any {
       });
     }
 
+    public static 'pwrite0(Ljava/io/FileDescriptor;JIJ)I'(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor, addr: Long, len: number, position: Long): void {
+      const fd = fdObj["java/io/FileDescriptor/fd"];
+      const heap = thread.getJVM().getHeap();
+      const data = heap.get_buffer(addr.toNumber(), len);
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      fs.write(fd, data, 0, len, position.toNumber(), (err, numBytes) => {
+        if (err) {
+          throwNodeError(thread, err);
+        } else {
+          thread.asyncReturn(numBytes);
+        }
+      });
+    }
+
   }
 
   class DirFd {
