@@ -259,6 +259,96 @@ public final class DoppioMethodHandles {
     return stateLoop(init, pred, body, true);
   }
 
+  public static MethodHandle countedLoop(
+      MethodHandle iterations, MethodHandle init, MethodHandle body)
+      throws NoSuchMethodException, IllegalAccessException {
+    Objects.requireNonNull(iterations);
+    return countedLoop(null, iterations, init, body, false);
+  }
+
+  public static MethodHandle countedLoop(
+      MethodHandle start, MethodHandle end, MethodHandle init, MethodHandle body)
+      throws NoSuchMethodException, IllegalAccessException {
+    Objects.requireNonNull(start);
+    Objects.requireNonNull(end);
+    Objects.requireNonNull(init);
+    return countedLoop(start, end, init, body, true);
+  }
+
+  private static MethodHandle countedLoop(
+      MethodHandle start,
+      MethodHandle end,
+      MethodHandle init,
+      MethodHandle body,
+      boolean explicitStart)
+      throws NoSuchMethodException, IllegalAccessException {
+    Objects.requireNonNull(body);
+
+    MethodType bodyType = body.type();
+    Class<?> returnType = bodyType.returnType();
+    if (returnType == void.class) {
+      throw new IllegalArgumentException("void counted-loop body is not supported by this overlay");
+    }
+    if (bodyType.parameterCount() < 2 ||
+        bodyType.parameterType(0) != returnType ||
+        bodyType.parameterType(1) != int.class) {
+      throw new IllegalArgumentException("body must accept state and int counter parameters");
+    }
+
+    List<Class<?>> externalTypes = bodyType.parameterList().subList(2, bodyType.parameterCount());
+    int startArgumentCount = 0;
+    if (explicitStart) {
+      MethodType startType = start.type();
+      if (startType.returnType() != int.class) {
+        throw new IllegalArgumentException("start must return int");
+      }
+      startArgumentCount = checkedPrefixArgumentCount(startType, externalTypes, "start");
+    }
+
+    MethodType endType = end.type();
+    if (endType.returnType() != int.class) {
+      throw new IllegalArgumentException("end must return int");
+    }
+    int endArgumentCount = checkedPrefixArgumentCount(endType, externalTypes, "end");
+
+    int initArgumentCount = 0;
+    if (init != null) {
+      MethodType initType = init.type();
+      if (initType.returnType() != returnType) {
+        throw new IllegalArgumentException("init return type does not match body return type");
+      }
+      initArgumentCount = checkedPrefixArgumentCount(initType, externalTypes, "init");
+    }
+
+    MethodHandle adapter = MethodHandles.publicLookup().findStatic(
+        DoppioMethodHandles.class,
+        "countedLoopTarget",
+        MethodType.methodType(
+            Object.class,
+            MethodHandle.class,
+            MethodHandle.class,
+            MethodHandle.class,
+            MethodHandle.class,
+            Class.class,
+            int.class,
+            int.class,
+            int.class,
+            Object[].class));
+    return MethodHandles.insertArguments(
+            adapter,
+            0,
+            start,
+            end,
+            init,
+            body,
+            returnType,
+            Integer.valueOf(startArgumentCount),
+            Integer.valueOf(endArgumentCount),
+            Integer.valueOf(initArgumentCount))
+        .asCollector(Object[].class, externalTypes.size())
+        .asType(MethodType.methodType(returnType, externalTypes));
+  }
+
   private static MethodHandle stateLoop(
       MethodHandle init, MethodHandle pred, MethodHandle body, boolean bodyFirst)
       throws NoSuchMethodException, IllegalAccessException {
@@ -281,15 +371,7 @@ public final class DoppioMethodHandles {
       if (initType.returnType() != returnType) {
         throw new IllegalArgumentException("init return type does not match body return type");
       }
-      if (initType.parameterCount() > externalTypes.size()) {
-        throw new IllegalArgumentException("init has too many parameters");
-      }
-      for (int i = 0; i < initType.parameterCount(); i++) {
-        if (initType.parameterType(i) != externalTypes.get(i)) {
-          throw new IllegalArgumentException("init parameter types do not match loop parameters");
-        }
-      }
-      initArgumentCount = initType.parameterCount();
+      initArgumentCount = checkedPrefixArgumentCount(initType, externalTypes, "init");
     }
 
     MethodType predType = pred.type();
@@ -472,6 +554,46 @@ public final class DoppioMethodHandles {
     }
   }
 
+  public static Object countedLoopTarget(
+      MethodHandle start,
+      MethodHandle end,
+      MethodHandle init,
+      MethodHandle body,
+      Class<?> returnType,
+      int startArgumentCount,
+      int endArgumentCount,
+      int initArgumentCount,
+      Object[] args) throws Throwable {
+    int startValue = 0;
+    if (start != null) {
+      Object[] startArgs = new Object[startArgumentCount];
+      System.arraycopy(args, 0, startArgs, 0, startArgumentCount);
+      startValue = ((Integer) start.invokeWithArguments(startArgs)).intValue();
+    }
+
+    Object[] endArgs = new Object[endArgumentCount];
+    System.arraycopy(args, 0, endArgs, 0, endArgumentCount);
+    int endValue = ((Integer) end.invokeWithArguments(endArgs)).intValue();
+
+    Object state;
+    if (init == null) {
+      state = defaultValue(returnType);
+    } else {
+      Object[] initArgs = new Object[initArgumentCount];
+      System.arraycopy(args, 0, initArgs, 0, initArgumentCount);
+      state = init.invokeWithArguments(initArgs);
+    }
+
+    Object[] bodyArgs = new Object[2 + args.length];
+    System.arraycopy(args, 0, bodyArgs, 2, args.length);
+    for (int index = startValue; index < endValue; index++) {
+      bodyArgs[0] = state;
+      bodyArgs[1] = Integer.valueOf(index);
+      state = body.invokeWithArguments(bodyArgs);
+    }
+    return state;
+  }
+
   private static boolean invokeLoopPredicate(
       MethodHandle pred, int predArgumentCount, Object state, Object[] args) throws Throwable {
     Object[] predArgs = new Object[predArgumentCount];
@@ -493,6 +615,19 @@ public final class DoppioMethodHandles {
     if (!arrayClass.isArray()) {
       throw new IllegalArgumentException("not an array class");
     }
+  }
+
+  private static int checkedPrefixArgumentCount(
+      MethodType type, List<Class<?>> externalTypes, String role) {
+    if (type.parameterCount() > externalTypes.size()) {
+      throw new IllegalArgumentException(role + " has too many parameters");
+    }
+    for (int i = 0; i < type.parameterCount(); i++) {
+      if (type.parameterType(i) != externalTypes.get(i)) {
+        throw new IllegalArgumentException(role + " parameter types do not match loop parameters");
+      }
+    }
+    return type.parameterCount();
   }
 
   private static Object defaultValue(Class<?> type) {

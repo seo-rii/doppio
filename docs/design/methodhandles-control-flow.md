@@ -20,8 +20,8 @@ The control-flow family is split into small implementation slices:
   non-`void` state variable shape, but body executes before the first predicate
   check.
 - `countedLoop(iterations, init, body)` and
-  `countedLoop(start, end, init, body)`: later slices. They add an `int` loop
-  counter state and extra validation around external parameter lists.
+  `countedLoop(start, end, init, body)`: third slice. They support a selected
+  non-`void` state variable shape with an `int` counter passed after the state.
 - `iteratedLoop(iterator, init, body)`: later slice. It needs iterator
   acquisition, `hasNext`/`next` sequencing, and element argument flow.
 - `loop(MethodHandle[]...)`: later slice. This is the general form behind the
@@ -80,16 +80,47 @@ selected `whileLoop` slice. This makes the first `doWhileLoop` support narrow
 but useful for compiler-generated state adapters that always carry one
 non-`void` state value.
 
+## Initial `countedLoop` Implementation
+
+The selected counted-loop slices use body shape `(V, int, A...)V`, with state
+first and the current counter second:
+
+```text
+int iterations(A...)
+V init(A...)
+V body(V, int, A...)
+V countedLoop(A... args) {
+  V v = init(args...);
+  for (int i = 0; i < iterations(args...); i++) {
+    v = body(v, i, args...);
+  }
+  return v;
+}
+```
+
+The four-handle overload replaces the implicit zero start with separate
+`start(A...)` and `end(A...)` handles. A start value greater than or equal to
+the end value executes no iterations. The three-handle overload accepts
+`init == null` and initializes state to the Java default value; the four-handle
+overload requires all four handles, matching Java 17 null validation.
+
+The selected implementation requires the body to carry the complete external
+argument list. `start`, `end`/`iterations`, and `init` may accept matching
+prefixes of that list. General parameter-list inference beyond this shape is
+not claimed.
+
 ## Runtime Structure
 
 - Class loading injects a public native
   `MethodHandles.whileLoop(MethodHandle, MethodHandle, MethodHandle)` overlay
   and a public native
   `MethodHandles.doWhileLoop(MethodHandle, MethodHandle, MethodHandle)` overlay
-  into the Java 8 `MethodHandles` class.
+  plus both public `MethodHandles.countedLoop` overloads into the Java 8
+  `MethodHandles` class.
 - The native entry point delegates to
   `java.lang.invoke.DoppioMethodHandles.whileLoop` or
-  `java.lang.invoke.DoppioMethodHandles.doWhileLoop`.
+  `java.lang.invoke.DoppioMethodHandles.doWhileLoop`, or to the corresponding
+  `DoppioMethodHandles.countedLoop` overload.
 - `DoppioMethodHandles` validates the selected shape, binds the loop parts into
   a generic target, collects external arguments into `Object[]`, and adapts the
   generic target back to `(A...)V`.
@@ -102,10 +133,15 @@ non-`void` state value.
   defaulting to zero, and `String` state loop with two external arguments for
   both `whileLoop` and `doWhileLoop`. The `doWhileLoop` coverage also checks
   that body executes once when the initial predicate state would have failed.
+  Counted-loop coverage includes zero-based iteration with explicit and null
+  initializers, zero iterations, reference state, explicit start/end ranges,
+  and reversed empty ranges.
 - Kotlin smoke coverage in `classes/kotlin_smoke/MethodHandleSmoke.kt`:
   reflective discovery of `MethodHandles.whileLoop` and
-  `MethodHandles.doWhileLoop`, integer state invocation, null initializer
-  invocation, body-first `doWhileLoop` behavior, and descriptor checks.
+  `MethodHandles.doWhileLoop` plus both `MethodHandles.countedLoop` overloads,
+  integer and reference state invocation, null initializer invocation,
+  body-first `doWhileLoop` behavior, explicit counted ranges, and descriptor
+  checks.
 
 ## Remaining Gaps
 
@@ -113,7 +149,7 @@ non-`void` state value.
 - Predicate and initializer validation is prefix-based but not a complete
   implementation of the generic `loop` effectively-identical parameter-list
   rules.
-- Broader `whileLoop`/`doWhileLoop` parity, `countedLoop`, `iteratedLoop`,
+- Broader `whileLoop`/`doWhileLoop`/`countedLoop` parity, `iteratedLoop`,
   generic `loop`, and `tableSwitch` still need separate fixtures and
   implementation slices.
 - The selected `whileLoop` and `doWhileLoop` slices now share validation and

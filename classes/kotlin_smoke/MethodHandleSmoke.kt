@@ -46,7 +46,16 @@ class MethodHandleOwner(@JvmField var text: String) {
     fun loopIncrement(value: Int, limit: Int): Int = value + 1
 
     @JvmStatic
+    fun loopCount(limit: Int): Int = limit
+
+    @JvmStatic
+    fun loopAddIndex(value: Int, index: Int, limit: Int): Int = value + index
+
+    @JvmStatic
     fun loopSeed(prefix: String, limit: Int): String = prefix
+
+    @JvmStatic
+    fun loopCountText(prefix: String, limit: Int): Int = limit
 
     @JvmStatic
     fun loopKeepAppending(value: String, prefix: String, limit: Int): Boolean =
@@ -54,6 +63,22 @@ class MethodHandleOwner(@JvmField var text: String) {
 
     @JvmStatic
     fun loopAppendDot(value: String, prefix: String, limit: Int): String = "$value."
+
+    @JvmStatic
+    fun loopAppendIndex(value: String, index: Int, prefix: String, limit: Int): String = value + index
+
+    @JvmStatic
+    fun loopRangeStart(prefix: String, start: Int, end: Int): Int = start
+
+    @JvmStatic
+    fun loopRangeEnd(prefix: String, start: Int, end: Int): Int = end
+
+    @JvmStatic
+    fun loopRangeSeed(prefix: String, start: Int, end: Int): String = prefix
+
+    @JvmStatic
+    fun loopRangeAppendIndex(value: String, index: Int, prefix: String, start: Int, end: Int): String =
+      value + index
 
     @JvmStatic
     fun longLabel(value: Long): String = "long:$value"
@@ -384,6 +409,19 @@ fun methodHandleSummary(): String {
     MethodHandle::class.java,
     MethodHandle::class.java
   )
+  val countedLoopMethod = MethodHandles::class.java.getMethod(
+    "countedLoop",
+    MethodHandle::class.java,
+    MethodHandle::class.java,
+    MethodHandle::class.java
+  )
+  val countedRangeLoopMethod = MethodHandles::class.java.getMethod(
+    "countedLoop",
+    MethodHandle::class.java,
+    MethodHandle::class.java,
+    MethodHandle::class.java,
+    MethodHandle::class.java
+  )
   val zeroInt = zeroMethod.invoke(null, intClass) as MethodHandle
   val zeroString = zeroMethod.invoke(null, stringClass) as MethodHandle
   val emptyString = emptyMethod.invoke(
@@ -517,6 +555,64 @@ fun methodHandleSummary(): String {
     doWhileText.invokeWithArguments("x", 3).toString(),
     doWhileText.invokeWithArguments("x", 0).toString()
   ).joinToString("~")
+  val loopCount = lookup.findStatic(
+    ownerClass,
+    "loopCount",
+    MethodType.methodType(intClass, intClass)
+  )
+  val loopAddIndex = lookup.findStatic(
+    ownerClass,
+    "loopAddIndex",
+    MethodType.methodType(intClass, intClass, intClass, intClass)
+  )
+  val countedInt = countedLoopMethod.invoke(null, loopCount, loopZero, loopAddIndex) as MethodHandle
+  val countedDefaultInt = countedLoopMethod.invoke(null, loopCount, null, loopAddIndex) as MethodHandle
+  val loopCountText = lookup.findStatic(
+    ownerClass,
+    "loopCountText",
+    MethodType.methodType(intClass, stringClass, intClass)
+  )
+  val loopAppendIndex = lookup.findStatic(
+    ownerClass,
+    "loopAppendIndex",
+    MethodType.methodType(stringClass, stringClass, intClass, stringClass, intClass)
+  )
+  val countedText = countedLoopMethod.invoke(null, loopCountText, loopSeed, loopAppendIndex) as MethodHandle
+  val loopRangeStart = lookup.findStatic(
+    ownerClass,
+    "loopRangeStart",
+    MethodType.methodType(intClass, stringClass, intClass, intClass)
+  )
+  val loopRangeEnd = lookup.findStatic(
+    ownerClass,
+    "loopRangeEnd",
+    MethodType.methodType(intClass, stringClass, intClass, intClass)
+  )
+  val loopRangeSeed = lookup.findStatic(
+    ownerClass,
+    "loopRangeSeed",
+    MethodType.methodType(stringClass, stringClass, intClass, intClass)
+  )
+  val loopRangeAppendIndex = lookup.findStatic(
+    ownerClass,
+    "loopRangeAppendIndex",
+    MethodType.methodType(stringClass, stringClass, intClass, stringClass, intClass, intClass)
+  )
+  val countedRange = countedRangeLoopMethod.invoke(
+    null,
+    loopRangeStart,
+    loopRangeEnd,
+    loopRangeSeed,
+    loopRangeAppendIndex
+  ) as MethodHandle
+  val countedLoops = listOf(
+    countedInt.invokeWithArguments(5).toString(),
+    countedDefaultInt.invokeWithArguments(4).toString(),
+    countedInt.invokeWithArguments(0).toString(),
+    countedText.invokeWithArguments("x", 3).toString(),
+    countedRange.invokeWithArguments("x", 2, 5).toString(),
+    countedRange.invokeWithArguments("x", 5, 2).toString()
+  ).joinToString("~")
   val tryTarget = lookup.findStatic(
     ownerClass,
     "tryTarget",
@@ -599,6 +695,7 @@ fun methodHandleSummary(): String {
     spreadVarargs,
     whileLoops,
     doWhileLoops,
+    countedLoops,
     tryFinallyValues
   ).joinToString("|")
   val combinatorTypes = listOf(
@@ -639,6 +736,10 @@ fun methodHandleSummary(): String {
     doWhileInt,
     doWhileDefaultInt,
     doWhileText,
+    countedInt,
+    countedDefaultInt,
+    countedText,
+    countedRange,
     tried,
     triedVoid
   ).joinToString("|") { it.type().toMethodDescriptorString() }

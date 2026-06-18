@@ -17,8 +17,20 @@ public class Java17MethodHandleControlFlow {
     return value + 1;
   }
 
+  public static int count(int limit) {
+    return limit;
+  }
+
+  public static int addIndex(int value, int index, int limit) {
+    return value + index;
+  }
+
   public static String seed(String prefix, int limit) {
     return prefix;
+  }
+
+  public static int countText(String prefix, int limit) {
+    return limit;
   }
 
   public static boolean keepAppending(String value, String prefix, int limit) {
@@ -27,6 +39,26 @@ public class Java17MethodHandleControlFlow {
 
   public static String appendDot(String value, String prefix, int limit) {
     return value + ".";
+  }
+
+  public static String appendIndex(String value, int index, String prefix, int limit) {
+    return value + index;
+  }
+
+  public static int rangeStart(String prefix, int start, int end) {
+    return start;
+  }
+
+  public static int rangeEnd(String prefix, int start, int end) {
+    return end;
+  }
+
+  public static String rangeSeed(String prefix, int start, int end) {
+    return prefix;
+  }
+
+  public static String rangeAppendIndex(String value, int index, String prefix, int start, int end) {
+    return value + index;
   }
 
   public static void main(String[] args) throws Throwable {
@@ -81,5 +113,55 @@ public class Java17MethodHandleControlFlow {
     System.out.println((String) doText.invokeExact("x", 3));
     System.out.println((String) doText.invokeExact("x", 0));
     System.out.println(doText.type().toMethodDescriptorString());
+
+    MethodHandle count = lookup.findStatic(
+        Java17MethodHandleControlFlow.class,
+        "count",
+        MethodType.methodType(int.class, int.class));
+    MethodHandle addIndex = lookup.findStatic(
+        Java17MethodHandleControlFlow.class,
+        "addIndex",
+        MethodType.methodType(int.class, int.class, int.class, int.class));
+    MethodHandle countedSum = MethodHandles.countedLoop(count, zero, addIndex);
+    System.out.println((int) countedSum.invokeExact(5));
+    System.out.println(countedSum.type().toMethodDescriptorString());
+
+    MethodHandle countedDefaultStart = MethodHandles.countedLoop(count, null, addIndex);
+    System.out.println((int) countedDefaultStart.invokeExact(4));
+    System.out.println(countedDefaultStart.type().toMethodDescriptorString());
+    System.out.println((int) countedSum.invokeExact(0));
+
+    MethodHandle countText = lookup.findStatic(
+        Java17MethodHandleControlFlow.class,
+        "countText",
+        MethodType.methodType(int.class, String.class, int.class));
+    MethodHandle appendIndex = lookup.findStatic(
+        Java17MethodHandleControlFlow.class,
+        "appendIndex",
+        MethodType.methodType(String.class, String.class, int.class, String.class, int.class));
+    MethodHandle countedText = MethodHandles.countedLoop(countText, seed, appendIndex);
+    System.out.println((String) countedText.invokeExact("x", 3));
+    System.out.println(countedText.type().toMethodDescriptorString());
+
+    MethodHandle rangeStart = lookup.findStatic(
+        Java17MethodHandleControlFlow.class,
+        "rangeStart",
+        MethodType.methodType(int.class, String.class, int.class, int.class));
+    MethodHandle rangeEnd = lookup.findStatic(
+        Java17MethodHandleControlFlow.class,
+        "rangeEnd",
+        MethodType.methodType(int.class, String.class, int.class, int.class));
+    MethodHandle rangeSeed = lookup.findStatic(
+        Java17MethodHandleControlFlow.class,
+        "rangeSeed",
+        MethodType.methodType(String.class, String.class, int.class, int.class));
+    MethodHandle rangeAppendIndex = lookup.findStatic(
+        Java17MethodHandleControlFlow.class,
+        "rangeAppendIndex",
+        MethodType.methodType(String.class, String.class, int.class, String.class, int.class, int.class));
+    MethodHandle countedRange = MethodHandles.countedLoop(rangeStart, rangeEnd, rangeSeed, rangeAppendIndex);
+    System.out.println((String) countedRange.invokeExact("x", 2, 5));
+    System.out.println((String) countedRange.invokeExact("x", 5, 2));
+    System.out.println(countedRange.type().toMethodDescriptorString());
   }
 }

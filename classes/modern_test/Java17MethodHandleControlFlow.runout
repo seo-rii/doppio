@@ -12,3 +12,13 @@ x...
 x...
 x.
 (Ljava/lang/String;I)Ljava/lang/String;
+10
+(I)I
+6
+(I)I
+0
+x012
+(Ljava/lang/String;I)Ljava/lang/String;
+x234
+x
+(Ljava/lang/String;II)Ljava/lang/String;

@@ -1899,6 +1899,33 @@ export default function (): any {
       );
     }
 
+    public static 'countedLoop(Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;'(
+      thread: JVMThread,
+      iterations: JVMTypes.java_lang_invoke_MethodHandle,
+      init: JVMTypes.java_lang_invoke_MethodHandle,
+      body: JVMTypes.java_lang_invoke_MethodHandle
+    ): void {
+      java_lang_invoke_MethodHandles.callDoppioHelper(
+        thread,
+        'java/lang/invoke/DoppioMethodHandles/countedLoop(Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;',
+        [iterations, init, body]
+      );
+    }
+
+    public static 'countedLoop(Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;'(
+      thread: JVMThread,
+      start: JVMTypes.java_lang_invoke_MethodHandle,
+      end: JVMTypes.java_lang_invoke_MethodHandle,
+      init: JVMTypes.java_lang_invoke_MethodHandle,
+      body: JVMTypes.java_lang_invoke_MethodHandle
+    ): void {
+      java_lang_invoke_MethodHandles.callDoppioHelper(
+        thread,
+        'java/lang/invoke/DoppioMethodHandles/countedLoop(Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;',
+        [start, end, init, body]
+      );
+    }
+
     public static 'tryFinally(Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;'(
       thread: JVMThread,
       target: JVMTypes.java_lang_invoke_MethodHandle,
