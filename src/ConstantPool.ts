@@ -746,6 +746,58 @@ export class MethodReference implements IConstantPoolItem {
             }
           };
           method = <Method> syntheticMethod;
+        } else if (syntheticCls.isSubclass(thread.getBsCl().getResolvedClass('Ljava/lang/ClassLoader;')) &&
+            this.signature === 'resources(Ljava/lang/String;)Ljava/util/stream/Stream;') {
+          syntheticMethod = {
+            cls: syntheticCls,
+            slot: -1,
+            accessFlags: new util.Flags(util.FlagMasks.PUBLIC | util.FlagMasks.NATIVE),
+            name: this.nameAndTypeInfo.name,
+            rawDescriptor: this.nameAndTypeInfo.descriptor,
+            attrs: [],
+            signature: this.signature,
+            fullSignature: syntheticFullSignature,
+            parameterTypes: ['Ljava/lang/String;'],
+            returnType: 'Ljava/util/stream/Stream;',
+            getParamWordSize: function(): number {
+              return 1;
+            },
+            convertArgs: function(thread: JVMThread, params: any[]): any[] {
+              return [thread].concat(params);
+            },
+            getNativeFunction: function(): Function {
+              return function(thread: JVMThread, javaThis: JVMTypes.java_lang_Object, name: JVMTypes.java_lang_String): any {
+                thread.setStatus(ThreadStatus.ASYNC_WAITING);
+                thread.getBsCl().initializeClass(thread, 'Ljava/lang/ClassLoader$DoppioResources;', (resourcesCls: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+                  if (resourcesCls === null) {
+                    return;
+                  }
+                  var resourcesCons = <any> resourcesCls.getConstructor(thread);
+                  resourcesCons['java/lang/ClassLoader$DoppioResources/stream(Ljava/lang/ClassLoader;Ljava/lang/String;)Ljava/util/stream/Stream;'](thread, [javaThis, name], (e?: JVMTypes.java_lang_Throwable, rv?: JVMTypes.java_lang_Object) => {
+                    if (e) {
+                      thread.throwException(e);
+                    } else {
+                      thread.asyncReturn(rv);
+                    }
+                  });
+                });
+                return null;
+              };
+            },
+            isSignaturePolymorphic: function(): boolean {
+              return false;
+            },
+            isHidden: function(): boolean {
+              return false;
+            },
+            isCallerSensitive: function(): boolean {
+              return false;
+            },
+            getFullSignature: function(): string {
+              return syntheticCls.getExternalName() + '.' + this.signature;
+            }
+          };
+          method = <Method> syntheticMethod;
         } else if (syntheticCls.getInternalName() === 'Ljava/lang/Thread;' && this.signature === 'isVirtual()Z') {
           syntheticMethod = {
             cls: syntheticCls,
@@ -4022,6 +4074,17 @@ export class MethodReference implements IConstantPoolItem {
 	          (<any> thread).stack.push(new InternalStackFrame(cb));
 	        }
 	        (<any> thread).stack.push(new NativeStackFrame(syntheticPatternMethod, [this].concat(args)));
+	        thread.setStatus(ThreadStatus.RUNNABLE);
+	      };
+	    } else if (this.signature === 'resources(Ljava/lang/String;)Ljava/util/stream/Stream;' &&
+	        this.method.cls.isSubclass(thread.getBsCl().getResolvedClass('Ljava/lang/ClassLoader;')) &&
+	        typeof this.jsConstructor.prototype[this.fullSignature] !== 'function') {
+	      var syntheticClassLoaderMethod = this.method;
+	      this.jsConstructor.prototype[this.fullSignature] = this.jsConstructor.prototype[this.signature] = function(thread: JVMThread, args: any[], cb?: (e?: JVMTypes.java_lang_Throwable, rv?: any) => void): void {
+	        if (typeof cb === 'function') {
+	          (<any> thread).stack.push(new InternalStackFrame(cb));
+	        }
+	        (<any> thread).stack.push(new NativeStackFrame(syntheticClassLoaderMethod, [this].concat(args)));
 	        thread.setStatus(ThreadStatus.RUNNABLE);
 	      };
 	    } else if ((this.fullSignature === 'java/util/regex/Matcher/results()Ljava/util/stream/Stream;' ||
