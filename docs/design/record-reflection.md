@@ -7,10 +7,9 @@ Java 16 records need two separate support layers in Doppio:
 2. Reflection support through modern `java.lang.Class` and
    `java.lang.reflect.RecordComponent` APIs.
 
-The first layer is partially implemented. A narrow synthetic bridge now exposes
-`Class.isRecord()`, but the rest of the second layer is not safe to add as a
-small class-library shim because Doppio still boots from a Java 8-era
-`java.lang.Class`, which does not declare `getRecordComponents()`.
+The first layer is partially implemented. Narrow synthetic bridges now expose
+`Class.isRecord()` and the basic `Class.getRecordComponents()` shape while
+keeping Doppio's Java 8-era `java.lang.Class` implementation in place.
 
 ## Current State
 
@@ -23,6 +22,11 @@ small class-library shim because Doppio still boots from a Java 8-era
   compiler-generated record `toString`, `equals`, and `hashCode`.
 - `Class.isRecord()` is exposed through a synthetic native bridge backed by the
   parsed `Record` attribute.
+- `Class.getRecordComponents()` is exposed through a native overlay on
+  `java.lang.Class` and returns a minimal
+  `java.lang.reflect.RecordComponent` shim for record classes. The first slice
+  covers component name, type, accessor method, declaring record, null for
+  non-record classes, and empty arrays for empty records.
 
 ## Required API Surface
 
@@ -37,13 +41,13 @@ small class-library shim because Doppio still boots from a Java 8-era
 
 ## Implementation Plan
 
-1. Add a failing Java 16 fixture for `getRecordComponents()` once the
-   class-library patch strategy is chosen.
-2. Decide how Doppio will extend existing boot classes such as
-   `java.lang.Class` without replacing the Java 8 implementation with an
-   incomplete stub.
-3. Create a `RecordComponent` class-library shim only after `Class` can return
-   instances of it.
+1. Keep the Java 16 `getRecordComponents()` fixture focused on the basic
+   component shape and deterministic accessor output.
+2. Extend existing boot classes such as `java.lang.Class` with narrow native
+   overlays instead of replacing the Java 8 implementation with an incomplete
+   stub.
+3. Keep the `RecordComponent` class-library shim minimal until the next
+   metadata slice needs generic or annotation state.
 4. Store full record component metadata from the `Record` attribute, not only
    names.
 5. Link each component to its accessor `Method` by name and descriptor.

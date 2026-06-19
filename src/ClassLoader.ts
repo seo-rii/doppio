@@ -103,34 +103,45 @@ function methodsInfo(data: Buffer, cpEnd: number): { countOffset: number; count:
   return { countOffset: countOffset, count: methodsCount, endOffset: offset };
 }
 
-function addJavaLangClassGetModule(data: Buffer): Buffer {
+function addJavaLangClassModernOverlays(data: Buffer): Buffer {
   var cp = constantPoolEnd(data),
-    nameIndex = cp.count,
-    descriptorIndex = cp.count + 1,
+    getModuleNameIndex = cp.count,
+    getModuleDescriptorIndex = cp.count + 1,
+    getRecordComponentsNameIndex = cp.count + 2,
+    getRecordComponentsDescriptorIndex = cp.count + 3,
     extraConstants = Buffer.concat([
       utf8Constant('getModule'),
-      utf8Constant('()Ljava/lang/Module;')
+      utf8Constant('()Ljava/lang/Module;'),
+      utf8Constant('getRecordComponents'),
+      utf8Constant('()[Ljava/lang/reflect/RecordComponent;')
     ]),
     withConstants = Buffer.concat([
       data.slice(0, 8),
-      u2(cp.count + 2),
+      u2(cp.count + 4),
       data.slice(10, cp.offset),
       extraConstants,
       data.slice(cp.offset)
     ]),
     methods = methodsInfo(withConstants, cp.offset + extraConstants.length),
-    method = Buffer.concat([
+    getModuleMethod = Buffer.concat([
       u2(0x0101),
-      u2(nameIndex),
-      u2(descriptorIndex),
+      u2(getModuleNameIndex),
+      u2(getModuleDescriptorIndex),
+      u2(0)
+    ]),
+    getRecordComponentsMethod = Buffer.concat([
+      u2(0x0101),
+      u2(getRecordComponentsNameIndex),
+      u2(getRecordComponentsDescriptorIndex),
       u2(0)
     ]);
 
   return Buffer.concat([
     withConstants.slice(0, methods.countOffset),
-    u2(methods.count + 1),
+    u2(methods.count + 2),
     withConstants.slice(methods.countOffset + 2, methods.endOffset),
-    method,
+    getModuleMethod,
+    getRecordComponentsMethod,
     withConstants.slice(methods.endOffset)
   ]);
 }
@@ -676,7 +687,7 @@ export class BootstrapClassLoader extends ClassLoader {
     }, (pItem?: IClasspathItem) => {
       if (pItem) {
         if (typeStr === 'Ljava/lang/Class;') {
-          clsData = addJavaLangClassGetModule(clsData);
+          clsData = addJavaLangClassModernOverlays(clsData);
         }
         if (typeStr === 'Ljava/lang/invoke/MethodHandles;') {
           clsData = addJavaLangInvokeMethodHandlesModernOverlays(clsData);

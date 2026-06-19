@@ -306,6 +306,59 @@ export default function (): any {
       return null;
     }
 
+    public static 'getRecordComponents()[Ljava/lang/reflect/RecordComponent;'(thread: JVMThread, javaThis: JVMTypes.java_lang_Class): any {
+      var clsData = javaThis.$cls;
+      if (!(clsData instanceof ReferenceClassData) || !clsData.isRecord()) {
+        return null;
+      }
+      var cls = <ReferenceClassData<any>> clsData;
+
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      thread.getBsCl().initializeClass(thread, 'Ljava/lang/reflect/RecordComponent;', (componentCls: ReferenceClassData<any>) => {
+        if (componentCls === null) {
+          thread.throwNewException('Ljava/lang/NoClassDefFoundError;', 'java/lang/reflect/RecordComponent');
+          return;
+        }
+        var components = cls.getRecordComponents(),
+          componentCons = componentCls.getConstructor(thread),
+          rv = util.newArray<any>(thread, thread.getBsCl(), '[Ljava/lang/reflect/RecordComponent;', components.length),
+          i = 0,
+          finishComponent = (index: number, typeObj: JVMTypes.java_lang_Class, accessor: JVMTypes.java_lang_reflect_Method) => {
+            var component = components[index],
+              componentObj = new componentCons(thread);
+            componentObj['java/lang/reflect/RecordComponent/name'] = util.initString(thread.getBsCl(), component.name);
+            componentObj['java/lang/reflect/RecordComponent/type'] = typeObj;
+            componentObj['java/lang/reflect/RecordComponent/accessor'] = accessor;
+            componentObj['java/lang/reflect/RecordComponent/declaringRecord'] = javaThis;
+            rv.array[index] = componentObj;
+          },
+          nextComponent = () => {
+            if (i >= components.length) {
+              thread.asyncReturn(rv);
+              return;
+            }
+            var index = i++,
+              component = components[index],
+              accessor = cls.getMethod(component.name + '()' + component.descriptor);
+            cls.getLoader().resolveClass(thread, component.descriptor, (typeData: ClassData) => {
+              if (typeData === null || accessor === null) {
+                thread.throwNewException('Ljava/lang/NoSuchMethodError;', component.name + '()' + component.descriptor);
+                return;
+              }
+              accessor.reflector(thread, (accessorObj: JVMTypes.java_lang_reflect_Method) => {
+                if (accessorObj === null) {
+                  thread.throwNewException('Ljava/lang/NoSuchMethodError;', component.name + '()' + component.descriptor);
+                  return;
+                }
+                finishComponent(index, typeData.getClassObject(thread), accessorObj);
+                nextComponent();
+              });
+            });
+          };
+        nextComponent();
+      });
+    }
+
     /**
      * Returns RuntimeVisibleAnnotations defined on the class.
      */

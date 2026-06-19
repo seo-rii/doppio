@@ -1047,6 +1047,8 @@ export function setup(grunt: IGrunt) {
      'unit_test']);
   var modernJavaTestTasks = [
     'release-cli',
+    'javac_modern_classlib',
+    'generate_doppio_jar',
     'javac_modern_multirelease_jar',
     'run_java_modern_multirelease',
     'unit_test_modern_multirelease',

@@ -2,7 +2,7 @@ import {ext_classname, Flags, descriptor2typestr, boxClassName, asyncForEach, ty
 import * as util from './util';
 import ByteStream from './ByteStream';
 import {ConstantPool, ClassReference, ConstString, MethodHandle, IConstantPoolItem} from './ConstantPool';
-import {IAttribute, makeAttributes, BootstrapMethods, ConstantValue, NestHost, NestMembers, PermittedSubclasses, RecordAttribute} from './attributes';
+import {IAttribute, IRecordComponentInfo, makeAttributes, BootstrapMethods, ConstantValue, NestHost, NestMembers, PermittedSubclasses, RecordAttribute} from './attributes';
 import {JVMThread, InternalStackFrame, NativeStackFrame, BytecodeStackFrame} from './threading';
 import * as logging from './logging';
 import {Method, Field} from './methods';
@@ -1244,6 +1244,14 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
       return [];
     }
     return record.components.map((component) => component.name);
+  }
+
+  public getRecordComponents(): IRecordComponentInfo[] {
+    var record = <RecordAttribute> this.getAttribute('Record');
+    if (record === null) {
+      return [];
+    }
+    return record.components.slice();
   }
 
   private getUnpermittedSealedSupertype(superClazz: ReferenceClassData<JVMTypes.java_lang_Object>, interfaceClazzes: ReferenceClassData<JVMTypes.java_lang_Object>[]): ReferenceClassData<JVMTypes.java_lang_Object> {
