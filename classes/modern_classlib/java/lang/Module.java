@@ -3,14 +3,17 @@ package java.lang;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
+import java.lang.module.ModuleDescriptor;
 import java.lang.reflect.AnnotatedElement;
-import java.util.Collections;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 
 public final class Module implements AnnotatedElement {
   private String name;
   private ClassLoader loader;
+  private String[] packages = new String[0];
 
   Module() {
   }
@@ -25,6 +28,14 @@ public final class Module implements AnnotatedElement {
 
   public ClassLoader getClassLoader() {
     return loader;
+  }
+
+  public ModuleDescriptor getDescriptor() {
+    return null;
+  }
+
+  public ModuleLayer getLayer() {
+    return null;
   }
 
   public boolean canRead(Module other) {
@@ -80,7 +91,7 @@ public final class Module implements AnnotatedElement {
   }
 
   public Set<String> getPackages() {
-    return Collections.emptySet();
+    return new HashSet<String>(Arrays.asList(packages));
   }
 
   public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {

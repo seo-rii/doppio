@@ -122,9 +122,12 @@ export default function (): any {
           return;
         }
         var moduleCons = moduleClass.getConstructor(thread),
-          module = new moduleCons(thread);
+          module = new moduleCons(thread),
+          packageName = javaThis.$cls.getPackageName(),
+          packages = packageName === '' ? [] : [util.initString(thread.getBsCl(), packageName)];
         (<any> module)['java/lang/Module/name'] = null;
         (<any> module)['java/lang/Module/loader'] = (<any> javaThis)['java/lang/Class/classLoader'];
+        (<any> module)['java/lang/Module/packages'] = util.newArrayFromData<JVMTypes.java_lang_String>(thread, thread.getBsCl(), '[Ljava/lang/String;', packages);
         (<any> javaThis)['java/lang/Class/module'] = module;
         thread.asyncReturn(module);
       });
