@@ -326,11 +326,13 @@ export default function (): any {
           finishComponent = (index: number, typeObj: JVMTypes.java_lang_Class, accessor: JVMTypes.java_lang_reflect_Method) => {
             var component = components[index],
               signatureAttr: attributes.Signature = null,
+              annotationsAttr: attributes.RuntimeVisibleAnnotations = null,
               componentObj = new componentCons(thread);
             for (var j = 0; j < component.attrs.length; j++) {
               if (component.attrs[j].getName() === 'Signature') {
                 signatureAttr = <attributes.Signature> component.attrs[j];
-                break;
+              } else if (component.attrs[j].getName() === 'RuntimeVisibleAnnotations') {
+                annotationsAttr = <attributes.RuntimeVisibleAnnotations> component.attrs[j];
               }
             }
             componentObj['java/lang/reflect/RecordComponent/name'] = util.initString(thread.getBsCl(), component.name);
@@ -338,6 +340,19 @@ export default function (): any {
             componentObj['java/lang/reflect/RecordComponent/accessor'] = accessor;
             componentObj['java/lang/reflect/RecordComponent/declaringRecord'] = javaThis;
             componentObj['java/lang/reflect/RecordComponent/signature'] = signatureAttr !== null ? util.initString(thread.getBsCl(), signatureAttr.sig) : null;
+            if (annotationsAttr !== null) {
+              var byteArrCons = (<ArrayClassData<number>> thread.getBsCl().getInitializedClass(thread, '[B')).getConstructor(thread),
+                annotations = new byteArrCons(thread, 0),
+                bytes = annotationsAttr.rawBytes,
+                rawAnnotations = new Array(bytes.length);
+              for (j = 0; j < bytes.length; j++) {
+                rawAnnotations[j] = bytes.readInt8(j);
+              }
+              annotations.array = rawAnnotations;
+              componentObj['java/lang/reflect/RecordComponent/annotations'] = annotations;
+            } else {
+              componentObj['java/lang/reflect/RecordComponent/annotations'] = null;
+            }
             rv.array[index] = componentObj;
           },
           nextComponent = () => {

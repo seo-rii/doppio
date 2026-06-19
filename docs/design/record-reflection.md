@@ -31,6 +31,9 @@ keeping Doppio's Java 8-era `java.lang.Class` implementation in place.
   `Signature` attribute string. `getGenericType()` and `getAnnotatedType()` use
   a raw `Class` fallback for non-generic components until full generic/type-use
   annotation parsing is implemented.
+- `RecordComponent.getAnnotation()`, `getAnnotations()`, and
+  `getDeclaredAnnotations()` parse runtime-visible component annotations using
+  the existing JDK annotation parser and the declaring record constant pool.
 
 ## Required API Surface
 
@@ -44,8 +47,9 @@ keeping Doppio's Java 8-era `java.lang.Class` implementation in place.
 - `RecordComponent.getAnnotatedType()` raw fallback for non-generic components
 - `RecordComponent.getAccessor()`
 - `RecordComponent.getDeclaringRecord()`
-- Full generic `Type` parsing and annotation accessors after the basic shape
-  works.
+- Runtime-visible component annotation lookup
+- Full generic `Type` parsing and type-use annotation accessors after the basic
+  shape works.
 
 ## Implementation Plan
 
@@ -60,8 +64,9 @@ keeping Doppio's Java 8-era `java.lang.Class` implementation in place.
 4. Store full record component metadata from the `Record` attribute, not only
    names.
 5. Link each component to its accessor `Method` by name and descriptor.
-6. Add annotation and full generic `Type` parity tests after the basic name,
-   type, accessor, declaring-record, and raw-signature tests are green.
+6. Add full generic `Type` and type-use annotation parity tests after the
+   basic name, type, accessor, declaring-record, raw-signature, and
+   runtime-visible component annotation tests are green.
 
 ## Risks
 
@@ -70,5 +75,6 @@ keeping Doppio's Java 8-era `java.lang.Class` implementation in place.
 - Record component accessors overlap with existing method reflection, so the
   implementation should reuse current `Method` object construction rather than
   inventing a parallel representation.
-- Annotation metadata needs careful ordering after basic component metadata,
-  because current annotation support is Java 8-era and incomplete.
+- Type-use annotation metadata needs careful ordering after runtime-visible
+  component annotations, because current annotation support is Java 8-era and
+  incomplete.
