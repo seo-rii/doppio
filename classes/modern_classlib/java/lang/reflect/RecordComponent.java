@@ -1,10 +1,13 @@
 package java.lang.reflect;
 
+import java.lang.annotation.Annotation;
+
 public final class RecordComponent implements AnnotatedElement {
   private String name;
   private Class<?> type;
   private Method accessor;
   private Class<?> declaringRecord;
+  private String signature;
 
   RecordComponent() {
   }
@@ -17,6 +20,18 @@ public final class RecordComponent implements AnnotatedElement {
     return type;
   }
 
+  public String getGenericSignature() {
+    return signature;
+  }
+
+  public Type getGenericType() {
+    return type;
+  }
+
+  public AnnotatedType getAnnotatedType() {
+    return new DoppioAnnotatedType(type);
+  }
+
   public Method getAccessor() {
     return accessor;
   }
@@ -25,22 +40,53 @@ public final class RecordComponent implements AnnotatedElement {
     return declaringRecord;
   }
 
-  public <T extends java.lang.annotation.Annotation> T getAnnotation(Class<T> annotationClass) {
+  public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
     if (annotationClass == null) {
       throw new NullPointerException();
     }
     return null;
   }
 
-  public java.lang.annotation.Annotation[] getAnnotations() {
-    return new java.lang.annotation.Annotation[0];
+  public Annotation[] getAnnotations() {
+    return new Annotation[0];
   }
 
-  public java.lang.annotation.Annotation[] getDeclaredAnnotations() {
-    return new java.lang.annotation.Annotation[0];
+  public Annotation[] getDeclaredAnnotations() {
+    return new Annotation[0];
   }
 
   public String toString() {
     return type.getTypeName() + " " + name;
+  }
+
+  private static final class DoppioAnnotatedType implements AnnotatedType {
+    private final Type type;
+
+    DoppioAnnotatedType(Type type) {
+      this.type = type;
+    }
+
+    public Type getType() {
+      return type;
+    }
+
+    public AnnotatedType getAnnotatedOwnerType() {
+      return null;
+    }
+
+    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+      if (annotationClass == null) {
+        throw new NullPointerException();
+      }
+      return null;
+    }
+
+    public Annotation[] getAnnotations() {
+      return new Annotation[0];
+    }
+
+    public Annotation[] getDeclaredAnnotations() {
+      return new Annotation[0];
+    }
   }
 }

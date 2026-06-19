@@ -27,6 +27,10 @@ keeping Doppio's Java 8-era `java.lang.Class` implementation in place.
   `java.lang.reflect.RecordComponent` shim for record classes. The first slice
   covers component name, type, accessor method, declaring record, null for
   non-record classes, and empty arrays for empty records.
+- `RecordComponent.getGenericSignature()` exposes the raw component
+  `Signature` attribute string. `getGenericType()` and `getAnnotatedType()` use
+  a raw `Class` fallback for non-generic components until full generic/type-use
+  annotation parsing is implemented.
 
 ## Required API Surface
 
@@ -35,9 +39,13 @@ keeping Doppio's Java 8-era `java.lang.Class` implementation in place.
 - `java.lang.reflect.RecordComponent`
 - `RecordComponent.getName()`
 - `RecordComponent.getType()`
+- `RecordComponent.getGenericSignature()` for raw signature strings
+- `RecordComponent.getGenericType()` raw fallback for non-generic components
+- `RecordComponent.getAnnotatedType()` raw fallback for non-generic components
 - `RecordComponent.getAccessor()`
 - `RecordComponent.getDeclaringRecord()`
-- Generic signature and annotation accessors after the basic shape works.
+- Full generic `Type` parsing and annotation accessors after the basic shape
+  works.
 
 ## Implementation Plan
 
@@ -46,13 +54,14 @@ keeping Doppio's Java 8-era `java.lang.Class` implementation in place.
 2. Extend existing boot classes such as `java.lang.Class` with narrow native
    overlays instead of replacing the Java 8 implementation with an incomplete
    stub.
-3. Keep the `RecordComponent` class-library shim minimal until the next
-   metadata slice needs generic or annotation state.
+3. Keep the `RecordComponent` class-library shim minimal: raw signature strings
+   and raw `Class` fallback first, full generic repositories and annotation
+   state later.
 4. Store full record component metadata from the `Record` attribute, not only
    names.
 5. Link each component to its accessor `Method` by name and descriptor.
-6. Add annotation and generic signature parity tests after the basic name,
-   type, accessor, and declaring-record tests are green.
+6. Add annotation and full generic `Type` parity tests after the basic name,
+   type, accessor, declaring-record, and raw-signature tests are green.
 
 ## Risks
 

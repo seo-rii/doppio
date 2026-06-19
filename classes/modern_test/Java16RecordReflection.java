@@ -10,6 +10,7 @@ public class Java16RecordReflection {
     print("plain", Plain.class);
     print("array", Data[].class);
     print("primitive", int.class);
+    printGenericSignatures(GenericData.class);
 
     Data value = new Data("Ada", 7, new int[] { 1, 2 });
     RecordComponent[] components = Data.class.getRecordComponents();
@@ -31,11 +32,24 @@ public class Java16RecordReflection {
       RecordComponent component = components[i];
       parts[i] = component.getName()
         + ":" + component.getType().getName()
+        + ":" + component.getGenericSignature()
+        + ":" + component.getGenericType().getTypeName()
+        + ":" + component.getAnnotatedType().getType().getTypeName()
         + ":" + component.getAccessor().getName()
         + ":" + component.getDeclaringRecord().getName()
         + ":" + component.toString();
     }
     System.out.println(label + ":" + Arrays.toString(parts));
+  }
+
+  private static void printGenericSignatures(Class<?> cls) {
+    RecordComponent[] components = cls.getRecordComponents();
+    String[] parts = new String[components.length];
+    for (int i = 0; i < components.length; i++) {
+      RecordComponent component = components[i];
+      parts[i] = component.getName() + ":" + component.getGenericSignature();
+    }
+    System.out.println("generic-signature:" + Arrays.toString(parts));
   }
 
   private static String valueText(Object value) {
@@ -48,6 +62,8 @@ public class Java16RecordReflection {
   record Data(String name, int count, int[] values) {}
 
   record Empty() {}
+
+  record GenericData<T extends Number>(T item, java.util.List<String> names) {}
 
   static final class Plain {}
 }

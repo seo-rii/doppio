@@ -325,11 +325,19 @@ export default function (): any {
           i = 0,
           finishComponent = (index: number, typeObj: JVMTypes.java_lang_Class, accessor: JVMTypes.java_lang_reflect_Method) => {
             var component = components[index],
+              signatureAttr: attributes.Signature = null,
               componentObj = new componentCons(thread);
+            for (var j = 0; j < component.attrs.length; j++) {
+              if (component.attrs[j].getName() === 'Signature') {
+                signatureAttr = <attributes.Signature> component.attrs[j];
+                break;
+              }
+            }
             componentObj['java/lang/reflect/RecordComponent/name'] = util.initString(thread.getBsCl(), component.name);
             componentObj['java/lang/reflect/RecordComponent/type'] = typeObj;
             componentObj['java/lang/reflect/RecordComponent/accessor'] = accessor;
             componentObj['java/lang/reflect/RecordComponent/declaringRecord'] = javaThis;
+            componentObj['java/lang/reflect/RecordComponent/signature'] = signatureAttr !== null ? util.initString(thread.getBsCl(), signatureAttr.sig) : null;
             rv.array[index] = componentObj;
           },
           nextComponent = () => {
