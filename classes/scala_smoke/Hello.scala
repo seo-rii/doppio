@@ -83,6 +83,7 @@ object Hello {
     val library = ScalaLibrarySmoke.exercise()
     val reflection = scalasmoke.ScalaPackageReflectionSmoke.exercise()
     val scalaReflect = ScalaReflectSmoke.exercise()
-    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$reflection:$scalaReflect")
+    val macroUse = ScalaMacroUseSmoke.exercise()
+    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$reflection:$scalaReflect:$macroUse")
   }
 }

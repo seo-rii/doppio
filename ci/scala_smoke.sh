@@ -6,6 +6,7 @@ version="${SCALA_COMPILER_VERSION:-2.13.18}"
 cache_dir="${SCALA_SMOKE_CACHE_DIR:-"$repo_root/build/scala-smoke-cache"}"
 work_dir="${SCALA_SMOKE_WORK_DIR:-"$repo_root/build/scala-smoke"}"
 source_dir="${SCALA_SMOKE_SOURCE_DIR:-"$repo_root/classes/scala_smoke"}"
+macro_source_dir="${SCALA_MACRO_SMOKE_SOURCE_DIR:-"$repo_root/classes/scala_macro_smoke"}"
 runner="$repo_root/build/release-cli/console/runner.js"
 
 download_jar() {
@@ -52,11 +53,13 @@ fi
 
 compiler_cp="$compiler_jar:$library_jar:$reflect_jar:$diff_utils_jar:$jline_jar"
 source_cp="$library_jar:$reflect_jar"
-runtime_cp="$work_dir/out:$library_jar:$reflect_jar"
+macro_out_dir="$work_dir/macros"
 out_dir="$work_dir/out"
+main_source_cp="$macro_out_dir:$source_cp"
+runtime_cp="$out_dir:$macro_out_dir:$library_jar:$reflect_jar"
 
-rm -rf "$out_dir"
-mkdir -p "$out_dir"
+rm -rf "$macro_out_dir" "$out_dir"
+mkdir -p "$macro_out_dir" "$out_dir"
 
 compile_timeout="${SCALA_SMOKE_COMPILE_TIMEOUT_SECONDS:-900}"
 run_timeout="${SCALA_SMOKE_RUN_TIMEOUT_SECONDS:-60}"
@@ -69,16 +72,27 @@ timeout -s INT "${compile_timeout}s" \
   -cp "$compiler_cp" \
   scala.tools.nsc.Main \
   -classpath "$source_cp" \
+  -d "$macro_out_dir" \
+  "$macro_source_dir"/*.scala
+
+timeout -s INT "${compile_timeout}s" \
+  node --max-old-space-size=4096 --no-deprecation "$runner" \
+  "-Xresponsiveness:$responsiveness" \
+  -cp "$compiler_cp" \
+  scala.tools.nsc.Main \
+  -classpath "$main_source_cp" \
   -d "$out_dir" \
   "$source_dir"/*.scala
 compile_end="$(date +%s)"
 
+test -f "$macro_out_dir/ScalaMacroSmoke.class"
 test -f "$out_dir/Hello.class"
 test -f "$out_dir/AdvancedScalaSmoke.class"
 test -f "$out_dir/Add.class"
 test -f "$out_dir/Lit.class"
 test -f "$out_dir/Metric.class"
 test -f "$out_dir/ScalaLibrarySmoke.class"
+test -f "$out_dir/ScalaMacroUseSmoke.class"
 test -f "$out_dir/ScalaReflectSmoke.class"
 test -f "$out_dir/ScalaReflectSmoke\$ReflectBox.class"
 test -f "$out_dir/scalasmoke/PackageRegistry.class"
@@ -92,7 +106,7 @@ test -f "$out_dir/SmokeBox.class"
 test -f "$out_dir/SmokeStage.class"
 test -f "$out_dir/ZeroExpr.class"
 
-expected_output="${SCALA_SMOKE_EXPECTED_OUTPUT:-"scala:38:parse>run:i=39:SCALA:a,bb:sc|even4:25:12:1=4,2=2,3=4:b:4/ccc:4/aa:2:g2:t5:String:3:z:2:worker:3:c1:describe/getName/total:pkg-worker-11:20:red-green-blue:23:ReflectBox:2:name/value:true"}"
+expected_output="${SCALA_SMOKE_EXPECTED_OUTPUT:-"scala:38:parse>run:i=39:SCALA:a,bb:sc|even4:25:12:1=4,2=2,3=4:b:4/ccc:4/aa:2:g2:t5:String:3:z:2:worker:3:c1:describe/getName/total:pkg-worker-11:20:red-green-blue:23:ReflectBox:2:name/value:true:m22:macro:cs"}"
 
 native_output="$(java -cp "$runtime_cp" Hello)"
 if [ "$native_output" != "$expected_output" ]; then

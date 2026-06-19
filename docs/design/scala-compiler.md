@@ -44,6 +44,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - `scala-reflect` runtime universe coverage for runtime mirror creation,
   `typeOf`, constructor/member symbol lookup, case-accessor discovery, and
   static class lookup;
+- two-phase Scala 2 macro expansion using `scala.reflect.macros.blackbox`,
+  where the macro implementation is compiled first under Doppio and then used
+  by the main source fixture in a second Doppio-hosted scalac invocation;
 - string interpolation and a plain `main` entry point.
 
 The smoke compares the generated program output on the host JVM and Doppio.
@@ -53,6 +56,11 @@ The smoke compares the generated program output on the host JVM and Doppio.
 The initial Scala 2.13 compiler smoke now passes under Doppio. It compiles the
 source fixture, checks the emitted class files, and compares generated program
 output on the host JVM and Doppio.
+
+The smoke also includes a two-phase macro path: Doppio-hosted scalac first
+emits a blackbox macro implementation class, then a second Doppio-hosted scalac
+pass expands calls from the normal smoke source set against that generated
+classpath entry.
 
 This is intentionally narrower than the Kotlin smoke. The next Scala compiler
 work should expand source coverage and classpath stress after each blocker is
@@ -79,7 +87,7 @@ reduced to a focused Java or Scala fixture.
 Expected blocker areas:
 
 - compiler classpath scanning and JAR I/O throughput;
-- Scala reflection-heavy compiler paths;
+- deeper Scala reflection-heavy compiler paths beyond basic macro expansion;
 - Java 9+ class-library APIs used from Scala 2.13 on Java 17;
 - `invokedynamic`/lambda metafactory paths and generic signature metadata;
 - compiler diagnostics and position rendering.

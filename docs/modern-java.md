@@ -227,9 +227,9 @@ still not claimed.
   objects, `Enumeration`, `@BeanProperty`, Java reflection over
   Scala-generated members, specialized class generation, and `scala-reflect`
   runtime universe use covering runtime mirror creation, `typeOf`, member
-  symbol lookup, case-accessor discovery, and static class lookup, plus string
-  interpolation, then runs the generated `Hello` class on both the host JVM and
-  Doppio.
+  symbol lookup, case-accessor discovery, and static class lookup, plus
+  two-phase Scala 2 blackbox macro expansion, plus string interpolation, then
+  runs the generated `Hello` class on both the host JVM and Doppio.
 - Current notes live in `docs/design/scala-compiler.md`.
 
 ## Current Test Targets
