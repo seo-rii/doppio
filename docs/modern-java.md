@@ -216,11 +216,13 @@ still not claimed.
   Central, runs `scala.tools.nsc.Main` under Doppio, and compiles
   `classes/scala_smoke/*.scala`; the generated `Hello` class now prints the
   expected output on both the host JVM and Doppio.
-- The initial fixture covers a small Scala 2.13 source slice with a sealed
-  trait, case objects, a generic case class, trait default method, anonymous
-  class, closures, collection pipelines, `Option`, `Either`, pattern matching,
-  and string interpolation, then runs the generated `Hello` class on both the
-  host JVM and Doppio.
+- The fixture covers a small Scala 2.13 source slice with sealed traits, case
+  objects, a sealed ADT with case classes, guarded pattern matching, a generic
+  case class, trait default method, anonymous class, closures, collection
+  pipelines, `Vector`, `Map.collect`, `PartialFunction.collect`, `Option`,
+  `Either`, tuple matching, for-comprehension desugaring, `lazy val`,
+  `try`/`catch`/`finally`, and string interpolation, then runs the generated
+  `Hello` class on both the host JVM and Doppio.
 - Current notes live in `docs/design/scala-compiler.md`.
 
 ## Current Test Targets

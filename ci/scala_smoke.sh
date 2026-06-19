@@ -73,10 +73,15 @@ timeout -s INT "${compile_timeout}s" \
 compile_end="$(date +%s)"
 
 test -f "$out_dir/Hello.class"
+test -f "$out_dir/AdvancedScalaSmoke.class"
+test -f "$out_dir/Add.class"
+test -f "$out_dir/Lit.class"
+test -f "$out_dir/SmokeExpr.class"
 test -f "$out_dir/SmokeBox.class"
 test -f "$out_dir/SmokeStage.class"
+test -f "$out_dir/ZeroExpr.class"
 
-expected_output="${SCALA_SMOKE_EXPECTED_OUTPUT:-"scala:38:parse>run:i=39:SCALA"}"
+expected_output="${SCALA_SMOKE_EXPECTED_OUTPUT:-"scala:38:parse>run:i=39:SCALA:a,bb:sc|even4:25:12"}"
 
 native_output="$(java -cp "$runtime_cp" Hello)"
 if [ "$native_output" != "$expected_output" ]; then

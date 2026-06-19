@@ -27,10 +27,14 @@ node --max-old-space-size=4096 --no-deprecation build/release-cli/console/runner
 The first source fixture covers a deliberately small Scala 2.13 slice:
 
 - top-level sealed trait and case objects;
+- sealed ADTs with case classes and guarded pattern matching;
 - a generic case class;
 - a trait with a default method;
 - an anonymous class;
-- closures, `List` pipelines, tuple pattern matching, `Option`, and `Either`;
+- closures, `List` pipelines, `Vector`, `Map.collect`, tuple pattern matching,
+  `Option`, and `Either`;
+- `PartialFunction.collect`, for-comprehension desugaring, `lazy val`, and
+  `try`/`catch`/`finally`;
 - string interpolation and a plain `main` entry point.
 
 The smoke compares the generated program output on the host JVM and Doppio.
