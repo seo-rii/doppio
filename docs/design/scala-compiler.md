@@ -38,6 +38,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - a multi-file source set using `groupMapReduce`, implicit value classes,
   default arguments, case-class `copy`, `@tailrec`, varargs with `ClassTag`,
   `Try`, and tuple ordering;
+- package object initialization, package-scoped classes/objects,
+  `Enumeration`, `@BeanProperty`, Java reflection over Scala-generated members,
+  and specialized class generation;
 - string interpolation and a plain `main` entry point.
 
 The smoke compares the generated program output on the host JVM and Doppio.

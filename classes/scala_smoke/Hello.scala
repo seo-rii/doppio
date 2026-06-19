@@ -81,6 +81,7 @@ object Hello {
     val either = Right(box.name).map(_.toUpperCase).fold(_ => "bad", identity)
     val advanced = AdvancedScalaSmoke.exercise(7)
     val library = ScalaLibrarySmoke.exercise()
-    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library")
+    val reflection = scalasmoke.ScalaPackageReflectionSmoke.exercise()
+    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$reflection")
   }
 }
