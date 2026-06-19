@@ -80,6 +80,7 @@ object Hello {
     val option = Option(box.value).filter(_ > 20).map(formatter.format).getOrElse("missing")
     val either = Right(box.name).map(_.toUpperCase).fold(_ => "bad", identity)
     val advanced = AdvancedScalaSmoke.exercise(7)
-    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced")
+    val library = ScalaLibrarySmoke.exercise()
+    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library")
   }
 }

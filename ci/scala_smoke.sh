@@ -76,12 +76,14 @@ test -f "$out_dir/Hello.class"
 test -f "$out_dir/AdvancedScalaSmoke.class"
 test -f "$out_dir/Add.class"
 test -f "$out_dir/Lit.class"
+test -f "$out_dir/Metric.class"
+test -f "$out_dir/ScalaLibrarySmoke.class"
 test -f "$out_dir/SmokeExpr.class"
 test -f "$out_dir/SmokeBox.class"
 test -f "$out_dir/SmokeStage.class"
 test -f "$out_dir/ZeroExpr.class"
 
-expected_output="${SCALA_SMOKE_EXPECTED_OUTPUT:-"scala:38:parse>run:i=39:SCALA:a,bb:sc|even4:25:12"}"
+expected_output="${SCALA_SMOKE_EXPECTED_OUTPUT:-"scala:38:parse>run:i=39:SCALA:a,bb:sc|even4:25:12:1=4,2=2,3=4:b:4/ccc:4/aa:2:g2:t5:String:3:z:2"}"
 
 native_output="$(java -cp "$runtime_cp" Hello)"
 if [ "$native_output" != "$expected_output" ]; then

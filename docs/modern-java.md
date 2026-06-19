@@ -221,8 +221,10 @@ still not claimed.
   case class, trait default method, anonymous class, closures, collection
   pipelines, `Vector`, `Map.collect`, `PartialFunction.collect`, `Option`,
   `Either`, tuple matching, for-comprehension desugaring, `lazy val`,
-  `try`/`catch`/`finally`, and string interpolation, then runs the generated
-  `Hello` class on both the host JVM and Doppio.
+  `try`/`catch`/`finally`, `groupMapReduce`, implicit value classes, default
+  arguments, case-class `copy`, `@tailrec`, varargs with `ClassTag`, `Try`,
+  tuple ordering, and string interpolation, then runs the generated `Hello`
+  class on both the host JVM and Doppio.
 - Current notes live in `docs/design/scala-compiler.md`.
 
 ## Current Test Targets
