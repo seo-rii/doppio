@@ -41,6 +41,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - package object initialization, package-scoped classes/objects,
   `Enumeration`, `@BeanProperty`, Java reflection over Scala-generated members,
   and specialized class generation;
+- `scala-reflect` runtime universe coverage for runtime mirror creation,
+  `typeOf`, constructor/member symbol lookup, case-accessor discovery, and
+  static class lookup;
 - string interpolation and a plain `main` entry point.
 
 The smoke compares the generated program output on the host JVM and Doppio.
@@ -67,6 +70,11 @@ reduced to a focused Java or Scala fixture.
   positional write native without advancing the channel's tracked file
   position. Coverage lives in
   `classes/modern_test/Java17FileChannelPositionalWrite.java`.
+- `scala-reflect` runtime universe forced the JIT non-virtual invoke fallback
+  path. The generated JIT trace previously referenced an out-of-scope
+  `methodReference` variable when falling back from the receiver object to the
+  resolved declaring-class prototype. The JIT now emits a runtime constant-pool
+  method reference local for that fallback, matching the interpreter behavior.
 
 Expected blocker areas:
 

@@ -819,8 +819,8 @@ if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.signature}'](t,a
       if ((paramSize > pops.length) && (pops.length > 0)) {
         argMaker += `args${suffix}.push(${pops.slice().reverse().join(',')});`;
       }
-      return argMaker + `var obj${suffix}=${(paramSize+1)===pops.length?pops[paramSize]:"f.opStack.pop()"};f.pc=${pc};
-	if(!u.isNull(t,f,obj${suffix})){var target${suffix}=obj${suffix}['${methodReference.fullSignature}'];if(typeof target${suffix}!=='function'&&methodReference.jsConstructor!==null){target${suffix}=methodReference.jsConstructor.prototype[methodReference.fullSignature];}target${suffix}.call(obj${suffix},t,args${suffix});f.returnToThreadLoop=true;${onSuccess}}else{${onError}}`;
+      return argMaker + `var methodReference${suffix}=f.method.cls.constantPool.get(${index});var obj${suffix}=${(paramSize+1)===pops.length?pops[paramSize]:"f.opStack.pop()"};f.pc=${pc};
+			if(!u.isNull(t,f,obj${suffix})){var target${suffix}=obj${suffix}['${methodReference.fullSignature}'];if(typeof target${suffix}!=='function'&&methodReference${suffix}.jsConstructor!==null){target${suffix}=methodReference${suffix}.jsConstructor.prototype[methodReference${suffix}.fullSignature];}target${suffix}.call(obj${suffix},t,args${suffix});f.returnToThreadLoop=true;${onSuccess}}else{${onError}}`;
     }};
   }
 

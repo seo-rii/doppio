@@ -225,7 +225,9 @@ still not claimed.
   arguments, case-class `copy`, `@tailrec`, varargs with `ClassTag`, `Try`,
   tuple ordering, package object initialization, package-scoped classes and
   objects, `Enumeration`, `@BeanProperty`, Java reflection over
-  Scala-generated members, specialized class generation, and string
+  Scala-generated members, specialized class generation, and `scala-reflect`
+  runtime universe use covering runtime mirror creation, `typeOf`, member
+  symbol lookup, case-accessor discovery, and static class lookup, plus string
   interpolation, then runs the generated `Hello` class on both the host JVM and
   Doppio.
 - Current notes live in `docs/design/scala-compiler.md`.
