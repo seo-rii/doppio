@@ -801,6 +801,48 @@ export class MethodReference implements IConstantPoolItem {
           };
           method = <Method> syntheticMethod;
         } else if (syntheticCls.isSubclass(thread.getBsCl().getResolvedClass('Ljava/lang/ClassLoader;')) &&
+            this.signature === 'getUnnamedModule()Ljava/lang/Module;') {
+          syntheticMethod = {
+            cls: syntheticCls,
+            slot: -1,
+            accessFlags: new util.Flags(util.FlagMasks.PUBLIC | util.FlagMasks.FINAL | util.FlagMasks.NATIVE),
+            name: this.nameAndTypeInfo.name,
+            rawDescriptor: this.nameAndTypeInfo.descriptor,
+            attrs: [],
+            signature: this.signature,
+            fullSignature: syntheticFullSignature,
+            parameterTypes: [],
+            returnType: 'Ljava/lang/Module;',
+            getParamWordSize: function(): number {
+              return 0;
+            },
+            convertArgs: function(thread: JVMThread, params: any[]): any[] {
+              return [thread].concat(params);
+            },
+            getNativeFunction: function(): Function {
+              return function(thread: JVMThread, javaThis: JVMTypes.java_lang_ClassLoader): any {
+                thread.setStatus(ThreadStatus.ASYNC_WAITING);
+                util.getClassLoaderUnnamedModule(thread, javaThis, (module: JVMTypes.java_lang_Object) => {
+                  thread.asyncReturn(module);
+                });
+                return null;
+              };
+            },
+            isSignaturePolymorphic: function(): boolean {
+              return false;
+            },
+            isHidden: function(): boolean {
+              return false;
+            },
+            isCallerSensitive: function(): boolean {
+              return false;
+            },
+            getFullSignature: function(): string {
+              return syntheticCls.getExternalName() + '.' + this.signature;
+            }
+          };
+          method = <Method> syntheticMethod;
+        } else if (syntheticCls.isSubclass(thread.getBsCl().getResolvedClass('Ljava/lang/ClassLoader;')) &&
             this.signature === 'getName()Ljava/lang/String;') {
           syntheticMethod = {
             cls: syntheticCls,
@@ -917,27 +959,19 @@ export class MethodReference implements IConstantPoolItem {
             getNativeFunction: function(): Function {
               return function(thread: JVMThread, javaThis: JVMTypes.java_lang_ClassLoader, name?: JVMTypes.java_lang_String): any {
                 var classLoaderPackageSignature = syntheticMethod.signature,
-                  packages = (<any> javaThis)['java/lang/ClassLoader/packages'],
-                  table = packages === null || packages === undefined ? null : (<any> packages)['java/util/HashMap/table'],
+                  entries = util.getClassLoaderDefinedPackageEntries(javaThis),
                   values: JVMTypes.java_lang_Package[] = [],
-                  i: number,
-                  node: JVMTypes.java_lang_Object;
+                  i: number;
                 if (classLoaderPackageSignature === 'getDefinedPackage(Ljava/lang/String;)Ljava/lang/Package;' && name === null) {
                   thread.throwNewException('Ljava/lang/NullPointerException;', '');
                   return null;
                 }
-                if (table !== null && table !== undefined && table.array !== null && table.array !== undefined) {
-                  for (i = 0; i < table.array.length; i++) {
-                    node = table.array[i];
-                    while (node !== null) {
-                      if (classLoaderPackageSignature === 'getDefinedPackage(Ljava/lang/String;)Ljava/lang/Package;' &&
-                          (<JVMTypes.java_lang_String> (<any> node)['java/util/HashMap$Node/key']).toString() === name.toString()) {
-                        return (<any> node)['java/util/HashMap$Node/value'];
-                      } else if (classLoaderPackageSignature === 'getDefinedPackages()[Ljava/lang/Package;') {
-                        values.push((<any> node)['java/util/HashMap$Node/value']);
-                      }
-                      node = (<any> node)['java/util/HashMap$Node/next'];
-                    }
+                for (i = 0; i < entries.length; i++) {
+                  if (classLoaderPackageSignature === 'getDefinedPackage(Ljava/lang/String;)Ljava/lang/Package;' &&
+                      entries[i].name === name.toString()) {
+                    return entries[i].pkg;
+                  } else if (classLoaderPackageSignature === 'getDefinedPackages()[Ljava/lang/Package;') {
+                    values.push(entries[i].pkg);
                   }
                 }
                 return classLoaderPackageSignature === 'getDefinedPackages()[Ljava/lang/Package;' ?
@@ -4291,6 +4325,7 @@ export class MethodReference implements IConstantPoolItem {
 	        thread.setStatus(ThreadStatus.RUNNABLE);
 	      };
 	    } else if ((this.signature === 'getName()Ljava/lang/String;' ||
+	        this.signature === 'getUnnamedModule()Ljava/lang/Module;' ||
 	        this.signature === 'isRegisteredAsParallelCapable()Z' ||
 	        this.signature === 'getDefinedPackage(Ljava/lang/String;)Ljava/lang/Package;' ||
 	        this.signature === 'getDefinedPackages()[Ljava/lang/Package;' ||

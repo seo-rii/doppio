@@ -115,6 +115,15 @@ export default function (): any {
       if (cachedModule !== null && cachedModule !== undefined) {
         return cachedModule;
       }
+      var loaderObj = (<any> javaThis)['java/lang/Class/classLoader'];
+      if (loaderObj !== null && loaderObj !== undefined) {
+        thread.setStatus(ThreadStatus.ASYNC_WAITING);
+        util.getClassLoaderUnnamedModule(thread, loaderObj, (module: JVMTypes.java_lang_Object) => {
+          (<any> javaThis)['java/lang/Class/module'] = module;
+          thread.asyncReturn(module);
+        });
+        return;
+      }
 
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
       thread.getBsCl().initializeClass(thread, 'Ljava/lang/Module;', (moduleClass: ReferenceClassData<JVMTypes.java_lang_Object>) => {
@@ -126,7 +135,7 @@ export default function (): any {
           packageName = javaThis.$cls.getPackageName(),
           packages = packageName === '' ? [] : [util.initString(thread.getBsCl(), packageName)];
         (<any> module)['java/lang/Module/name'] = null;
-        (<any> module)['java/lang/Module/loader'] = (<any> javaThis)['java/lang/Class/classLoader'];
+        (<any> module)['java/lang/Module/loader'] = loaderObj;
         (<any> module)['java/lang/Module/packages'] = util.newArrayFromData<JVMTypes.java_lang_String>(thread, thread.getBsCl(), '[Ljava/lang/String;', packages);
         (<any> javaThis)['java/lang/Class/module'] = module;
         thread.asyncReturn(module);

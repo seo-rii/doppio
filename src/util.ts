@@ -912,6 +912,60 @@ export function newArrayFromData<T>(thread: JVMThread, cl: ClassLoader, desc: st
   return arr;
 }
 
+export interface ClassLoaderPackageEntry {
+  name: string;
+  pkg: JVMTypes.java_lang_Package;
+}
+
+export function getClassLoaderDefinedPackageEntries(loaderObj: JVMTypes.java_lang_ClassLoader): ClassLoaderPackageEntry[] {
+  var packages = (<any> loaderObj)['java/lang/ClassLoader/packages'],
+    table = packages === null || packages === undefined ? null : (<any> packages)['java/util/HashMap/table'],
+    entries: ClassLoaderPackageEntry[] = [],
+    i: number,
+    node: JVMTypes.java_lang_Object,
+    key: JVMTypes.java_lang_String;
+  if (table !== null && table !== undefined && table.array !== null && table.array !== undefined) {
+    for (i = 0; i < table.array.length; i++) {
+      node = table.array[i];
+      while (node !== null) {
+        key = (<JVMTypes.java_lang_String> (<any> node)['java/util/HashMap$Node/key']);
+        entries.push({
+          name: key.toString(),
+          pkg: (<any> node)['java/util/HashMap$Node/value']
+        });
+        node = (<any> node)['java/util/HashMap$Node/next'];
+      }
+    }
+  }
+  return entries;
+}
+
+export function getClassLoaderUnnamedModule(thread: JVMThread, loaderObj: JVMTypes.java_lang_ClassLoader, cb: (module: JVMTypes.java_lang_Object) => void): void {
+  var cachedModule = (<any> loaderObj)['java/lang/ClassLoader/doppioUnnamedModule'];
+  if (cachedModule !== null && cachedModule !== undefined) {
+    cb(cachedModule);
+    return;
+  }
+  thread.getBsCl().initializeClass(thread, 'Ljava/lang/Module;', (moduleClass: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+    if (moduleClass === null) {
+      return;
+    }
+    cachedModule = (<any> loaderObj)['java/lang/ClassLoader/doppioUnnamedModule'];
+    if (cachedModule !== null && cachedModule !== undefined) {
+      cb(cachedModule);
+      return;
+    }
+    var moduleCons = moduleClass.getConstructor(thread),
+      module = new moduleCons(thread),
+      packages = getClassLoaderDefinedPackageEntries(loaderObj).map((entry) => initString(thread.getBsCl(), entry.name));
+    (<any> module)['java/lang/Module/name'] = null;
+    (<any> module)['java/lang/Module/loader'] = loaderObj;
+    (<any> module)['java/lang/Module/packages'] = newArrayFromData<JVMTypes.java_lang_String>(thread, thread.getBsCl(), '[Ljava/lang/String;', packages);
+    (<any> loaderObj)['java/lang/ClassLoader/doppioUnnamedModule'] = module;
+    cb(module);
+  });
+}
+
 /**
  * Returns the boxed class name of the given primitive type.
  */
