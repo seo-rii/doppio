@@ -919,7 +919,7 @@ function modernJava(grunt: IGrunt) {
     utf8('start');
     nameAndType(20, 6);
     ref(10, 12, 21);
-    longConst(50);
+    longConst(500);
     utf8('sleep');
     utf8('(J)V');
     nameAndType(25, 26);

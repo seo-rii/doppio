@@ -746,6 +746,154 @@ export class MethodReference implements IConstantPoolItem {
             }
           };
           method = <Method> syntheticMethod;
+        } else if (syntheticCls.getInternalName() === 'Ljava/lang/ClassLoader;' &&
+            this.signature === 'getPlatformClassLoader()Ljava/lang/ClassLoader;') {
+          syntheticMethod = {
+            cls: syntheticCls,
+            slot: -1,
+            accessFlags: syntheticAccessFlags,
+            name: this.nameAndTypeInfo.name,
+            rawDescriptor: this.nameAndTypeInfo.descriptor,
+            attrs: [],
+            signature: this.signature,
+            fullSignature: syntheticFullSignature,
+            parameterTypes: [],
+            returnType: 'Ljava/lang/ClassLoader;',
+            getParamWordSize: function(): number {
+              return 0;
+            },
+            convertArgs: function(thread: JVMThread, params: any[]): any[] {
+              return [thread];
+            },
+            getNativeFunction: function(): Function {
+              return function(thread: JVMThread): JVMTypes.java_lang_ClassLoader {
+                var systemLoader = thread.getJVM().getSystemClassLoader(),
+                  systemObj = systemLoader === null ? null : systemLoader.getLoaderObject(),
+                  platformObj = systemObj === null ? null : (<any> systemObj)['java/lang/ClassLoader/parent'],
+                  classLoaderCons: any;
+                if (platformObj !== null && platformObj !== undefined) {
+                  (<any> platformObj)['java/lang/ClassLoader/doppioPlatform'] = true;
+                  return platformObj;
+                }
+                classLoaderCons = syntheticCls.getConstructor(thread);
+                platformObj = (<any> classLoaderCons).$doppioPlatformClassLoader;
+                if (platformObj === null || platformObj === undefined) {
+                  platformObj = new classLoaderCons(thread);
+                  (<any> platformObj)['java/lang/ClassLoader/parent'] = null;
+                  (<any> platformObj)['java/lang/ClassLoader/doppioPlatform'] = true;
+                  (<any> classLoaderCons).$doppioPlatformClassLoader = platformObj;
+                }
+                return platformObj;
+              };
+            },
+            isSignaturePolymorphic: function(): boolean {
+              return false;
+            },
+            isHidden: function(): boolean {
+              return false;
+            },
+            isCallerSensitive: function(): boolean {
+              return false;
+            },
+            getFullSignature: function(): string {
+              return syntheticCls.getExternalName() + '.' + this.signature;
+            }
+          };
+          method = <Method> syntheticMethod;
+        } else if (syntheticCls.isSubclass(thread.getBsCl().getResolvedClass('Ljava/lang/ClassLoader;')) &&
+            this.signature === 'getName()Ljava/lang/String;') {
+          syntheticMethod = {
+            cls: syntheticCls,
+            slot: -1,
+            accessFlags: new util.Flags(util.FlagMasks.PUBLIC | util.FlagMasks.NATIVE),
+            name: this.nameAndTypeInfo.name,
+            rawDescriptor: this.nameAndTypeInfo.descriptor,
+            attrs: [],
+            signature: this.signature,
+            fullSignature: syntheticFullSignature,
+            parameterTypes: [],
+            returnType: 'Ljava/lang/String;',
+            getParamWordSize: function(): number {
+              return 0;
+            },
+            convertArgs: function(thread: JVMThread, params: any[]): any[] {
+              return [thread].concat(params);
+            },
+            getNativeFunction: function(): Function {
+              return function(thread: JVMThread, javaThis: JVMTypes.java_lang_ClassLoader): JVMTypes.java_lang_String {
+                var systemLoader = thread.getJVM().getSystemClassLoader(),
+                  systemObj = systemLoader === null ? null : systemLoader.getLoaderObject(),
+                  platformObj = systemObj === null ? null : (<any> systemObj)['java/lang/ClassLoader/parent'],
+                  name: string = null;
+                if ((<any> javaThis)['java/lang/ClassLoader/doppioPlatform'] === true || javaThis === platformObj) {
+                  name = 'platform';
+                } else if (javaThis === systemObj) {
+                  name = 'app';
+                }
+                return name === null ? null : util.initString(thread.getBsCl(), name);
+              };
+            },
+            isSignaturePolymorphic: function(): boolean {
+              return false;
+            },
+            isHidden: function(): boolean {
+              return false;
+            },
+            isCallerSensitive: function(): boolean {
+              return false;
+            },
+            getFullSignature: function(): string {
+              return syntheticCls.getExternalName() + '.' + this.signature;
+            }
+          };
+          method = <Method> syntheticMethod;
+        } else if (syntheticCls.isSubclass(thread.getBsCl().getResolvedClass('Ljava/lang/ClassLoader;')) &&
+            this.signature === 'isRegisteredAsParallelCapable()Z') {
+          syntheticMethod = {
+            cls: syntheticCls,
+            slot: -1,
+            accessFlags: new util.Flags(util.FlagMasks.PUBLIC | util.FlagMasks.FINAL | util.FlagMasks.NATIVE),
+            name: this.nameAndTypeInfo.name,
+            rawDescriptor: this.nameAndTypeInfo.descriptor,
+            attrs: [],
+            signature: this.signature,
+            fullSignature: syntheticFullSignature,
+            parameterTypes: [],
+            returnType: 'Z',
+            getParamWordSize: function(): number {
+              return 0;
+            },
+            convertArgs: function(thread: JVMThread, params: any[]): any[] {
+              return [thread].concat(params);
+            },
+            getNativeFunction: function(): Function {
+              return function(thread: JVMThread, javaThis: JVMTypes.java_lang_ClassLoader): number {
+                var systemLoader = thread.getJVM().getSystemClassLoader(),
+                  systemObj = systemLoader === null ? null : systemLoader.getLoaderObject(),
+                  platformObj = systemObj === null ? null : (<any> systemObj)['java/lang/ClassLoader/parent'];
+                if ((<any> javaThis)['java/lang/ClassLoader/doppioPlatform'] === true ||
+                    javaThis === systemObj ||
+                    javaThis === platformObj) {
+                  return 1;
+                }
+                return (<any> javaThis)['java/lang/ClassLoader/parallelLockMap'] === null ||
+                  (<any> javaThis)['java/lang/ClassLoader/parallelLockMap'] === undefined ? 0 : 1;
+              };
+            },
+            isSignaturePolymorphic: function(): boolean {
+              return false;
+            },
+            isHidden: function(): boolean {
+              return false;
+            },
+            isCallerSensitive: function(): boolean {
+              return false;
+            },
+            getFullSignature: function(): string {
+              return syntheticCls.getExternalName() + '.' + this.signature;
+            }
+          };
+          method = <Method> syntheticMethod;
         } else if (syntheticCls.isSubclass(thread.getBsCl().getResolvedClass('Ljava/lang/ClassLoader;')) &&
             this.signature === 'resources(Ljava/lang/String;)Ljava/util/stream/Stream;') {
           syntheticMethod = {
@@ -4018,6 +4166,7 @@ export class MethodReference implements IConstantPoolItem {
 	        this.fullSignature === 'java/lang/StrictMath/absExact(J)J' ||
 	        this.fullSignature === 'java/lang/Character/toString(I)Ljava/lang/String;' ||
 	        this.fullSignature === 'java/lang/Runtime/version()Ljava/lang/Runtime$Version;' ||
+	        this.fullSignature === 'java/lang/ClassLoader/getPlatformClassLoader()Ljava/lang/ClassLoader;' ||
 	        this.fullSignature === 'java/lang/System/getLogger(Ljava/lang/String;)Ljava/lang/System$Logger;' ||
 	        this.fullSignature === 'java/lang/System/getLogger(Ljava/lang/String;Ljava/util/ResourceBundle;)Ljava/lang/System$Logger;' ||
 	        resolvedNumberFormatCompact ||
@@ -4076,7 +4225,9 @@ export class MethodReference implements IConstantPoolItem {
 	        (<any> thread).stack.push(new NativeStackFrame(syntheticPatternMethod, [this].concat(args)));
 	        thread.setStatus(ThreadStatus.RUNNABLE);
 	      };
-	    } else if (this.signature === 'resources(Ljava/lang/String;)Ljava/util/stream/Stream;' &&
+	    } else if ((this.signature === 'getName()Ljava/lang/String;' ||
+	        this.signature === 'isRegisteredAsParallelCapable()Z' ||
+	        this.signature === 'resources(Ljava/lang/String;)Ljava/util/stream/Stream;') &&
 	        this.method.cls.isSubclass(thread.getBsCl().getResolvedClass('Ljava/lang/ClassLoader;')) &&
 	        typeof this.jsConstructor.prototype[this.fullSignature] !== 'function') {
 	      var syntheticClassLoaderMethod = this.method;
