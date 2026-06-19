@@ -95,6 +95,7 @@ test -f "$out_dir/ScalaLibrarySmoke.class"
 test -f "$out_dir/ScalaMacroUseSmoke.class"
 test -f "$out_dir/ScalaReflectSmoke.class"
 test -f "$out_dir/ScalaReflectSmoke\$ReflectBox.class"
+test -f "$out_dir/ScalaStackWalkerSmoke.class"
 test -f "$out_dir/scalasmoke/PackageRegistry.class"
 test -f "$out_dir/scalasmoke/PackageWorker.class"
 test -f "$out_dir/scalasmoke/ScalaPackageReflectionSmoke.class"
@@ -106,7 +107,7 @@ test -f "$out_dir/SmokeBox.class"
 test -f "$out_dir/SmokeStage.class"
 test -f "$out_dir/ZeroExpr.class"
 
-expected_output="${SCALA_SMOKE_EXPECTED_OUTPUT:-"scala:38:parse>run:i=39:SCALA:a,bb:sc|even4:25:12:1=4,2=2,3=4:b:4/ccc:4/aa:2:g2:t5:String:3:z:2:worker:3:c1:describe/getName/total:pkg-worker-11:20:red-green-blue:23:ReflectBox:2:name/value:true:m22:macro:cs"}"
+expected_output="${SCALA_SMOKE_EXPECTED_OUTPUT:-"scala:38:parse>run:i=39:SCALA:a,bb:sc|even4:25:12:1=4,2=2,3=4:b:4/ccc:4/aa:2:g2:t5:String:3:z:2:worker:3:c1:describe/getName/total:pkg-worker-11:20:red-green-blue:23:ReflectBox:2:name/value:true:m22:macro:cs:5:leaf:(I)Ljava/lang/String;:(I)Ljava/lang/String;:ScalaStackWalkerSmoke$|outer:(Ljava/lang/String;)Ljava/lang/String;:(Ljava/lang/String;)Ljava/lang/String;:ScalaStackWalkerSmoke$|exercise:()Ljava/lang/String;:()Ljava/lang/String;:ScalaStackWalkerSmoke$:(I)Ljava/lang/String;:UnsupportedOperationException"}"
 
 native_output="$(java -cp "$runtime_cp" Hello)"
 if [ "$native_output" != "$expected_output" ]; then

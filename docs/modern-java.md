@@ -225,7 +225,9 @@ still not claimed.
   arguments, case-class `copy`, `@tailrec`, varargs with `ClassTag`, `Try`,
   tuple ordering, package object initialization, package-scoped classes and
   objects, `Enumeration`, `@BeanProperty`, Java reflection over
-  Scala-generated members, specialized class generation, and `scala-reflect`
+  Scala-generated members, specialized class generation, Java `StackWalker`
+  frame descriptor/`MethodType` metadata with retained-class-reference guards,
+  and `scala-reflect`
   runtime universe use covering runtime mirror creation, `typeOf`, member
   symbol lookup, case-accessor discovery, and static class lookup, plus
   two-phase Scala 2 blackbox macro expansion, plus string interpolation, then

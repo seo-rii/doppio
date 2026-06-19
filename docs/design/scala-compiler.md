@@ -41,6 +41,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - package object initialization, package-scoped classes/objects,
   `Enumeration`, `@BeanProperty`, Java reflection over Scala-generated members,
   and specialized class generation;
+- source-level Java `StackWalker` usage covering retained-class-reference frame
+  descriptor and `MethodType` metadata plus the no-retain `getMethodType`
+  guard;
 - `scala-reflect` runtime universe coverage for runtime mirror creation,
   `typeOf`, constructor/member symbol lookup, case-accessor discovery, and
   static class lookup;
