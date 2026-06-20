@@ -1,36 +1,30 @@
-doppio: A JVM in TypeScript v0.5.0
-==================================
+Doppio Modern JVM
+=================
 
-[![Join the chat at https://gitter.im/plasma-umass/doppio](https://badges.gitter.im/plasma-umass/doppio.svg)](https://gitter.im/plasma-umass/doppio?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-[![Build Status](https://travis-ci.org/plasma-umass/doppio.svg?branch=master)](https://travis-ci.org/plasma-umass/doppio)
-[![Build status](https://ci.appveyor.com/api/projects/status/tcwicbagl9xi3m6v?svg=true)](https://ci.appveyor.com/project/jvilk/doppio)
-[![npm version](https://badge.fury.io/js/doppiojvm.svg)](https://badge.fury.io/js/doppiojvm)
-[![david-dm-status-badge](https://david-dm.org/plasma-umass/doppio/master.svg)](https://david-dm.org/plasma-umass/doppio/master#info=dependencies&view=table)
-[![david-dm-status-badge](https://david-dm.org/plasma-umass/doppio/master/dev-status.svg)](https://david-dm.org/plasma-umass/doppio/master#info=devDependencies&view=table)
+[![Modern Java](https://github.com/seo-rii/doppio/actions/workflows/modern-java.yml/badge.svg?branch=modern)](https://github.com/seo-rii/doppio/actions/workflows/modern-java.yml)
+[![Pages](https://github.com/seo-rii/doppio/actions/workflows/pages.yml/badge.svg?branch=modern)](https://github.com/seo-rii/doppio/actions/workflows/pages.yml)
 
-_doppio_ is a double shot of espresso.
-In this case, it's also a POSIX-compatible runtime system plus a JVM written in [TypeScript](http://www.typescriptlang.org/) and an active research project of the [PLASMA group at the University of Massachusetts](http://plasma.cs.umass.edu/).
+_doppio_ is a double shot of espresso. This fork keeps the original
+POSIX-compatible runtime system and JVM written in
+[TypeScript](http://www.typescriptlang.org/), while tracking modern Java
+compatibility, Kotlin compiler bring-up, Scala compiler smoke coverage, and
+browser release builds.
 
-To try doppio now, head to the [live demo page](http://plasma-umass.github.io/doppio-demo/).
+To try the browser build, head to the [live Pages site](https://seorii.page/doppio/).
 
-To learn more, read some [documentation](docs), or read our [academic paper](http://dl.acm.org/citation.cfm?id=2594293) [(alt. link w/ no paywall)](https://plasma-umass.github.io/doppio-demo/paper.pdf) published at [PLDI 2014](http://conferences.inf.ed.ac.uk/pldi2014/)!
-
-You can also get in touch via our [mailing list][mail] or via the IRC channel
-\#plasma-umass on Freenode.
-
-[mail]: https://groups.google.com/forum/?fromgroups#!forum/plasma-umass-gsoc
+To learn more, read the [developer guide](docs), the
+[modern Java compatibility matrix](docs/modern-java.md), or the original
+[academic paper](http://dl.acm.org/citation.cfm?id=2594293) [(alt. link w/ no paywall)](https://plasma-umass.github.io/doppio-demo/paper.pdf)
+published at [PLDI 2014](http://conferences.inf.ed.ac.uk/pldi2014/).
 
 Getting & Building the Code
 ---------------------------
 
 Before attempting to build doppio, you must have the following installed:
 
-* Node v6.0 or higher
-  * There is a bug that prevents you from compiling DoppioJVM with Node v4 and below.
-* NPM package `grunt-cli` installed globally
-  * `npm install -g grunt-cli`
-* Java 8 JDK
-* (Recommended) Yarn
+* Node 24 for the CI-supported modern toolchain.
+* Yarn 1.22.
+* Java 17 JDK.
 
 If you are on Windows, you will need the following installed:
 
@@ -40,7 +34,7 @@ If you are on Windows, you will need the following installed:
 
 Run the following commands to build doppio. Note that your first time building may take some time, as the build script will download the entire Java Class Library.
 
-    git clone https://github.com/plasma-umass/doppio.git
+    git clone https://github.com/seo-rii/doppio.git
     cd doppio
     yarn install       # npm install should work if you do not have yarn
     grunt release      # For browser integration.
@@ -52,6 +46,13 @@ Testing
 Run the full test suite using node.js:
 
     grunt test
+
+Run the modern Java/Kotlin/Scala compatibility suite:
+
+    grunt --stack test-modern-java --grunt-ignore-compile-errors
+    KOTLIN_SMOKE_CLASSPATH_MODE=full ./ci/kotlin_smoke.sh
+    ./ci/kotlin_reflect_smoke.sh
+    ./ci/scala_smoke.sh
 
 Run the full test suite in a web browser:
 
@@ -80,3 +81,12 @@ You can also build and interact with a simple example application with:
     grunt examples
 
 The code is in [`docs/examples`](docs/examples).
+
+GitHub Pages
+------------
+
+The `Pages` workflow builds the release browser bundle, compiles the browser
+example, generates the BrowserFS listings, and deploys the `docs` directory.
+The project page is intended to be available at:
+
+    https://seorii.page/doppio/

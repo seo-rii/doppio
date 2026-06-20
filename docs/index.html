@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Doppio Modern JVM</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f7f7f4;
+        --ink: #181a1f;
+        --muted: #5d6673;
+        --line: #d7d9dd;
+        --panel: #ffffff;
+        --accent: #0f766e;
+        --accent-ink: #ffffff;
+        --code: #111827;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #111318;
+          --ink: #f2f4f8;
+          --muted: #a8b0bd;
+          --line: #303641;
+          --panel: #181c23;
+          --accent: #2dd4bf;
+          --accent-ink: #06201d;
+          --code: #f8fafc;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.5;
+      }
+
+      header,
+      main,
+      footer {
+        width: min(100%, 1060px);
+        margin: 0 auto;
+        padding: 28px 20px;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      a {
+        color: inherit;
+        text-underline-offset: 3px;
+      }
+
+      .brand {
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+
+      .intro {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+        gap: 28px;
+        align-items: stretch;
+        padding-top: 48px;
+      }
+
+      h1 {
+        margin: 0 0 18px;
+        font-size: clamp(2rem, 7vw, 4.75rem);
+        line-height: 1;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin: 0 0 14px;
+        font-size: 1.1rem;
+        letter-spacing: 0;
+      }
+
+      p {
+        margin: 0 0 18px;
+        color: var(--muted);
+        font-size: 1rem;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 26px;
+      }
+
+      .button {
+        display: inline-flex;
+        min-height: 42px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 0 16px;
+        background: var(--panel);
+        font-weight: 650;
+        text-decoration: none;
+      }
+
+      .button.primary {
+        border-color: transparent;
+        background: var(--accent);
+        color: var(--accent-ink);
+      }
+
+      .terminal {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        overflow: hidden;
+      }
+
+      .terminal-bar {
+        display: flex;
+        gap: 7px;
+        border-bottom: 1px solid var(--line);
+        padding: 12px;
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--line);
+      }
+
+      pre {
+        margin: 0;
+        padding: 18px;
+        overflow-x: auto;
+        color: var(--code);
+        font: 0.92rem/1.55 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+        margin-top: 34px;
+      }
+
+      .tile {
+        min-height: 136px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 18px;
+        background: var(--panel);
+      }
+
+      footer {
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+      }
+
+      @media (max-width: 760px) {
+        header {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .intro,
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="./">Doppio Modern JVM</a>
+      <nav aria-label="Primary">
+        <a href="examples/simple.html">Demo</a>
+        <a href="README.md">Developer Guide</a>
+        <a href="modern-java.md">Modern Java Matrix</a>
+        <a href="https://github.com/seo-rii/doppio">GitHub</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <div>
+          <h1 id="page-title">Doppio Modern JVM</h1>
+          <p>
+            A TypeScript JVM fork focused on Java 17+ compatibility, Kotlin
+            compiler bring-up, Scala compiler smoke coverage, and browser
+            release builds.
+          </p>
+          <div class="actions">
+            <a class="button primary" href="examples/simple.html">Open browser demo</a>
+            <a class="button" href="modern-java.md">View compatibility matrix</a>
+          </div>
+        </div>
+
+        <div class="terminal" aria-label="Example command">
+          <div class="terminal-bar" aria-hidden="true">
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </div>
+          <pre><code>git clone https://github.com/seo-rii/doppio.git
+cd doppio
+yarn install
+grunt release
+./doppio classes.demo.Fib 7</code></pre>
+        </div>
+      </section>
+
+      <section class="grid" aria-label="Project areas">
+        <article class="tile">
+          <h2>Browser Runtime</h2>
+          <p>GitHub Pages publishes the generated release bundle and a runnable BrowserFS-backed Java example.</p>
+        </article>
+        <article class="tile">
+          <h2>Modern Java</h2>
+          <p>Compatibility work is tracked by Java version, implementation status, difficulty, and focused tests.</p>
+        </article>
+        <article class="tile">
+          <h2>Compiler Smokes</h2>
+          <p>Kotlin and Scala compiler smoke tests run generated programs on both the host JVM and Doppio.</p>
+        </article>
+      </section>
+    </main>
+
+    <footer>
+      <p>Published from the <code>modern</code> branch of <a href="https://github.com/seo-rii/doppio">seo-rii/doppio</a>.</p>
+    </footer>
+  </body>
+</html>
