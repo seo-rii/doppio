@@ -3678,7 +3678,7 @@ function modernJava(grunt: IGrunt) {
     u4(0xcafebabe);
     u2(0);
     u2(55);
-    u2(292);
+    u2(303);
 
     cls(2);
     utf8('classes/modern_test/Java11ConstantDynamicInvoke');
@@ -3969,12 +3969,23 @@ function modernJava(grunt: IGrunt) {
     nameAndType(287, 119);
     dynamic(34, 288);
     double64(0.5);
+    utf8('INSTANCE_DOUBLE_SETTER_FIELD');
+    nameAndType(292, 271);
+    ref(9, 1, 293);
+    methodHandle(3, 294);
+    methodHandle(1, 294);
+    utf8('setInstanceDoubleResult');
+    nameAndType(297, 119);
+    dynamic(35, 298);
+    utf8('instanceDoubleFieldValue');
+    nameAndType(300, 271);
+    dynamic(36, 301);
 
     u2(0x0021);
     u2(1);
     u2(3);
     u2(0);
-    u2(6);
+    u2(7);
 
     u2(0x0019);
     u2(43);
@@ -4009,6 +4020,11 @@ function modernJava(grunt: IGrunt) {
 
     u2(0x0009);
     u2(270);
+    u2(271);
+    u2(0);
+
+    u2(0x0001);
+    u2(292);
     u2(271);
     u2(0);
 
@@ -4146,6 +4162,12 @@ function modernJava(grunt: IGrunt) {
       0x14, 0x01, 0x22,
       0x63,
       0xb6, 0x01, 0x1c,
+      0xb2, 0x00, 0x11,
+      0x13, 0x01, 0x2b,
+      0xb6, 0x00, 0x7c,
+      0xb2, 0x00, 0x11,
+      0x14, 0x01, 0x2e,
+      0xb6, 0x01, 0x1c,
       0xb1
     ], 5, 1);
 
@@ -4205,8 +4227,8 @@ function modernJava(grunt: IGrunt) {
 
     u2(1);
     u2(24);
-    u4(266);
-    u2(35);
+    u4(284);
+    u2(37);
     u2(31);
     u2(1);
     u2(36);
@@ -4339,6 +4361,15 @@ function modernJava(grunt: IGrunt) {
     u2(31);
     u2(1);
     u2(275);
+    u2(31);
+    u2(3);
+    u2(295);
+    u2(100);
+    u2(290);
+    u2(31);
+    u2(2);
+    u2(296);
+    u2(100);
 
     grunt.file.write(outPath, Buffer.from(bytes));
     grunt.log.ok('Generated ' + outPath);

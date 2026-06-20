@@ -232,7 +232,10 @@ handles, dynamic constants, and record object-method linkage:
   `GETSTATIC` field targets cover the tested case where an `int` field value
   backs a `long` dynamic constant.
   Static method targets also cover the tested `void` return case where the
-  reference dynamic constant result is `null`.
+  reference dynamic constant result is `null`. Field setter targets cover
+  static reference, receiver-backed reference, static primitive `double`, and
+  receiver-backed primitive `double` writes, with follow-up getter dynamic
+  constants proving the side effects.
 - Java 16 records have a targeted `java.lang.runtime.ObjectMethods.bootstrap`
   `invokedynamic` fast path for compiler-generated field component handles,
   covering generated `toString`, `equals`, and `hashCode` in the current record
@@ -292,8 +295,9 @@ handles, dynamic constants, and record object-method linkage:
   adaptation beyond the targeted virtual/interface/special receiver cases and
   tested interface static method target, remaining
   field setter shapes beyond the tested reference `PUTSTATIC`, primitive
-  `PUTSTATIC` `CONSTANT_Long` to `double`, and receiver-backed reference
-  `PUTFIELD` cases, varargs adaptation beyond the tested reference-array
+  `PUTSTATIC` `CONSTANT_Long` to `double`, receiver-backed reference
+  `PUTFIELD`, and receiver-backed primitive `PUTFIELD` `CONSTANT_Double` to
+  `double` cases, varargs adaptation beyond the tested reference-array
   collection and `CONSTANT_Integer` to `long...` widening cases, full primitive boxing/unboxing parity beyond the tested
   `int` return, `CONSTANT_Integer` argument boxing, `Integer` argument
   unboxing, `Integer` to `long` argument widening, `CONSTANT_Integer` to
