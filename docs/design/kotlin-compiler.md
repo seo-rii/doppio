@@ -533,6 +533,12 @@ Current verified checks:
   filtering, map lookup by unsigned keys, and byte-to-hex rendering. Both the
   host JVM and Doppio print
   `3:4:0fa0ff:2,9,18446744073709551615:4294967295,4:wrap:true:true`.
+- A Kotlin source-level `CompletableFuture` smoke covers Java SAM conversion
+  into `CompletableFuture.supplyAsync`, executor-backed asynchronous
+  completion, `thenApply`, `thenCompose`, `handle`, `thenCombine`,
+  `applyToEither`, `allOf`, `join`, and timed `get`. Both the host JVM and
+  Doppio print `KT2!:5:l`. A 2026-06-20 full-classpath run completed in 544
+  seconds.
 - A minimal enum-polymorphism smoke covers enum constants with class bodies,
   overridden properties and methods, `Enum.entries`, `enumValues`,
   `enumValueOf`, `valueOf`, and `when` dispatch over those constants. Both the

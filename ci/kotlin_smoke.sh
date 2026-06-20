@@ -92,6 +92,7 @@ test -f "$out_dir/BytecodeSmokeKt.class"
 test -f "$out_dir/CollectionBuilderSmokeKt.class"
 test -f "$out_dir/CollectionBuilderSmokeKt\$collectionBuilderSummary\$\$inlined\$groupingBy\$1.class"
 test -f "$out_dir/ConcurrentCacheSmokeKt.class"
+test -f "$out_dir/CompletableFutureSmokeKt.class"
 test -f "$out_dir/ControlFlowSmokeKt.class"
 test -f "$out_dir/CaptureOwner.class"
 test -f "$out_dir/CaptureOwner\$Nested.class"
@@ -234,6 +235,8 @@ default_expected_output="${default_expected_output}
 v5|a3|mh>handle|handle!|11|7|(Ljava/lang/String;I)Ljava/lang/String;|(LMethodHandleOwner;Ljava/lang/String;)Ljava/lang/String;|id|const|bound6|handle?|ins9|drop|flt9|[ret4]|c/a/b|empty|word|pos:7|neg:-2/-2|(I)Ljava/lang/String;|(IJLjava/lang/String;)Ljava/lang/String;|(Ljava/lang/String;I)Ljava/lang/String;|(Ljava/lang/String;)Ljava/lang/String;|(I)Ljava/lang/String;|exact3|loose4|A/B6/C|left:right|left|right|long:12|one|changed|7|9|boom|0|true|true|4|3:true|true|matched|fold:n6:6|collect:a,b,c~collectAt:x,y~collectMid:m,n:tail~spread:d,e,f~spreadAt:g,h,i~spreadMid/o/p/tail~true~var:j,k~false~fixed:l,m~spreadInvoker11|5~3~x...|5~3~1~x...~x.|10~6~0~x012~x234~x|cleanup:none,target:try:7,try~none,target:try:7,try~try-fail:bad:8/IllegalArgumentException:try-fail:bad:8,null,bad~void-none,void,void-target:void|u7/ur>reflect?/IllegalAccessException|join:2/MethodHandleOwner:String/text:String/text:String|MethodHandleOwner/true:true/secret:pl/IllegalAccessException|(Ljava/lang/invoke/MethodHandle;Ljava/lang/String;I)Ljava/lang/String;|(Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;)Ljava/lang/String;|(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;|(D)Ljava/lang/String;|([Ljava/lang/String;I)Ljava/lang/String;|([III)V|(Ljava/lang/IllegalStateException;)Ljava/lang/String;|()I|()Ljava/lang/String;|(ILjava/lang/String;)Ljava/lang/String;|([Ljava/lang/String;)I|(I)[Ljava/lang/String;|(Ljava/lang/String;I)V|(ILjava/lang/String;)Ljava/lang/String;|(Ljava/lang/String;I)Ljava/lang/String;|(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;|(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;|(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;|(Ljava/lang/String;[Ljava/lang/String;)Ljava/lang/String;|(Ljava/lang/String;[Ljava/lang/String;)Ljava/lang/String;|(Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;|(Ljava/lang/invoke/MethodHandle;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;|(I)I|(I)I|(Ljava/lang/String;I)Ljava/lang/String;|(I)I|(I)I|(Ljava/lang/String;I)Ljava/lang/String;|(I)I|(I)I|(Ljava/lang/String;I)Ljava/lang/String;|(Ljava/lang/String;II)Ljava/lang/String;|(Ljava/lang/String;I)Ljava/lang/String;|(Ljava/lang/String;)V"
 default_expected_output="${default_expected_output}
 3:4:0fa0ff:2,9,18446744073709551615:4294967295,4:wrap:true:true"
+default_expected_output="${default_expected_output}
+KT2!:5:l"
 default_expected_output="${default_expected_output}
 A1B3G5|tk2|X1,x2,xxx3|low/high/high|IllegalArgumentException"
 expected_output="${KOTLIN_SMOKE_EXPECTED_OUTPUT:-"$default_expected_output"}"

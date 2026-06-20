@@ -191,7 +191,10 @@ still not claimed.
   `whileLoop`/`doWhileLoop`/`countedLoop` non-`void` state loops), and
   method-type descriptor reporting, plus Kotlin unsigned
   primitives and unsigned arrays covering wraparound arithmetic, unsigned
-  sorting, filtering, map keys, and hexadecimal byte rendering, then runs the
+  sorting, filtering, map keys, and hexadecimal byte rendering, plus Kotlin
+  source-level Java `CompletableFuture` interop covering SAM conversion,
+  executor-backed completion, composition, recovery, combination, racing, and
+  timed retrieval, then runs the
   generated code on both the host JVM and Doppio with `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only

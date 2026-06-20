@@ -42,5 +42,6 @@ fun main() {
   println(proxyReflectionSummary())
   println(methodHandleSummary())
   println(unsignedSummary())
+  println(completableFutureSummary())
   println(enumPolymorphismSummary())
 }
