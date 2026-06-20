@@ -2027,6 +2027,100 @@ export default function (): any {
     }
   }
 
+  var LOOKUP_PUBLIC = 0x0001,
+    LOOKUP_PRIVATE = 0x0002,
+    LOOKUP_PROTECTED = 0x0004,
+    LOOKUP_PACKAGE = 0x0008;
+
+  class java_lang_invoke_MethodHandles$Lookup {
+    private static getAllowedModes(lookup: JVMTypes.java_lang_invoke_MethodHandles$Lookup): number {
+      var modes = lookup['java/lang/invoke/MethodHandles$Lookup/allowedModes'];
+      return modes === -1 ? 0x000f : modes;
+    }
+
+    private static isPublicLookup(lookup: JVMTypes.java_lang_invoke_MethodHandles$Lookup, modes: number): boolean {
+      var lookupClass = <JVMTypes.java_lang_Class> lookup['java/lang/invoke/MethodHandles$Lookup/lookupClass'];
+      return modes === LOOKUP_PUBLIC &&
+        lookupClass !== null &&
+        lookupClass !== undefined &&
+        lookupClass.$cls.getInternalName() === 'Ljava/lang/Object;';
+    }
+
+    public static 'previousLookupClass()Ljava/lang/Class;'(
+      thread: JVMThread,
+      javaThis: JVMTypes.java_lang_invoke_MethodHandles$Lookup
+    ): JVMTypes.java_lang_Class {
+      return null;
+    }
+
+    public static 'hasFullPrivilegeAccess()Z'(
+      thread: JVMThread,
+      javaThis: JVMTypes.java_lang_invoke_MethodHandles$Lookup
+    ): number {
+      var modes = java_lang_invoke_MethodHandles$Lookup.getAllowedModes(javaThis);
+      return (modes & LOOKUP_PRIVATE) !== 0 &&
+        (modes & LOOKUP_PACKAGE) !== 0 ? 1 : 0;
+    }
+
+    public static 'dropLookupMode(I)Ljava/lang/invoke/MethodHandles$Lookup;'(
+      thread: JVMThread,
+      javaThis: JVMTypes.java_lang_invoke_MethodHandles$Lookup,
+      modeToDrop: number
+    ): JVMTypes.java_lang_invoke_MethodHandles$Lookup {
+      var modes = java_lang_invoke_MethodHandles$Lookup.getAllowedModes(javaThis),
+        newModes: number,
+        lookupClass: ReferenceClassData<JVMTypes.java_lang_Object>,
+        lookupCons: any,
+        rv: JVMTypes.java_lang_invoke_MethodHandles$Lookup;
+
+      if (modeToDrop === 0 || (modeToDrop & (modeToDrop - 1)) !== 0 ||
+          (modeToDrop & ~(0x0001 | 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020 | 0x0040)) !== 0) {
+        thread.throwNewException('Ljava/lang/IllegalArgumentException;', 'mode is not a valid single lookup mode');
+        return;
+      }
+
+      if (java_lang_invoke_MethodHandles$Lookup.isPublicLookup(javaThis, modes)) {
+        return javaThis;
+      }
+
+      switch (modeToDrop) {
+        case 0x0001:
+          newModes = 0;
+          break;
+        case 0x0002:
+          newModes = modes & ~(LOOKUP_PRIVATE | LOOKUP_PROTECTED);
+          break;
+        case 0x0004:
+          newModes = modes & ~LOOKUP_PROTECTED;
+          break;
+        case 0x0008:
+          newModes = modes & ~(LOOKUP_PRIVATE | LOOKUP_PROTECTED | LOOKUP_PACKAGE);
+          break;
+        case 0x0010:
+          newModes = modes & LOOKUP_PUBLIC;
+          break;
+        case 0x0020:
+        case 0x0040:
+          newModes = modes & ~LOOKUP_PROTECTED;
+          break;
+        default:
+          thread.throwNewException('Ljava/lang/IllegalArgumentException;', 'mode is not a valid lookup mode');
+          return;
+      }
+
+      if (newModes === modes) {
+        return javaThis;
+      }
+
+      lookupClass = <ReferenceClassData<JVMTypes.java_lang_Object>> javaThis.getClass();
+      lookupCons = lookupClass.getConstructor(thread);
+      rv = new lookupCons(thread);
+      rv['java/lang/invoke/MethodHandles$Lookup/lookupClass'] = javaThis['java/lang/invoke/MethodHandles$Lookup/lookupClass'];
+      rv['java/lang/invoke/MethodHandles$Lookup/allowedModes'] = newModes;
+      return rv;
+    }
+  }
+
   class java_lang_invoke_MethodHandleNatives {
     /**
      * I'm going by JAMVM's implementation of this method, which is very easy
@@ -2442,6 +2536,7 @@ export default function (): any {
     'java/lang/Throwable': java_lang_Throwable,
     'java/lang/UNIXProcess': java_lang_UNIXProcess,
     'java/lang/invoke/MethodHandles': java_lang_invoke_MethodHandles,
+    'java/lang/invoke/MethodHandles$Lookup': java_lang_invoke_MethodHandles$Lookup,
     'java/lang/invoke/MethodHandleNatives': java_lang_invoke_MethodHandleNatives,
     'java/lang/invoke/MethodHandle': java_lang_invoke_MethodHandle
   };
