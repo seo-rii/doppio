@@ -47,6 +47,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - `scala-reflect` runtime universe coverage for runtime mirror creation,
   `typeOf`, constructor/member symbol lookup, case-accessor discovery, and
   static class lookup;
+- Scala 2.13 collection-library coverage for `LazyList`, extractor `unapply`,
+  `Regex`, `TreeMap`, `ArraySeq`, `groupMap`, map views, and right-biased
+  `Either`;
 - two-phase Scala 2 macro expansion using `scala.reflect.macros.blackbox`,
   where the macro implementation is compiled first under Doppio and then used
   by the main source fixture in a second Doppio-hosted scalac invocation;
@@ -58,7 +61,9 @@ The smoke compares the generated program output on the host JVM and Doppio.
 
 The initial Scala 2.13 compiler smoke now passes under Doppio. It compiles the
 source fixture, checks the emitted class files, and compares generated program
-output on the host JVM and Doppio.
+output on the host JVM and Doppio. The smoke now includes a Scala 2.13
+collection/extractor slice covering `LazyList`, extractor `unapply`, `Regex`,
+`TreeMap`, `ArraySeq`, `groupMap`, map views, and right-biased `Either`.
 
 The smoke also includes a two-phase macro path: Doppio-hosted scalac first
 emits a blackbox macro implementation class, then a second Doppio-hosted scalac
