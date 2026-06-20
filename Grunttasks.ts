@@ -13,6 +13,60 @@ import express = require('express');
 import bodyParser = require('body-parser');
 import glob = require('glob');
 
+const BOOTSTRAP_JVM_TYPES_STUB = path.resolve(__dirname, 'includes', 'JVMTypes.d.ts');
+const BOOTSTRAP_JDK_JSON_STUB = path.resolve(__dirname, 'vendor', 'java_home', 'jdk.json.d.ts');
+
+function ensureDir(dir: string): void {
+  if (fs.existsSync(dir)) {
+    return;
+  }
+  ensureDir(path.dirname(dir));
+  fs.mkdirSync(dir);
+}
+
+function writeBootstrapTypeStubs(): void {
+  if (!fs.existsSync(BOOTSTRAP_JVM_TYPES_STUB)) {
+    const names: {[name: string]: boolean} = {};
+    const sourceFiles = glob.sync('{src,console,tasks}/**/*.ts')
+      .concat(glob.sync('Grunttasks.ts'));
+    sourceFiles.forEach((file) => {
+      const data = fs.readFileSync(path.resolve(__dirname, file), 'utf8');
+      let match: RegExpExecArray;
+      const regex = /JVMTypes\.([A-Za-z_$][\w$]*)/g;
+      while ((match = regex.exec(data)) !== null) {
+        names[match[1]] = true;
+      }
+    });
+
+    const sortedNames = Object.keys(names).sort();
+    let output = 'declare namespace JVMTypes {\n';
+    sortedNames.forEach((name) => {
+      if (name === 'JVMArray') {
+        output += '  export type JVMArray<T> = { array: T[]; cls?: any; [key: string]: any; };\n';
+      } else if (name === 'JVMFunction') {
+        output += '  export type JVMFunction = any;\n';
+      } else {
+        output += `  export class ${name} { static [key: string]: any; [key: string]: any; }\n`;
+      }
+    });
+    output += '}\nexport = JVMTypes;\n';
+
+    ensureDir(path.dirname(BOOTSTRAP_JVM_TYPES_STUB));
+    fs.writeFileSync(BOOTSTRAP_JVM_TYPES_STUB, output);
+  }
+
+  if (!fs.existsSync(BOOTSTRAP_JDK_JSON_STUB)) {
+    ensureDir(path.dirname(BOOTSTRAP_JDK_JSON_STUB));
+    fs.writeFileSync(BOOTSTRAP_JDK_JSON_STUB,
+`declare let JDKInfo: {
+  url: string;
+  classpath: string[];
+};
+export = JDKInfo;
+`);
+  }
+}
+
 /**
  * Returns a webpack configuration for testing a particular DoppioJVM build.
  */
@@ -825,11 +879,12 @@ export function setup(grunt: IGrunt) {
     if (!downloadScriptExists || !includeExists) {
       // Awkward bootstrapping:
       // Need to build DoppioJVM before we can check if a new JDK is needed.
-      tasks.unshift('ts:dev-cli');
+      tasks.unshift('prepare_bootstrap_type_stubs', 'ts:dev-cli');
       if (!includeExists) {
         // Tell Grunt to ignore these errors; we'll compile it a second time
         // once bootstrapped to catch any valid errors.
         grunt.config.set('ts.options.failOnTypeErrors', false);
+        grunt.config.set('ts.options.noImplicitAny', false);
         // Disable the grunt-ts cache for this compilation. Otherwise, it may
         // cache a problematic compile and will not error when we go to build
         // the app with error checking turned on.
@@ -840,8 +895,12 @@ export function setup(grunt: IGrunt) {
     }
     grunt.task.run(tasks);
   });
+  grunt.registerTask("prepare_bootstrap_type_stubs", "Creates temporary declaration stubs for the first bootstrap compile.", function() {
+    writeBootstrapTypeStubs();
+  });
   grunt.registerTask("enable_type_errors", "Enables TypeScript type errors after bootstrapping.", function() {
     grunt.config.set('ts.options.failOnTypeErrors', true);
+    grunt.config.set('ts.options.noImplicitAny', true);
     grunt.config.set('ts.options.fast', 'watch');
   });
   grunt.registerTask('generate_doppio_jar', 'Only generates doppio.jar if input classes have changed.', function() {

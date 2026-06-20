@@ -64,6 +64,13 @@ The current compromise is deliberate:
   not replace the `NodePRNG` import with a browser-external placeholder.
 - Project and Grunt bootstrap no-emit checks use `target=ES2015`; these pass
   under both `typescript@6.0.3` and `typescript@7.0.1-rc`.
+- The first Grunt bootstrap compile may run before `includes/JVMTypes.d.ts` and
+  `vendor/java_home/jdk.json.d.ts` exist. It now writes temporary declaration
+  stubs and disables `noImplicitAny` for that first emit-only pass, then
+  restores normal type-error behavior after real declarations are generated.
+  This keeps GitHub Actions from reporting known bootstrap-only TypeScript
+  annotations while preserving the later strict project and bootstrap
+  typechecks.
 - `grunt-contrib-uglify` is upgraded to `5.2.2` / `uglify-js@3.19.3` for CLI
   minification, with `compress.arrows=false` so Webpack 1's later Uglify pass
   still receives ES5-compatible input.
