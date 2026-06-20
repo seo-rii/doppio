@@ -82,10 +82,11 @@ object Hello {
     val advanced = AdvancedScalaSmoke.exercise(7)
     val library = ScalaLibrarySmoke.exercise()
     val collections = ScalaCollectionSmoke.exercise()
+    val interop = ScalaInteropSmoke.exercise()
     val reflection = scalasmoke.ScalaPackageReflectionSmoke.exercise()
     val scalaReflect = ScalaReflectSmoke.exercise()
     val macroUse = ScalaMacroUseSmoke.exercise()
     val stackWalker = ScalaStackWalkerSmoke.exercise()
-    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$collections:$reflection:$scalaReflect:$macroUse:$stackWalker")
+    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$collections:$interop:$reflection:$scalaReflect:$macroUse:$stackWalker")
   }
 }

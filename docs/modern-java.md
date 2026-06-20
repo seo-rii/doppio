@@ -228,6 +228,8 @@ still not claimed.
   objects, `Enumeration`, `@BeanProperty`, Java reflection over
   Scala-generated members, specialized class generation, Java `StackWalker`
   frame descriptor/`MethodType` metadata with retained-class-reference guards,
+  Java collection interop through `scala.jdk.CollectionConverters`, a small
+  `Future`/`Promise`/`Await` path running on a Java executor,
   and `scala-reflect`
   runtime universe use covering runtime mirror creation, `typeOf`, member
   symbol lookup, case-accessor discovery, and static class lookup, plus
