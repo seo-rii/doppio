@@ -781,14 +781,23 @@ export default function (): any {
       // TODO: Need to check specific flags
       const pathString = getStringFromHeap(thread, pathAddress);
       // TODO: fs.access() is better but not currently supported in browserfs: https://github.com/jvilk/BrowserFS/issues/128
-      const checker = util.are_in_browser() ? fs.stat : fs.access;
-      checker(pathString, (err, stat) => {
-        if (err) {
-          throwNodeError(thread, err);
-        } else {
-          thread.asyncReturn();
-        }
-      });
+      if (util.are_in_browser()) {
+        fs.stat(pathString, (err: Error, stat: fs.Stats) => {
+          if (err) {
+            throwNodeError(thread, err);
+          } else {
+            thread.asyncReturn();
+          }
+        });
+      } else {
+        fs.access(pathString, (err: Error) => {
+          if (err) {
+            throwNodeError(thread, err);
+          } else {
+            thread.asyncReturn();
+          }
+        });
+      }
     }
 
     public static 'getpwuid(I)[B'(thread: JVMThread, arg0: number): JVMTypes.JVMArray<number> {

@@ -45,14 +45,14 @@ function mkdirp(p: string) {
  * Downloads the JDK at JDK_URL into the destination path.
  * Creates the path if it doesn't exist.
  */
-function downloadJDK(url: string, destPath: string, cb: (err?: Error) => void) {
+function downloadJDK(downloadUrl: string, destPath: string, cb: (err?: Error) => void) {
   let ended = false;
   mkdirp(destPath);
-  https.get(url, (res) => {
+  https.get(<any> downloadUrl, (res: any) => {
     if (res.statusCode === 302) {
       // Redirected.
       ended = true;
-      downloadJDK(res.headers['location'], destPath, cb);
+      downloadJDK(<string> res.headers['location'], destPath, cb);
       return;
     }
 
