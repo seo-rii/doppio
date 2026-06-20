@@ -8,9 +8,9 @@ import {asyncForEach} from './util';
 // Type information only.
 import TBFSFS from 'browserfs/dist/node/core/FS';
 // Export so it can be returned from ClasspathJar.
-import TZipFS from 'browserfs/dist/node/backend/ZipFS';
+import ZipFSClass from 'browserfs/dist/node/backend/ZipFS';
 import {setImmediate} from 'browserfs';
-export type TZipFS = TZipFS;
+export type TZipFS = ZipFSClass;
 let BFSFS = BrowserFS.BFSRequire('fs');
 let ZipFS = BrowserFS.FileSystem.ZipFS;
 export type MetaIndex = {[pkgName: string]: boolean | MetaIndex};

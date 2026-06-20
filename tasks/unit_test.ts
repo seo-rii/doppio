@@ -4,7 +4,7 @@ import async = require('async');
 
 function unitTest(grunt: IGrunt) {
 	grunt.registerMultiTask('unit_test', 'Run doppio unit tests.', function() {
-    var files: { src: string[]; dest: string }[] = this.files,
+    var files: { src: string[]; dest: string }[] = <any> this.files,
       done: (status?: boolean) => void = this.async(),
       tasks: Array<AsyncFunction<void>> = [], testFailed = false;
     // Delete failures.txt if it exists.

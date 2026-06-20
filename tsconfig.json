@@ -2,13 +2,28 @@
     "compilerOptions": {
         "module": "commonjs",
         "declaration": true,
-        "target": "ES3",
+        "target": "ES2015",
         "noImplicitAny": true,
+        "noImplicitThis": false,
         "inlineSourceMap": true,
         "inlineSources": true,
-        "outDir": "build/tsc"
+        "outDir": "build/tsc",
+        "skipLibCheck": true,
+        "strict": false,
+        "strictFunctionTypes": false,
+        "strictNullChecks": false,
+        "strictPropertyInitialization": false,
+        "types": [
+            "async",
+            "grunt",
+            "jasmine",
+            "node"
+        ],
+        "useUnknownInCatchVariables": false
     },
     "include": [
+        "types/**/*.d.ts",
+        "includes/**/*.d.ts",
         "src/**/*.ts",
         "tasks/**/*.ts",
         "*.ts",

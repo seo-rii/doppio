@@ -25,7 +25,7 @@ export function getBuild(): string {
 var globalErrorTrap: (err: Error) => void = null
 onerror = function(err) {
   if (globalErrorTrap) {
-    globalErrorTrap(new Error(err));
+    globalErrorTrap(new Error("" + err));
   }
 };
 
@@ -65,6 +65,6 @@ export function getTests(cb: (tests: DoppioTest[]) => void) {
   }, cb);
 }
 
-export function runTest(test: DoppioTest, cb: (err: Error, actual: string, expected: string) => void): void {
+export function runTest(test: DoppioTest, cb: (err: Error, actual?: string, expected?: string, diff?: string) => void): void {
   test.run(registerGlobalErrorTrap, cb);
 }

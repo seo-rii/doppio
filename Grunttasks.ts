@@ -115,14 +115,7 @@ function getWebpackConfig(target: string, optimize: boolean = false): webpack.Co
     config.plugins.push(new webpack.optimize.UglifyJsPlugin(<any> {
       compress: {
         warnings: false,
-        unsafe: true,
-        screw_ie8: false
-      },
-      mangle: {
-        screw_ie8: false
-      },
-      output: {
-        screw_ie8: false
+        unsafe: true
       },
       sourceMap: true
     }));
@@ -291,21 +284,23 @@ export function setup(grunt: IGrunt) {
       options: {
         comments: true,
         declaration: true,
-        target: 'es3',
+        target: 'es5',
         noImplicitAny: true,
         inlineSourceMap: true,
         inlineSources: true,
+        skipLibCheck: true,
+        additionalFlags: '--ignoreConfig --ignoreDeprecations 6.0 --strict false --strictNullChecks false --strictPropertyInitialization false --noImplicitThis false --useUnknownInCatchVariables false',
         fast: 'watch'
       },
       'dev-cli': {
-        src: ["console/*.ts", "src/**/*.ts", "typings/index.d.ts"],
+        src: ["types/**/*.d.ts", "includes/**/*.d.ts", "console/*.ts", "src/**/*.ts", "vendor/pako.d.ts"],
         outDir: 'build/dev-cli',
         options: {
           module: 'commonjs'
         }
       },
       'test': {
-        src: ["console/*.ts", "src/**/*.ts", "typings/index.d.ts", 'tasks/test/*.ts'],
+        src: ["types/**/*.d.ts", "includes/**/*.d.ts", "console/*.ts", "src/**/*.ts", "vendor/pako.d.ts", 'tasks/test/*.ts'],
         outDir: 'build/scratch/test/dev',
         options: {
           module: 'commonjs'
@@ -320,13 +315,7 @@ export function setup(grunt: IGrunt) {
           global_defs: {
             RELEASE: true
           },
-          screw_ie8: false
-        },
-        mangle: {
-          screw_ie8: false
-        },
-        output: {
-          screw_ie8: false
+          arrows: false
         },
         sourceMap: true,
         sourceMapIncludeSources: true
@@ -967,7 +956,7 @@ export function setup(grunt: IGrunt) {
     const done = this.async();
     const app = express();
     app.use(bodyParser.json());
-    app.use(express.static('.'));
+    app.use((<any> express.static)('.'));
     app.put('/results/:name', function(req, res) {
       const data = req.body;
       grunt.log.ok(`Creating ${req.params.name}...`);

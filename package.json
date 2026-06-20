@@ -17,7 +17,7 @@
     "tar-fs": "^1.13.2"
   },
   "devDependencies": {
-    "@types/async": "2.0.32",
+    "@types/async": "2.4.2",
     "@types/body-parser": "0.0.33",
     "@types/dropboxjs": "0.0.29",
     "@types/esprima": "^2.1.33",
@@ -25,8 +25,8 @@
     "@types/express-serve-static-core": "^4.0.37",
     "@types/filesystem": "0.0.28",
     "@types/glob": "^5.0.30",
-    "@types/grunt": "^0.4.20",
-    "@types/jasmine": "^2.5.35",
+    "@types/grunt": "0.4.32",
+    "@types/jasmine": "2.5.35",
     "@types/karma": "^0.13.33",
     "@types/node": "6.0.33",
     "@types/rimraf": "0.0.28",
@@ -48,7 +48,7 @@
     "grunt-contrib-compress": "^1.2.0",
     "grunt-contrib-connect": "^1.0",
     "grunt-contrib-copy": "^1.0",
-    "grunt-contrib-uglify": "^2.0",
+    "grunt-contrib-uglify": "5.2.2",
     "grunt-karma": "^2.0",
     "grunt-lineending": "^1.0.0",
     "grunt-merge-source-maps": "^0.1.0",
@@ -68,8 +68,8 @@
     "locate-java-home": "1.1.1",
     "semver": "^5.3.0",
     "source-map-loader": "^0.1.5",
-    "typescript": "2.9.2",
-    "uglify-js": "^2.7.3",
+    "typescript": "6.0.3",
+    "uglify-js": "3.19.3",
     "underscore": "^1.12.1",
     "webpack": "^1.13.1",
     "webpack-dev-server": "^1.16.2"
@@ -78,7 +78,11 @@
     "test": "grunt test",
     "prepublish": "node ./prepublish.js",
     "install": "node ./install.js",
-    "appveyor-test": "grunt --stack test-browser-appveyor"
+    "appveyor-test": "grunt --stack test-browser-appveyor",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "typecheck:bootstrap": "tsc --noEmit --ignoreConfig --noImplicitAny --noImplicitThis false --strict false --strictNullChecks false --strictPropertyInitialization false --useUnknownInCatchVariables false --module commonjs --target ES2015 --skipLibCheck types/legacy-globals.d.ts tasks/*.ts Grunttasks.ts",
+    "typecheck:typescript-7-rc": "npx -y -p typescript@7.0.1-rc tsc --project tsconfig.json --noEmit",
+    "typecheck:typescript-7-rc-bootstrap": "npx -y -p typescript@7.0.1-rc tsc --noEmit --ignoreConfig --noImplicitAny --noImplicitThis false --strict false --strictNullChecks false --strictPropertyInitialization false --useUnknownInCatchVariables false --module commonjs --target ES2015 --skipLibCheck types/legacy-globals.d.ts tasks/*.ts Grunttasks.ts"
   },
   "repository": {
     "type": "git",

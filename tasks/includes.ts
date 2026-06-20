@@ -8,7 +8,7 @@ import path = require('path');
 function includes(grunt: IGrunt) {
   grunt.registerMultiTask('includes', 'Generates JVMTypes.d.ts.', function() {
     var doppiohPath: string = 'build/dev-cli/console/doppioh.js',
-        options = this.options(),
+        options = (<any> this).options(),
         packages: string[] = options.packages,
         dest: string = options.dest,
         done: (status?: boolean) => void = this.async(),

@@ -7,8 +7,8 @@ var escodegen = require('escodegen');
 
 function iceCream(grunt: IGrunt) {
   grunt.registerMultiTask('ice-cream', 'Removes debug statements from code.', function() {
-    var files: {src: string[]; dest: string}[] = this.files,
-        remove: string[] = this.options().remove;
+    var files: {src: string[]; dest: string}[] = <any> this.files,
+        remove: string[] = (<any> this).options().remove;
 
     files.forEach((file: {src: string[]; dest: string}) => {
       var jsFileContent = fs.readFileSync(file.src[0]).toString(),

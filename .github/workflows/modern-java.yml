@@ -32,6 +32,13 @@ jobs:
           npm install -g yarn@1.22.22
           yarn install --frozen-lockfile --ignore-engines --ignore-optional
 
+      - name: Check TypeScript compiler compatibility
+        run: |
+          yarn typecheck
+          yarn typecheck:bootstrap
+          yarn typecheck:typescript-7-rc
+          yarn typecheck:typescript-7-rc-bootstrap
+
       - name: Run modern Java compatibility tests
         run: ./node_modules/.bin/grunt --stack test-modern-java --grunt-ignore-compile-errors
 

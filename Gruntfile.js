@@ -21,7 +21,7 @@ function shouldRecompile(file) {
   return !fs.existsSync(jsFile) || fs.statSync(file).mtime > fs.statSync(jsFile).mtime;
 }
 
-ts_files = glob.sync('tasks/*.ts');
+ts_files = glob.sync('types/**/*.d.ts').concat(glob.sync('tasks/*.ts'));
 ts_files.push('Grunttasks.ts');
 
 // Node glob returns *nix-style path separators.
@@ -37,7 +37,7 @@ ts_files.forEach(function(e, i) {
 
 // Run!
 if (ts_files_to_compile.length > 0) {
-  result = child_process.spawnSync(ts_path, ['--noImplicitAny', '--module', 'commonjs'].concat(ts_files_to_compile));
+  result = child_process.spawnSync(ts_path, ['--ignoreConfig', '--noImplicitAny', '--noImplicitThis', 'false', '--strict', 'false', '--strictNullChecks', 'false', '--strictPropertyInitialization', 'false', '--useUnknownInCatchVariables', 'false', '--module', 'commonjs', '--target', 'ES2015', '--skipLibCheck'].concat(ts_files_to_compile));
   if (!ignoreCompileErrors && result.status !== 0) {
     throw new Error("Compilation error: " + result.stdout + "\n" + result.stderr);
   }

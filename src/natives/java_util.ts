@@ -19,7 +19,7 @@ import * as deflate from 'pako/lib/zlib/deflate';
 import * as inflate from 'pako/lib/zlib/inflate';
 import crc32 = require('pako/lib/zlib/crc32');
 import adler32 = require('pako/lib/zlib/adler32');
-import * as ZStreamCons from 'pako/lib/zlib/zstream';
+import ZStreamCons = require('pako/lib/zlib/zstream');
 import * as GZHeader from 'pako/lib/zlib/gzheader';
 import {manifestHasMultiReleaseTrue, MULTI_RELEASE_RUNTIME_VERSION} from '../classpath';
 import i82u8 = util.i82u8;

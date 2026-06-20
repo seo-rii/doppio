@@ -5,8 +5,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as url from 'url';
 import * as https from 'https';
-import * as rimraf from 'rimraf';
-import * as glob from 'glob';
+import rimraf = require('rimraf');
+import glob = require('glob');
 let gunzip: () => NodeJS.ReadWriteStream = require('gunzip-maybe');
 let tarFs: {
   extract: (path: string) => NodeJS.WritableStream;
