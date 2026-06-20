@@ -4,6 +4,7 @@
 import path = require('path');
 import fs = require('fs');
 import os = require('os');
+import child_process = require('child_process');
 import _ = require('underscore');
 import webpack = require('webpack');
 import karma = require('karma');
@@ -980,6 +981,19 @@ export function setup(grunt: IGrunt) {
     })
   });
 
+  grunt.registerTask('vite-release', 'Bundles the release browser library with Vite.', function() {
+    const viteBin = path.resolve(__dirname, 'node_modules', '.bin', `vite${process.platform === 'win32' ? '.cmd' : ''}`);
+    const result = child_process.spawnSync(viteBin, ['build', '--config', path.resolve(__dirname, 'vite.config.mjs')], {
+      stdio: 'inherit'
+    });
+    if (result.error) {
+      throw result.error;
+    }
+    if (result.status !== 0) {
+      grunt.fail.fatal(`Vite release bundle failed with exit code ${result.status}.`);
+    }
+  });
+
   /**
    * PUBLIC-FACING TARGETS BELOW.
    */
@@ -1016,7 +1030,7 @@ export function setup(grunt: IGrunt) {
   grunt.registerTask('release',
     ['release-cli',
      'make_build_dir:release',
-     'webpack:release',
+     'vite-release',
      'listings:release']);
 
   grunt.registerTask('examples',

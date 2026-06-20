@@ -1,9 +1,10 @@
 # TypeScript and Dependency Modernization
 
 This document tracks the Doppio build-tool upgrade path separately from Java
-runtime compatibility work. The build currently relies on a legacy Grunt,
-Webpack 1, and TypeScript pipeline, so compiler upgrades should stay staged and
-verified by the existing Java/Kotlin/Scala smokes.
+runtime compatibility work. The build currently relies on a legacy Grunt and
+TypeScript pipeline, with Vite handling the release browser library bundle and
+Webpack 1 still handling dev/test/benchmark browser bundles. Compiler upgrades
+should stay staged and verified by the existing Java/Kotlin/Scala smokes.
 
 ## Baseline
 
@@ -17,6 +18,12 @@ verified by the existing Java/Kotlin/Scala smokes.
   checks.
 - Grunt TypeScript task: upgraded from `grunt-ts@6.0.0-beta.3` to
   `grunt-ts@6.0.0-beta.22`.
+- Release browser bundler: `vite@4.5.14` library-mode UMD build, with
+  BrowserFS kept as an external `BrowserFS` global.
+- Remaining browser bundlers: Webpack 1 is still used for dev, fast-dev,
+  browser-test, and benchmark bundles.
+- Dependency installation must allow optional dependencies because esbuild's
+  platform binary is delivered that way.
 - Host CI runtime: Node 24 through `.github/workflows/modern-java.yml`.
 - Current TypeScript npm tags observed during the upgrade audit: `latest` is
   `6.0.3`; `rc` is `7.0.1-rc`.
@@ -41,14 +48,20 @@ Both are type-only fixes; runtime behavior is unchanged.
   declarations, DefinitelyTyped packages, Grunt task context typing,
   callback nullability, `module` namespace declarations, BrowserFS typings,
   and old CommonJS callable imports.
-- `uglify-js@2` cannot parse ES2015 output, and `webpack@1` still uses its own
-  UglifyJS 2 optimization plugin.
+- `uglify-js@2` cannot parse ES2015 output, and the remaining Webpack 1
+  dev/test/benchmark paths still use their legacy loader/plugin surface.
 
 The current compromise is deliberate:
 
 - Grunt emit uses `typescript@6.0.3` with `target=es5` and
-  `--ignoreDeprecations 6.0` so the existing Webpack 1 release pipeline keeps
-  working.
+  `--ignoreDeprecations 6.0` so the remaining Webpack 1 dev/test/benchmark
+  paths keep working.
+- `grunt release` now builds `build/release/doppio.js` through Vite library
+  mode. The config preserves the existing `Doppio` UMD global, BrowserFS
+  external/global behavior, BrowserFS-backed Node shims, and legacy JSON
+  include remapping for `jdk.json`, `package.json`, and `benchmarks.json`.
+  The release bundle also aliases `crypto` to a small browser shim so Vite does
+  not replace the `NodePRNG` import with a browser-external placeholder.
 - Project and Grunt bootstrap no-emit checks use `target=ES2015`; these pass
   under both `typescript@6.0.3` and `typescript@7.0.1-rc`.
 - `grunt-contrib-uglify` is upgraded to `5.2.2` / `uglify-js@3.19.3` for CLI
@@ -64,11 +77,11 @@ The current compromise is deliberate:
 2. Keep TypeScript 7.0.1-rc no-emit checks green in CI.
 3. Replace the Grunt TypeScript task with a direct `tsc --project` invocation,
    keeping Grunt only as orchestration while Java compatibility work continues.
-4. Replace Webpack 1 and its bundled UglifyJS 2 path, then move actual emitted
-   JavaScript from ES5 to ES2015 and verify CLI, browser bundle, modern Java,
-   Kotlin compiler, and Scala compiler smokes. The current Webpack type
-   surface is tightly coupled to `@types/webpack@1.x`.
-5. Upgrade DefinitelyTyped packages after the compiler target and bundler
+4. Replace the remaining Webpack 1 dev/test/benchmark bundles with Vite/Rollup
+   or a direct Rollup pipeline.
+5. Move actual emitted JavaScript from ES5 to ES2015 and verify CLI, browser
+   bundle, modern Java, Kotlin compiler, and Scala compiler smokes.
+6. Upgrade DefinitelyTyped packages after the compiler target and bundler
    surface are modernized. Updating types first creates noise without changing
    runtime behavior.
 
@@ -82,6 +95,7 @@ npm run typecheck:bootstrap
 npm run typecheck:typescript-7-rc
 npm run typecheck:typescript-7-rc-bootstrap
 ./node_modules/.bin/grunt --stack ts:dev-cli
+./node_modules/.bin/grunt --stack release --grunt-ignore-compile-errors
 ./node_modules/.bin/grunt --stack test-modern-java --grunt-ignore-compile-errors
 ```
 
