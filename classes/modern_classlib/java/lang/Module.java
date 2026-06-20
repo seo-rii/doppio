@@ -50,11 +50,13 @@ public final class Module implements AnnotatedElement {
 
   public boolean isExported(String pn, Module other) {
     Objects.requireNonNull(pn);
+    Objects.requireNonNull(other);
     return true;
   }
 
   public boolean isOpen(String pn, Module other) {
     Objects.requireNonNull(pn);
+    Objects.requireNonNull(other);
     return true;
   }
 
