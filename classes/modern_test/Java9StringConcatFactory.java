@@ -21,9 +21,13 @@ public class Java9StringConcatFactory {
     boolean enabled = true;
     double weight = 3.5d;
     float wholeFloat = 1.0f;
+    float nanFloat = Float.NaN;
     double negativeZero = -0.0d;
+    double positiveInfinity = Double.POSITIVE_INFINITY;
     long big = 1234567890123L;
     long negative = -9876543210L;
+    Byte boxedByte = Byte.valueOf((byte) -8);
+    Short boxedShort = Short.valueOf((short) 1234);
     Integer boxedInt = Integer.valueOf(42);
     Long boxedLong = Long.valueOf(9876543210L);
     Boolean boxedBoolean = Boolean.TRUE;
@@ -33,9 +37,11 @@ public class Java9StringConcatFactory {
     System.out.println("count=" + count + ", label=" + label);
     System.out.println(label + ":" + enabled + ":" + weight);
     System.out.println("floating=" + wholeFloat + ":" + negativeZero);
+    System.out.println("floating-special=" + nanFloat + ":" + positiveInfinity);
     System.out.println("big=" + big + ", negative=" + negative);
     System.out.println(big + ":" + label);
     System.out.println("boxed=" + boxedInt + ":" + boxedLong + ":" + boxedBoolean + ":" + boxedChar);
+    System.out.println("boxed-more=" + boxedByte + ":" + boxedShort);
     System.out.println("boxed-floating=" + boxedFloat + ":" + boxedDouble);
     Object observable = new ObservableValue("alpha");
     Object missing = null;
