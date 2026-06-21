@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Doppio Modern JVM runs Java bytecode and modern JVM language compilers in the browser."
+    />
+    <link rel="icon" href="data:," />
+    <title>Doppio Modern JVM</title>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="./">
+        <span class="brand-mark" aria-hidden="true">D2</span>
+        <span>Doppio Modern JVM</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="./" aria-current="page">Overview</a>
+        <a href="./docs.html?page=guide">Docs</a>
+        <a href="./playground/">Playground</a>
+        <a href="https://github.com/seo-rii/doppio">GitHub</a>
+      </nav>
+    </header>
+
+    <main class="home-main">
+      <section class="home-intro" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">JVM in TypeScript / modern branch</p>
+          <h1 id="page-title">Doppio Modern JVM</h1>
+          <p class="lede">
+            Run JVM bytecode in the browser, inspect Java 17+ compatibility work,
+            and compile editable Java, Kotlin, or Scala source without leaving the page.
+          </p>
+          <div class="home-actions">
+            <a class="button primary" href="./playground/">Open playground</a>
+            <a class="button" href="./docs.html?page=compatibility">Compatibility matrix</a>
+          </div>
+        </div>
+
+        <div class="runtime-visual" aria-label="Doppio browser runtime architecture">
+          <div class="runtime-bar">
+            <span>browser-runtime.pipeline</span>
+            <span class="runtime-signal">ready</span>
+          </div>
+          <div class="runtime-stack">
+            <div class="runtime-layer">
+              <strong>Source</strong>
+              <p>Main.java / Main.kt / Main.scala</p>
+              <span class="runtime-tag">editable</span>
+            </div>
+            <div class="runtime-layer">
+              <strong>Compiler</strong>
+              <p>javac / K2JVMCompiler / scalac</p>
+              <span class="runtime-tag">on demand</span>
+            </div>
+            <div class="runtime-layer">
+              <strong>Doppio</strong>
+              <p>class loader / interpreter / JIT / BrowserFS</p>
+              <span class="runtime-tag">TypeScript</span>
+            </div>
+          </div>
+          <div class="language-rail" aria-hidden="true">
+            <span>JAVA</span>
+            <span>KOTLIN</span>
+            <span>SCALA</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="status-band" aria-labelledby="status-title">
+        <div class="section-heading">
+          <h2 id="status-title">Bring-up status</h2>
+          <p>
+            The compatibility matrix records implementation status and difficulty.
+            Compiler smokes validate generated programs on both the host JVM and Doppio.
+          </p>
+        </div>
+        <div class="status-grid">
+          <article class="status-item">
+            <div class="status-label">
+              <strong>Modern Java</strong>
+              <span>9 through 17+</span>
+            </div>
+            <p>Class-file features, library overlays, records, sealed classes, constants, and MethodHandles.</p>
+            <div class="status-meter" style="--meter: 72%"><span></span></div>
+          </article>
+          <article class="status-item">
+            <div class="status-label">
+              <strong>Kotlin compiler</strong>
+              <span>2.4.0 smoke</span>
+            </div>
+            <p>Compiler startup, broad language constructs, reflection paths, contracts, and runtime execution.</p>
+            <div class="status-meter" style="--meter: 64%; --meter-color: var(--gold)"><span></span></div>
+          </article>
+          <article class="status-item">
+            <div class="status-label">
+              <strong>Scala compiler</strong>
+              <span>2.13.18 smoke</span>
+            </div>
+            <p>Compiler execution, collections, reflection, macros, package metadata, and functional APIs.</p>
+            <div class="status-meter" style="--meter: 58%; --meter-color: var(--coral)"><span></span></div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>Published from <strong>modern</strong> at seorii.page/doppio.</span>
+      <span> &copy; <span data-current-year></span> Doppio contributors.</span>
+    </footer>
+
+    <script type="module" src="./src/home.mjs"></script>
+  </body>
+</html>

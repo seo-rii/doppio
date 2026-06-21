@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Compile and run editable Java, Kotlin, and Scala source in Doppio Modern JVM."
+    />
+    <link rel="icon" href="data:," />
+    <title>Playground | Doppio Modern JVM</title>
+  </head>
+  <body class="playground-page">
+    <header class="site-header">
+      <a class="brand" href="../">
+        <span class="brand-mark" aria-hidden="true">D2</span>
+        <span>Doppio Modern JVM</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="../">Overview</a>
+        <a href="../docs.html?page=guide">Docs</a>
+        <a href="./" aria-current="page">Playground</a>
+        <a href="https://github.com/seo-rii/doppio">GitHub</a>
+      </nav>
+    </header>
+
+    <main class="playground">
+      <div class="playground-toolbar">
+        <div class="language-tabs" role="tablist" aria-label="Source language">
+          <button class="language-tab" type="button" role="tab" aria-selected="true" data-language="java">Java</button>
+          <button class="language-tab" type="button" role="tab" aria-selected="false" data-language="kotlin">Kotlin</button>
+          <button class="language-tab" type="button" role="tab" aria-selected="false" data-language="scala">Scala</button>
+        </div>
+        <div class="toolbar-actions">
+          <button id="reset-button" class="button" type="button">Reset</button>
+          <button id="stop-button" class="button" type="button" disabled>Stop</button>
+          <button id="run-button" class="button primary run-button" type="button">Run</button>
+        </div>
+      </div>
+
+      <div class="workspace">
+        <section class="editor-pane" aria-label="Source editor">
+          <div class="pane-header">
+            <span id="source-filename">Main.java</span>
+            <span>Ctrl/Command + Enter to run</span>
+          </div>
+          <textarea
+            id="source-editor"
+            class="source-editor"
+            aria-label="Editable source code"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+          ></textarea>
+        </section>
+
+        <section class="console-pane" aria-label="Program console">
+          <div class="pane-header">
+            <span>Console</span>
+            <span>Doppio stdout / stderr</span>
+          </div>
+          <div class="console-content">
+            <pre id="console-output" class="console-output console-empty">Ready to compile Java.</pre>
+            <div class="stdin-row">
+              <input id="stdin-input" type="text" aria-label="Standard input" placeholder="Send standard input" />
+              <button id="stdin-button" type="button">Send</button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="playground-status" role="status">
+        <span id="playground-state" class="status-state" data-state="ready">Java source ready</span>
+        <span>Local browser filesystem · <span id="elapsed-time">0.0s</span></span>
+      </div>
+    </main>
+
+    <script type="module" src="../src/playground.mjs"></script>
+  </body>
+</html>

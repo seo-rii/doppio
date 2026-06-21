@@ -45,4 +45,7 @@ tasks/test/*.d.ts
 /dist
 /docs/examples/doppio
 /docs/examples/listings.json
-
+/docs/assets
+/docs/index.html
+/docs/docs.html
+/docs/playground

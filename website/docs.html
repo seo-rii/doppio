@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Doppio Modern JVM documentation and compatibility notes." />
+    <link rel="icon" href="data:," />
+    <title>Documentation | Doppio Modern JVM</title>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="./">
+        <span class="brand-mark" aria-hidden="true">D2</span>
+        <span>Doppio Modern JVM</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="./">Overview</a>
+        <a href="./docs.html?page=guide" aria-current="page">Docs</a>
+        <a href="./playground/">Playground</a>
+        <a href="https://github.com/seo-rii/doppio">GitHub</a>
+      </nav>
+    </header>
+
+    <main class="docs-shell">
+      <nav class="docs-sidebar" aria-label="Documentation">
+        <div class="docs-nav-group">
+          <strong>Project</strong>
+          <a href="./docs.html?page=guide" data-doc-page="guide">Developer guide</a>
+          <a href="./docs.html?page=compatibility" data-doc-page="compatibility">Compatibility matrix</a>
+          <a href="./docs.html?page=toolchain" data-doc-page="toolchain">TypeScript toolchain</a>
+        </div>
+        <div class="docs-nav-group">
+          <strong>Compilers</strong>
+          <a href="./docs.html?page=kotlin" data-doc-page="kotlin">Kotlin compiler</a>
+          <a href="./docs.html?page=scala" data-doc-page="scala">Scala compiler</a>
+        </div>
+        <div class="docs-nav-group">
+          <strong>Runtime design</strong>
+          <a href="./docs.html?page=invoke" data-doc-page="invoke">java.lang.invoke</a>
+          <a href="./docs.html?page=records" data-doc-page="records">Record reflection</a>
+          <a href="./docs.html?page=controlflow" data-doc-page="controlflow">MethodHandle loops</a>
+          <a href="./docs.html?page=finally" data-doc-page="finally">MethodHandle try/finally</a>
+        </div>
+      </nav>
+
+      <article id="document-content" class="document document-loading" aria-live="polite">
+        Loading document...
+      </article>
+
+      <aside class="docs-toc" aria-label="On this page">
+        <strong>On this page</strong>
+        <nav id="document-toc"></nav>
+      </aside>
+    </main>
+
+    <script type="module" src="./src/docs.mjs"></script>
+  </body>
+</html>

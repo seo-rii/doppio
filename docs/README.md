@@ -6,7 +6,8 @@ So you want to hack on DoppioJVM: maybe to integrate it into your project more c
  * [Plugging DoppioJVM into a Frontend](https://github.com/seo-rii/doppio/tree/modern/docs#plugging-doppiojvm-into-a-frontend)
  * [Adding Native Methods Using doppioh](https://github.com/seo-rii/doppio/tree/modern/docs#adding-native-methods-using-doppioh)
 
-The hosted browser build and example are published from the `modern` branch at
+The hosted browser build, rendered documentation, and editable Java, Kotlin,
+and Scala playground are published from the `modern` branch at
 https://seorii.page/doppio/.
 
 ## Plugging DoppioJVM into a Frontend

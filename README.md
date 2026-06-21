@@ -11,6 +11,8 @@ compatibility, Kotlin compiler bring-up, Scala compiler smoke coverage, and
 browser release builds.
 
 To try the browser build, head to the [live Pages site](https://seorii.page/doppio/).
+The site includes rendered project documentation and an editable Java, Kotlin,
+and Scala playground that compiles and runs source inside Doppio.
 
 To learn more, read the [developer guide](docs), the
 [modern Java compatibility matrix](docs/modern-java.md), or the original
@@ -85,8 +87,9 @@ The code is in [`docs/examples`](docs/examples).
 GitHub Pages
 ------------
 
-The `Pages` workflow builds the release browser bundle, compiles the browser
-example, generates the BrowserFS listings, and deploys the `docs` directory.
+The `Pages` workflow builds the release browser bundle, packages the Java,
+Kotlin, and Scala compiler runtimes behind BrowserFS listings, builds the Vite
+documentation site and playground, and deploys the `docs` directory.
 The project page is intended to be available at:
 
     https://seorii.page/doppio/
