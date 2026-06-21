@@ -36,6 +36,7 @@ fun main() {
   println(fileIoSummary())
   println(nioPathSummary())
   println(concurrentCacheSummary())
+  println(contractSmokeSummary())
   println(resourceLookupSummary())
   println(serviceLoaderSummary())
   println(jarZipSummary())

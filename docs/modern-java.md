@@ -156,7 +156,9 @@ still not claimed.
   same-file checks, plus Kotlin source-level use of concurrent cache
   primitives covering `ConcurrentHashMap` compute/merge paths, atomics,
   `CopyOnWriteArrayList`, `ThreadLocal`, `ReentrantLock.withLock`,
-  synchronized maps, and one-shot thread-local isolation, plus Kotlin
+  synchronized maps, and one-shot thread-local isolation, plus Kotlin contracts
+  covering `returns` implications, `callsInPlace` invocation-kind metadata,
+  inline contract functions, and nullable smart casts, plus Kotlin
   classpath resource lookup covering `Class.getResource`,
   `ClassLoader.getResource`, `ClassLoader.getResources`,
   `ClassLoader.resources`,
@@ -194,7 +196,8 @@ still not claimed.
   sorting, filtering, map keys, and hexadecimal byte rendering, plus Kotlin
   source-level Java `CompletableFuture` interop covering SAM conversion,
   executor-backed completion, composition, recovery, combination, racing, and
-  timed retrieval, then runs the
+  timed retrieval, plus Kotlin contracts covering inline call-in-place behavior
+  and nullable smart casts, then runs the
   generated code on both the host JVM and Doppio with `kotlin-stdlib.jar`.
 - The workflow now runs that smoke with `KOTLIN_SMOKE_CLASSPATH_MODE=full`,
   covering the full `kotlinc/lib/*.jar` classpath rather than only

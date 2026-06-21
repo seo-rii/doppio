@@ -539,6 +539,12 @@ Current verified checks:
   `applyToEither`, `allOf`, `join`, and timed `get`. Both the host JVM and
   Doppio print `KT2!:5:l`. A 2026-06-20 full-classpath run completed in 544
   seconds.
+- A Kotlin contracts smoke covers `ExperimentalContracts`, `returns`
+  implications, `callsInPlace` with `AT_MOST_ONCE` and `EXACTLY_ONCE`, inline
+  contract functions, nullable smart casts in the caller, and lambda capture
+  through an exactly-once block. Both the host JVM and Doppio print
+  `KT2|missing|before>body7>after|7|1002`. A 2026-06-21 full-classpath run
+  completed in 600 seconds.
 - A minimal enum-polymorphism smoke covers enum constants with class bodies,
   overridden properties and methods, `Enum.entries`, `enumValues`,
   `enumValueOf`, `valueOf`, and `when` dispatch over those constants. Both the

@@ -93,6 +93,7 @@ test -f "$out_dir/CollectionBuilderSmokeKt.class"
 test -f "$out_dir/CollectionBuilderSmokeKt\$collectionBuilderSummary\$\$inlined\$groupingBy\$1.class"
 test -f "$out_dir/ConcurrentCacheSmokeKt.class"
 test -f "$out_dir/CompletableFutureSmokeKt.class"
+test -f "$out_dir/ContractSmokeKt.class"
 test -f "$out_dir/ControlFlowSmokeKt.class"
 test -f "$out_dir/CaptureOwner.class"
 test -f "$out_dir/CaptureOwner\$Nested.class"
@@ -223,6 +224,8 @@ default_expected_output="${default_expected_output}
 0:5:d,1:7:e,2:4:z|64656c74|input.txt:false,nested:true|input.txt:19,nested/moved.txt:19|input.txt/runtime-nio/nested/moved.txt|true/true/true"
 default_expected_output="${default_expected_output}
 a=123,b=12,c=89|true|true:y:Y11|abc:false:true:1|main:11/worker:3/main:11/main:11|locked:3:hold:1:true|k=1,z=12|11"
+default_expected_output="${default_expected_output}
+KT2|missing|before>body7>after|7|1002"
 default_expected_output="${default_expected_output}
 ffffff|4:cafebabe|1:1:true|true:true:true"
 default_expected_output="${default_expected_output}
