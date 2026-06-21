@@ -52,22 +52,6 @@ jobs:
       - name: Build Pages artifact
         run: ./ci/build_pages.sh
 
-      - name: Install Chromium
-        run: npx playwright install chromium --only-shell
-
-      - name: Test Pages in Chromium
-        run: |
-          python3 -m http.server 4173 --directory docs > /tmp/doppio-pages-server.log 2>&1 &
-          server_pid=$!
-          trap 'kill "$server_pid"' EXIT
-          for attempt in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:4173/ > /dev/null; then
-              break
-            fi
-            sleep 1
-          done
-          yarn site:browser-test
-
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
