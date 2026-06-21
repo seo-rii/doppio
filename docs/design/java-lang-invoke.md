@@ -181,9 +181,11 @@ handles, dynamic constants, and record object-method linkage:
   now maps raw operand-stack words back to descriptor parameters for tested
   wide-slot `long` concat arguments, including adjacent `long` parameters and a
   `long` followed by a reference parameter. It also handles tested boxed
-  primitive object arguments for `Integer`, `Long`, `Boolean`, and `Character`
-  without invoking arbitrary Java `toString()` code, plus one observable user
-  object `toString()` dispatch and one null reference concat.
+  primitive object arguments for `Integer`, `Long`, `Boolean`, `Character`,
+  `Float`, and `Double`, including selected floating-point `.0` and
+  negative-zero rendering, without invoking arbitrary Java `toString()` code,
+  plus one observable user object `toString()` dispatch and one null reference
+  concat.
 - Java 11 `CONSTANT_Dynamic` parsing and `ldc` resolution have a targeted fast
   path for selected `java.lang.invoke.ConstantBootstraps` methods:
   `nullConstant`, `primitiveClass`, `enumConstant`, `getStaticFinal`, and
@@ -313,4 +315,5 @@ handles, dynamic constants, and record object-method linkage:
   reflection metadata.
 - `StringConcatFactory` object/reference arguments still need broader
   `String.valueOf(Object)` coverage beyond the tested boxed primitive wrappers,
-  observable user object, and null reference concat.
+  selected floating-point rendering edges, observable user object, and null
+  reference concat.

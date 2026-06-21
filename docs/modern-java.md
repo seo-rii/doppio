@@ -292,9 +292,11 @@ still not claimed.
   primitive `OptionalInt`/`OptionalLong`/`OptionalDouble` `ifPresentOrElse`
   and `stream`,
   string concat including adjacent `long` wide-slot arguments, a `long`
-  followed by a reference argument, boxed `Integer`, `Long`, `Boolean`, and
-  `Character` object arguments, observable user-object `toString()` dispatch,
-  null reference conversion, and `makeConcatWithConstants` static `Class`,
+  followed by a reference argument, boxed `Integer`, `Long`, `Boolean`,
+  `Character`, `Float`, and `Double` object arguments, selected floating-point
+  `.0` and negative-zero rendering, observable user-object `toString()`
+  dispatch, null reference conversion, and `makeConcatWithConstants` static
+  `Class`,
   `MethodType` recipe constants for an ordinary class, an interface,
   an array class, and a `(String)int` method type, plus a
   `MethodHandle(int)String` recipe constant, a

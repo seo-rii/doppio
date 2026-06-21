@@ -6248,9 +6248,10 @@ export class InvokeDynamic implements IConstantPoolItem {
       case 'B':
       case 'S':
       case 'I':
+        return '' + value;
       case 'F':
       case 'D':
-        return '' + value;
+        return this.stringifyFloatingPointValue(value);
       default:
         if (type === 'Ljava/lang/String;') {
           return value.toString();
@@ -6271,13 +6272,28 @@ export class InvokeDynamic implements IConstantPoolItem {
             case 'Ljava/lang/Long;':
               return value['java/lang/Long/value'].toString();
             case 'Ljava/lang/Float;':
-              return '' + value['java/lang/Float/value'];
+              return this.stringifyFloatingPointValue(value['java/lang/Float/value']);
             case 'Ljava/lang/Double;':
-              return '' + value['java/lang/Double/value'];
+              return this.stringifyFloatingPointValue(value['java/lang/Double/value']);
           }
         }
         return value.toString();
     }
+  }
+
+  private stringifyFloatingPointValue(value: number): string {
+    if (value === 0) {
+      return 1 / value === Number.NEGATIVE_INFINITY ? '-0.0' : '0.0';
+    }
+    if (value === Number.POSITIVE_INFINITY) {
+      return 'Infinity';
+    }
+    if (value === Number.NEGATIVE_INFINITY) {
+      return '-Infinity';
+    }
+    var rendered = '' + value;
+    return rendered.indexOf('.') === -1 && rendered.indexOf('e') === -1 && rendered.indexOf('E') === -1 && rendered !== 'NaN' ?
+      rendered + '.0' : rendered;
   }
 
   private getStringConcatRecipe(bootstrapMethod: [MethodHandle, IConstantPoolItem[]]): string {
@@ -6319,18 +6335,7 @@ export class InvokeDynamic implements IConstantPoolItem {
         return '' + value;
       case 'F':
       case 'D':
-        if (value === 0) {
-          return 1 / value === Number.NEGATIVE_INFINITY ? '-0.0' : '0.0';
-        }
-        if (value === Number.POSITIVE_INFINITY) {
-          return 'Infinity';
-        }
-        if (value === Number.NEGATIVE_INFINITY) {
-          return '-Infinity';
-        }
-        var rendered = '' + value;
-        return rendered.indexOf('.') === -1 && rendered.indexOf('e') === -1 && rendered.indexOf('E') === -1 && rendered !== 'NaN' ?
-          rendered + '.0' : rendered;
+        return this.stringifyFloatingPointValue(value);
       default:
         return value.toString();
     }
