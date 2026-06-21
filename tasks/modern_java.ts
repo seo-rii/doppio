@@ -3244,6 +3244,23 @@ function modernJava(grunt: IGrunt) {
     grunt.file.write(outPath, Buffer.from(bytes));
     grunt.log.ok('Generated ' + outPath);
 
+    var constantDynamicMoreSource = 'classes/modern_test/Java11ConstantDynamicMore.java',
+      constantDynamicMoreSupportClass = 'classes/modern_test/Java11ConstantDynamicMore$Support.class',
+      constantDynamicMoreChoiceClass = 'classes/modern_test/Java11ConstantDynamicMore$Support$Choice.class',
+      constantDynamicMoreSourceMtime = fs.statSync(constantDynamicMoreSource).mtime.getTime();
+    if (!fs.existsSync(constantDynamicMoreSupportClass) ||
+        !fs.existsSync(constantDynamicMoreChoiceClass) ||
+        fs.statSync(constantDynamicMoreSupportClass).mtime.getTime() < constantDynamicMoreSourceMtime ||
+        fs.statSync(constantDynamicMoreChoiceClass).mtime.getTime() < constantDynamicMoreSourceMtime) {
+      try {
+        child_process.execFileSync(grunt.config('build.javac') || 'javac',
+          ['-J-Dfile.encoding=UTF8', '--release', '11', '-d', '.', constantDynamicMoreSource],
+          { stdio: 'inherit' });
+      } catch (e) {
+        grunt.fail.fatal('Error compiling Java 11 CONSTANT_Dynamic support classes: ' + e);
+      }
+    }
+
     outPath = 'classes/modern_test/Java11ConstantDynamicMore.class';
     bytes = [];
 
