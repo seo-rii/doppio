@@ -50,6 +50,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - Scala 2.13 collection-library coverage for `LazyList`, extractor `unapply`,
   `Regex`, `TreeMap`, `ArraySeq`, `groupMap`, map views, and right-biased
   `Either`;
+- Scala 2.13 functional/library coverage for `Function.chain`, composed
+  function adapters, `Option.when`/`Option.unless`, `Using.resource`,
+  `Try.map`/`filter`/`recover`, `Either.cond`, and `partitionMap`;
 - Java collection interop through `scala.jdk.CollectionConverters`, mutable
   Java list/map wrappers, and a small `Future`/`Promise`/`Await` path running
   on a Java executor;
@@ -67,7 +70,11 @@ source fixture, checks the emitted class files, and compares generated program
 output on the host JVM and Doppio. The smoke now includes a Scala 2.13
 collection/extractor slice covering `LazyList`, extractor `unapply`, `Regex`,
 `TreeMap`, `ArraySeq`, `groupMap`, map views, and right-biased `Either`, plus
-Java collection interop and a small asynchronous `Future` path.
+functional/library coverage for `Function.chain`, composed function adapters,
+`Option.when`/`Option.unless`, `Using.resource`, `Try` recovery, `Either.cond`,
+and `partitionMap`, plus Java collection interop and a small asynchronous
+`Future` path. A local 2026-06-21 run of the expanded smoke completed in
+303 seconds using Scala 2.13.18.
 
 The smoke also includes a two-phase macro path: Doppio-hosted scalac first
 emits a blackbox macro implementation class, then a second Doppio-hosted scalac

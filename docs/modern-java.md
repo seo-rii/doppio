@@ -234,6 +234,9 @@ still not claimed.
   objects, `Enumeration`, `@BeanProperty`, Java reflection over
   Scala-generated members, specialized class generation, Java `StackWalker`
   frame descriptor/`MethodType` metadata with retained-class-reference guards,
+  Scala 2.13 functional/library paths including `Function.chain`,
+  composed function adapters, `Option.when`/`Option.unless`,
+  `Using.resource`, `Try` recovery, `Either.cond`, and `partitionMap`,
   Java collection interop through `scala.jdk.CollectionConverters`, a small
   `Future`/`Promise`/`Await` path running on a Java executor,
   and `scala-reflect`
