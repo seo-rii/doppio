@@ -178,6 +178,11 @@ Current verified checks:
   `ci/kotlin_smoke.sh` and the `Modern Java` GitHub Actions workflow. The
   workflow caches `kotlin-compiler@2.4.0` outside the repository tree and runs
   the generated class on both the host JVM and Doppio.
+- `ci/kotlin_diagnostic_smoke.sh` now covers a failing Kotlin compiler path:
+  Doppio-hosted `K2JVMCompiler` compiles an intentionally invalid source file,
+  exits with status 1, reports the expected initializer type-mismatch
+  diagnostic with source position and caret, and leaves the output directory
+  empty.
 - The CI smoke now compiles multiple Kotlin files covering a data class,
   annotation class, interface default implementation, generic class, default
   arguments, string templates, and a lambda. Runtime execution includes
