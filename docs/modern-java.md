@@ -258,8 +258,10 @@ combinator parity is still not claimed.
   `Using.resource`, `Try` recovery, `Either.cond`, and `partitionMap`,
   Java collection interop through `scala.jdk.CollectionConverters`, a small
   `Future`/`Promise`/`Await` path running on a Java executor, classfile
-  assertions for `InvokeDynamic`/`LambdaMetafactory` emission and representative
-  generic `Signature` metadata, and a diagnostic smoke covering type-mismatch
+  assertions for `InvokeDynamic`/`LambdaMetafactory` emission, representative
+  generic `Signature` metadata, path-dependent types, higher-kinded implicit
+  typeclass lookup, self-types, by-name argument evaluation, extractor
+  matching, and `@switch` lowering, and a diagnostic smoke covering type-mismatch
   source filename, line number, found/required types, caret, and error count,
   and `scala-reflect`
   runtime universe use covering runtime mirror creation, `typeOf`, member

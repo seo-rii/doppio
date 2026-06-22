@@ -53,6 +53,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - Scala 2.13 functional/library coverage for `Function.chain`, composed
   function adapters, `Option.when`/`Option.unless`, `Using.resource`,
   `Try.map`/`filter`/`recover`, `Either.cond`, and `partitionMap`;
+- Scala language/type-system coverage for path-dependent types, higher-kinded
+  implicit typeclass lookup, self-types, by-name argument evaluation, extractor
+  matching, and `@switch` lowering;
 - Java collection interop through `scala.jdk.CollectionConverters`, mutable
   Java list/map wrappers, and a small `Future`/`Promise`/`Await` path running
   on a Java executor;
@@ -72,9 +75,13 @@ collection/extractor slice covering `LazyList`, extractor `unapply`, `Regex`,
 `TreeMap`, `ArraySeq`, `groupMap`, map views, and right-biased `Either`, plus
 functional/library coverage for `Function.chain`, composed function adapters,
 `Option.when`/`Option.unless`, `Using.resource`, `Try` recovery, `Either.cond`,
-and `partitionMap`, plus Java collection interop and a small asynchronous
-`Future` path. A local 2026-06-21 run of the expanded smoke completed in
-303 seconds using Scala 2.13.18.
+and `partitionMap`, plus language/type-system coverage for path-dependent
+types, higher-kinded implicit typeclass lookup, self-types, by-name argument
+evaluation, extractor matching, and `@switch` lowering, plus Java collection
+interop and a small asynchronous `Future` path. A local 2026-06-21 run of the
+expanded smoke completed in 303 seconds using Scala 2.13.18.
+A local 2026-06-23 run with the language/type-system smoke completed in
+488 seconds using Scala 2.13.18.
 
 The smoke also includes a two-phase macro path: Doppio-hosted scalac first
 emits a blackbox macro implementation class, then a second Doppio-hosted scalac
