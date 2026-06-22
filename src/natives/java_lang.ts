@@ -2014,6 +2014,19 @@ export default function (): any {
       );
     }
 
+    public static 'iteratedLoop(Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;'(
+      thread: JVMThread,
+      iterator: JVMTypes.java_lang_invoke_MethodHandle,
+      init: JVMTypes.java_lang_invoke_MethodHandle,
+      body: JVMTypes.java_lang_invoke_MethodHandle
+    ): void {
+      java_lang_invoke_MethodHandles.callDoppioHelper(
+        thread,
+        'java/lang/invoke/DoppioMethodHandles/iteratedLoop(Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;',
+        [iterator, init, body]
+      );
+    }
+
     public static 'tryFinally(Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;'(
       thread: JVMThread,
       target: JVMTypes.java_lang_invoke_MethodHandle,

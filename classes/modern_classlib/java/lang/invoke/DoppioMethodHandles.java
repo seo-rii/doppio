@@ -2,6 +2,7 @@ package java.lang.invoke;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 
@@ -275,6 +276,79 @@ public final class DoppioMethodHandles {
     return countedLoop(start, end, init, body, true);
   }
 
+  public static MethodHandle iteratedLoop(MethodHandle iterator, MethodHandle init, MethodHandle body)
+      throws NoSuchMethodException, IllegalAccessException {
+    Objects.requireNonNull(body);
+
+    MethodType bodyType = body.type();
+    Class<?> returnType = bodyType.returnType();
+    if (returnType == void.class) {
+      throw new IllegalArgumentException("void iterated-loop body is not supported by this overlay");
+    }
+    if (bodyType.parameterCount() < 2 || bodyType.parameterType(0) != returnType) {
+      throw new IllegalArgumentException("body must accept state and element parameters");
+    }
+
+    int bodyExternalArgumentCount = bodyType.parameterCount() - 2;
+    List<Class<?>> externalTypes = new ArrayList<Class<?>>(
+        bodyType.parameterList().subList(2, bodyType.parameterCount()));
+    boolean defaultIterator = iterator == null;
+    int iteratorArgumentCount = 0;
+    if (defaultIterator) {
+      if (externalTypes.isEmpty()) {
+        externalTypes.add(Iterable.class);
+      } else if (!Iterable.class.isAssignableFrom(externalTypes.get(0))) {
+        throw new IllegalArgumentException("first loop parameter must be Iterable when iterator is null");
+      }
+    } else {
+      MethodType iteratorType = iterator.type();
+      if (!Iterator.class.isAssignableFrom(iteratorType.returnType())) {
+        throw new IllegalArgumentException("iterator must return Iterator");
+      }
+      if (externalTypes.isEmpty() && iteratorType.parameterCount() > 0) {
+        externalTypes.addAll(iteratorType.parameterList());
+      }
+      iteratorArgumentCount = checkedPrefixArgumentCount(iteratorType, externalTypes, "iterator");
+    }
+
+    int initArgumentCount = 0;
+    if (init != null) {
+      MethodType initType = init.type();
+      if (initType.returnType() != returnType) {
+        throw new IllegalArgumentException("init return type does not match body return type");
+      }
+      initArgumentCount = checkedPrefixArgumentCount(initType, externalTypes, "init");
+    }
+
+    MethodHandle adapter = MethodHandles.publicLookup().findStatic(
+        DoppioMethodHandles.class,
+        "iteratedLoopTarget",
+        MethodType.methodType(
+            Object.class,
+            MethodHandle.class,
+            MethodHandle.class,
+            MethodHandle.class,
+            Class.class,
+            int.class,
+            int.class,
+            int.class,
+            boolean.class,
+            Object[].class));
+    return MethodHandles.insertArguments(
+            adapter,
+            0,
+            iterator,
+            init,
+            body,
+            returnType,
+            Integer.valueOf(iteratorArgumentCount),
+            Integer.valueOf(initArgumentCount),
+            Integer.valueOf(bodyExternalArgumentCount),
+            Boolean.valueOf(defaultIterator))
+        .asCollector(Object[].class, externalTypes.size())
+        .asType(MethodType.methodType(returnType, externalTypes));
+  }
+
   private static MethodHandle countedLoop(
       MethodHandle start,
       MethodHandle end,
@@ -541,6 +615,44 @@ public final class DoppioMethodHandles {
     int selector = ((Integer) args[0]).intValue();
     MethodHandle target = selector >= 0 && selector < targets.length ? targets[selector] : fallback;
     return target.invokeWithArguments(args);
+  }
+
+  public static Object iteratedLoopTarget(
+      MethodHandle iterator,
+      MethodHandle init,
+      MethodHandle body,
+      Class<?> returnType,
+      int iteratorArgumentCount,
+      int initArgumentCount,
+      int bodyExternalArgumentCount,
+      boolean defaultIterator,
+      Object[] args) throws Throwable {
+    Iterator<?> values;
+    if (defaultIterator) {
+      values = ((Iterable<?>) args[0]).iterator();
+    } else {
+      Object[] iteratorArgs = new Object[iteratorArgumentCount];
+      System.arraycopy(args, 0, iteratorArgs, 0, iteratorArgumentCount);
+      values = (Iterator<?>) iterator.invokeWithArguments(iteratorArgs);
+    }
+
+    Object state;
+    if (init == null) {
+      state = defaultValue(returnType);
+    } else {
+      Object[] initArgs = new Object[initArgumentCount];
+      System.arraycopy(args, 0, initArgs, 0, initArgumentCount);
+      state = init.invokeWithArguments(initArgs);
+    }
+
+    Object[] bodyArgs = new Object[2 + bodyExternalArgumentCount];
+    System.arraycopy(args, 0, bodyArgs, 2, bodyExternalArgumentCount);
+    while (values.hasNext()) {
+      bodyArgs[0] = state;
+      bodyArgs[1] = values.next();
+      state = body.invokeWithArguments(bodyArgs);
+    }
+    return state;
   }
 
   public static Object whileLoopTarget(

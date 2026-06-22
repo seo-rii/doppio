@@ -1,0 +1,13 @@
+(Ljava/lang/Iterable;)Ljava/lang/String;
+abc
+(Ljava/util/List;)Ljava/lang/String;
+a2b2
+(Ljava/lang/String;)Ljava/lang/String;
+p:papbpc
+(Ljava/lang/Iterable;)I
+10
+0
+NullPointerException:nullBody
+IllegalArgumentException:badIterator
+IllegalArgumentException:badInit
+IllegalArgumentException:nullIteratorBadA

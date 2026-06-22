@@ -61,6 +61,7 @@ https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/invoke/Me
 - Cleanup-throws-over-target-result and cleanup-throws-over-target-exception
   precedence should get explicit fixtures before claiming full control-flow
   parity.
-- The broader Java 9+ control-flow family (`loop`, `whileLoop`, `doWhileLoop`,
-  `countedLoop`, `iteratedLoop`, and `tableSwitch`) still needs separate design
-  and implementation slices.
+- Broader Java 9+ control-flow parity continues in
+  `docs/design/methodhandles-control-flow.md`, including the remaining generic
+  `loop` work and unimplemented edge cases for the selected loop and switch
+  slices.
