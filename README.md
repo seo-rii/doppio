@@ -90,6 +90,8 @@ GitHub Pages
 The `Pages` workflow builds the release browser bundle, packages the Java,
 Kotlin, and Scala compiler runtimes behind BrowserFS listings, builds the Vite
 documentation site and playground, and deploys the `docs` directory.
+It also runs a Chromium browser smoke in a Playwright container that opens the
+generated site and compiles/runs Java, Kotlin, and Scala through the playground.
 The project page is intended to be available at:
 
     https://seorii.page/doppio/
