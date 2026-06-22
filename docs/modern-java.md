@@ -242,7 +242,8 @@ still not claimed.
   Java collection interop through `scala.jdk.CollectionConverters`, a small
   `Future`/`Promise`/`Await` path running on a Java executor, classfile
   assertions for `InvokeDynamic`/`LambdaMetafactory` emission and representative
-  generic `Signature` metadata,
+  generic `Signature` metadata, and a diagnostic smoke covering type-mismatch
+  source filename, line number, found/required types, caret, and error count,
   and `scala-reflect`
   runtime universe use covering runtime mirror creation, `typeOf`, member
   symbol lookup, case-accessor discovery, and static class lookup, plus

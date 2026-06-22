@@ -88,6 +88,11 @@ that Scala lambda-heavy classes contain `InvokeDynamic` entries backed by
 It also asserts representative Java `Signature` metadata for a generic case
 class method, a generic trait method, and a specialized generic class method.
 
+`ci/scala_diagnostic_smoke.sh` runs Doppio-hosted scalac on an intentionally
+invalid source file and checks the nonzero exit status plus diagnostic source
+filename, line number, error kind, found/required types, source line, caret
+position, and error count.
+
 This is intentionally narrower than the Kotlin smoke. The next Scala compiler
 work should expand source coverage and classpath stress after each blocker is
 reduced to a focused Java or Scala fixture.
@@ -117,7 +122,7 @@ Expected blocker areas:
 - Java 9+ class-library APIs used from Scala 2.13 on Java 17;
 - broader `invokedynamic`/lambda metafactory paths and deeper generic
   signature metadata;
-- compiler diagnostics and position rendering.
+- broader compiler diagnostics and position rendering.
 
 ## Test Target
 

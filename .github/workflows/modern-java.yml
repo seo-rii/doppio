@@ -71,5 +71,8 @@ jobs:
           path: build/scala-smoke-cache
           key: scala-compiler-2.13.18
 
+      - name: Run Scala diagnostic smoke
+        run: ./ci/scala_diagnostic_smoke.sh
+
       - name: Run Scala compiler smoke
         run: ./ci/scala_smoke.sh
