@@ -85,6 +85,8 @@ The same smoke now inspects generated classfiles with `javap -v` and asserts
 that Scala lambda-heavy classes contain `InvokeDynamic` entries backed by
 `LambdaMetafactory`. A local 2026-06-22 run of the checked smoke completed in
 409 seconds using Scala 2.13.18.
+It also asserts representative Java `Signature` metadata for a generic case
+class method, a generic trait method, and a specialized generic class method.
 
 This is intentionally narrower than the Kotlin smoke. The next Scala compiler
 work should expand source coverage and classpath stress after each blocker is
@@ -113,8 +115,8 @@ Expected blocker areas:
 - compiler classpath scanning and JAR I/O throughput;
 - deeper Scala reflection-heavy compiler paths beyond basic macro expansion;
 - Java 9+ class-library APIs used from Scala 2.13 on Java 17;
-- broader `invokedynamic`/lambda metafactory paths and generic signature
-  metadata;
+- broader `invokedynamic`/lambda metafactory paths and deeper generic
+  signature metadata;
 - compiler diagnostics and position rendering.
 
 ## Test Target
