@@ -28,9 +28,11 @@ keeping Doppio's Java 8-era `java.lang.Class` implementation in place.
   covers component name, type, accessor method, declaring record, null for
   non-record classes, and empty arrays for empty records.
 - `RecordComponent.getGenericSignature()` exposes the raw component
-  `Signature` attribute string. `getGenericType()` and `getAnnotatedType()` use
-  a raw `Class` fallback for non-generic components until full generic/type-use
-  annotation parsing is implemented.
+  `Signature` attribute string. `getGenericType()` uses a raw `Class` fallback
+  for non-generic components. `getAnnotatedType()` uses the same raw type
+  fallback and now exposes top-level runtime-visible type-use annotations for
+  record component types; nested type-argument annotations still require full
+  generic/type-use metadata parsing.
 - `RecordComponent.getAnnotation()`, `getAnnotations()`, and
   `getDeclaredAnnotations()` parse runtime-visible component annotations using
   the existing JDK annotation parser and the declaring record constant pool.
@@ -45,11 +47,12 @@ keeping Doppio's Java 8-era `java.lang.Class` implementation in place.
 - `RecordComponent.getGenericSignature()` for raw signature strings
 - `RecordComponent.getGenericType()` raw fallback for non-generic components
 - `RecordComponent.getAnnotatedType()` raw fallback for non-generic components
+  plus top-level runtime-visible type-use annotation lookup
 - `RecordComponent.getAccessor()`
 - `RecordComponent.getDeclaringRecord()`
 - Runtime-visible component annotation lookup
-- Full generic `Type` parsing and type-use annotation accessors after the basic
-  shape works.
+- Full generic `Type` parsing and nested type-use annotation accessors after
+  the top-level shape works.
 
 ## Implementation Plan
 
@@ -64,9 +67,10 @@ keeping Doppio's Java 8-era `java.lang.Class` implementation in place.
 4. Store full record component metadata from the `Record` attribute, not only
    names.
 5. Link each component to its accessor `Method` by name and descriptor.
-6. Add full generic `Type` and type-use annotation parity tests after the
-   basic name, type, accessor, declaring-record, raw-signature, and
-   runtime-visible component annotation tests are green.
+6. Add full generic `Type` and nested type-use annotation parity tests after
+   the basic name, type, accessor, declaring-record, raw-signature,
+   runtime-visible component annotation, and top-level annotated-type tests are
+   green.
 
 ## Risks
 

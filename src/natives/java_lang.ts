@@ -54,6 +54,14 @@ export default function (): any {
     element['java/lang/StackTraceElement/lineNumber'] = ln;
   }
 
+  function byteArrayFromBuffer(thread: JVMThread, bytes: Buffer): JVMTypes.JVMArray<number> {
+    var data: number[] = new Array(bytes.length), i: number;
+    for (i = 0; i < bytes.length; i++) {
+      data[i] = bytes.readInt8(i);
+    }
+    return util.newArrayFromData<number>(thread, thread.getBsCl(), '[B', data);
+  }
+
   function arrayGet(thread: JVMThread, arr: JVMTypes.JVMArray<any>, idx: number): any {
     if (arr == null) {
       thread.throwNewException('Ljava/lang/NullPointerException;', '');
@@ -339,12 +347,15 @@ export default function (): any {
             var component = components[index],
               signatureAttr: attributes.Signature = null,
               annotationsAttr: attributes.RuntimeVisibleAnnotations = null,
+              typeAnnotationsAttr: attributes.RuntimeVisibleTypeAnnotations = null,
               componentObj = new componentCons(thread);
             for (var j = 0; j < component.attrs.length; j++) {
               if (component.attrs[j].getName() === 'Signature') {
                 signatureAttr = <attributes.Signature> component.attrs[j];
               } else if (component.attrs[j].getName() === 'RuntimeVisibleAnnotations') {
                 annotationsAttr = <attributes.RuntimeVisibleAnnotations> component.attrs[j];
+              } else if (component.attrs[j].getName() === 'RuntimeVisibleTypeAnnotations') {
+                typeAnnotationsAttr = <attributes.RuntimeVisibleTypeAnnotations> component.attrs[j];
               }
             }
             componentObj['java/lang/reflect/RecordComponent/name'] = util.initString(thread.getBsCl(), component.name);
@@ -353,17 +364,16 @@ export default function (): any {
             componentObj['java/lang/reflect/RecordComponent/declaringRecord'] = javaThis;
             componentObj['java/lang/reflect/RecordComponent/signature'] = signatureAttr !== null ? util.initString(thread.getBsCl(), signatureAttr.sig) : null;
             if (annotationsAttr !== null) {
-              var byteArrCons = (<ArrayClassData<number>> thread.getBsCl().getInitializedClass(thread, '[B')).getConstructor(thread),
-                annotations = new byteArrCons(thread, 0),
-                bytes = annotationsAttr.rawBytes,
-                rawAnnotations = new Array(bytes.length);
-              for (j = 0; j < bytes.length; j++) {
-                rawAnnotations[j] = bytes.readInt8(j);
-              }
-              annotations.array = rawAnnotations;
-              componentObj['java/lang/reflect/RecordComponent/annotations'] = annotations;
+              componentObj['java/lang/reflect/RecordComponent/annotations'] = byteArrayFromBuffer(thread, annotationsAttr.rawBytes);
             } else {
               componentObj['java/lang/reflect/RecordComponent/annotations'] = null;
+            }
+            if (typeAnnotationsAttr !== null) {
+              var topLevelTypeAnnotations = typeAnnotationsAttr.topLevelAnnotationBytes();
+              componentObj['java/lang/reflect/RecordComponent/typeAnnotations'] =
+                topLevelTypeAnnotations !== null ? byteArrayFromBuffer(thread, topLevelTypeAnnotations) : null;
+            } else {
+              componentObj['java/lang/reflect/RecordComponent/typeAnnotations'] = null;
             }
             rv.array[index] = componentObj;
           },
@@ -403,12 +413,7 @@ export default function (): any {
         methods: Method[], i: number, m: Method;
 
       if (annotationsVisible !== null) {
-        // TODO: Use a typed array?
-        var bytes = annotationsVisible.rawBytes, data: number[] = new Array(bytes.length);
-        for (var i = 0; i < bytes.length; i++) {
-          data[i] = bytes.readInt8(i);
-        }
-        return util.newArrayFromData<number>(thread, thread.getBsCl(), '[B', data);
+        return byteArrayFromBuffer(thread, annotationsVisible.rawBytes);
       }
       return null;
     }

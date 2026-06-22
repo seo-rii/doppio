@@ -13,6 +13,7 @@ public final class RecordComponent implements AnnotatedElement {
   private Class<?> declaringRecord;
   private String signature;
   private byte[] annotations;
+  private byte[] typeAnnotations;
   private volatile transient Map<Class<? extends Annotation>, Annotation> declaredAnnotations;
 
   RecordComponent() {
@@ -35,7 +36,7 @@ public final class RecordComponent implements AnnotatedElement {
   }
 
   public AnnotatedType getAnnotatedType() {
-    return new DoppioAnnotatedType(type);
+    return new DoppioAnnotatedType(type, declaringRecord, typeAnnotations);
   }
 
   public Method getAccessor() {
@@ -80,11 +81,15 @@ public final class RecordComponent implements AnnotatedElement {
   }
 
   private Map<Class<? extends Annotation>, Annotation> parseAnnotations() {
+    return parseAnnotations(declaringRecord, annotations);
+  }
+
+  private static Map<Class<? extends Annotation>, Annotation> parseAnnotations(Class<?> declaringClass, byte[] annotations) {
     try {
-      return parseAnnotations("jdk.internal.access.SharedSecrets", "jdk.internal.reflect.ConstantPool");
+      return parseAnnotations("jdk.internal.access.SharedSecrets", "jdk.internal.reflect.ConstantPool", declaringClass, annotations);
     } catch (ClassNotFoundException e) {
       try {
-        return parseAnnotations("sun.misc.SharedSecrets", "sun.reflect.ConstantPool");
+        return parseAnnotations("sun.misc.SharedSecrets", "sun.reflect.ConstantPool", declaringClass, annotations);
       } catch (ClassNotFoundException e2) {
         throw new AnnotationFormatError(e2.toString());
       } catch (ReflectiveOperationException e2) {
@@ -95,18 +100,18 @@ public final class RecordComponent implements AnnotatedElement {
     }
   }
 
-  private Map<Class<? extends Annotation>, Annotation> parseAnnotations(String sharedSecretsName, String constantPoolName)
+  private static Map<Class<? extends Annotation>, Annotation> parseAnnotations(String sharedSecretsName, String constantPoolName, Class<?> declaringClass, byte[] annotations)
       throws ReflectiveOperationException {
     Class<?> sharedSecretsClass = Class.forName(sharedSecretsName);
     Object javaLangAccess = sharedSecretsClass.getMethod("getJavaLangAccess").invoke(null);
     Object constantPool = sharedSecretsClass.getMethod("getJavaLangAccess").getReturnType()
       .getMethod("getConstantPool", Class.class)
-      .invoke(javaLangAccess, declaringRecord);
+      .invoke(javaLangAccess, declaringClass);
     Class<?> annotationParserClass = Class.forName("sun.reflect.annotation.AnnotationParser");
     try {
       return (Map<Class<? extends Annotation>, Annotation>) annotationParserClass
         .getMethod("parseAnnotations", byte[].class, Class.forName(constantPoolName), Class.class)
-        .invoke(null, annotations, constantPool, declaringRecord);
+        .invoke(null, annotations, constantPool, declaringClass);
     } catch (InvocationTargetException e) {
       Throwable cause = e.getCause();
       if (cause instanceof RuntimeException) {
@@ -121,9 +126,14 @@ public final class RecordComponent implements AnnotatedElement {
 
   private static final class DoppioAnnotatedType implements AnnotatedType {
     private final Type type;
+    private final Class<?> declaringClass;
+    private final byte[] annotations;
+    private volatile transient Map<Class<? extends Annotation>, Annotation> declaredAnnotations;
 
-    DoppioAnnotatedType(Type type) {
+    DoppioAnnotatedType(Type type, Class<?> declaringClass, byte[] annotations) {
       this.type = type;
+      this.declaringClass = declaringClass;
+      this.annotations = annotations;
     }
 
     public Type getType() {
@@ -138,15 +148,29 @@ public final class RecordComponent implements AnnotatedElement {
       if (annotationClass == null) {
         throw new NullPointerException();
       }
-      return null;
+      return (T) declaredAnnotations().get(annotationClass);
     }
 
     public Annotation[] getAnnotations() {
-      return new Annotation[0];
+      return getDeclaredAnnotations();
     }
 
     public Annotation[] getDeclaredAnnotations() {
-      return new Annotation[0];
+      return declaredAnnotations().values().toArray(new Annotation[0]);
+    }
+
+    private Map<Class<? extends Annotation>, Annotation> declaredAnnotations() {
+      Map<Class<? extends Annotation>, Annotation> result = declaredAnnotations;
+      if (result == null) {
+        synchronized (this) {
+          result = declaredAnnotations;
+          if (result == null) {
+            result = annotations == null ? Collections.<Class<? extends Annotation>, Annotation>emptyMap() : parseAnnotations(declaringClass, annotations);
+            declaredAnnotations = result;
+          }
+        }
+      }
+      return result;
     }
   }
 }

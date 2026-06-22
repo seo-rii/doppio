@@ -568,6 +568,138 @@ export class RuntimeVisibleAnnotations implements IAttribute {
   }
 }
 
+export class RuntimeVisibleTypeAnnotations implements IAttribute {
+  public rawBytes: Buffer;
+
+  constructor(rawBytes: Buffer) {
+    this.rawBytes = rawBytes;
+  }
+
+  public getName() {
+    return 'RuntimeVisibleTypeAnnotations';
+  }
+
+  public static parse(byteStream: ByteStream, constantPool: ConstantPool, attrLen: number): IAttribute {
+    return new this(byteStream.read(attrLen));
+  }
+
+  public topLevelAnnotationBytes(): Buffer {
+    function u2(value: number): Buffer {
+      var rv = Buffer.alloc(2);
+      rv.writeUInt16BE(value, 0);
+      return rv;
+    }
+
+    function skipAnnotation(bytes: ByteStream): void {
+      bytes.skip(2); // type_index
+      var numElementValuePairs = bytes.getUint16(), i: number;
+      for (i = 0; i < numElementValuePairs; i++) {
+        bytes.skip(2); // element_name_index
+        skipElementValue(bytes);
+      }
+    }
+
+    function skipElementValue(bytes: ByteStream): void {
+      var tag = String.fromCharCode(bytes.getUint8()), numValues: number, i: number;
+      switch (tag) {
+        case 'e':
+          bytes.skip(4);
+          break;
+        case 'Z':
+        case 'B':
+        case 'C':
+        case 'S':
+        case 'I':
+        case 'F':
+        case 'J':
+        case 'D':
+        case 's':
+        case 'c':
+          bytes.skip(2);
+          break;
+        case '@':
+          skipAnnotation(bytes);
+          break;
+        case '[':
+          numValues = bytes.getUint16();
+          for (i = 0; i < numValues; i++) {
+            skipElementValue(bytes);
+          }
+          break;
+        default:
+          throw new Error('Unknown annotation element value tag: ' + tag);
+      }
+    }
+
+    function skipTargetInfo(bytes: ByteStream, targetType: number): void {
+      var tableLength: number;
+      switch (targetType) {
+        case 0x00:
+        case 0x01:
+        case 0x16:
+          bytes.skip(1);
+          break;
+        case 0x10:
+        case 0x17:
+        case 0x42:
+        case 0x43:
+        case 0x44:
+        case 0x45:
+        case 0x46:
+          bytes.skip(2);
+          break;
+        case 0x11:
+        case 0x12:
+          bytes.skip(2);
+          break;
+        case 0x13:
+        case 0x14:
+        case 0x15:
+          break;
+        case 0x40:
+        case 0x41:
+          tableLength = bytes.getUint16();
+          bytes.skip(tableLength * 6);
+          break;
+        case 0x47:
+        case 0x48:
+        case 0x49:
+        case 0x4A:
+        case 0x4B:
+          bytes.skip(3);
+          break;
+        default:
+          throw new Error('Unknown type annotation target_type: ' + targetType);
+      }
+    }
+
+    var bytes = new ByteStream(this.rawBytes),
+      numAnnotations = bytes.getUint16(),
+      annotations: Buffer[] = [],
+      i: number;
+    for (i = 0; i < numAnnotations; i++) {
+      var targetType = bytes.getUint8(),
+        annotationStart: number,
+        annotationEnd: number,
+        typePathLength: number;
+      skipTargetInfo(bytes, targetType);
+      typePathLength = bytes.getUint8();
+      bytes.skip(typePathLength * 2);
+      annotationStart = bytes.pos();
+      skipAnnotation(bytes);
+      annotationEnd = bytes.pos();
+      if (typePathLength === 0) {
+        annotations.push(this.rawBytes.slice(annotationStart, annotationEnd));
+      }
+    }
+
+    if (annotations.length === 0) {
+      return null;
+    }
+    return Buffer.concat([u2(annotations.length)].concat(annotations));
+  }
+}
+
 export class AnnotationDefault implements IAttribute {
   public rawBytes: Buffer;
   constructor(rawBytes: Buffer) {
@@ -773,6 +905,7 @@ export function makeAttributes(byteStream: ByteStream, constantPool: ConstantPoo
     'Deprecated': Deprecated,
     'Signature': Signature,
     'RuntimeVisibleAnnotations': RuntimeVisibleAnnotations,
+    'RuntimeVisibleTypeAnnotations': RuntimeVisibleTypeAnnotations,
     'AnnotationDefault': AnnotationDefault,
     'EnclosingMethod': EnclosingMethod,
     'BootstrapMethods': BootstrapMethods,

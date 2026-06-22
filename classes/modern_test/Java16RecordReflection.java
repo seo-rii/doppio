@@ -4,6 +4,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.RecordComponent;
 import java.util.Arrays;
 
@@ -16,6 +17,7 @@ public class Java16RecordReflection {
     print("primitive", int.class);
     printGenericSignatures(GenericData.class);
     printAnnotations(AnnotatedData.class);
+    printTypeUseAnnotations(TypeAnnotatedData.class);
 
     Data value = new Data("Ada", 7, new int[] { 1, 2 });
     RecordComponent[] components = Data.class.getRecordComponents();
@@ -77,6 +79,21 @@ public class Java16RecordReflection {
     }
   }
 
+  private static void printTypeUseAnnotations(Class<?> cls) {
+    RecordComponent[] components = cls.getRecordComponents();
+    String[] parts = new String[components.length];
+    for (int i = 0; i < components.length; i++) {
+      RecordComponent component = components[i];
+      AnnotatedType annotatedType = component.getAnnotatedType();
+      TypeLabel label = annotatedType.getAnnotation(TypeLabel.class);
+      parts[i] = component.getName()
+        + ":" + (label == null ? "null" : label.value())
+        + ":" + annotatedType.getAnnotations().length
+        + ":" + annotatedType.getDeclaredAnnotations().length;
+    }
+    System.out.println("type-annotations:" + Arrays.toString(parts));
+  }
+
   private static String valueText(Object value) {
     if (value instanceof int[]) {
       return Arrays.toString((int[]) value);
@@ -92,9 +109,17 @@ public class Java16RecordReflection {
 
   record AnnotatedData(@Label("name") String name, @Label("count") int count) {}
 
+  record TypeAnnotatedData(@TypeLabel("name-type") String name, java.util.List<@TypeLabel("element-type") String> names) {}
+
   @Retention(RetentionPolicy.RUNTIME)
   @Target(ElementType.RECORD_COMPONENT)
   @interface Label {
+    String value();
+  }
+
+  @Retention(RetentionPolicy.RUNTIME)
+  @Target(ElementType.TYPE_USE)
+  @interface TypeLabel {
     String value();
   }
 
