@@ -63,15 +63,14 @@ export default function (): any {
   }
 
   function arrayGet(thread: JVMThread, arr: JVMTypes.JVMArray<any>, idx: number): any {
-    if (arr == null) {
-      thread.throwNewException('Ljava/lang/NullPointerException;', '');
+    if (!isNotNull(thread, arr) || !verifyArray(thread, arr)) {
+      return null;
+    }
+    var array = arr.array;
+    if (idx < 0 || idx >= array.length) {
+      thread.throwNewException('Ljava/lang/ArrayIndexOutOfBoundsException;', 'Tried to access an illegal index in an array.');
     } else {
-      var array = arr.array;
-      if (idx < 0 || idx >= array.length) {
-        thread.throwNewException('Ljava/lang/ArrayIndexOutOfBoundsException;', 'Tried to access an illegal index in an array.');
-      } else {
-        return array[idx];
-      }
+      return array[idx];
     }
   }
 
@@ -91,6 +90,47 @@ export default function (): any {
     } else {
       return true;
     }
+  }
+
+  function arrayGetPrimitive(thread: JVMThread, arr: JVMTypes.JVMArray<any>, idx: number, requestedType: string): any {
+    var wideningSources: {[type: string]: string[]} = {
+        Z: ['Z'],
+        B: ['B'],
+        C: ['C'],
+        S: ['B', 'S'],
+        I: ['B', 'C', 'S', 'I'],
+        J: ['B', 'C', 'S', 'I', 'J'],
+        F: ['B', 'C', 'S', 'I', 'J', 'F'],
+        D: ['B', 'C', 'S', 'I', 'J', 'F', 'D']
+      },
+      component: ClassData,
+      sourceType: string,
+      value: any;
+    if (!isNotNull(thread, arr) || !verifyArray(thread, arr)) {
+      return null;
+    }
+    component = arr.getClass().getComponentClass();
+    if (!(component instanceof PrimitiveClassData)) {
+      thread.throwNewException('Ljava/lang/IllegalArgumentException;', 'argument type mismatch');
+      return null;
+    }
+    sourceType = component.getInternalName();
+    if (wideningSources[requestedType].indexOf(sourceType) === -1) {
+      thread.throwNewException('Ljava/lang/IllegalArgumentException;', 'argument type mismatch');
+      return null;
+    }
+    if (idx < 0 || idx >= arr.array.length) {
+      thread.throwNewException('Ljava/lang/ArrayIndexOutOfBoundsException;', 'Tried to access an illegal index in an array.');
+      return null;
+    }
+    value = arr.array[idx];
+    if (requestedType === 'J' && !(value instanceof Long)) {
+      return Long.fromNumber(value);
+    }
+    if ((requestedType === 'F' || requestedType === 'D') && value instanceof Long) {
+      return value.toNumber();
+    }
+    return value;
   }
 
   function arraySetPrimitive(thread: JVMThread, arr: JVMTypes.JVMArray<any>, idx: number, value: any, sourceType: string): void {
@@ -883,14 +923,37 @@ export default function (): any {
       return val;
     }
 
-    public static 'getBoolean(Ljava/lang/Object;I)Z': (thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number) => number = arrayGet;
-    public static 'getByte(Ljava/lang/Object;I)B': (thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number) => number = arrayGet;
-    public static 'getChar(Ljava/lang/Object;I)C': (thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number) => number = arrayGet;
-    public static 'getShort(Ljava/lang/Object;I)S': (thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number) => number = arrayGet;
-    public static 'getInt(Ljava/lang/Object;I)I': (thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number) => number = arrayGet;
-    public static 'getLong(Ljava/lang/Object;I)J': (thread: JVMThread, arg0: JVMTypes.JVMArray<Long>, arg1: number) => Long = arrayGet;
-    public static 'getFloat(Ljava/lang/Object;I)F': (thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number) => number = arrayGet;
-    public static 'getDouble(Ljava/lang/Object;I)D': (thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number) => number = arrayGet;
+    public static 'getBoolean(Ljava/lang/Object;I)Z'(thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number): number {
+      return arrayGetPrimitive(thread, arg0, arg1, 'Z');
+    }
+
+    public static 'getByte(Ljava/lang/Object;I)B'(thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number): number {
+      return arrayGetPrimitive(thread, arg0, arg1, 'B');
+    }
+
+    public static 'getChar(Ljava/lang/Object;I)C'(thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number): number {
+      return arrayGetPrimitive(thread, arg0, arg1, 'C');
+    }
+
+    public static 'getShort(Ljava/lang/Object;I)S'(thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number): number {
+      return arrayGetPrimitive(thread, arg0, arg1, 'S');
+    }
+
+    public static 'getInt(Ljava/lang/Object;I)I'(thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number): number {
+      return arrayGetPrimitive(thread, arg0, arg1, 'I');
+    }
+
+    public static 'getLong(Ljava/lang/Object;I)J'(thread: JVMThread, arg0: JVMTypes.JVMArray<Long>, arg1: number): Long {
+      return arrayGetPrimitive(thread, arg0, arg1, 'J');
+    }
+
+    public static 'getFloat(Ljava/lang/Object;I)F'(thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number): number {
+      return arrayGetPrimitive(thread, arg0, arg1, 'F');
+    }
+
+    public static 'getDouble(Ljava/lang/Object;I)D'(thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number): number {
+      return arrayGetPrimitive(thread, arg0, arg1, 'D');
+    }
 
     public static 'set(Ljava/lang/Object;ILjava/lang/Object;)V'(thread: JVMThread, arr: JVMTypes.JVMArray<any>, idx: number, val: JVMTypes.java_lang_Object): void {
       if (verifyArray(thread, arr) && isNotNull(thread, arr)) {
