@@ -240,7 +240,8 @@ still not claimed.
   composed function adapters, `Option.when`/`Option.unless`,
   `Using.resource`, `Try` recovery, `Either.cond`, and `partitionMap`,
   Java collection interop through `scala.jdk.CollectionConverters`, a small
-  `Future`/`Promise`/`Await` path running on a Java executor,
+  `Future`/`Promise`/`Await` path running on a Java executor, classfile
+  assertions for `InvokeDynamic`/`LambdaMetafactory` emission,
   and `scala-reflect`
   runtime universe use covering runtime mirror creation, `typeOf`, member
   symbol lookup, case-accessor discovery, and static class lookup, plus

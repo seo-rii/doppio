@@ -111,6 +111,11 @@ test -f "$out_dir/SmokeBox.class"
 test -f "$out_dir/SmokeStage.class"
 test -f "$out_dir/ZeroExpr.class"
 
+scala_indy_dump="$work_dir/scala-indy-javap.txt"
+javap -classpath "$runtime_cp" -v 'ScalaFunctionalSmoke$' 'ScalaInteropSmoke$' 'Hello$' > "$scala_indy_dump"
+grep -q 'InvokeDynamic' "$scala_indy_dump"
+grep -q 'LambdaMetafactory' "$scala_indy_dump"
+
 expected_output="${SCALA_SMOKE_EXPECTED_OUTPUT:-"scala:38:parse>run:i=39:SCALA:a,bb:sc|even4:25:12:1=4,2=2,3=4:b:4/ccc:4/aa:2:g2:t5:String:3:z:2:1,3,5,7:1=8,2=5:a5|z2:134:k10:r6:r0a1b2:2:2,1:5:f32:worker:3:c1:describe/getName/total:pkg-worker-11:20:red-green-blue:23:ReflectBox:2:name/value:true:f17/14/p17+c14/u7/alpha>bb>close/t49+13/x|_=24/ok49:m22:macro:cs:5:leaf:(I)Ljava/lang/String;:(I)Ljava/lang/String;:ScalaStackWalkerSmoke$|outer:(Ljava/lang/String;)Ljava/lang/String;:(Ljava/lang/String;)Ljava/lang/String;:ScalaStackWalkerSmoke$|exercise:()Ljava/lang/String;:()Ljava/lang/String;:ScalaStackWalkerSmoke$:(I)Ljava/lang/String;:UnsupportedOperationException"}"
 
 native_output="$(java -cp "$runtime_cp" Hello)"
