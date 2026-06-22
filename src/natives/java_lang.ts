@@ -93,6 +93,45 @@ export default function (): any {
     }
   }
 
+  function arraySetPrimitive(thread: JVMThread, arr: JVMTypes.JVMArray<any>, idx: number, value: any, sourceType: string): void {
+    var wideningTargets: {[type: string]: string[]} = {
+        Z: ['Z'],
+        B: ['B', 'S', 'I', 'J', 'F', 'D'],
+        C: ['C', 'I', 'J', 'F', 'D'],
+        S: ['S', 'I', 'J', 'F', 'D'],
+        I: ['I', 'J', 'F', 'D'],
+        J: ['J', 'F', 'D'],
+        F: ['F', 'D'],
+        D: ['D']
+      },
+      component: ClassData,
+      targetType: string;
+    if (!isNotNull(thread, arr) || !verifyArray(thread, arr)) {
+      return;
+    }
+    component = arr.getClass().getComponentClass();
+    if (!(component instanceof PrimitiveClassData)) {
+      thread.throwNewException('Ljava/lang/IllegalArgumentException;', 'argument type mismatch');
+      return;
+    }
+    targetType = component.getInternalName();
+    if (wideningTargets[sourceType].indexOf(targetType) === -1) {
+      thread.throwNewException('Ljava/lang/IllegalArgumentException;', 'argument type mismatch');
+      return;
+    }
+    if (idx < 0 || idx >= arr.array.length) {
+      thread.throwNewException('Ljava/lang/ArrayIndexOutOfBoundsException;', 'Tried to write to an illegal index in an array.');
+      return;
+    }
+    if (targetType === 'J' && !(value instanceof Long)) {
+      arr.array[idx] = Long.fromNumber(value);
+    } else if ((targetType === 'F' || targetType === 'D') && value instanceof Long) {
+      arr.array[idx] = value.toNumber();
+    } else {
+      arr.array[idx] = value;
+    }
+  }
+
   class java_lang_Class {
 
     public static 'forName0(Ljava/lang/String;ZLjava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/Class;'(thread: JVMThread, jvmStr: JVMTypes.java_lang_String, initialize: number, jclo: JVMTypes.java_lang_ClassLoader, caller: JVMTypes.java_lang_Class): void {
@@ -883,35 +922,35 @@ export default function (): any {
     }
 
     public static 'setBoolean(Ljava/lang/Object;IZ)V'(thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number, arg2: number): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+      arraySetPrimitive(thread, arg0, arg1, arg2, 'Z');
     }
 
     public static 'setByte(Ljava/lang/Object;IB)V'(thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number, arg2: number): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+      arraySetPrimitive(thread, arg0, arg1, arg2, 'B');
     }
 
     public static 'setChar(Ljava/lang/Object;IC)V'(thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number, arg2: number): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+      arraySetPrimitive(thread, arg0, arg1, arg2, 'C');
     }
 
     public static 'setShort(Ljava/lang/Object;IS)V'(thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number, arg2: number): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+      arraySetPrimitive(thread, arg0, arg1, arg2, 'S');
     }
 
     public static 'setInt(Ljava/lang/Object;II)V'(thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number, arg2: number): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+      arraySetPrimitive(thread, arg0, arg1, arg2, 'I');
     }
 
     public static 'setLong(Ljava/lang/Object;IJ)V'(thread: JVMThread, arg0: JVMTypes.JVMArray<Long>, arg1: number, arg2: Long): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+      arraySetPrimitive(thread, arg0, arg1, arg2, 'J');
     }
 
     public static 'setFloat(Ljava/lang/Object;IF)V'(thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number, arg2: number): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+      arraySetPrimitive(thread, arg0, arg1, arg2, 'F');
     }
 
     public static 'setDouble(Ljava/lang/Object;ID)V'(thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number, arg2: number): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+      arraySetPrimitive(thread, arg0, arg1, arg2, 'D');
     }
 
     public static 'newArray(Ljava/lang/Class;I)Ljava/lang/Object;'(thread: JVMThread, cls: JVMTypes.java_lang_Class, len: number): JVMTypes.JVMArray<any> {

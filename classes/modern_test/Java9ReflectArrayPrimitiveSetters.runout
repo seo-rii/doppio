@@ -1,0 +1,14 @@
+[true]
+[7]
+[8, 300]
+[A]
+[9, 10, 66, 11]
+[12, 13, 67, 14]
+[15.0, 16.0, 1.5, 17.0]
+[18.0, 19.0, 2.5, 3.5, 68.0]
+IllegalArgumentException
+IllegalArgumentException
+IllegalArgumentException
+ArrayIndexOutOfBoundsException
+NullPointerException
+IllegalArgumentException
