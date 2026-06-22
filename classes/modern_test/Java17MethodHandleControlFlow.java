@@ -5,6 +5,8 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 
 public class Java17MethodHandleControlFlow {
+  private static int sideEffect;
+
   public static int zero(int limit) {
     return 0;
   }
@@ -59,6 +61,30 @@ public class Java17MethodHandleControlFlow {
 
   public static String rangeAppendIndex(String value, int index, String prefix, int start, int end) {
     return value + index;
+  }
+
+  public static void resetSideEffect(int limit) {
+    sideEffect = 0;
+  }
+
+  public static boolean sideEffectBelow(int limit) {
+    return sideEffect < limit;
+  }
+
+  public static void incrementSideEffect(int limit) {
+    sideEffect++;
+  }
+
+  public static boolean sideEffectBelowThree() {
+    return sideEffect < 3;
+  }
+
+  public static void incrementSideEffectNoArgs() {
+    sideEffect++;
+  }
+
+  public static void addSideEffectIndex(int index, int limit) {
+    sideEffect += index;
   }
 
   public static void main(String[] args) throws Throwable {
@@ -163,5 +189,59 @@ public class Java17MethodHandleControlFlow {
     System.out.println((String) countedRange.invokeExact("x", 2, 5));
     System.out.println((String) countedRange.invokeExact("x", 5, 2));
     System.out.println(countedRange.type().toMethodDescriptorString());
+
+    MethodHandle resetSideEffect = lookup.findStatic(
+        Java17MethodHandleControlFlow.class,
+        "resetSideEffect",
+        MethodType.methodType(void.class, int.class));
+    MethodHandle sideEffectBelow = lookup.findStatic(
+        Java17MethodHandleControlFlow.class,
+        "sideEffectBelow",
+        MethodType.methodType(boolean.class, int.class));
+    MethodHandle incrementSideEffect = lookup.findStatic(
+        Java17MethodHandleControlFlow.class,
+        "incrementSideEffect",
+        MethodType.methodType(void.class, int.class));
+    MethodHandle voidWhile = MethodHandles.whileLoop(resetSideEffect, sideEffectBelow, incrementSideEffect);
+    System.out.println(voidWhile.type().toMethodDescriptorString());
+    sideEffect = 99;
+    voidWhile.invokeExact(4);
+    System.out.println(sideEffect);
+
+    MethodHandle sideEffectBelowThree = lookup.findStatic(
+        Java17MethodHandleControlFlow.class,
+        "sideEffectBelowThree",
+        MethodType.methodType(boolean.class));
+    MethodHandle incrementSideEffectNoArgs = lookup.findStatic(
+        Java17MethodHandleControlFlow.class,
+        "incrementSideEffectNoArgs",
+        MethodType.methodType(void.class));
+    MethodHandle voidWhileDefault = MethodHandles.whileLoop(null, sideEffectBelowThree, incrementSideEffectNoArgs);
+    System.out.println(voidWhileDefault.type().toMethodDescriptorString());
+    sideEffect = 0;
+    voidWhileDefault.invokeExact();
+    System.out.println(sideEffect);
+
+    MethodHandle voidDoWhile = MethodHandles.doWhileLoop(resetSideEffect, incrementSideEffect, sideEffectBelow);
+    System.out.println(voidDoWhile.type().toMethodDescriptorString());
+    sideEffect = 99;
+    voidDoWhile.invokeExact(4);
+    System.out.println(sideEffect);
+
+    MethodHandle addSideEffectIndex = lookup.findStatic(
+        Java17MethodHandleControlFlow.class,
+        "addSideEffectIndex",
+        MethodType.methodType(void.class, int.class, int.class));
+    MethodHandle voidCounted = MethodHandles.countedLoop(count, resetSideEffect, addSideEffectIndex);
+    System.out.println(voidCounted.type().toMethodDescriptorString());
+    sideEffect = 99;
+    voidCounted.invokeExact(5);
+    System.out.println(sideEffect);
+
+    MethodHandle voidCountedDefault = MethodHandles.countedLoop(count, null, addSideEffectIndex);
+    System.out.println(voidCountedDefault.type().toMethodDescriptorString());
+    sideEffect = 10;
+    voidCountedDefault.invokeExact(4);
+    System.out.println(sideEffect);
   }
 }

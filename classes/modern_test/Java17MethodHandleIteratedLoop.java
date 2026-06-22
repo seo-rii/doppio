@@ -9,6 +9,8 @@ import java.util.Iterator;
 import java.util.List;
 
 public class Java17MethodHandleIteratedLoop {
+  private static int sideEffect;
+
   public static String seed() {
     return "";
   }
@@ -31,6 +33,18 @@ public class Java17MethodHandleIteratedLoop {
 
   public static Iterator<String> prefixIterator(String prefix) {
     return Arrays.asList("a", "b", "c").iterator();
+  }
+
+  public static void resetPrefix(String prefix) {
+    sideEffect = 0;
+  }
+
+  public static void appendElement(String element, String prefix) {
+    sideEffect += prefix.length() + element.length();
+  }
+
+  public static void appendElementOnly(String element) {
+    sideEffect += element.length();
   }
 
   public static int sum(int state, Integer element) {
@@ -71,6 +85,18 @@ public class Java17MethodHandleIteratedLoop {
         Java17MethodHandleIteratedLoop.class,
         "prefixIterator",
         MethodType.methodType(Iterator.class, String.class));
+    MethodHandle resetPrefix = lookup.findStatic(
+        Java17MethodHandleIteratedLoop.class,
+        "resetPrefix",
+        MethodType.methodType(void.class, String.class));
+    MethodHandle appendElement = lookup.findStatic(
+        Java17MethodHandleIteratedLoop.class,
+        "appendElement",
+        MethodType.methodType(void.class, String.class, String.class));
+    MethodHandle appendElementOnly = lookup.findStatic(
+        Java17MethodHandleIteratedLoop.class,
+        "appendElementOnly",
+        MethodType.methodType(void.class, String.class));
 
     MethodHandle defaultIterator = MethodHandles.iteratedLoop(null, seed, join);
     System.out.println(defaultIterator.type().toMethodDescriptorString());
@@ -92,6 +118,18 @@ public class Java17MethodHandleIteratedLoop {
     System.out.println(sumLoop.type().toMethodDescriptorString());
     System.out.println((int) sumLoop.invokeExact((Iterable<Integer>) Arrays.asList(2, 3, 5)));
     System.out.println((int) sumLoop.invokeExact((Iterable<Integer>) Collections.<Integer>emptyList()));
+
+    MethodHandle voidExplicitIterator = MethodHandles.iteratedLoop(prefixIterator, resetPrefix, appendElement);
+    System.out.println(voidExplicitIterator.type().toMethodDescriptorString());
+    sideEffect = 99;
+    voidExplicitIterator.invokeExact("p");
+    System.out.println(sideEffect);
+
+    MethodHandle voidDefaultIterator = MethodHandles.iteratedLoop(null, null, appendElementOnly);
+    System.out.println(voidDefaultIterator.type().toMethodDescriptorString());
+    sideEffect = 0;
+    voidDefaultIterator.invokeExact((Iterable<String>) Arrays.asList("aa", "b"));
+    System.out.println(sideEffect);
 
     try {
       MethodHandles.iteratedLoop(null, seed, null);

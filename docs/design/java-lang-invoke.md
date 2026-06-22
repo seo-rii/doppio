@@ -68,7 +68,7 @@ The fixture matrix tracks the covered smoke tests and the next fixtures to add:
 | Reflective unreflect lookup | Covered | `unreflect`, `unreflectConstructor`, `unreflectGetter`, `unreflectSetter`, and `MethodHandles.reflectAs` for selected public members plus private non-nestmate and nestmate members | Public reflective method/constructor/field handles invoke, report native-compatible types, and selected direct handles round-trip back to reflective members; private non-nestmate reflective members fail with `IllegalAccessException`; private nestmate method, constructor, and field unreflect succeeds | `sun.invoke.util.VerifyAccess` nestmate shim plus `MethodHandleNatives.init` |
 | Private lookup factory | Partial | `MethodHandles.privateLookupIn` into a same-package target with private constructor, method, and field access, plus selected Java 9+ lookup-mode queries | Returned lookup reports the target class, retains Java 8 private/package lookup modes, accesses private static/instance methods and fields from the caller and a peer class, rejects public lookup plus primitive/array targets, returns null `previousLookupClass`, reports full-privilege access for full/private lookups, and supports selected `dropLookupMode` reductions | class-load native method injection plus `java/lang/invoke/MethodHandles` and `MethodHandles$Lookup` native overlays |
 | `asType` adaptation | Partial | Adapt public static and virtual method handles across selected reference and primitive signatures | Reference cast, return widening to `Object`, non-void return dropping to `void`, `void` return adaptation to `null` reference, primitive argument and return widening, primitive return boxing, unboxing, arity mismatch, and runtime cast failure match the native JVM | existing Java 8 method-handle adapter path |
-| Method-handle combinators | Partial | Compose same-class method handles with selected JDK combinators | `identity`, `constant`, `bindTo`, `insertArguments`, `dropArguments`, `filterArguments`, `filterReturnValue`, `permuteArguments`, `guardWithTest`, `catchException`, `exactInvoker`, `invoker`, `spreadInvoker`, `collectArguments`, zero-position and selected nonzero-position `foldArguments`, `explicitCastArguments`, `arrayElementGetter`, `arrayElementSetter`, `throwException`, selected `MethodHandle.asCollector`, `asSpreader`, `asVarargsCollector`, and `asFixedArity` adapter flows, plus Java 17 public overlays `zero`, `empty`, `arrayLength`, `arrayConstructor`, `dropArgumentsToMatch`, `dropReturn`, selected `tryFinally`, `tableSwitch`, and `iteratedLoop` flows, and selected `whileLoop`/`doWhileLoop`/`countedLoop` non-void state loops produce native-compatible results and descriptor strings for the tested shapes | existing Java 8 method-handle adapter/combinator path plus class-load native overlay helpers |
+| Method-handle combinators | Partial | Compose same-class method handles with selected JDK combinators | `identity`, `constant`, `bindTo`, `insertArguments`, `dropArguments`, `filterArguments`, `filterReturnValue`, `permuteArguments`, `guardWithTest`, `catchException`, `exactInvoker`, `invoker`, `spreadInvoker`, `collectArguments`, zero-position and selected nonzero-position `foldArguments`, `explicitCastArguments`, `arrayElementGetter`, `arrayElementSetter`, `throwException`, selected `MethodHandle.asCollector`, `asSpreader`, `asVarargsCollector`, and `asFixedArity` adapter flows, plus Java 17 public overlays `zero`, `empty`, `arrayLength`, `arrayConstructor`, `dropArgumentsToMatch`, `dropReturn`, selected `tryFinally`, `tableSwitch`, and `iteratedLoop` flows, and selected `whileLoop`/`doWhileLoop`/`countedLoop` non-void state plus void side-effect loops produce native-compatible results and descriptor strings for the tested shapes | existing Java 8 method-handle adapter/combinator path plus class-load native overlay helpers |
 | Nominal method-handle descriptors | Partial | `MethodHandleDesc.resolveConstantDesc` and `DirectMethodHandleDesc.resolveConstantDesc` for public same-class and selected JDK-class static/virtual methods, constructors, static/instance fields, and `asType` | Resolved handles invoke, report native-compatible types, mutate fields, and propagate missing-method failures | class-library shim delegating to `MethodHandles.Lookup` |
 | VarHandle descriptors | Covered | `ConstantDescs.CD_VarHandle`, nested `CD_VarHandleDesc`, plus VarHandle bootstrap descriptor constants | Descriptor metadata only, no execution claim | class-library shim |
 | Nominal dynamic-constant descriptors | Partial | `DynamicConstantDesc.resolveConstantDesc` for selected `ConstantBootstraps` descriptors | `nullConstant`, `primitiveClass`, `enumConstant`, `getStaticFinal`, reference `explicitCast`, selected primitive-target `explicitCast` numeric conversion, and selected descriptor-level `invoke` public-static method-handle targets resolve to native-compatible values, including tested primitive return widening; selected bad primitive name, missing enum, bad explicit-cast, and bad invoke result-cast failures use native-style `BootstrapMethodError` wrapping; selected `getStaticFinal` field lookup failures use `NoSuchFieldError` | class-library shim |
@@ -252,7 +252,7 @@ handles, dynamic constants, and record object-method linkage:
   `tryFinally` normal, exceptional, and `void` flows, selected `tableSwitch`
   selector/fallback flows, selected `iteratedLoop` `Iterable`/`Iterator`
   flows, and selected `whileLoop`, `doWhileLoop`, and both `countedLoop`
-  overloads for non-`void` state loops.
+  overloads for non-`void` state loops plus selected `void` side-effect loops.
   The `tryFinally` slice is tracked separately in
   `docs/design/methodhandles-try-finally.md`; the control-flow family and
   selected state-loop slices are tracked in
@@ -278,15 +278,17 @@ handles, dynamic constants, and record object-method linkage:
 - How much of the Java 17 JDK `java.lang.invoke` implementation can be reused
   with the existing Java 8 class library image.
 - The selected `whileLoop`, `doWhileLoop`, `countedLoop`, and `iteratedLoop`
-  slices cover non-`void` state loops only. The selected `tableSwitch` slice covers
+  slices cover non-`void` state loops plus selected `void` side-effect loops.
+  The selected `tableSwitch` slice covers
   same-typed fallback/target handles with a leading `int` selector, in-range
   dispatch, fallback dispatch, and selected validation errors. The selected
   `iteratedLoop` slice covers null-iterator `Iterable` dispatch, explicit
-  iterator handles, reference and primitive state, empty iteration, and selected
-  validation errors. Broad state-loop parity and the remaining generic Java 9+
-  `loop` combinator still need separate fixtures and implementation slices
-  because they need control-flow, exception, and argument-flow parity beyond
-  the simple public overlay helper shape.
+  iterator handles, reference and primitive state, selected `void` side-effect
+  iteration, empty iteration, and selected validation errors. Broad state-loop
+  parity and the remaining generic Java 9+ `loop` combinator still need
+  separate fixtures and implementation slices because they need control-flow,
+  exception, and argument-flow parity beyond the simple public overlay helper
+  shape.
 - `MethodHandleNatives.resolve` currently bridges Java 11 nestmate private
   `find*` lookup through `MemberName` access-flag adjustment, and the modern
   `sun.invoke.util.VerifyAccess` shim bridges `unreflect*` lookup access

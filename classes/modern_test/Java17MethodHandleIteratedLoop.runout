@@ -7,6 +7,10 @@ p:papbpc
 (Ljava/lang/Iterable;)I
 10
 0
+(Ljava/lang/String;)V
+6
+(Ljava/lang/Iterable;)V
+3
 NullPointerException:nullBody
 IllegalArgumentException:badIterator
 IllegalArgumentException:badInit

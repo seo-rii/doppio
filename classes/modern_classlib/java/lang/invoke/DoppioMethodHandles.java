@@ -282,16 +282,25 @@ public final class DoppioMethodHandles {
 
     MethodType bodyType = body.type();
     Class<?> returnType = bodyType.returnType();
-    if (returnType == void.class) {
-      throw new IllegalArgumentException("void iterated-loop body is not supported by this overlay");
-    }
-    if (bodyType.parameterCount() < 2 || bodyType.parameterType(0) != returnType) {
-      throw new IllegalArgumentException("body must accept state and element parameters");
+    boolean voidState = returnType == void.class;
+    int bodyExternalArgumentCount;
+    List<Class<?>> externalTypes;
+    if (voidState) {
+      if (bodyType.parameterCount() < 1) {
+        throw new IllegalArgumentException("void body must accept element parameter");
+      }
+      bodyExternalArgumentCount = bodyType.parameterCount() - 1;
+      externalTypes = new ArrayList<Class<?>>(
+          bodyType.parameterList().subList(1, bodyType.parameterCount()));
+    } else {
+      if (bodyType.parameterCount() < 2 || bodyType.parameterType(0) != returnType) {
+        throw new IllegalArgumentException("body must accept state and element parameters");
+      }
+      bodyExternalArgumentCount = bodyType.parameterCount() - 2;
+      externalTypes = new ArrayList<Class<?>>(
+          bodyType.parameterList().subList(2, bodyType.parameterCount()));
     }
 
-    int bodyExternalArgumentCount = bodyType.parameterCount() - 2;
-    List<Class<?>> externalTypes = new ArrayList<Class<?>>(
-        bodyType.parameterList().subList(2, bodyType.parameterCount()));
     boolean defaultIterator = iterator == null;
     int iteratorArgumentCount = 0;
     if (defaultIterator) {
@@ -333,6 +342,7 @@ public final class DoppioMethodHandles {
             int.class,
             int.class,
             boolean.class,
+            boolean.class,
             Object[].class));
     return MethodHandles.insertArguments(
             adapter,
@@ -344,7 +354,8 @@ public final class DoppioMethodHandles {
             Integer.valueOf(iteratorArgumentCount),
             Integer.valueOf(initArgumentCount),
             Integer.valueOf(bodyExternalArgumentCount),
-            Boolean.valueOf(defaultIterator))
+            Boolean.valueOf(defaultIterator),
+            Boolean.valueOf(voidState))
         .asCollector(Object[].class, externalTypes.size())
         .asType(MethodType.methodType(returnType, externalTypes));
   }
@@ -360,16 +371,22 @@ public final class DoppioMethodHandles {
 
     MethodType bodyType = body.type();
     Class<?> returnType = bodyType.returnType();
-    if (returnType == void.class) {
-      throw new IllegalArgumentException("void counted-loop body is not supported by this overlay");
-    }
-    if (bodyType.parameterCount() < 2 ||
-        bodyType.parameterType(0) != returnType ||
-        bodyType.parameterType(1) != int.class) {
-      throw new IllegalArgumentException("body must accept state and int counter parameters");
+    boolean voidState = returnType == void.class;
+    List<Class<?>> externalTypes;
+    if (voidState) {
+      if (bodyType.parameterCount() < 1 || bodyType.parameterType(0) != int.class) {
+        throw new IllegalArgumentException("void body must accept int counter parameter");
+      }
+      externalTypes = bodyType.parameterList().subList(1, bodyType.parameterCount());
+    } else {
+      if (bodyType.parameterCount() < 2 ||
+          bodyType.parameterType(0) != returnType ||
+          bodyType.parameterType(1) != int.class) {
+        throw new IllegalArgumentException("body must accept state and int counter parameters");
+      }
+      externalTypes = bodyType.parameterList().subList(2, bodyType.parameterCount());
     }
 
-    List<Class<?>> externalTypes = bodyType.parameterList().subList(2, bodyType.parameterCount());
     int startArgumentCount = 0;
     if (explicitStart) {
       MethodType startType = start.type();
@@ -407,6 +424,7 @@ public final class DoppioMethodHandles {
             int.class,
             int.class,
             int.class,
+            boolean.class,
             Object[].class));
     return MethodHandles.insertArguments(
             adapter,
@@ -418,7 +436,8 @@ public final class DoppioMethodHandles {
             returnType,
             Integer.valueOf(startArgumentCount),
             Integer.valueOf(endArgumentCount),
-            Integer.valueOf(initArgumentCount))
+            Integer.valueOf(initArgumentCount),
+            Boolean.valueOf(voidState))
         .asCollector(Object[].class, externalTypes.size())
         .asType(MethodType.methodType(returnType, externalTypes));
   }
@@ -431,14 +450,17 @@ public final class DoppioMethodHandles {
 
     MethodType bodyType = body.type();
     Class<?> returnType = bodyType.returnType();
-    if (returnType == void.class) {
-      throw new IllegalArgumentException("void state-loop body is not supported by this overlay");
-    }
-    if (bodyType.parameterCount() == 0 || bodyType.parameterType(0) != returnType) {
-      throw new IllegalArgumentException("body must accept and return the loop state type");
+    boolean voidState = returnType == void.class;
+    List<Class<?>> externalTypes;
+    if (voidState) {
+      externalTypes = bodyType.parameterList();
+    } else {
+      if (bodyType.parameterCount() == 0 || bodyType.parameterType(0) != returnType) {
+        throw new IllegalArgumentException("body must accept and return the loop state type");
+      }
+      externalTypes = bodyType.parameterList().subList(1, bodyType.parameterCount());
     }
 
-    List<Class<?>> externalTypes = bodyType.parameterList().subList(1, bodyType.parameterCount());
     int initArgumentCount = 0;
     if (init != null) {
       MethodType initType = init.type();
@@ -452,11 +474,12 @@ public final class DoppioMethodHandles {
     if (predType.returnType() != boolean.class) {
       throw new IllegalArgumentException("predicate must return boolean");
     }
-    if (predType.parameterCount() > bodyType.parameterCount()) {
+    if (predType.parameterCount() > (voidState ? externalTypes.size() : bodyType.parameterCount())) {
       throw new IllegalArgumentException("predicate has too many parameters");
     }
     for (int i = 0; i < predType.parameterCount(); i++) {
-      if (predType.parameterType(i) != bodyType.parameterType(i)) {
+      Class<?> expectedType = voidState ? externalTypes.get(i) : bodyType.parameterType(i);
+      if (predType.parameterType(i) != expectedType) {
         throw new IllegalArgumentException("predicate parameter types do not match loop state");
       }
     }
@@ -473,6 +496,7 @@ public final class DoppioMethodHandles {
             Class.class,
             int.class,
             int.class,
+            boolean.class,
             Object[].class));
     return MethodHandles.insertArguments(
             adapter,
@@ -482,7 +506,8 @@ public final class DoppioMethodHandles {
             body,
             returnType,
             Integer.valueOf(initArgumentCount),
-            Integer.valueOf(predType.parameterCount()))
+            Integer.valueOf(predType.parameterCount()),
+            Boolean.valueOf(voidState))
         .asCollector(Object[].class, externalTypes.size())
         .asType(MethodType.methodType(returnType, externalTypes));
   }
@@ -626,6 +651,7 @@ public final class DoppioMethodHandles {
       int initArgumentCount,
       int bodyExternalArgumentCount,
       boolean defaultIterator,
+      boolean voidState,
       Object[] args) throws Throwable {
     Iterator<?> values;
     if (defaultIterator) {
@@ -636,21 +662,35 @@ public final class DoppioMethodHandles {
       values = (Iterator<?>) iterator.invokeWithArguments(iteratorArgs);
     }
 
-    Object state;
-    if (init == null) {
-      state = defaultValue(returnType);
+    Object state = null;
+    if (voidState) {
+      if (init != null) {
+        Object[] initArgs = new Object[initArgumentCount];
+        System.arraycopy(args, 0, initArgs, 0, initArgumentCount);
+        init.invokeWithArguments(initArgs);
+      }
     } else {
-      Object[] initArgs = new Object[initArgumentCount];
-      System.arraycopy(args, 0, initArgs, 0, initArgumentCount);
-      state = init.invokeWithArguments(initArgs);
+      if (init == null) {
+        state = defaultValue(returnType);
+      } else {
+        Object[] initArgs = new Object[initArgumentCount];
+        System.arraycopy(args, 0, initArgs, 0, initArgumentCount);
+        state = init.invokeWithArguments(initArgs);
+      }
     }
 
-    Object[] bodyArgs = new Object[2 + bodyExternalArgumentCount];
-    System.arraycopy(args, 0, bodyArgs, 2, bodyExternalArgumentCount);
+    int leadingBodyArguments = voidState ? 1 : 2;
+    Object[] bodyArgs = new Object[leadingBodyArguments + bodyExternalArgumentCount];
+    System.arraycopy(args, 0, bodyArgs, leadingBodyArguments, bodyExternalArgumentCount);
     while (values.hasNext()) {
-      bodyArgs[0] = state;
-      bodyArgs[1] = values.next();
-      state = body.invokeWithArguments(bodyArgs);
+      if (voidState) {
+        bodyArgs[0] = values.next();
+        body.invokeWithArguments(bodyArgs);
+      } else {
+        bodyArgs[0] = state;
+        bodyArgs[1] = values.next();
+        state = body.invokeWithArguments(bodyArgs);
+      }
     }
     return state;
   }
@@ -662,21 +702,30 @@ public final class DoppioMethodHandles {
       Class<?> returnType,
       int initArgumentCount,
       int predArgumentCount,
+      boolean voidState,
       Object[] args) throws Throwable {
-    Object state;
-    if (init == null) {
-      state = defaultValue(returnType);
+    Object state = null;
+    if (voidState) {
+      if (init != null) {
+        Object[] initArgs = new Object[initArgumentCount];
+        System.arraycopy(args, 0, initArgs, 0, initArgumentCount);
+        init.invokeWithArguments(initArgs);
+      }
     } else {
-      Object[] initArgs = new Object[initArgumentCount];
-      System.arraycopy(args, 0, initArgs, 0, initArgumentCount);
-      state = init.invokeWithArguments(initArgs);
+      if (init == null) {
+        state = defaultValue(returnType);
+      } else {
+        Object[] initArgs = new Object[initArgumentCount];
+        System.arraycopy(args, 0, initArgs, 0, initArgumentCount);
+        state = init.invokeWithArguments(initArgs);
+      }
     }
 
     while (true) {
-      if (!invokeLoopPredicate(pred, predArgumentCount, state, args)) {
+      if (!invokeLoopPredicate(pred, predArgumentCount, state, args, voidState)) {
         return state;
       }
-      state = invokeLoopBody(body, state, args);
+      state = invokeLoopBody(body, state, args, voidState);
     }
   }
 
@@ -687,19 +736,28 @@ public final class DoppioMethodHandles {
       Class<?> returnType,
       int initArgumentCount,
       int predArgumentCount,
+      boolean voidState,
       Object[] args) throws Throwable {
-    Object state;
-    if (init == null) {
-      state = defaultValue(returnType);
+    Object state = null;
+    if (voidState) {
+      if (init != null) {
+        Object[] initArgs = new Object[initArgumentCount];
+        System.arraycopy(args, 0, initArgs, 0, initArgumentCount);
+        init.invokeWithArguments(initArgs);
+      }
     } else {
-      Object[] initArgs = new Object[initArgumentCount];
-      System.arraycopy(args, 0, initArgs, 0, initArgumentCount);
-      state = init.invokeWithArguments(initArgs);
+      if (init == null) {
+        state = defaultValue(returnType);
+      } else {
+        Object[] initArgs = new Object[initArgumentCount];
+        System.arraycopy(args, 0, initArgs, 0, initArgumentCount);
+        state = init.invokeWithArguments(initArgs);
+      }
     }
 
     while (true) {
-      state = invokeLoopBody(body, state, args);
-      if (!invokeLoopPredicate(pred, predArgumentCount, state, args)) {
+      state = invokeLoopBody(body, state, args, voidState);
+      if (!invokeLoopPredicate(pred, predArgumentCount, state, args, voidState)) {
         return state;
       }
     }
@@ -714,6 +772,7 @@ public final class DoppioMethodHandles {
       int startArgumentCount,
       int endArgumentCount,
       int initArgumentCount,
+      boolean voidState,
       Object[] args) throws Throwable {
     int startValue = 0;
     if (start != null) {
@@ -726,35 +785,58 @@ public final class DoppioMethodHandles {
     System.arraycopy(args, 0, endArgs, 0, endArgumentCount);
     int endValue = ((Integer) end.invokeWithArguments(endArgs)).intValue();
 
-    Object state;
-    if (init == null) {
-      state = defaultValue(returnType);
+    Object state = null;
+    if (voidState) {
+      if (init != null) {
+        Object[] initArgs = new Object[initArgumentCount];
+        System.arraycopy(args, 0, initArgs, 0, initArgumentCount);
+        init.invokeWithArguments(initArgs);
+      }
     } else {
-      Object[] initArgs = new Object[initArgumentCount];
-      System.arraycopy(args, 0, initArgs, 0, initArgumentCount);
-      state = init.invokeWithArguments(initArgs);
+      if (init == null) {
+        state = defaultValue(returnType);
+      } else {
+        Object[] initArgs = new Object[initArgumentCount];
+        System.arraycopy(args, 0, initArgs, 0, initArgumentCount);
+        state = init.invokeWithArguments(initArgs);
+      }
     }
 
-    Object[] bodyArgs = new Object[2 + args.length];
-    System.arraycopy(args, 0, bodyArgs, 2, args.length);
+    int leadingBodyArguments = voidState ? 1 : 2;
+    Object[] bodyArgs = new Object[leadingBodyArguments + args.length];
+    System.arraycopy(args, 0, bodyArgs, leadingBodyArguments, args.length);
     for (int index = startValue; index < endValue; index++) {
-      bodyArgs[0] = state;
-      bodyArgs[1] = Integer.valueOf(index);
-      state = body.invokeWithArguments(bodyArgs);
+      if (voidState) {
+        bodyArgs[0] = Integer.valueOf(index);
+        body.invokeWithArguments(bodyArgs);
+      } else {
+        bodyArgs[0] = state;
+        bodyArgs[1] = Integer.valueOf(index);
+        state = body.invokeWithArguments(bodyArgs);
+      }
     }
     return state;
   }
 
   private static boolean invokeLoopPredicate(
-      MethodHandle pred, int predArgumentCount, Object state, Object[] args) throws Throwable {
+      MethodHandle pred,
+      int predArgumentCount,
+      Object state,
+      Object[] args,
+      boolean voidState) throws Throwable {
     Object[] predArgs = new Object[predArgumentCount];
     for (int i = 0; i < predArgumentCount; i++) {
-      predArgs[i] = i == 0 ? state : args[i - 1];
+      predArgs[i] = voidState ? args[i] : (i == 0 ? state : args[i - 1]);
     }
     return ((Boolean) pred.invokeWithArguments(predArgs)).booleanValue();
   }
 
-  private static Object invokeLoopBody(MethodHandle body, Object state, Object[] args) throws Throwable {
+  private static Object invokeLoopBody(
+      MethodHandle body, Object state, Object[] args, boolean voidState) throws Throwable {
+    if (voidState) {
+      body.invokeWithArguments(args);
+      return null;
+    }
     Object[] bodyArgs = new Object[1 + args.length];
     System.arraycopy(args, 0, bodyArgs, 1, args.length);
     bodyArgs[0] = state;

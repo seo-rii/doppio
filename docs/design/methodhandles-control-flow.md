@@ -13,20 +13,24 @@ https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/invoke/Me
 The control-flow family is split into small implementation slices:
 
 - `whileLoop(init, pred, body)`: first slice. Support non-`void` state variable
-  loops where `body` has shape `(V, A...)V`, `pred` accepts a prefix of
-  `(V, A...)` and returns `boolean`, and `init` is either `null` or accepts a
-  prefix of `(A...)` and returns `V`.
+  loops where `body` has shape `(V, A...)V`, plus selected `void`
+  side-effect loops where `body` has shape `(A...)void`. `pred` accepts a
+  prefix of the effective loop argument list and returns `boolean`, and `init`
+  is either `null` or accepts a prefix of `(A...)`.
 - `doWhileLoop(init, body, pred)`: second slice. It supports the same selected
-  non-`void` state variable shape, but body executes before the first predicate
-  check.
+  non-`void` state variable and `void` side-effect shapes, but body executes
+  before the first predicate check.
 - `countedLoop(iterations, init, body)` and
   `countedLoop(start, end, init, body)`: third slice. They support a selected
-  non-`void` state variable shape with an `int` counter passed after the state.
+  non-`void` state variable shape with an `int` counter passed after the
+  state, plus selected `void` side-effect loops where the counter is the
+  leading body parameter.
 - `iteratedLoop(iterator, init, body)`: fourth slice. It supports selected
   non-`void` state variable loops where the body has shape `(V, T, A...)V`,
-  the iterator is either `null` and supplied by the leading `Iterable` runtime
-  argument, or a handle returning `Iterator`, and `init` is either `null` or
-  accepts a prefix of `(A...)`.
+  plus selected `void` side-effect loops where the body has shape
+  `(T, A...)void`. The iterator is either `null` and supplied by the leading
+  `Iterable` runtime argument, or a handle returning `Iterator`, and `init` is
+  either `null` or accepts a prefix of `(A...)`.
 - `loop(MethodHandle[]...)`: later slice. This is the general form behind the
   convenience combinators and should wait until more simple slices have parity
   tests.
@@ -60,6 +64,22 @@ from the body parameters after the leading state variable.
 the body return type. Primitive state values are boxed inside the generic helper
 and adapted back to the exact method-handle type with `asType`.
 
+For the selected `void` shape, no state value is threaded. `init`, `pred`, and
+`body` consume matching prefixes of the external argument list, and the result
+handle returns `void`:
+
+```text
+void init(A...)
+boolean pred(A...)
+void body(A...)
+void whileLoop(A... args) {
+  init(args...);
+  while (pred(args...)) {
+    body(args...);
+  }
+}
+```
+
 ## Initial `doWhileLoop` Implementation
 
 The first `doWhileLoop` slice intentionally mirrors the selected `whileLoop`
@@ -83,6 +103,9 @@ parameter lists for `init` and `pred` under the same constraints as the
 selected `whileLoop` slice. This makes the first `doWhileLoop` support narrow
 but useful for compiler-generated state adapters that always carry one
 non-`void` state value.
+
+For the selected `void` shape, the same no-state argument flow is used, but
+`body(args...)` executes before the first predicate check.
 
 ## Initial `countedLoop` Implementation
 
@@ -112,6 +135,10 @@ The selected implementation requires the body to carry the complete external
 argument list. `start`, `end`/`iterations`, and `init` may accept matching
 prefixes of that list. General parameter-list inference beyond this shape is
 not claimed.
+
+For the selected `void` shape, the body shape is `(int, A...)void`; the current
+counter is the leading body parameter, no state is threaded, and the result
+handle returns `void`.
 
 ## Initial `iteratedLoop` Implementation
 
@@ -143,6 +170,10 @@ iterator whose parameters are a prefix of the selected external argument list.
 If the body has no external arguments and the explicit iterator does, the
 iterator parameter list becomes the result handle's external argument list.
 
+For the selected `void` shape, the body shape is `(T, A...)void`; the current
+element is the leading body parameter, no state is threaded, and the result
+handle returns `void`.
+
 ## Runtime Structure
 
 - Class loading injects a public native
@@ -171,14 +202,16 @@ iterator parameter list becomes the result handle's external argument list.
   that body executes once when the initial predicate state would have failed.
   Counted-loop coverage includes zero-based iteration with explicit and null
   initializers, zero iterations, reference state, explicit start/end ranges,
-  and reversed empty ranges.
+  reversed empty ranges, and selected `void` side-effect loops for
+  `whileLoop`, `doWhileLoop`, and `countedLoop`.
 - Java fixture coverage in
   `classes/modern_test/Java17MethodHandleIteratedLoop.java`: null-iterator
   `Iterable` dispatch, null-iterator body argument flow, explicit iterator
   handle dispatch, reference state, primitive `int` state with `null`
-  initializer defaulting to zero, empty iteration, descriptor strings, and
-  selected validation failures for null body, non-`Iterator` iterator return,
-  mismatched initializer return, and invalid null-iterator external arguments.
+  initializer defaulting to zero, empty iteration, selected `void` side-effect
+  explicit/default iterator loops, descriptor strings, and selected validation
+  failures for null body, non-`Iterator` iterator return, mismatched
+  initializer return, and invalid null-iterator external arguments.
 - Kotlin smoke coverage in `classes/kotlin_smoke/MethodHandleSmoke.kt`:
   reflective discovery of `MethodHandles.whileLoop` and
   `MethodHandles.doWhileLoop` plus both `MethodHandles.countedLoop` overloads,
@@ -188,15 +221,16 @@ iterator parameter list becomes the result handle's external argument list.
 
 ## Remaining Gaps
 
-- `void` body loops are not claimed by the initial slice.
 - Predicate and initializer validation is prefix-based but not a complete
   implementation of the generic `loop` effectively-identical parameter-list
   rules.
-- The selected `iteratedLoop` slice does not claim `void` body loops, broad
-  element/argument adaptation, exact generic `loop` effectively-identical
-  parameter-list inference, exact null-iterator validation order beyond the
-  tested cases, or exception-flow parity beyond normal `hasNext`/`next`/body
-  sequencing.
+- The selected `void` loop slices cover simple side-effect loops only; broad
+  no-state/state mixes, exact generic `loop` effectively-identical
+  parameter-list inference, and full validation ordering are not claimed.
+- The selected `iteratedLoop` slice does not claim broad element/argument
+  adaptation, exact generic `loop` effectively-identical parameter-list
+  inference, exact null-iterator validation order beyond the tested cases, or
+  exception-flow parity beyond normal `hasNext`/`next`/body sequencing.
 - Broader `whileLoop`/`doWhileLoop`/`countedLoop`/`iteratedLoop` parity and
   generic `loop` still need separate fixtures and implementation slices.
 - The selected `whileLoop` and `doWhileLoop` slices now share validation and
