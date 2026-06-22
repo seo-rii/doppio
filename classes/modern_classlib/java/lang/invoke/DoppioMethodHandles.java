@@ -464,6 +464,38 @@ public final class DoppioMethodHandles {
         .asType(targetType);
   }
 
+  public static MethodHandle tableSwitch(MethodHandle fallback, MethodHandle... targets)
+      throws NoSuchMethodException, IllegalAccessException {
+    Objects.requireNonNull(fallback);
+    Objects.requireNonNull(targets);
+    if (targets.length == 0) {
+      throw new IllegalArgumentException("no target handles");
+    }
+
+    MethodType switchType = fallback.type();
+    if (switchType.parameterCount() == 0 || switchType.parameterType(0) != int.class) {
+      throw new IllegalArgumentException("leading selector parameter must be int");
+    }
+    for (int i = 0; i < targets.length; i++) {
+      Objects.requireNonNull(targets[i]);
+      if (!switchType.equals(targets[i].type())) {
+        throw new IllegalArgumentException("target types must match fallback type");
+      }
+    }
+
+    MethodHandle adapter = MethodHandles.publicLookup().findStatic(
+        DoppioMethodHandles.class,
+        "tableSwitchTarget",
+        MethodType.methodType(
+            Object.class,
+            MethodHandle.class,
+            MethodHandle[].class,
+            Object[].class));
+    return MethodHandles.insertArguments(adapter, 0, new Object[] { fallback, targets })
+        .asCollector(Object[].class, switchType.parameterCount())
+        .asType(switchType);
+  }
+
   public static int arrayLengthTarget(Object array) {
     return Array.getLength(array);
   }
@@ -502,6 +534,13 @@ public final class DoppioMethodHandles {
       }
     }
     return result;
+  }
+
+  public static Object tableSwitchTarget(
+      MethodHandle fallback, MethodHandle[] targets, Object[] args) throws Throwable {
+    int selector = ((Integer) args[0]).intValue();
+    MethodHandle target = selector >= 0 && selector < targets.length ? targets[selector] : fallback;
+    return target.invokeWithArguments(args);
   }
 
   public static Object whileLoopTarget(

@@ -161,7 +161,8 @@ function addJavaLangInvokeMethodHandlesModernOverlays(data: Buffer): Buffer {
       ['doWhileLoop', '(Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;'],
       ['countedLoop', '(Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;'],
       ['countedLoop', '(Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;'],
-      ['tryFinally', '(Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;']
+      ['tryFinally', '(Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;'],
+      ['tableSwitch', '(Ljava/lang/invoke/MethodHandle;[Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;']
     ],
     extraConstants = Buffer.concat(overlays.reduce((constants: Buffer[], overlay: string[]) => {
       constants.push(utf8Constant(overlay[0]), utf8Constant(overlay[1]));

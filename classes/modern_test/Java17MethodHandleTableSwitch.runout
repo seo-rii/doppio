@@ -1,0 +1,14 @@
+(ILjava/lang/String;)Ljava/lang/String;
+p:zero0
+p:one1
+p:two2
+p:fallback-1
+p:fallback3
+(II)I
+15
+26
+-2
+NullPointerException:nullFallback
+NullPointerException:nullTarget
+IllegalArgumentException:noTargets
+IllegalArgumentException:typeMismatch

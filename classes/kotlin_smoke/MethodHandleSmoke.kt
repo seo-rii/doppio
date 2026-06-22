@@ -96,6 +96,15 @@ class MethodHandleOwner(@JvmField var text: String) {
     fun foldAtCombiner(value: Int): String = "n$value"
 
     @JvmStatic
+    fun tableFallback(index: Int, prefix: String): String = "$prefix:fb$index"
+
+    @JvmStatic
+    fun tableTarget0(index: Int, prefix: String): String = "$prefix:zero$index"
+
+    @JvmStatic
+    fun tableTarget1(index: Int, prefix: String): String = "$prefix:one$index"
+
+    @JvmStatic
     fun isEmpty(value: String): Boolean = value.isEmpty()
 
     @JvmStatic
@@ -397,6 +406,11 @@ fun methodHandleSummary(): String {
     MethodHandle::class.java,
     MethodHandle::class.java
   )
+  val tableSwitchMethod = MethodHandles::class.java.getMethod(
+    "tableSwitch",
+    MethodHandle::class.java,
+    Array<MethodHandle>::class.java
+  )
   val whileLoopMethod = MethodHandles::class.java.getMethod(
     "whileLoop",
     MethodHandle::class.java,
@@ -450,6 +464,26 @@ fun methodHandleSummary(): String {
     MethodType.methodType(stringClass, intClass)
   )
   val foldedAtOne = foldArgumentsAtMethod.invoke(null, foldAtTarget, 1, foldAtCombiner) as MethodHandle
+  val tableFallback = lookup.findStatic(
+    ownerClass,
+    "tableFallback",
+    MethodType.methodType(stringClass, intClass, stringClass)
+  )
+  val tableTarget0 = lookup.findStatic(
+    ownerClass,
+    "tableTarget0",
+    MethodType.methodType(stringClass, intClass, stringClass)
+  )
+  val tableTarget1 = lookup.findStatic(
+    ownerClass,
+    "tableTarget1",
+    MethodType.methodType(stringClass, intClass, stringClass)
+  )
+  val tableSwitch = tableSwitchMethod.invoke(
+    null,
+    tableFallback,
+    arrayOf(tableTarget0, tableTarget1)
+  ) as MethodHandle
   val joinArray = lookup.findStatic(
     ownerClass,
     "joinArray",
@@ -656,6 +690,11 @@ fun methodHandleSummary(): String {
     tryFailure,
     MethodHandleOwner.cleanupLog
   ).joinToString("~")
+  val tableSwitchValues = listOf(
+    tableSwitch.invokeWithArguments(0, "ts").toString(),
+    tableSwitch.invokeWithArguments(1, "ts").toString(),
+    tableSwitch.invokeWithArguments(-1, "ts").toString()
+  ).joinToString("~")
   val combinators = listOf(
     identity.invokeWithArguments("id").toString(),
     constant.invokeWithArguments().toString(),
@@ -696,7 +735,8 @@ fun methodHandleSummary(): String {
     whileLoops,
     doWhileLoops,
     countedLoops,
-    tryFinallyValues
+    tryFinallyValues,
+    tableSwitchValues
   ).joinToString("|")
   val combinatorTypes = listOf(
     boundStatic,
@@ -740,6 +780,7 @@ fun methodHandleSummary(): String {
     countedDefaultInt,
     countedText,
     countedRange,
+    tableSwitch,
     tried,
     triedVoid
   ).joinToString("|") { it.type().toMethodDescriptorString() }

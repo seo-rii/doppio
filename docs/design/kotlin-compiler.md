@@ -381,9 +381,10 @@ Current verified checks:
   `asSpreader`, `asVarargsCollector`, and `asFixedArity` adapter flows, and
   Java 17 public overlays `zero`, `empty`, `arrayLength`, `arrayConstructor`,
   `dropArgumentsToMatch`, `dropReturn`, selected `tryFinally` flows, and
-  selected `whileLoop`/`doWhileLoop`/`countedLoop` non-`void` state loops,
-  including both counted-loop overloads, with descriptor-string checks for the
-  adapted shapes. The
+  selected `tableSwitch` selector/fallback flows, and selected
+  `whileLoop`/`doWhileLoop`/`countedLoop` non-`void` state loops, including
+  both counted-loop overloads, with descriptor-string checks for the adapted
+  shapes. The
   Java 17 overlays are reached by reflection so the smoke exercises runtime
   discovery and invocation without requiring the Kotlin source frontend to
   hard-code those signatures. This extends the source-level Kotlin coverage

@@ -2025,6 +2025,18 @@ export default function (): any {
         [target, cleanup]
       );
     }
+
+    public static 'tableSwitch(Ljava/lang/invoke/MethodHandle;[Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;'(
+      thread: JVMThread,
+      fallback: JVMTypes.java_lang_invoke_MethodHandle,
+      targets: JVMTypes.java_lang_invoke_MethodHandle[]
+    ): void {
+      java_lang_invoke_MethodHandles.callDoppioHelper(
+        thread,
+        'java/lang/invoke/DoppioMethodHandles/tableSwitch(Ljava/lang/invoke/MethodHandle;[Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;',
+        [fallback, targets]
+      );
+    }
   }
 
   var LOOKUP_PUBLIC = 0x0001,
