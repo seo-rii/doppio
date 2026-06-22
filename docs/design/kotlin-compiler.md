@@ -187,6 +187,16 @@ Current verified checks:
   annotation class, interface default implementation, generic class, default
   arguments, string templates, and a lambda. Runtime execution includes
   `kotlin-stdlib.jar` and checks the same output on the host JVM and Doppio.
+- `ci/kotlin_bytecode_smoke.sh` now compiles a smaller focused Kotlin source
+  set under Doppio, compares its generated program output on the host JVM and
+  Doppio, and runs `javap -v` over representative generated classfiles. The
+  checks cover Kotlin lambda `InvokeDynamic` entries backed by
+  `LambdaMetafactory`, receiver `ExtensionFunctionType` metadata, value-class
+  `box-impl`/`unbox-impl` lowering, runtime-visible annotation and parameter
+  metadata, `MethodParameters`, generic `Signature` attributes, bridge methods,
+  interface `DefaultImpls`, and `kotlin.Metadata`. This focused bytecode smoke
+  uses the minimal compiler classpath; full-classpath stress remains covered by
+  `ci/kotlin_smoke.sh`.
 - The same smoke now passes with the full `kotlinc/lib/*.jar` classpath. A
   local 2026-06-14 run completed in 83 seconds and produced `HelloKt`,
   `ConstructsKt`, `SmokePoint`, `SmokeNamed`, `SmokeBox`, `SmokeTag`, and

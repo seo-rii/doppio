@@ -57,6 +57,9 @@ jobs:
       - name: Run Kotlin diagnostic smoke
         run: ./ci/kotlin_diagnostic_smoke.sh
 
+      - name: Run Kotlin bytecode smoke
+        run: ./ci/kotlin_bytecode_smoke.sh
+
       - name: Run Kotlin compiler smoke
         env:
           KOTLIN_SMOKE_CLASSPATH_MODE: full
