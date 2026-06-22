@@ -237,7 +237,10 @@ Current verified checks:
   classpath. A custom interceptor queues the initial coroutine start plus two
   suspended continuation resumes, and the test drains the queue between each
   step to verify that the generated coroutine state machine preserves locals
-  across multiple dispatched suspension points.
+  across multiple dispatched suspension points. `ci/kotlin_coroutine_smoke.sh`
+  adds a smaller companion compile that checks nested `try`/`finally` cleanup
+  across the same queued suspension shape with `clean>inner>outer`; a local
+  2026-06-22 run completed in 127 seconds.
 - A minimal callable-reference and lazy-sequence smoke compiled in 175 seconds
   and both the host JVM and Doppio printed `a2|b7|c4|d9:20:8:7:10`. The repo
   smoke now includes the same path and completed in 234 seconds with the full

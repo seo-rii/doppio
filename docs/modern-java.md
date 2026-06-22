@@ -158,7 +158,9 @@ still not claimed.
   `CopyOnWriteArrayList`, `ThreadLocal`, `ReentrantLock.withLock`,
   synchronized maps, and one-shot thread-local isolation, plus Kotlin contracts
   covering `returns` implications, `callsInPlace` invocation-kind metadata,
-  inline contract functions, and nullable smart casts, plus Kotlin
+  inline contract functions, and nullable smart casts, plus an isolated Kotlin
+  coroutine lowering smoke covering queued `ContinuationInterceptor` resumption
+  through nested `try`/`finally` cleanup, plus Kotlin
   classpath resource lookup covering `Class.getResource`,
   `ClassLoader.getResource`, `ClassLoader.getResources`,
   `ClassLoader.resources`,
