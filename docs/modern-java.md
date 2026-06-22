@@ -104,7 +104,8 @@ combinator parity is still not claimed.
   path including delayed continuation resume and resume-time exception
   propagation, plus Java `Thread`-based and `ExecutorService`-based
   continuation resumption, a custom `ContinuationInterceptor` event loop with
-  multiple queued suspension resumes, `try`/`catch`/`finally`, `Closeable.use`,
+  multiple queued suspension resumes, queued suspend control flow through
+  `try`/`catch`/`finally`, `break`, and `continue`, `Closeable.use`,
   destructuring, range loops, stepped `downTo` loops, `mapIndexed`, and
   `synchronized`, plus top-level, bound, unbound, constructor, and companion
   callable references used through lazy `Sequence` pipelines, plus

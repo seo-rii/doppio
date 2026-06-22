@@ -256,6 +256,12 @@ Current verified checks:
   adds a smaller companion compile that checks nested `try`/`finally` cleanup
   across the same queued suspension shape with `clean>inner>outer`; a local
   2026-06-22 run completed in 127 seconds.
+- A follow-up queued suspend control-flow smoke now adds a three-resume state
+  machine through `try`/`catch`/`finally`, `break`, and `continue`, with both
+  host JVM and Doppio printing
+  `pending|d1:pending|r1:pending|d1:pending|r2:pending|d1:pending|r3:pending|d1:done12|loop0>wait:v0>finally0:5>loop1>wait:v1>catch:neg1>finally1:12>loop2>wait:v2>finally2:12>outer:12`.
+  A 2026-06-23 local minimal-classpath Doppio compiler run completed in 869
+  seconds.
 - A minimal callable-reference and lazy-sequence smoke compiled in 175 seconds
   and both the host JVM and Doppio printed `a2|b7|c4|d9:20:8:7:10`. The repo
   smoke now includes the same path and completed in 234 seconds with the full
