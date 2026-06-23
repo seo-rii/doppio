@@ -1,0 +1,10 @@
+to-file:4
+to-source-pos:5
+to-target-pos:6
+to-target-bytes:00 00 63 64 65 66
+from-file:4
+from-source-pos:6
+from-target-pos:1
+from-target-bytes:63 64 65 66
+to-eof:0
+to-eof-source-pos:0

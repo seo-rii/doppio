@@ -35,18 +35,24 @@ function readIOVecs(thread: JVMThread, address: Long, len: number): IOVec[] {
 
 export default function (): any {
   class sun_nio_ch_FileChannelImpl {
+    private static mappedBases: { [address: number]: number } = {};
 
-    public static 'map0(IJJ)J'(thread: JVMThread, javaThis: JVMTypes.sun_nio_ch_FileChannelImpl, arg0: number, arg1: Long, arg2: Long): void {
-      var fdObj = (<any> javaThis)['sun/nio/ch/FileChannelImpl/fd'],
+    private static map(thread: JVMThread, javaThis: JVMTypes.sun_nio_ch_FileChannelImpl, positionArg: Long, lenArg: Long): void {
+      const fdObj = (<any> javaThis)['sun/nio/ch/FileChannelImpl/fd'],
         fd = fdObj['java/io/FileDescriptor/fd'],
-        position = arg1.toNumber(),
-        len = arg2.toNumber(),
+        position = positionArg.toNumber(),
+        len = lenArg.toNumber(),
         heap = thread.getJVM().getHeap(),
-        addr = heap.malloc(len === 0 ? 1 : len),
+        pageSize = 4096,
+        baseAddr = heap.malloc((len === 0 ? 1 : len) + pageSize - 1),
+        addr = Math.ceil(baseAddr / pageSize) * pageSize,
         buf = heap.get_buffer(addr, len);
+      sun_nio_ch_FileChannelImpl.mappedBases[addr] = baseAddr;
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
       fs.read(fd, buf, 0, len, position, (err) => {
         if (err) {
+          delete sun_nio_ch_FileChannelImpl.mappedBases[addr];
+          heap.free(baseAddr);
           throwNodeError(thread, err);
         } else {
           thread.asyncReturn(Long.fromNumber(addr), null);
@@ -54,11 +60,57 @@ export default function (): any {
       });
     }
 
+    public static 'map0(IJJ)J'(thread: JVMThread, javaThis: JVMTypes.sun_nio_ch_FileChannelImpl, arg0: number, arg1: Long, arg2: Long): void {
+      sun_nio_ch_FileChannelImpl.map(thread, javaThis, arg1, arg2);
+    }
+
+    public static 'map0(IJJZ)J'(thread: JVMThread, javaThis: JVMTypes.sun_nio_ch_FileChannelImpl, arg0: number, arg1: Long, arg2: Long, arg3: boolean): void {
+      sun_nio_ch_FileChannelImpl.map(thread, javaThis, arg1, arg2);
+    }
+
     public static 'unmap0(JJ)I'(thread: JVMThread, arg0: Long, arg1: Long): number {
       if (!arg0.isZero()) {
-        thread.getJVM().getHeap().free(arg0.toNumber());
+        const addr = arg0.toNumber(),
+          baseAddr = sun_nio_ch_FileChannelImpl.mappedBases[addr] || addr;
+        delete sun_nio_ch_FileChannelImpl.mappedBases[addr];
+        thread.getJVM().getHeap().free(baseAddr);
       }
       return 0;
+    }
+
+    public static 'transferTo0(Ljava/io/FileDescriptor;JJLjava/io/FileDescriptor;)J'(thread: JVMThread, javaThis: JVMTypes.sun_nio_ch_FileChannelImpl, srcFdObj: JVMTypes.java_io_FileDescriptor, position: Long, count: Long, dstFdObj: JVMTypes.java_io_FileDescriptor): void {
+      const srcFd = srcFdObj["java/io/FileDescriptor/fd"],
+        dstFd = dstFdObj["java/io/FileDescriptor/fd"],
+        len = count.toNumber();
+
+      if (len <= 0) {
+        thread.setStatus(ThreadStatus.ASYNC_WAITING);
+        thread.asyncReturn(Long.ZERO, null);
+        return;
+      }
+
+      const data = Buffer.alloc(len);
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      fs.read(srcFd, data, 0, len, position.toNumber(), (readErr, bytesRead) => {
+        if (readErr) {
+          throwNodeError(thread, readErr);
+        } else if (bytesRead === 0) {
+          thread.asyncReturn(Long.ZERO, null);
+        } else {
+          fs.write(dstFd, data, 0, bytesRead, FDState.getPos(dstFd), (writeErr, bytesWritten) => {
+            if (writeErr) {
+              throwNodeError(thread, writeErr);
+            } else {
+              FDState.incrementPos(dstFd, bytesWritten);
+              thread.asyncReturn(Long.fromNumber(bytesWritten), null);
+            }
+          });
+        }
+      });
+    }
+
+    public static 'maxDirectTransferSize0()I'(thread: JVMThread): number {
+      return 1024 * 1024;
     }
 
     public static 'position0(Ljava/io/FileDescriptor;J)J'(thread: JVMThread, javaThis: JVMTypes.sun_nio_ch_FileChannelImpl, fdObj: JVMTypes.java_io_FileDescriptor, offset: Long): Long {
@@ -146,18 +198,16 @@ export default function (): any {
   }
 
   class sun_nio_ch_IOUtil {
-    private static fdVal: number = 0;
-
     public static 'iovMax()I'(thread: JVMThread): number {
       return 1024;
     }
 
-    public static 'setfdVal(Ljava/io/FileDescriptor;I)V'(thread: JVMThread, fdVal: number): void {
-      sun_nio_ch_IOUtil.fdVal = fdVal;
+    public static 'setfdVal(Ljava/io/FileDescriptor;I)V'(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor, fdVal: number): void {
+      fdObj["java/io/FileDescriptor/fd"] = fdVal;
     }
 
-    public static 'fdVal(Ljava/io/FileDescriptor;)I'(thread: JVMThread): number {
-      return sun_nio_ch_IOUtil.fdVal;
+    public static 'fdVal(Ljava/io/FileDescriptor;)I'(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor): number {
+      return fdObj["java/io/FileDescriptor/fd"];
     }
   }
 

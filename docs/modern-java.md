@@ -53,7 +53,9 @@ no-op behavior, closed-channel failure behavior, and selected
 zero-length, negative-position, and channel-position preservation behavior, plus
 selected `FileChannel.read(ByteBuffer[])`/`write(ByteBuffer[])` scatter/gather
 behavior across heap and direct buffers, EOF/zero-length results, and channel
-and buffer-position updates.
+and buffer-position updates, plus selected `FileChannel.transferTo` and
+`transferFrom` file-channel paths covering copied byte counts, EOF transfer
+results, file contents, and source/target position updates.
 
 ## Implementation Order
 
