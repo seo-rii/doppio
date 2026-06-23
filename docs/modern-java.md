@@ -48,7 +48,9 @@ combinator parity is still not claimed.
 
 Java 17 I/O note: the compatibility row above now also includes selected
 `FileChannel.force(boolean)` data/metadata flush behavior, read-only-channel
-no-op behavior, and closed-channel failure behavior.
+no-op behavior, closed-channel failure behavior, and selected
+`FileChannel.read(ByteBuffer, long)` heap/direct-buffer positional reads, EOF,
+zero-length, negative-position, and channel-position preservation behavior.
 
 ## Implementation Order
 

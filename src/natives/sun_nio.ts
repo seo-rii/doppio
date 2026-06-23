@@ -163,6 +163,20 @@ export default function (): any {
       });
     }
 
+    public static 'pread0(Ljava/io/FileDescriptor;JIJ)I'(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor, address: Long, len: number, position: Long): void {
+      const fd = fdObj["java/io/FileDescriptor/fd"],
+        addr = address.toNumber(),
+        buf = thread.getJVM().getHeap().get_buffer(addr, len);
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      fs.read(fd, buf, 0, len, position.toNumber(), (err, bytesRead) => {
+        if (err) {
+          thread.throwNewException("Ljava/io/IOException;", 'Error reading file: ' + err);
+        } else {
+          thread.asyncReturn(bytesRead === 0 && len !== 0 ? -1 : bytesRead);
+        }
+      });
+    }
+
     public static 'preClose0(Ljava/io/FileDescriptor;)V'(thread: JVMThread, arg0: JVMTypes.java_io_FileDescriptor): void {
       // NOP, I think the actual fs.close is called later. If not, NBD.
     }
