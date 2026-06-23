@@ -9,6 +9,7 @@ import ThreadStatus = Doppio.VM.Enums.ThreadStatus;
 import * as fs from 'fs';
 import * as BrowserFS from 'browserfs';
 import FDState = Doppio.VM.FDState;
+import { mappedByteBufferMappings } from './java_nio';
 let BFSUtils = BrowserFS.BFSRequire('bfs_utils');
 
 interface IOVec {
@@ -37,7 +38,7 @@ export default function (): any {
   class sun_nio_ch_FileChannelImpl {
     private static mappedBases: { [address: number]: number } = {};
 
-    private static map(thread: JVMThread, javaThis: JVMTypes.sun_nio_ch_FileChannelImpl, positionArg: Long, lenArg: Long): void {
+    private static map(thread: JVMThread, javaThis: JVMTypes.sun_nio_ch_FileChannelImpl, prot: number, positionArg: Long, lenArg: Long): void {
       const fdObj = (<any> javaThis)['sun/nio/ch/FileChannelImpl/fd'],
         fd = fdObj['java/io/FileDescriptor/fd'],
         position = positionArg.toNumber(),
@@ -48,10 +49,12 @@ export default function (): any {
         addr = Math.ceil(baseAddr / pageSize) * pageSize,
         buf = heap.get_buffer(addr, len);
       sun_nio_ch_FileChannelImpl.mappedBases[addr] = baseAddr;
+      mappedByteBufferMappings[addr] = { fd: fd, position: position, length: len, writable: prot === 1 };
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
       fs.read(fd, buf, 0, len, position, (err) => {
         if (err) {
           delete sun_nio_ch_FileChannelImpl.mappedBases[addr];
+          delete mappedByteBufferMappings[addr];
           heap.free(baseAddr);
           throwNodeError(thread, err);
         } else {
@@ -61,11 +64,11 @@ export default function (): any {
     }
 
     public static 'map0(IJJ)J'(thread: JVMThread, javaThis: JVMTypes.sun_nio_ch_FileChannelImpl, arg0: number, arg1: Long, arg2: Long): void {
-      sun_nio_ch_FileChannelImpl.map(thread, javaThis, arg1, arg2);
+      sun_nio_ch_FileChannelImpl.map(thread, javaThis, arg0, arg1, arg2);
     }
 
     public static 'map0(IJJZ)J'(thread: JVMThread, javaThis: JVMTypes.sun_nio_ch_FileChannelImpl, arg0: number, arg1: Long, arg2: Long, arg3: boolean): void {
-      sun_nio_ch_FileChannelImpl.map(thread, javaThis, arg1, arg2);
+      sun_nio_ch_FileChannelImpl.map(thread, javaThis, arg0, arg1, arg2);
     }
 
     public static 'unmap0(JJ)I'(thread: JVMThread, arg0: Long, arg1: Long): number {
@@ -73,6 +76,7 @@ export default function (): any {
         const addr = arg0.toNumber(),
           baseAddr = sun_nio_ch_FileChannelImpl.mappedBases[addr] || addr;
         delete sun_nio_ch_FileChannelImpl.mappedBases[addr];
+        delete mappedByteBufferMappings[addr];
         thread.getJVM().getHeap().free(baseAddr);
       }
       return 0;

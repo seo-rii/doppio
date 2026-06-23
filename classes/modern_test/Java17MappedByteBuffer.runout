@@ -1,0 +1,12 @@
+loaded-call:true
+load-same:true
+byte0:a
+full-force-same:true
+after-full-force:aZcdYf
+readonly-loaded-call:true
+readonly-load-same:true
+readonly-bytes:Zcd
+readonly-force-same:true
+empty-capacity:0
+empty-loaded-call:true
+empty-force-same:true

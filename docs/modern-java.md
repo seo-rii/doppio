@@ -55,7 +55,11 @@ selected `FileChannel.read(ByteBuffer[])`/`write(ByteBuffer[])` scatter/gather
 behavior across heap and direct buffers, EOF/zero-length results, and channel
 and buffer-position updates, plus selected `FileChannel.transferTo` and
 `transferFrom` file-channel paths covering copied byte counts, EOF transfer
-results, file contents, and source/target position updates.
+results, file contents, and source/target position updates, plus selected
+`MappedByteBuffer.isLoaded()`, `load()`, and full-buffer `force()` mmap
+behavior covering writable, read-only, and empty mappings. Java 13+
+`MappedByteBuffer.force(int, int)` range forcing is not claimed yet because it
+requires a bytecode-compatible bootstrap class-library shim.
 
 ## Implementation Order
 
