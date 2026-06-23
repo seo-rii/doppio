@@ -181,71 +181,59 @@ export default function (): any {
     }
 
     public static 'getSafepointCount()J'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): Long {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+      return Long.ZERO;
     }
 
     public static 'getTotalSafepointTime()J'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): Long {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+      return Long.ZERO;
     }
 
     public static 'getSafepointSyncTime()J'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): Long {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+      return Long.ZERO;
     }
 
     public static 'getTotalApplicationNonStoppedTime()J'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): Long {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+      return Long.ZERO;
     }
 
     public static 'getLoadedClassSize()J'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): Long {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+      return Long.ZERO;
     }
 
     public static 'getUnloadedClassSize()J'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): Long {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+      return Long.ZERO;
     }
 
     public static 'getClassLoadingTime()J'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): Long {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+      return Long.ZERO;
     }
 
     public static 'getMethodDataSize()J'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): Long {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+      return Long.ZERO;
     }
 
     public static 'getInitializedClassCount()J'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): Long {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+      return Long.fromNumber(thread.getBsCl().getLoadedClassNames().length);
     }
 
     public static 'getClassInitializationTime()J'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): Long {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+      return Long.ZERO;
     }
 
     public static 'getClassVerificationTime()J'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): Long {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+      return Long.ZERO;
     }
 
+  }
+
+  class sun_management_HotspotThread {
+    public static 'getInternalThreadCount()I'(thread: JVMThread, javaThis: JVMTypes.sun_management_HotspotThread): number {
+      return 0;
+    }
+
+    public static 'getInternalThreadTimes0([Ljava/lang/String;[J)I'(thread: JVMThread, javaThis: JVMTypes.sun_management_HotspotThread, threadNames: JVMTypes.JVMArray<JVMTypes.java_lang_String>, threadTimes: JVMTypes.JVMArray<Long>): number {
+      return 0;
+    }
   }
 
   class sun_management_ThreadImpl {
@@ -263,6 +251,7 @@ export default function (): any {
 
   return {
     'sun/management/ClassLoadingImpl': sun_management_ClassLoadingImpl,
+    'sun/management/HotspotThread': sun_management_HotspotThread,
     'sun/management/MemoryImpl': sun_management_MemoryImpl,
     'sun/management/OperatingSystemImpl': sun_management_OperatingSystemImpl,
     'sun/management/ThreadImpl': sun_management_ThreadImpl,

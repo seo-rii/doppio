@@ -1396,12 +1396,16 @@ combinator parity is still not claimed.
   live/peak/started/daemon thread count invariants, CPU-time enablement,
   current-thread CPU/user time, synthetic compilation bean metadata/time,
   memory verbose no-op behavior, synthetic heap/non-heap `MemoryUsage`
-  values with stable field invariants, and synthetic OS name/architecture/version,
-  processor-count, object-name, and unsupported load-average metadata.
+  values with stable field invariants, empty memory pool/manager/garbage
+  collector list shims, synthetic OS name/architecture/version,
+  processor-count, object-name, unsupported load-average metadata, selected
+  `com.sun.management.OperatingSystemMXBean` unsupported `-1`/load fallback
+  getters, and zero-valued HotSpot safepoint/class-loading/internal-thread
+  diagnostic counters.
 - The shim intentionally reports synthetic in-VM counts and empty VM input
-  arguments. Detailed `ThreadInfo`, memory pool/manager metadata, exact host
-  OS and memory accounting, detailed HotSpot compilation counters,
-  safepoint/class-size counters, and host JVM diagnostic data are not
+  arguments. Detailed `ThreadInfo`, non-empty memory pool/manager metadata,
+  exact host OS and memory accounting, detailed HotSpot compilation counters,
+  real safepoint/class-size counters, and host JVM diagnostic data are not
   implemented.
 
 ## Known InstantSource Gaps
