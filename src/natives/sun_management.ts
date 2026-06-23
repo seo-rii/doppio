@@ -7,6 +7,11 @@ import util = Doppio.VM.Util;
 import Long = Doppio.VM.Long;
 
 export default function (): any {
+  class sun_management_ClassLoadingImpl {
+    public static 'setVerboseClass(Z)V'(thread: JVMThread, enabled: number): void {
+    }
+  }
+
   class sun_management_MemoryImpl {
 
     public static 'getMemoryPools0()[Ljava/lang/management/MemoryPoolMXBean;'(thread: JVMThread): JVMTypes.JVMArray<JVMTypes.java_lang_management_MemoryPoolMXBean> {
@@ -26,7 +31,6 @@ export default function (): any {
     }
 
     public static 'setVerboseGC(Z)V'(thread: JVMThread, javaThis: JVMTypes.sun_management_MemoryImpl, arg0: number): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
     }
 
   }
@@ -62,26 +66,18 @@ export default function (): any {
     }
 
     public static 'getTotalClassCount()J'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): Long {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+      return Long.fromNumber(thread.getBsCl().getLoadedClassNames().length);
     }
 
     public static 'getUnloadedClassCount()J'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): Long {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+      return Long.ZERO;
     }
 
     public static 'getVerboseClass()Z'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): number {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
       return 0;
     }
 
     public static 'getVerboseGC()Z'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): number {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
       return 0;
     }
 
@@ -90,9 +86,7 @@ export default function (): any {
     }
 
     public static 'getVmArguments0()[Ljava/lang/String;'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): JVMTypes.JVMArray<JVMTypes.java_lang_String> {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+      return util.newArrayFromData<JVMTypes.java_lang_String>(thread, thread.getBsCl(), '[Ljava/lang/String;', []);
     }
 
     public static 'getStartupTime()J'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): Long {
@@ -114,27 +108,19 @@ export default function (): any {
     }
 
     public static 'getTotalThreadCount()J'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): Long {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+      return Long.fromNumber(thread.getThreadPool().getThreads().length);
     }
 
     public static 'getLiveThreadCount()I'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): number {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return 0;
+      return thread.getThreadPool().getThreads().length;
     }
 
     public static 'getPeakThreadCount()I'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): number {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return 0;
+      return thread.getThreadPool().getThreads().length;
     }
 
     public static 'getDaemonThreadCount()I'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): number {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return 0;
+      return thread.getThreadPool().getThreads().filter((thread: JVMThread) => thread.isDaemon()).length;
     }
 
     public static 'getSafepointCount()J'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): Long {
@@ -219,6 +205,7 @@ export default function (): any {
   }
 
   return {
+    'sun/management/ClassLoadingImpl': sun_management_ClassLoadingImpl,
     'sun/management/MemoryImpl': sun_management_MemoryImpl,
     'sun/management/ThreadImpl': sun_management_ThreadImpl,
     'sun/management/VMManagementImpl': sun_management_VMManagementImpl
