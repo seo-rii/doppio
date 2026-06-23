@@ -50,7 +50,10 @@ Java 17 I/O note: the compatibility row above now also includes selected
 `FileChannel.force(boolean)` data/metadata flush behavior, read-only-channel
 no-op behavior, closed-channel failure behavior, and selected
 `FileChannel.read(ByteBuffer, long)` heap/direct-buffer positional reads, EOF,
-zero-length, negative-position, and channel-position preservation behavior.
+zero-length, negative-position, and channel-position preservation behavior, plus
+selected `FileChannel.read(ByteBuffer[])`/`write(ByteBuffer[])` scatter/gather
+behavior across heap and direct buffers, EOF/zero-length results, and channel
+and buffer-position updates.
 
 ## Implementation Order
 

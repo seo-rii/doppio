@@ -1,0 +1,16 @@
+read:6
+read-pos:6
+first-pos:2
+second-pos:3
+third-pos:1
+ab
+cde
+f
+eof:-1
+empty-read:0
+write:6
+write-pos:6
+write-first-pos:3
+write-second-pos:3
+write-third-pos:2
+written-bytes:12BCxy

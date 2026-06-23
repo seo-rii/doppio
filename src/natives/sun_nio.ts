@@ -11,6 +11,28 @@ import * as BrowserFS from 'browserfs';
 import FDState = Doppio.VM.FDState;
 let BFSUtils = BrowserFS.BFSRequire('bfs_utils');
 
+interface IOVec {
+  base: number;
+  len: number;
+}
+
+function readIOVecs(thread: JVMThread, address: Long, len: number): IOVec[] {
+  const heap = thread.getJVM().getHeap(),
+    base = address.toNumber(),
+    sizeOfIOVec = 8,
+    vecs: IOVec[] = [];
+
+  for (let i = 0; i < len; i++) {
+    const offset = base + i * sizeOfIOVec,
+      vecBase = heap.get_word(offset),
+      vecLen = heap.get_word(offset + 4);
+    if (vecLen > 0) {
+      vecs.push({ base: vecBase, len: vecLen });
+    }
+  }
+  return vecs;
+}
+
 export default function (): any {
   class sun_nio_ch_FileChannelImpl {
 
@@ -127,8 +149,7 @@ export default function (): any {
     private static fdVal: number = 0;
 
     public static 'iovMax()I'(thread: JVMThread): number {
-      // Maximum number of IOVectors supported. Let's punt and say zero.
-      return 0;
+      return 1024;
     }
 
     public static 'setfdVal(Ljava/io/FileDescriptor;I)V'(thread: JVMThread, fdVal: number): void {
@@ -175,6 +196,51 @@ export default function (): any {
           thread.asyncReturn(bytesRead === 0 && len !== 0 ? -1 : bytesRead);
         }
       });
+    }
+
+    public static 'readv0(Ljava/io/FileDescriptor;JI)J'(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor, address: Long, len: number): void {
+      const fd = fdObj["java/io/FileDescriptor/fd"],
+        heap = thread.getJVM().getHeap(),
+        vecs = readIOVecs(thread, address, len);
+      let total = 0,
+        index = 0;
+
+      if (vecs.length === 0) {
+        thread.setStatus(ThreadStatus.ASYNC_WAITING);
+        thread.asyncReturn(Long.ZERO, null);
+        return;
+      }
+
+      const readNext = (): void => {
+        if (index >= vecs.length) {
+          FDState.incrementPos(fd, total);
+          thread.asyncReturn(Long.fromNumber(total), null);
+          return;
+        }
+
+        const vec = vecs[index],
+          buf = heap.get_buffer(vec.base, vec.len);
+        fs.read(fd, buf, 0, vec.len, FDState.getPos(fd) + total, (err, bytesRead) => {
+          if (err) {
+            throwNodeError(thread, err);
+          } else if (bytesRead === 0) {
+            FDState.incrementPos(fd, total);
+            thread.asyncReturn(Long.fromNumber(total === 0 ? -1 : total), null);
+          } else {
+            total += bytesRead;
+            if (bytesRead < vec.len) {
+              FDState.incrementPos(fd, total);
+              thread.asyncReturn(Long.fromNumber(total), null);
+            } else {
+              index++;
+              readNext();
+            }
+          }
+        });
+      };
+
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      readNext();
     }
 
     public static 'preClose0(Ljava/io/FileDescriptor;)V'(thread: JVMThread, arg0: JVMTypes.java_io_FileDescriptor): void {
@@ -269,6 +335,48 @@ export default function (): any {
           thread.asyncReturn(numBytes);
         }
       });
+    }
+
+    public static 'writev0(Ljava/io/FileDescriptor;JI)J'(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor, address: Long, len: number): void {
+      const fd = fdObj["java/io/FileDescriptor/fd"],
+        heap = thread.getJVM().getHeap(),
+        vecs = readIOVecs(thread, address, len);
+      let total = 0,
+        index = 0;
+
+      if (vecs.length === 0) {
+        thread.setStatus(ThreadStatus.ASYNC_WAITING);
+        thread.asyncReturn(Long.ZERO, null);
+        return;
+      }
+
+      const writeNext = (): void => {
+        if (index >= vecs.length) {
+          FDState.incrementPos(fd, total);
+          thread.asyncReturn(Long.fromNumber(total), null);
+          return;
+        }
+
+        const vec = vecs[index],
+          data = heap.get_buffer(vec.base, vec.len);
+        fs.write(fd, data, 0, vec.len, FDState.getPos(fd) + total, (err, numBytes) => {
+          if (err) {
+            throwNodeError(thread, err);
+          } else {
+            total += numBytes;
+            if (numBytes < vec.len) {
+              FDState.incrementPos(fd, total);
+              thread.asyncReturn(Long.fromNumber(total), null);
+            } else {
+              index++;
+              writeNext();
+            }
+          }
+        });
+      };
+
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      writeNext();
     }
 
   }

@@ -116,7 +116,7 @@ export default class Heap {
       this._freeLists[cl].push (addr);
       this._offset += sz;
     }
-    return addr;
+    return this._freeLists[cl].pop();
   }
 
   // Computes ceil(log2(num)).

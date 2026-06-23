@@ -266,14 +266,12 @@ export default function (): any {
       thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
     }
 
-    public static 'getInt(J)I'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, arg0: Long): number {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return 0;
+    public static 'getInt(J)I'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, address: Long): number {
+      return thread.getJVM().getHeap().get_word(address.toNumber());
     }
 
-    public static 'putInt(JI)V'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, arg0: Long, arg1: number): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'putInt(JI)V'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, address: Long, value: number): void {
+      thread.getJVM().getHeap().store_word(address.toNumber(), value);
     }
 
     public static 'getLong(J)J'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, address: Long): Long {
@@ -745,6 +743,57 @@ export default function (): any {
 
   class jdk_internal_misc_Unsafe {
     public static 'registerNatives()V'(thread: JVMThread): void {
+    }
+
+    public static 'allocateMemory(J)J'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object, size: Long): Long {
+      return Long.fromNumber(thread.getJVM().getHeap().malloc(size.toNumber()));
+    }
+
+    public static 'freeMemory(J)V'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object, address: Long): void {
+      thread.getJVM().getHeap().free(address.toNumber());
+    }
+
+    public static 'getInt(Ljava/lang/Object;J)I'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object, obj: JVMTypes.java_lang_Object, offset: Long): number {
+      if (obj === null) {
+        return thread.getJVM().getHeap().get_word(offset.toNumber());
+      }
+      return getFromVMIndex(thread, <any> javaThis, obj, offset);
+    }
+
+    public static 'putInt(Ljava/lang/Object;JI)V'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object, obj: JVMTypes.java_lang_Object, offset: Long, value: number): void {
+      if (obj === null) {
+        thread.getJVM().getHeap().store_word(offset.toNumber(), value);
+        return;
+      }
+      setFromVMIndex(thread, <any> javaThis, obj, offset, value);
+    }
+
+    public static 'getLong(Ljava/lang/Object;J)J'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object, obj: JVMTypes.java_lang_Object, offset: Long): Long {
+      if (obj === null) {
+        const heap = thread.getJVM().getHeap(),
+          address = offset.toNumber();
+        return new Long(heap.get_word(address), heap.get_word(address + 4));
+      }
+      return getFromVMIndex(thread, <any> javaThis, obj, offset);
+    }
+
+    public static 'putLong(Ljava/lang/Object;JJ)V'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object, obj: JVMTypes.java_lang_Object, offset: Long, value: Long): void {
+      if (obj === null) {
+        const heap = thread.getJVM().getHeap(),
+          address = offset.toNumber();
+        heap.store_word(address, value.getLowBits());
+        heap.store_word(address + 4, value.getHighBits());
+        return;
+      }
+      setFromVMIndex(thread, <any> javaThis, obj, offset, value);
+    }
+
+    public static 'addressSize()I'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object): number {
+      return 4;
+    }
+
+    public static 'pageSize()I'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object): number {
+      return 4096;
     }
 
     public static 'arrayBaseOffset0(Ljava/lang/Class;)I'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object, arg0: JVMTypes.java_lang_Class): number {
