@@ -755,6 +755,7 @@ class JVM {
       'java.vm.name': 'DoppioJVM 32-bit VM',
       'java.vm.version': pkg.version,
       'java.vm.vendor': 'PLASMA@UMass',
+      'sun.management.compiler': 'DoppioJVM',
       'java.awt.headless': (are_in_browser()).toString(), // true if we're using the console frontend
       'java.awt.graphicsenv': 'classes.awt.CanvasGraphicsEnvironment',
       'jline.terminal': 'jline.UnsupportedTerminal', // we can't shell out to `stty`,

@@ -57,7 +57,7 @@ export default function (): any {
 
     public static 'initOptionalSupportFields()V'(thread: JVMThread): void {
       var vmManagementStatics = <typeof JVMTypes.sun_management_VMManagementImpl> (<ReferenceClassData<JVMTypes.sun_management_VMManagementImpl>> thread.getBsCl().getInitializedClass(thread, 'Lsun/management/VMManagementImpl;')).getConstructor(thread);
-      vmManagementStatics['sun/management/VMManagementImpl/compTimeMonitoringSupport'] = 0;
+      vmManagementStatics['sun/management/VMManagementImpl/compTimeMonitoringSupport'] = 1;
       vmManagementStatics['sun/management/VMManagementImpl/threadContentionMonitoringSupport'] = 0;
       vmManagementStatics['sun/management/VMManagementImpl/currentThreadCpuTimeSupport'] = 1;
       vmManagementStatics['sun/management/VMManagementImpl/otherThreadCpuTimeSupport'] = 1;
@@ -116,9 +116,7 @@ export default function (): any {
     }
 
     public static 'getTotalCompileTime()J'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): Long {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+      return Long.ZERO;
     }
 
     public static 'getTotalThreadCount()J'(thread: JVMThread, javaThis: JVMTypes.sun_management_VMManagementImpl): Long {
