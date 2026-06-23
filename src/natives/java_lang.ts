@@ -956,31 +956,55 @@ export default function (): any {
     }
 
     public static 'set(Ljava/lang/Object;ILjava/lang/Object;)V'(thread: JVMThread, arr: JVMTypes.JVMArray<any>, idx: number, val: JVMTypes.java_lang_Object): void {
-      if (verifyArray(thread, arr) && isNotNull(thread, arr)) {
-        if (idx < 0 || idx >= arr.array.length) {
-          thread.throwNewException('Ljava/lang/ArrayIndexOutOfBoundsException;', 'Tried to write to an illegal index in an array.');
-        } else {
-          var ccls = arr.getClass().getComponentClass();
-          if (ccls instanceof PrimitiveClassData) {
-            if (val.getClass().isSubclass(thread.getBsCl().getInitializedClass(thread, (<PrimitiveClassData> ccls).boxClassName()))) {
-              var ccname = ccls.getInternalName();
-              (<JVMTypes.JVMFunction> (<any> val)[`${util.internal2external[ccname]}Value()${ccname}`])(thread, null, (e?: JVMTypes.java_lang_Throwable, rv?: any) => {
-                if (e) {
-                  thread.throwException(e);
-                } else {
-                  arr.array[idx] = rv;
-                  thread.asyncReturn();
-                }
-              });
-            } else {
-              thread.throwNewException('Ljava/lang/IllegalArgumentException;', 'argument type mismatch');
-            }
-          } else if (val.getClass().isSubclass(ccls)) {
-            arr.array[idx] = val;
-          } else {
-            thread.throwNewException('Ljava/lang/IllegalArgumentException;', 'argument type mismatch');
-          }
+      var ccls: ClassData,
+        sourceType: string;
+      if (!isNotNull(thread, arr) || !verifyArray(thread, arr)) {
+        return;
+      }
+      if (idx < 0 || idx >= arr.array.length) {
+        thread.throwNewException('Ljava/lang/ArrayIndexOutOfBoundsException;', 'Tried to write to an illegal index in an array.');
+        return;
+      }
+      ccls = arr.getClass().getComponentClass();
+      if (ccls instanceof PrimitiveClassData) {
+        if (val === null) {
+          thread.throwNewException('Ljava/lang/IllegalArgumentException;', 'argument type mismatch');
+          return;
         }
+        switch (val.getClass().getInternalName()) {
+          case 'Ljava/lang/Boolean;':
+            sourceType = 'Z';
+            break;
+          case 'Ljava/lang/Byte;':
+            sourceType = 'B';
+            break;
+          case 'Ljava/lang/Character;':
+            sourceType = 'C';
+            break;
+          case 'Ljava/lang/Short;':
+            sourceType = 'S';
+            break;
+          case 'Ljava/lang/Integer;':
+            sourceType = 'I';
+            break;
+          case 'Ljava/lang/Long;':
+            sourceType = 'J';
+            break;
+          case 'Ljava/lang/Float;':
+            sourceType = 'F';
+            break;
+          case 'Ljava/lang/Double;':
+            sourceType = 'D';
+            break;
+          default:
+            thread.throwNewException('Ljava/lang/IllegalArgumentException;', 'argument type mismatch');
+            return;
+        }
+        arraySetPrimitive(thread, arr, idx, (<any> val).unbox(), sourceType);
+      } else if (val === null || val.getClass().isSubclass(ccls)) {
+        arr.array[idx] = val;
+      } else {
+        thread.throwNewException('Ljava/lang/IllegalArgumentException;', 'argument type mismatch');
       }
     }
 
