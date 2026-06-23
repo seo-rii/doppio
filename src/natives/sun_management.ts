@@ -2,6 +2,7 @@ import * as JVMTypes from '../../includes/JVMTypes';
 import * as Doppio from '../doppiojvm';
 import JVMThread = Doppio.VM.Threading.JVMThread;
 import ReferenceClassData = Doppio.VM.ClassFile.ReferenceClassData;
+import IJVMConstructor = Doppio.VM.ClassFile.IJVMConstructor;
 import logging = Doppio.Debug.Logging;
 import util = Doppio.VM.Util;
 import Long = Doppio.VM.Long;
@@ -24,10 +25,23 @@ export default function (): any {
       return util.newArrayFromData<JVMTypes.sun_management_MemoryManagerImpl>(thread, thread.getBsCl(), '[Lsun/management/MemoryManagerImpl;', []);
     }
 
-    public static 'getMemoryUsage0(Z)Ljava/lang/management/MemoryUsage;'(thread: JVMThread, javaThis: JVMTypes.sun_management_MemoryImpl, arg0: number): JVMTypes.java_lang_management_MemoryUsage {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+    public static 'getMemoryUsage0(Z)Ljava/lang/management/MemoryUsage;'(thread: JVMThread, javaThis: JVMTypes.sun_management_MemoryImpl, arg0: number): void {
+      var processMemory = typeof process !== 'undefined' && (<any> process).memoryUsage !== undefined ? (<any> process).memoryUsage() : null,
+        heapUsed = processMemory !== null ? Math.max(0, Math.floor(processMemory.heapUsed)) : 0,
+        heapCommitted = processMemory !== null ? Math.max(heapUsed, Math.floor(processMemory.heapTotal)) : heapUsed,
+        nonHeapUsed = processMemory !== null ? Math.max(0, Math.floor(processMemory.rss - processMemory.heapTotal)) : 0,
+        nonHeapCommitted = nonHeapUsed,
+        used = arg0 ? heapUsed : nonHeapUsed,
+        committed = arg0 ? heapCommitted : nonHeapCommitted;
+
+      thread.import('Ljava/lang/management/MemoryUsage;', (usageCons: IJVMConstructor<JVMTypes.java_lang_management_MemoryUsage>) => {
+        var usage = new usageCons(thread);
+        usage['java/lang/management/MemoryUsage/init'] = Long.fromNumber(-1);
+        usage['java/lang/management/MemoryUsage/used'] = Long.fromNumber(used);
+        usage['java/lang/management/MemoryUsage/committed'] = Long.fromNumber(committed);
+        usage['java/lang/management/MemoryUsage/max'] = Long.fromNumber(-1);
+        thread.asyncReturn(usage);
+      });
     }
 
     public static 'setVerboseGC(Z)V'(thread: JVMThread, javaThis: JVMTypes.sun_management_MemoryImpl, arg0: number): void {
