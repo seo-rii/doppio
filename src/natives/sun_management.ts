@@ -49,6 +49,51 @@ export default function (): any {
 
   }
 
+  class sun_management_OperatingSystemImpl {
+    public static 'initialize()V'(thread: JVMThread): void {
+    }
+
+    public static 'getCommittedVirtualMemorySize()J'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object): Long {
+      return Long.fromNumber(-1);
+    }
+
+    public static 'getTotalSwapSpaceSize()J'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object): Long {
+      return Long.fromNumber(-1);
+    }
+
+    public static 'getFreeSwapSpaceSize()J'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object): Long {
+      return Long.fromNumber(-1);
+    }
+
+    public static 'getProcessCpuTime()J'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object): Long {
+      return Long.fromNumber(-1);
+    }
+
+    public static 'getFreePhysicalMemorySize()J'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object): Long {
+      return Long.fromNumber(-1);
+    }
+
+    public static 'getTotalPhysicalMemorySize()J'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object): Long {
+      return Long.fromNumber(-1);
+    }
+
+    public static 'getOpenFileDescriptorCount()J'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object): Long {
+      return Long.fromNumber(-1);
+    }
+
+    public static 'getMaxFileDescriptorCount()J'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object): Long {
+      return Long.fromNumber(-1);
+    }
+
+    public static 'getSystemCpuLoad()D'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object): number {
+      return -1;
+    }
+
+    public static 'getProcessCpuLoad()D'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object): number {
+      return -1;
+    }
+  }
+
   class sun_management_VMManagementImpl {
 
     public static 'getVersion0()Ljava/lang/String;'(thread: JVMThread): JVMTypes.java_lang_String {
@@ -219,6 +264,7 @@ export default function (): any {
   return {
     'sun/management/ClassLoadingImpl': sun_management_ClassLoadingImpl,
     'sun/management/MemoryImpl': sun_management_MemoryImpl,
+    'sun/management/OperatingSystemImpl': sun_management_OperatingSystemImpl,
     'sun/management/ThreadImpl': sun_management_ThreadImpl,
     'sun/management/VMManagementImpl': sun_management_VMManagementImpl
   };

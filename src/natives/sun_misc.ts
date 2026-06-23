@@ -68,6 +68,42 @@ export default function (): any {
     fi[0][fi[1]] = val;
   }
 
+  function unsafeArrayBaseOffset(cls: JVMTypes.java_lang_Class): number {
+    return 0;
+  }
+
+  function unsafeArrayIndexScale(cls: JVMTypes.java_lang_Class): number {
+    var clsData = cls.$cls;
+    if (clsData instanceof ArrayClassData) {
+      switch (clsData.getComponentClass().getInternalName()[0]) {
+        case 'L':
+        case '[':
+        case 'F':
+        case 'I':
+          // 32-bits
+          return 4;
+        case 'B':
+        case 'Z':
+          // 8 bit
+          return 1;
+        case 'C':
+        case 'S':
+          // 16-bit
+          return 2;
+        case 'D':
+        case 'J':
+          // 64-bit
+          return 8;
+        default:
+          // Erroneous input.
+          return -1;
+      }
+    } else {
+      // Erroneous input.
+      return -1;
+    }
+  }
+
   class sun_misc_GC {
 
     public static 'maxObjectInspectionAge()J'(thread: JVMThread): Long {
@@ -434,7 +470,7 @@ export default function (): any {
     }
 
     public static 'arrayBaseOffset(Ljava/lang/Class;)I'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, arg0: JVMTypes.java_lang_Class): number {
-      return 0;
+      return unsafeArrayBaseOffset(arg0);
     }
 
     /**
@@ -443,35 +479,7 @@ export default function (): any {
      * Doppio emulates byte-addressable memory, so a return value of 4 indicates 4 bytes/32-bit large elements.
      */
     public static 'arrayIndexScale(Ljava/lang/Class;)I'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, arg0: JVMTypes.java_lang_Class): number {
-      var cls = arg0.$cls;
-      if (cls instanceof ArrayClassData) {
-        switch(cls.getComponentClass().getInternalName()[0]) {
-          case 'L':
-          case '[':
-          case 'F':
-          case 'I':
-            // 32-bits
-            return 4;
-          case 'B':
-          case 'Z':
-            // 8 bit
-            return 1;
-          case 'C':
-          case 'S':
-            // 16-bit
-            return 2;
-          case 'D':
-          case 'J':
-            // 64-bit
-            return 8;
-          default:
-            // Erroneous input.
-            return -1;
-        }
-      } else {
-        // Erroneous input.
-        return -1;
-      }
+      return unsafeArrayIndexScale(arg0);
     }
 
     public static 'addressSize()I'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe): number {
@@ -613,9 +621,7 @@ export default function (): any {
     }
 
     public static 'getLoadAverage([DI)I'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, arg0: JVMTypes.JVMArray<number>, arg1: number): number {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return 0;
+      return -1;
     }
 
     /**
@@ -737,6 +743,23 @@ export default function (): any {
 
   }
 
+  class jdk_internal_misc_Unsafe {
+    public static 'registerNatives()V'(thread: JVMThread): void {
+    }
+
+    public static 'arrayBaseOffset0(Ljava/lang/Class;)I'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object, arg0: JVMTypes.java_lang_Class): number {
+      return unsafeArrayBaseOffset(arg0);
+    }
+
+    public static 'arrayIndexScale0(Ljava/lang/Class;)I'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object, arg0: JVMTypes.java_lang_Class): number {
+      return unsafeArrayIndexScale(arg0);
+    }
+
+    public static 'getLoadAverage0([DI)I'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object, arg0: JVMTypes.JVMArray<number>, arg1: number): number {
+      return -1;
+    }
+  }
+
   /**
    * URLClassPath has optional support for a lookupcache, which we do not support.
    */
@@ -764,6 +787,7 @@ export default function (): any {
     'sun/misc/Perf': sun_misc_Perf,
     'sun/misc/Signal': sun_misc_Signal,
     'sun/misc/Unsafe': sun_misc_Unsafe,
+    'jdk/internal/misc/Unsafe': jdk_internal_misc_Unsafe,
     'sun/misc/Version': sun_misc_Version,
     'sun/misc/VM': sun_misc_VM,
     'sun/misc/VMSupport': sun_misc_VMSupport,
