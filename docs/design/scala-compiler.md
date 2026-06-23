@@ -59,6 +59,8 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - Java collection interop through `scala.jdk.CollectionConverters`, mutable
   Java list/map wrappers, and a small `Future`/`Promise`/`Await` path running
   on a Java executor;
+- `scala.concurrent.duration` finite duration arithmetic, scanning, sorting,
+  parsing, scaling, clamping, and infinite-duration metadata;
 - two-phase Scala 2 macro expansion using `scala.reflect.macros.blackbox`,
   where the macro implementation is compiled first under Doppio and then used
   by the main source fixture in a second Doppio-hosted scalac invocation;
@@ -82,6 +84,10 @@ interop and a small asynchronous `Future` path. A local 2026-06-21 run of the
 expanded smoke completed in 303 seconds using Scala 2.13.18.
 A local 2026-06-23 run with the language/type-system smoke completed in
 488 seconds using Scala 2.13.18.
+The smoke now also covers `scala.concurrent.duration` finite duration
+arithmetic, scan/sort paths, string parsing, scaling, clamping, and
+finite/infinite metadata. A local 2026-06-24 run with this duration slice
+completed in 300 seconds using Scala 2.13.18.
 
 The smoke also includes a two-phase macro path: Doppio-hosted scalac first
 emits a blackbox macro implementation class, then a second Doppio-hosted scalac

@@ -259,7 +259,9 @@ combinator parity is still not claimed.
   composed function adapters, `Option.when`/`Option.unless`,
   `Using.resource`, `Try` recovery, `Either.cond`, and `partitionMap`,
   Java collection interop through `scala.jdk.CollectionConverters`, a small
-  `Future`/`Promise`/`Await` path running on a Java executor, classfile
+  `Future`/`Promise`/`Await` path running on a Java executor,
+  `scala.concurrent.duration` arithmetic/sorting/parsing/scaling checks,
+  classfile
   assertions for `InvokeDynamic`/`LambdaMetafactory` emission, representative
   generic `Signature` metadata, path-dependent types, higher-kinded implicit
   typeclass lookup, self-types, by-name argument evaluation, extractor
