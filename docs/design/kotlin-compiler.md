@@ -491,6 +491,12 @@ Current verified checks:
   `MatchResult.Destructured`, `RegexOption` set construction,
   `StringsKt.replaceRange`, `LambdaMetafactory` bootstrap methods for the
   Kotlin lambdas, `StackMapTable`, and `kotlin.Metadata`.
+- A minimal duration smoke compiled with the repo suite in 731 seconds and
+  both the host JVM and Doppio printed
+  `3250|0,500,1500,1250|-1000,0,1500,3000|1|2.0|1250|2250|3|true:true:true`.
+  It covers Kotlin `Duration` value-class arithmetic, `runningFold`,
+  sorting/comparison, nanosecond-to-microsecond conversion, duration division,
+  ISO parsing, scaling, range coercion, and finite/infinite checks.
 - A minimal file I/O smoke compiled with the repo suite in 364 seconds and
   both the host JVM and Doppio printed
   `0:5:a,1:4:b,2:5:g|aaa|input.txt:17,nested/out.txt:17|616c706861|txt/out/nested/out.txt|true/true`.

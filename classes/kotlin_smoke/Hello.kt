@@ -34,6 +34,7 @@ fun main() {
   println(sequenceBuilderSummary())
   println(resultExceptionSummary())
   println(textRegexSummary())
+  println(durationSummary())
   println(fileIoSummary())
   println(nioPathSummary())
   println(concurrentCacheSummary())

@@ -151,7 +151,9 @@ combinator parity is still not claimed.
   lambda labeled returns, plus Kotlin text/regex APIs covering named groups,
   lazy `findAll` sequences, destructured matches, transform replacements,
   `replaceFirst`, `split`, `trimIndent`/`lineSequence`, regex options, and
-  string range replacement, plus Kotlin file I/O helpers covering
+  string range replacement, plus Kotlin `Duration` stdlib value-class
+  arithmetic, sorting, ISO parsing, scaling, range coercion, and
+  finite/infinite checks, plus Kotlin file I/O helpers covering
   `writeText`, `appendText`, `readLines`, `useLines`, `copyTo`,
   `walkTopDown`, relative path normalization, file metadata, and byte reads,
   plus Kotlin source-level use of Java NIO `Path`/`Files` covering
