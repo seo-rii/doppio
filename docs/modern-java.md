@@ -46,6 +46,10 @@ target/fallback dispatch, selected iterated `Iterable`/`Iterator` flows, plus
 stateful loop flows in the Java fixtures and Kotlin smoke. Full control-flow
 combinator parity is still not claimed.
 
+Java 17 I/O note: the compatibility row above now also includes selected
+`FileChannel.force(boolean)` data/metadata flush behavior, read-only-channel
+no-op behavior, and closed-channel failure behavior.
+
 ## Implementation Order
 
 1. Accept and test simple Java 17-26 class-file containers that do not need new

@@ -200,6 +200,22 @@ export default function (): any {
       });
     }
 
+    public static 'force0(Ljava/io/FileDescriptor;Z)I'(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor, metaData: boolean): void {
+      const fd = fdObj["java/io/FileDescriptor/fd"];
+      if (fd === -1) {
+        thread.throwNewException("Ljava/io/IOException;", "Bad file descriptor");
+        return;
+      }
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      fs.fsync(fd, (err) => {
+        if (err) {
+          throwNodeError(thread, err);
+        } else {
+          thread.asyncReturn(0);
+        }
+      });
+    }
+
     public static 'closeIntFD(I)V'(thread: JVMThread, fd: number): void {
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
       fs.close(fd, (err) => {
