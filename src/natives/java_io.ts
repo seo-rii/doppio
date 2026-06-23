@@ -88,11 +88,25 @@ export default function (): any {
   class java_io_FileDescriptor {
 
     public static 'sync()V'(thread: JVMThread, javaThis: JVMTypes.java_io_FileDescriptor): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+      var fd = javaThis['java/io/FileDescriptor/fd'];
+      if (fd === -1) {
+        thread.throwNewException('Ljava/io/SyncFailedException;', 'Bad file descriptor');
+      } else if (fd === 0 || fd === 1 || fd === 2) {
+        return;
+      } else {
+        thread.setStatus(ThreadStatus.ASYNC_WAITING);
+        fs.fsync(fd, (err?: NodeJS.ErrnoException) => {
+          if (err) {
+            thread.throwNewException('Ljava/io/SyncFailedException;', err.message);
+          } else {
+            thread.asyncReturn();
+          }
+        });
+      }
     }
 
     public static 'initIDs()V'(thread: JVMThread): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+      // NOP.
     }
 
   }
@@ -411,7 +425,18 @@ export default function (): any {
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
       fs.open(filepath, modeStr, (e, fd) => {
         if (e) {
-          return throwNodeError(thread, e);
+          if (e.code !== 'ENOENT' || mode === rafStatics["java/io/RandomAccessFile/O_RDONLY"]) {
+            return throwNodeError(thread, e);
+          }
+          fs.open(filepath, 'w+', (createErr, createdFd) => {
+            if (createErr) {
+              return throwNodeError(thread, createErr);
+            }
+            var createdFdObj = javaThis['java/io/RandomAccessFile/fd'];
+            createdFdObj['java/io/FileDescriptor/fd'] = createdFd;
+            FDState.open(createdFd, 0);
+            thread.asyncReturn();
+          });
         } else {
           var fdObj = javaThis['java/io/RandomAccessFile/fd'];
           fdObj['java/io/FileDescriptor/fd'] = fd;
@@ -522,11 +547,29 @@ export default function (): any {
     }
 
     public static 'setLength(J)V'(thread: JVMThread, javaThis: JVMTypes.java_io_RandomAccessFile, arg0: Long): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+      var fdObj = javaThis['java/io/RandomAccessFile/fd'],
+        fd = fdObj['java/io/FileDescriptor/fd'],
+        newLength = arg0.toNumber();
+      if (fd === -1) {
+        thread.throwNewException('Ljava/io/IOException;', "Bad file descriptor");
+      } else if (newLength < 0) {
+        thread.throwNewException('Ljava/io/IOException;', "Invalid argument");
+      } else {
+        thread.setStatus(ThreadStatus.ASYNC_WAITING);
+        fs.ftruncate(fd, newLength, (err?: NodeJS.ErrnoException) => {
+          if (err) {
+            return throwNodeError(thread, err);
+          }
+          if (FDState.getPos(fd) > newLength) {
+            FDState.setPos(fd, newLength);
+          }
+          thread.asyncReturn();
+        });
+      }
     }
 
     public static 'initIDs()V'(thread: JVMThread): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+      // NOP.
     }
 
     public static 'close0()V'(thread: JVMThread, javaThis: JVMTypes.java_io_RandomAccessFile): void {
