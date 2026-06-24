@@ -30,14 +30,27 @@ public class Java17InstantSource {
     System.out.println(fixed.withZone(ZoneId.of("Asia/Seoul")).instant());
     System.out.println(fixed.withZone(ZoneId.of("Asia/Seoul")).getZone());
     System.out.println(fixed.withZone(ZoneId.of("UTC")) == fixed.withZone(ZoneId.of("UTC")));
+    System.out.println(fixed.toString());
+    System.out.println(fixed.equals(InstantSource.fixed(fixedInstant)));
+    System.out.println(fixed.hashCode() == InstantSource.fixed(fixedInstant).hashCode());
+    System.out.println(fixed.withZone(ZoneId.of("UTC")).toString());
+    System.out.println(fixed.withZone(ZoneId.of("UTC")).equals(fixed));
+    System.out.println(fixed.withZone(ZoneId.of("Asia/Seoul")).equals(
+        Clock.fixed(fixedInstant, ZoneId.of("Asia/Seoul"))));
 
     System.out.println(InstantSource.offset(fixed, Duration.ZERO) == fixed);
-    System.out.println(InstantSource.offset(fixed, Duration.ofSeconds(5)).instant());
+    InstantSource offsetFive = InstantSource.offset(fixed, Duration.ofSeconds(5));
+    System.out.println(offsetFive.instant());
+    System.out.println(offsetFive.toString());
+    System.out.println(offsetFive.equals(InstantSource.offset(fixed, Duration.ofSeconds(5))));
     System.out.println(InstantSource.offset(fixed, Duration.ofNanos(-123456789L)).instant());
 
     System.out.println(InstantSource.tick(fixed, Duration.ZERO) == fixed);
     System.out.println(InstantSource.tick(fixed, Duration.ofNanos(1L)) == fixed);
-    System.out.println(InstantSource.tick(fixed, Duration.ofSeconds(10L)).instant());
+    InstantSource tickTen = InstantSource.tick(fixed, Duration.ofSeconds(10L));
+    System.out.println(tickTen.instant());
+    System.out.println(tickTen.toString());
+    System.out.println(tickTen.equals(InstantSource.tick(fixed, Duration.ofSeconds(10L))));
     System.out.println(InstantSource.tick(fixed, Duration.ofMillis(250L)).instant());
 
     CountingSource custom = new CountingSource(fixedInstant);
@@ -53,6 +66,8 @@ public class Java17InstantSource {
 
     InstantSource system = InstantSource.system();
     System.out.println(system instanceof Clock);
+    System.out.println(system.toString());
+    System.out.println(system == InstantSource.system());
     System.out.println(system.instant().getEpochSecond() > 0L);
     System.out.println(system.millis() > 0L);
     System.out.println(system.withZone(ZoneId.of("UTC")).getZone());

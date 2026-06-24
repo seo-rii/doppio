@@ -86,7 +86,9 @@ public interface InstantSource {
     }
 
     public boolean equals(Object obj) {
-      return obj instanceof ClockSource && clock.equals(((ClockSource) obj).clock);
+      return obj instanceof ClockSource
+          ? clock.equals(((ClockSource) obj).clock)
+          : clock.equals(obj);
     }
 
     public int hashCode() {

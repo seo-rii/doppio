@@ -1434,9 +1434,11 @@ requires a bytecode-compatible bootstrap class-library shim.
 - The covered surface is the tested `system`, `fixed`, `offset`, `tick`,
   `instant`, `millis`, and `withZone` behavior, including zero-duration
   identity for fixed sources, custom-source wrapping, tick truncation, and
-  null/invalid-duration validation.
+  null/invalid-duration validation, plus selected fixed/offset/tick/system
+  `toString`, equality, and hash-code behavior including wrapper-to-wrapper and
+  wrapper-to-raw-`Clock` comparisons for fixed clocks.
 - Exact OpenJDK implementation class names, serialization details, and
-  exhaustive `Clock` equality/toString compatibility are not claimed yet.
+  exhaustive raw `Clock` equality compatibility are not claimed yet.
 
 ## Known HexFormat Gaps
 
