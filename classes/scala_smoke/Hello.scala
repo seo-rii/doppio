@@ -91,6 +91,7 @@ object Hello {
     val stackWalker = ScalaStackWalkerSmoke.exercise()
     val durations = ScalaDurationSmoke.exercise()
     val nio = ScalaNioSmoke.exercise()
-    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$collections:$interop:$reflection:$scalaReflect:$functional:$language:$macroUse:$stackWalker:$durations:$nio")
+    val methodHandles = ScalaMethodHandlesSmoke.exercise()
+    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$collections:$interop:$reflection:$scalaReflect:$functional:$language:$macroUse:$stackWalker:$durations:$nio:$methodHandles")
   }
 }

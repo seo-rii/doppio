@@ -59,6 +59,10 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - Java collection interop through `scala.jdk.CollectionConverters`, mutable
   Java list/map wrappers, and a small `Future`/`Promise`/`Await` path running
   on a Java executor;
+- source-level `java.lang.invoke.MethodHandles` coverage for selected static,
+  virtual, and constructor lookup, `MethodHandle.asType`, `invokeWithArguments`,
+  and basic combinators including `bindTo`, `insertArguments`, `dropArguments`,
+  `filterReturnValue`, and `guardWithTest`;
 - reflection-backed Java NIO coverage for `Path.of(String, String...)`,
   `Path.of(URI)`, `Files.mismatch`, `Files.isSameFile`, and path cleanup
   through `Files.walk`;
@@ -95,6 +99,9 @@ It also covers Scala-compiled reflection-backed Java NIO calls through
 `Path.of` factories, `Files.mismatch`, `Files.isSameFile`, and cleanup through
 `Files.walk`, avoiding compile-time dependence on those Java 11/12 signatures
 when Scala sees the Java 8 boot surface.
+It now includes a direct Scala source-level `java.lang.invoke.MethodHandles`
+smoke for selected static, virtual, constructor, adaptation, and basic
+combinator flows that Kotlin already stresses more broadly.
 
 The smoke also includes a two-phase macro path: Doppio-hosted scalac first
 emits a blackbox macro implementation class, then a second Doppio-hosted scalac
