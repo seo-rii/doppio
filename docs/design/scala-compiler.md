@@ -67,6 +67,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
   `JarFile`, `ZipInputStream`, and `URLClassLoader` resource reads;
 - `ServiceLoader` discovery from generated `META-INF/services` metadata,
   including duplicate-provider collapse and reload;
+- classpath resource lookup through `Class.getResource`,
+  `ClassLoader.getResource`, `getResources`, `getResourceAsStream`,
+  `getSystemResource`, and reflection-backed Java 9 `ClassLoader.resources`;
 - reflection-backed Java NIO coverage for `Path.of(String, String...)`,
   `Path.of(URI)`, `Files.mismatch`, `Files.isSameFile`, and path cleanup
   through `Files.walk`;
@@ -113,6 +116,9 @@ through `URLClassLoader`.
 The classpath stress slice now also creates `META-INF/services` metadata for
 Scala-compiled provider classes and verifies `ServiceLoader` discovery,
 duplicate-provider collapse, and reload behavior.
+It also creates runtime resource files in both compiled output classpath roots
+and verifies class-relative, loader-relative, system, enumeration, stream, and
+Java 9 `ClassLoader.resources` lookup paths from Scala-compiled code.
 
 The smoke also includes a two-phase macro path: Doppio-hosted scalac first
 emits a blackbox macro implementation class, then a second Doppio-hosted scalac

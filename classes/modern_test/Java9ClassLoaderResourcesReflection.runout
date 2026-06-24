@@ -1,0 +1,4 @@
+resources:java.util.stream.Stream:[class java.lang.String]
+file:/first,file:/first,file:/second
+1:pkg/resource.txt
+null:InvocationTargetException:NullPointerException

@@ -286,6 +286,9 @@ behavior.
   `JarFile`, `ZipInputStream`, and `URLClassLoader`,
   `ServiceLoader` provider discovery from generated `META-INF/services`
   metadata including duplicate-provider collapse and reload,
+  classpath resource lookup through `Class.getResource`,
+  `ClassLoader.getResource`, `getResources`, `getResourceAsStream`,
+  `getSystemResource`, and reflection-backed `ClassLoader.resources`,
   reflection-backed Scala use of Java NIO `Path.of` factories and
   `Files.mismatch` paths,
   `scala.concurrent.duration` arithmetic/sorting/parsing/scaling checks,

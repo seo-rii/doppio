@@ -7,7 +7,7 @@ import {JVMThread, InternalStackFrame, NativeStackFrame, BytecodeStackFrame} fro
 import * as logging from './logging';
 import {Method, Field} from './methods';
 import {ClassLoader, CustomClassLoader} from './ClassLoader';
-import {ClassState, ConstantPoolItemType} from './enums';
+import {ClassState, ConstantPoolItemType, ThreadStatus} from './enums';
 import ClassLock from './ClassLock';
 import assert from './assert';
 import gLong from './gLong';
@@ -117,6 +117,127 @@ var injectedMethods: {[className: string]: {[methodName: string]: string[]}} = {
     'toString': ["(): string", `function() { return "(" + this['java/lang/invoke/MethodType/ptypes'].array.map(function (type) { return type.$cls.getInternalName(); }).join("") + ")" + this['java/lang/invoke/MethodType/rtype'].$cls.getInternalName(); }`]
   }
 };
+
+function makeSyntheticClassLoaderResourcesMethod(cls: ReferenceClassData<JVMTypes.java_lang_Object>, slot: number): Method {
+  var signature = 'resources(Ljava/lang/String;)Ljava/util/stream/Stream;',
+    fullSignature = `${descriptor2typestr(cls.getInternalName())}/${signature}`,
+    method: any = {
+      cls: cls,
+      slot: slot,
+      accessFlags: new Flags(util.FlagMasks.PUBLIC | util.FlagMasks.NATIVE),
+      name: 'resources',
+      rawDescriptor: '(Ljava/lang/String;)Ljava/util/stream/Stream;',
+      attrs: [],
+      signature: signature,
+      fullSignature: fullSignature,
+      parameterTypes: ['Ljava/lang/String;'],
+      returnType: 'Ljava/util/stream/Stream;',
+      isStatic: false,
+      isSynchronized: false,
+      isNative: true,
+      hasWideParameters: false,
+      isSignaturePolymorphicMethod: false,
+      getParamWordSize: function(): number {
+        return 1;
+      },
+      convertArgs: function(thread: JVMThread, params: any[]): any[] {
+        return [thread, params[0], params[1]];
+      },
+      getNativeFunction: function(): Function {
+        return function(thread: JVMThread, javaThis: JVMTypes.java_lang_Object, name: JVMTypes.java_lang_String): any {
+          thread.setStatus(ThreadStatus.ASYNC_WAITING);
+          thread.getBsCl().initializeClass(thread, 'Ljava/lang/ClassLoader$DoppioResources;', (resourcesCls: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+            if (resourcesCls === null) {
+              return;
+            }
+            var resourcesCons = <any> resourcesCls.getConstructor(thread);
+            resourcesCons['java/lang/ClassLoader$DoppioResources/stream(Ljava/lang/ClassLoader;Ljava/lang/String;)Ljava/util/stream/Stream;'](thread, [javaThis, name], (e?: JVMTypes.java_lang_Throwable, rv?: JVMTypes.java_lang_Object) => {
+              if (e) {
+                thread.throwException(e);
+              } else {
+                thread.asyncReturn(rv);
+              }
+            });
+          });
+          return null;
+        };
+      },
+      isSignaturePolymorphic: function(): boolean {
+        return false;
+      },
+      isHidden: function(): boolean {
+        return false;
+      },
+      isCallerSensitive: function(): boolean {
+        return false;
+      },
+      isDefault: function(): boolean {
+        return false;
+      },
+      getFullSignature: function(): string {
+        return fullSignature;
+      },
+      getAttribute: function(): IAttribute {
+        return null;
+      },
+      getAnnotationType: function(): JVMTypes.JVMArray<number> {
+        return null;
+      },
+      methodLock: function(thread: JVMThread, frame: BytecodeStackFrame): Monitor {
+        return frame.locals[0].getMonitor();
+      },
+      outputJavaScriptFunction: function(jsConsName: string, outStream: StringOutputStream, nonVirtualOnly: boolean = false, methodExpression?: string): void {
+        var methodExpr = methodExpression || `cls.getSpecificMethod("Ljava/lang/ClassLoader;", "${signature}")`;
+        if (!nonVirtualOnly) {
+          outStream.write(`${jsConsName}.prototype["${signature}"] = `);
+        }
+        outStream.write(`${jsConsName}.prototype["${fullSignature}"] = `);
+        outStream.write(`(function(method) {
+  return function(thread, args, cb) {
+    if (typeof cb === 'function') {
+      thread.stack.push(new InternalStackFrame(cb));
+    }
+    thread.stack.push(new NativeStackFrame(method, [this, args[0]]));
+    if (thread.status !== ${ThreadStatus.RUNNABLE}) {
+      thread.setStatus(${ThreadStatus.RUNNABLE});
+    }
+  };
+})(${methodExpr});\n`);
+      },
+      reflector: function(thread: JVMThread, cb: (reflectedMethod: JVMTypes.java_lang_reflect_Method) => void): void {
+        var bsCl = thread.getBsCl();
+        cls.getLoader().resolveClasses(thread, ['Ljava/lang/String;', 'Ljava/util/stream/Stream;'], (classes: {[className: string]: ClassData}) => {
+          if (classes === null) {
+            return cb(null);
+          }
+          thread.getBsCl().resolveClasses(thread, ['Ljava/lang/reflect/Method;'], (reflectClasses: {[className: string]: ClassData}) => {
+            if (reflectClasses === null) {
+              return cb(null);
+            }
+            var methodCons = (<ReferenceClassData<JVMTypes.java_lang_reflect_Method>> reflectClasses['Ljava/lang/reflect/Method;']).getConstructor(thread),
+              clazzArray = (<ArrayClassData<JVMTypes.java_lang_Class>> bsCl.getInitializedClass(thread, '[Ljava/lang/Class;')).getConstructor(thread),
+              methodObj = new methodCons(thread),
+              parameterTypes = new clazzArray(thread, 0),
+              exceptionTypes = new clazzArray(thread, 0);
+            parameterTypes.array = [classes['Ljava/lang/String;'].getClassObject(thread)];
+            methodObj['java/lang/reflect/Method/clazz'] = cls.getClassObject(thread);
+            methodObj['java/lang/reflect/Method/name'] = thread.getJVM().internString('resources');
+            methodObj['java/lang/reflect/Method/parameterTypes'] = parameterTypes;
+            methodObj['java/lang/reflect/Method/returnType'] = classes['Ljava/util/stream/Stream;'].getClassObject(thread);
+            methodObj['java/lang/reflect/Method/exceptionTypes'] = exceptionTypes;
+            methodObj['java/lang/reflect/Method/modifiers'] = method.accessFlags.getRawByte();
+            methodObj['java/lang/reflect/Method/slot'] = slot;
+            methodObj['java/lang/reflect/Method/signature'] = null;
+            methodObj['java/lang/reflect/Method/annotations'] = null;
+            methodObj['java/lang/reflect/Method/annotationDefault'] = null;
+            methodObj['java/lang/reflect/Method/parameterAnnotations'] = null;
+            cb(methodObj);
+          });
+        });
+      }
+    };
+  return <Method> method;
+}
 
 /**
  * Same as injected methods, but these are static.
@@ -883,6 +1004,10 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     for (i = 0; i < numMethods; i++) {
       var m = new Method(this, this.constantPool, i, byteStream);
       this.methods[i] = m;
+    }
+    if (this.className === 'Ljava/lang/ClassLoader;' &&
+        this.methods.every((m: Method) => m.signature !== 'resources(Ljava/lang/String;)Ljava/util/stream/Stream;')) {
+      this.methods.push(makeSyntheticClassLoaderResourcesMethod(this, this.methods.length));
     }
     // class attributes
     this.attrs = makeAttributes(byteStream, this.constantPool);
