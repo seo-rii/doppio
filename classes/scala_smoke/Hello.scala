@@ -95,6 +95,7 @@ object Hello {
     val jarZip = ScalaJarZipSmoke.exercise()
     val serviceLoader = ScalaServiceLoaderSmoke.exercise()
     val resources = ScalaResourceLookupSmoke.exercise()
-    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$collections:$interop:$reflection:$scalaReflect:$functional:$language:$macroUse:$stackWalker:$durations:$nio:$methodHandles:$jarZip:$serviceLoader:$resources")
+    val proxyReflection = ScalaProxyReflectionSmoke.exercise()
+    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$collections:$interop:$reflection:$scalaReflect:$functional:$language:$macroUse:$stackWalker:$durations:$nio:$methodHandles:$jarZip:$serviceLoader:$resources:$proxyReflection")
   }
 }

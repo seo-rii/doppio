@@ -70,6 +70,10 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - classpath resource lookup through `Class.getResource`,
   `ClassLoader.getResource`, `getResources`, `getResourceAsStream`,
   `getSystemResource`, and reflection-backed Java 9 `ClassLoader.resources`;
+- Java dynamic-proxy interop covering a Scala trait proxy,
+  `InvocationHandler` dispatch, reflective proxy-method invocation, runtime
+  method and parameter annotations, proxy `Object` method dispatch,
+  `Proxy.isProxyClass`, and `Proxy.getInvocationHandler`;
 - reflection-backed Java NIO coverage for `Path.of(String, String...)`,
   `Path.of(URI)`, `Files.mismatch`, `Files.isSameFile`, and path cleanup
   through `Files.walk`;
@@ -119,6 +123,10 @@ duplicate-provider collapse, and reload behavior.
 It also creates runtime resource files in both compiled output classpath roots
 and verifies class-relative, loader-relative, system, enumeration, stream, and
 Java 9 `ClassLoader.resources` lookup paths from Scala-compiled code.
+It now also covers Java dynamic proxies from Scala-compiled code, including
+trait dispatch through `InvocationHandler`, reflective proxy-method invocation,
+runtime annotation metadata on the proxied interface method and parameter, and
+proxy `Object` method behavior.
 
 The smoke also includes a two-phase macro path: Doppio-hosted scalac first
 emits a blackbox macro implementation class, then a second Doppio-hosted scalac

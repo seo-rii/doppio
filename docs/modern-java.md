@@ -289,6 +289,10 @@ behavior.
   classpath resource lookup through `Class.getResource`,
   `ClassLoader.getResource`, `getResources`, `getResourceAsStream`,
   `getSystemResource`, and reflection-backed `ClassLoader.resources`,
+  Java dynamic-proxy interop through a Scala trait proxy,
+  `InvocationHandler`, reflective proxy-method invocation, runtime method and
+  parameter annotations, proxy `Object` methods, `Proxy.isProxyClass`, and
+  `Proxy.getInvocationHandler`,
   reflection-backed Scala use of Java NIO `Path.of` factories and
   `Files.mismatch` paths,
   `scala.concurrent.duration` arithmetic/sorting/parsing/scaling checks,
