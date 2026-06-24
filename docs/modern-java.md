@@ -175,7 +175,8 @@ behavior.
   plus Kotlin source-level use of Java NIO `Path`/`Files` covering
   `Paths.get`, directory creation, line and byte reads/writes, copy/move,
   `Files.list`, `Files.walk`, metadata predicates, path normalization, and
-  same-file checks, plus Kotlin source-level use of `MappedByteBuffer`
+  same-file checks, `Path.of` factories, and `Files.mismatch`, plus Kotlin
+  source-level use of `MappedByteBuffer`
   covering mmap `load`, full-buffer `force`, reflection-backed range `force`,
   read-only mappings, empty mappings, and range validation, plus Kotlin
   source-level use of concurrent cache

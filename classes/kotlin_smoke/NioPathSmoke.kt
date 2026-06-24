@@ -1,11 +1,11 @@
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import java.nio.file.Paths
+import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 
 fun nioPathSummary(): String {
-  val base = Paths.get("build", "kotlin-smoke", "runtime-nio")
+  val base = Path.of("build", "kotlin-smoke", "runtime-nio")
   if (Files.exists(base)) {
     base.toFile().deleteRecursively()
   }
@@ -27,6 +27,19 @@ fun nioPathSummary(): String {
   Files.copy(source, copied, StandardCopyOption.REPLACE_EXISTING)
   val moved = base.resolve("nested").resolve("moved.txt")
   Files.move(copied, moved, StandardCopyOption.REPLACE_EXISTING)
+
+  val diff = base.resolve("diff.txt")
+  val prefix = base.resolve("prefix.txt")
+  Files.write(diff, "deltaX".toByteArray(StandardCharsets.UTF_8))
+  Files.write(prefix, "delta".toByteArray(StandardCharsets.UTF_8))
+  val mismatchSummary = listOf(
+    Files.mismatch(source, moved),
+    Files.mismatch(source, diff),
+    Files.mismatch(source, prefix),
+    Files.mismatch(source, source)
+  ).joinToString("/")
+  Files.deleteIfExists(diff)
+  Files.deleteIfExists(prefix)
 
   val listStream = Files.list(base)
   val listSummary = try {
@@ -53,15 +66,20 @@ fun nioPathSummary(): String {
   }
 
   val normalized = base.resolve("nested").resolve("..").resolve("input.txt").normalize()
+  val pathOfNormalized = Path.of(base.toString(), "nested", "..", "input.txt").normalize()
+  val uriPath = Path.of(source.toUri())
   val metadata = source.fileName.toString() + "/" +
     source.parent.fileName + "/" +
     base.relativize(moved)
   val state = Files.exists(source).toString() + "/" +
     Files.isRegularFile(moved) + "/" +
-    Files.isSameFile(source, normalized)
+    Files.isSameFile(source, normalized) + "/" +
+    Files.isSameFile(source, pathOfNormalized) + "/" +
+    Files.isSameFile(source, uriPath)
 
   return lineSummary + "|" +
     bytePrefix + "|" +
+    mismatchSummary + "|" +
     listSummary + "|" +
     walkSummary + "|" +
     metadata + "|" +
