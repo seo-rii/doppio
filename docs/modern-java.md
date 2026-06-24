@@ -282,6 +282,8 @@ behavior.
   `Future`/`Promise`/`Await` path running on a Java executor,
   Scala source-level `java.lang.invoke.MethodHandles` lookup/adaptation
   coverage for selected static, virtual, constructor, and combinator flows,
+  runtime JAR/ZIP/classpath resource reads through `JarOutputStream`,
+  `JarFile`, `ZipInputStream`, and `URLClassLoader`,
   reflection-backed Scala use of Java NIO `Path.of` factories and
   `Files.mismatch` paths,
   `scala.concurrent.duration` arithmetic/sorting/parsing/scaling checks,
