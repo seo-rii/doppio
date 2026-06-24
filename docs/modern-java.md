@@ -174,7 +174,9 @@ requires a bytecode-compatible bootstrap class-library shim.
   plus Kotlin source-level use of Java NIO `Path`/`Files` covering
   `Paths.get`, directory creation, line and byte reads/writes, copy/move,
   `Files.list`, `Files.walk`, metadata predicates, path normalization, and
-  same-file checks, plus Kotlin source-level use of concurrent cache
+  same-file checks, plus Kotlin source-level use of `MappedByteBuffer`
+  covering mmap `load`, full-buffer `force`, read-only mappings, and empty
+  mappings, plus Kotlin source-level use of concurrent cache
   primitives covering `ConcurrentHashMap` compute/merge paths, atomics,
   `CopyOnWriteArrayList`, `ThreadLocal`, `ReentrantLock.withLock`,
   synchronized maps, and one-shot thread-local isolation, plus Kotlin contracts

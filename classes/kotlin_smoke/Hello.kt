@@ -37,6 +37,7 @@ fun main() {
   println(durationSummary())
   println(fileIoSummary())
   println(nioPathSummary())
+  println(mappedBufferSummary())
   println(concurrentCacheSummary())
   println(contractSmokeSummary())
   println(resourceLookupSummary())
