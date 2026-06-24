@@ -57,9 +57,10 @@ and buffer-position updates, plus selected `FileChannel.transferTo` and
 `transferFrom` file-channel paths covering copied byte counts, EOF transfer
 results, file contents, and source/target position updates, plus selected
 `MappedByteBuffer.isLoaded()`, `load()`, and full-buffer `force()` mmap
-behavior covering writable, read-only, and empty mappings. Java 13+
-`MappedByteBuffer.force(int, int)` range forcing is not claimed yet because it
-requires a bytecode-compatible bootstrap class-library shim.
+behavior covering writable, read-only, and empty mappings, plus selected Java
+13+ `MappedByteBuffer.force(int, int)` range forcing, zero-length range,
+read-only range no-op, empty-mapping validation order, and range validation
+behavior.
 
 ## Implementation Order
 
@@ -175,8 +176,9 @@ requires a bytecode-compatible bootstrap class-library shim.
   `Paths.get`, directory creation, line and byte reads/writes, copy/move,
   `Files.list`, `Files.walk`, metadata predicates, path normalization, and
   same-file checks, plus Kotlin source-level use of `MappedByteBuffer`
-  covering mmap `load`, full-buffer `force`, read-only mappings, and empty
-  mappings, plus Kotlin source-level use of concurrent cache
+  covering mmap `load`, full-buffer `force`, reflection-backed range `force`,
+  read-only mappings, empty mappings, and range validation, plus Kotlin
+  source-level use of concurrent cache
   primitives covering `ConcurrentHashMap` compute/merge paths, atomics,
   `CopyOnWriteArrayList`, `ThreadLocal`, `ReentrantLock.withLock`,
   synchronized maps, and one-shot thread-local isolation, plus Kotlin contracts

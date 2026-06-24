@@ -19,6 +19,64 @@ export interface MappedByteBufferMapping {
 export const mappedByteBufferMappings: { [address: number]: MappedByteBufferMapping } = {};
 
 export default function (): any {
+  function forceMappedRange(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor, addressArg: Long, lenArg: Long, returnValue?: JVMTypes.java_lang_Object): boolean {
+    if (fdObj === null || lenArg.lessThanOrEqual(Long.ZERO)) {
+      return true;
+    }
+
+    const address = addressArg.toNumber(),
+      len = lenArg.toNumber();
+    let mapping: MappedByteBufferMapping = null,
+      baseAddress = 0;
+
+    for (const key in mappedByteBufferMappings) {
+      if (mappedByteBufferMappings.hasOwnProperty(key)) {
+        const candidateBase = parseInt(key, 10),
+          candidate = mappedByteBufferMappings[candidateBase];
+        if (address >= candidateBase && address <= candidateBase + candidate.length) {
+          mapping = candidate;
+          baseAddress = candidateBase;
+          break;
+        }
+      }
+    }
+
+    if (mapping === null || !mapping.writable) {
+      return true;
+    }
+
+    const fd = mapping.fd;
+    if (fd === -1) {
+      thread.throwNewException("Ljava/io/IOException;", "Bad file descriptor");
+      return false;
+    }
+
+    const offset = address - baseAddress,
+      writeLen = Math.min(len, Math.max(0, mapping.length - offset));
+    if (writeLen <= 0) {
+      return true;
+    }
+
+    const buf = thread.getJVM().getHeap().get_buffer(address, writeLen);
+    thread.setStatus(ThreadStatus.ASYNC_WAITING);
+    fs.write(fd, buf, 0, writeLen, mapping.position + offset, (writeErr) => {
+      if (writeErr) {
+        thread.throwNewException("Ljava/io/IOException;", 'Error forcing mapped buffer: ' + writeErr.message);
+      } else {
+        fs.fsync(fd, (syncErr) => {
+          if (syncErr) {
+            thread.throwNewException("Ljava/io/IOException;", 'Error syncing mapped buffer: ' + syncErr.message);
+          } else if (returnValue !== undefined) {
+            thread.asyncReturn(returnValue);
+          } else {
+            thread.asyncReturn();
+          }
+        });
+      }
+    });
+    return false;
+  }
+
   class java_nio_Bits {
 
     public static 'copyFromShortArray(Ljava/lang/Object;JJJ)V'(thread: JVMThread, arg0: JVMTypes.java_lang_Object, arg1: Long, arg2: Long, arg3: Long): void {
@@ -57,58 +115,25 @@ export default function (): any {
     }
 
     public static 'force0(Ljava/io/FileDescriptor;JJ)V'(thread: JVMThread, javaThis: JVMTypes.java_nio_MappedByteBuffer, fdObj: JVMTypes.java_io_FileDescriptor, addressArg: Long, lenArg: Long): void {
-      if (fdObj === null || lenArg.lessThanOrEqual(Long.ZERO)) {
+      forceMappedRange(thread, fdObj, addressArg, lenArg);
+    }
+
+    public static 'force(II)Ljava/nio/MappedByteBuffer;'(thread: JVMThread, javaThis: JVMTypes.java_nio_MappedByteBuffer, index: number, length: number): JVMTypes.java_nio_MappedByteBuffer | void {
+      const fdObj = javaThis['java/nio/MappedByteBuffer/fd'],
+        capacity = javaThis['java/nio/Buffer/capacity'],
+        address = javaThis['java/nio/Buffer/address'];
+
+      if (fdObj === null || address.isZero() || capacity === 0) {
+        return javaThis;
+      }
+      if (index < 0 || length < 0 || index > capacity - length) {
+        thread.throwNewException('Ljava/lang/IndexOutOfBoundsException;', '');
         return;
       }
 
-      const address = addressArg.toNumber(),
-        len = lenArg.toNumber();
-      let mapping: MappedByteBufferMapping = null,
-        baseAddress = 0;
-
-      for (const key in mappedByteBufferMappings) {
-        if (mappedByteBufferMappings.hasOwnProperty(key)) {
-          const candidateBase = parseInt(key, 10),
-            candidate = mappedByteBufferMappings[candidateBase];
-          if (address >= candidateBase && address <= candidateBase + candidate.length) {
-            mapping = candidate;
-            baseAddress = candidateBase;
-            break;
-          }
-        }
+      if (forceMappedRange(thread, fdObj, Long.fromNumber(address.toNumber() + index), Long.fromNumber(length), javaThis)) {
+        return javaThis;
       }
-
-      if (mapping === null || !mapping.writable) {
-        return;
-      }
-
-      const fd = mapping.fd;
-      if (fd === -1) {
-        thread.throwNewException("Ljava/io/IOException;", "Bad file descriptor");
-        return;
-      }
-
-      const offset = address - baseAddress,
-        writeLen = Math.min(len, Math.max(0, mapping.length - offset));
-      if (writeLen <= 0) {
-        return;
-      }
-
-      const buf = thread.getJVM().getHeap().get_buffer(address, writeLen);
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.write(fd, buf, 0, writeLen, mapping.position + offset, (writeErr) => {
-        if (writeErr) {
-          thread.throwNewException("Ljava/io/IOException;", 'Error forcing mapped buffer: ' + writeErr.message);
-        } else {
-          fs.fsync(fd, (syncErr) => {
-            if (syncErr) {
-              thread.throwNewException("Ljava/io/IOException;", 'Error syncing mapped buffer: ' + syncErr.message);
-            } else {
-              thread.asyncReturn();
-            }
-          });
-        }
-      });
     }
 
   }
