@@ -284,6 +284,8 @@ behavior.
   coverage for selected static, virtual, constructor, and combinator flows,
   runtime JAR/ZIP/classpath resource reads through `JarOutputStream`,
   `JarFile`, `ZipInputStream`, and `URLClassLoader`,
+  `ServiceLoader` provider discovery from generated `META-INF/services`
+  metadata including duplicate-provider collapse and reload,
   reflection-backed Scala use of Java NIO `Path.of` factories and
   `Files.mismatch` paths,
   `scala.concurrent.duration` arithmetic/sorting/parsing/scaling checks,

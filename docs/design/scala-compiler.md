@@ -65,6 +65,8 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
   `filterReturnValue`, and `guardWithTest`;
 - runtime JAR/ZIP/classpath resource coverage through `JarOutputStream`,
   `JarFile`, `ZipInputStream`, and `URLClassLoader` resource reads;
+- `ServiceLoader` discovery from generated `META-INF/services` metadata,
+  including duplicate-provider collapse and reload;
 - reflection-backed Java NIO coverage for `Path.of(String, String...)`,
   `Path.of(URI)`, `Files.mismatch`, `Files.isSameFile`, and path cleanup
   through `Files.walk`;
@@ -108,6 +110,9 @@ It also includes a Scala runtime JAR/ZIP smoke that writes a manifest-bearing
 JAR, reads entries and manifest metadata through `JarFile`, scans the same
 archive through `ZipInputStream`, and verifies classpath-style resource lookup
 through `URLClassLoader`.
+The classpath stress slice now also creates `META-INF/services` metadata for
+Scala-compiled provider classes and verifies `ServiceLoader` discovery,
+duplicate-provider collapse, and reload behavior.
 
 The smoke also includes a two-phase macro path: Doppio-hosted scalac first
 emits a blackbox macro implementation class, then a second Doppio-hosted scalac

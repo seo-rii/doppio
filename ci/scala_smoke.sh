@@ -104,7 +104,11 @@ test -f "$out_dir/ScalaMhBox.class"
 test -f "$out_dir/ScalaNioSmoke.class"
 test -f "$out_dir/ScalaReflectSmoke.class"
 test -f "$out_dir/ScalaReflectSmoke\$ReflectBox.class"
+test -f "$out_dir/ScalaServiceLoaderSmoke.class"
 test -f "$out_dir/ScalaStackWalkerSmoke.class"
+test -f "$out_dir/ScalaServiceLookupPlugin.class"
+test -f "$out_dir/AlphaScalaServiceLookupPlugin.class"
+test -f "$out_dir/BetaScalaServiceLookupPlugin.class"
 test -f "$out_dir/SmokeCodec.class"
 test -f "$out_dir/SmokeFolder.class"
 test -f "$out_dir/scalasmoke/PackageRegistry.class"
@@ -130,7 +134,15 @@ grep -Fq '// <B:Ljava/lang/Object;>(Lscala/Function1<TA;TB;>;)LSmokeBox<TB;>;' "
 grep -Fq '// (TA;)Ljava/lang/String;' "$scala_signature_dump"
 grep -Fq '// (TA;)Lscala/Tuple2<TA;TA;>;' "$scala_signature_dump"
 
-expected_output="${SCALA_SMOKE_EXPECTED_OUTPUT:-"scala:38:parse>run:i=39:SCALA:a,bb:sc|even4:25:12:1=4,2=2,3=4:b:4/ccc:4/aa:2:g2:t5:String:3:z:2:1,3,5,7:1=8,2=5:a5|z2:134:k10:r6:r0a1b2:2:2,1:5:f32:worker:3:c1:describe/getName/total:pkg-worker-11:20:red-green-blue:23:ReflectBox:2:name/value:true:f17/14/p17+c14/u7/alpha>bb>close/t49+13/x|_=24/ok49:L:a7:R:b3:some(i2)|none|some(i4):a1,b2,c3:op7:12:2:dozen/sx/seven:m22:macro:cs:5:leaf:(I)Ljava/lang/String;:(I)Ljava/lang/String;:ScalaStackWalkerSmoke$|outer:(Ljava/lang/String;)Ljava/lang/String;:(Ljava/lang/String;)Ljava/lang/String;:ScalaStackWalkerSmoke$|exercise:()Ljava/lang/String;:()Ljava/lang/String;:ScalaStackWalkerSmoke$:(I)Ljava/lang/String;:UnsupportedOperationException:3250|0,500,1500,1250|-1000,0,1500,3000|1|2.0|1250|2250|3|true:false:true:-1/5/5/-1:true:true:10:nested/left.txt:mh:8:b7:cal:ala:const:MH:empty/filled:jarzip:false:META-INF/MANIFEST.MF,META-INF/services/example.Service,META-INF/versions/17/pkg/data.txt,pkg/data.txt:scala/jar:scala.Provider:10:true:true|META-INF/MANIFEST.MF=META-INF,META-INF/services/example.Service=META-INF,META-INF/versions/17/pkg/data.txt=META-INF,pkg/data.txt=scala|jar:jar:scala/jar:scala.Provider:true"}"
+mkdir -p "$out_dir/META-INF/services"
+cat > "$out_dir/META-INF/services/ScalaServiceLookupPlugin" <<'SCALA_SERVICE_PROVIDERS'
+# Scala smoke service providers
+AlphaScalaServiceLookupPlugin
+AlphaScalaServiceLookupPlugin
+BetaScalaServiceLookupPlugin
+SCALA_SERVICE_PROVIDERS
+
+expected_output="${SCALA_SMOKE_EXPECTED_OUTPUT:-"scala:38:parse>run:i=39:SCALA:a,bb:sc|even4:25:12:1=4,2=2,3=4:b:4/ccc:4/aa:2:g2:t5:String:3:z:2:1,3,5,7:1=8,2=5:a5|z2:134:k10:r6:r0a1b2:2:2,1:5:f32:worker:3:c1:describe/getName/total:pkg-worker-11:20:red-green-blue:23:ReflectBox:2:name/value:true:f17/14/p17+c14/u7/alpha>bb>close/t49+13/x|_=24/ok49:L:a7:R:b3:some(i2)|none|some(i4):a1,b2,c3:op7:12:2:dozen/sx/seven:m22:macro:cs:5:leaf:(I)Ljava/lang/String;:(I)Ljava/lang/String;:ScalaStackWalkerSmoke$|outer:(Ljava/lang/String;)Ljava/lang/String;:(Ljava/lang/String;)Ljava/lang/String;:ScalaStackWalkerSmoke$|exercise:()Ljava/lang/String;:()Ljava/lang/String;:ScalaStackWalkerSmoke$:(I)Ljava/lang/String;:UnsupportedOperationException:3250|0,500,1500,1250|-1000,0,1500,3000|1|2.0|1250|2250|3|true:false:true:-1/5/5/-1:true:true:10:nested/left.txt:mh:8:b7:cal:ala:const:MH:empty/filled:jarzip:false:META-INF/MANIFEST.MF,META-INF/services/example.Service,META-INF/versions/17/pkg/data.txt,pkg/data.txt:scala/jar:scala.Provider:10:true:true|META-INF/MANIFEST.MF=META-INF,META-INF/services/example.Service=META-INF,META-INF/versions/17/pkg/data.txt=META-INF,pkg/data.txt=scala|jar:jar:scala/jar:scala.Provider:true:svc:alpha=7,beta=11:2:alpha=7,beta=11:AlphaScalaServiceLookupPlugin>BetaScalaServiceLookupPlugin:true"}"
 
 native_output="$(java -cp "$runtime_cp" Hello)"
 if [ "$native_output" != "$expected_output" ]; then

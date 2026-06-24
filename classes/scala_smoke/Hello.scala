@@ -93,6 +93,7 @@ object Hello {
     val nio = ScalaNioSmoke.exercise()
     val methodHandles = ScalaMethodHandlesSmoke.exercise()
     val jarZip = ScalaJarZipSmoke.exercise()
-    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$collections:$interop:$reflection:$scalaReflect:$functional:$language:$macroUse:$stackWalker:$durations:$nio:$methodHandles:$jarZip")
+    val serviceLoader = ScalaServiceLoaderSmoke.exercise()
+    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$collections:$interop:$reflection:$scalaReflect:$functional:$language:$macroUse:$stackWalker:$durations:$nio:$methodHandles:$jarZip:$serviceLoader")
   }
 }
