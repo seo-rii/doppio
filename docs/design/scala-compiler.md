@@ -59,6 +59,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - Java collection interop through `scala.jdk.CollectionConverters`, mutable
   Java list/map wrappers, and a small `Future`/`Promise`/`Await` path running
   on a Java executor;
+- reflection-backed Java NIO coverage for `Path.of(String, String...)`,
+  `Path.of(URI)`, `Files.mismatch`, `Files.isSameFile`, and path cleanup
+  through `Files.walk`;
 - `scala.concurrent.duration` finite duration arithmetic, scanning, sorting,
   parsing, scaling, clamping, and infinite-duration metadata;
 - two-phase Scala 2 macro expansion using `scala.reflect.macros.blackbox`,
@@ -88,6 +91,10 @@ The smoke now also covers `scala.concurrent.duration` finite duration
 arithmetic, scan/sort paths, string parsing, scaling, clamping, and
 finite/infinite metadata. A local 2026-06-24 run with this duration slice
 completed in 300 seconds using Scala 2.13.18.
+It also covers Scala-compiled reflection-backed Java NIO calls through
+`Path.of` factories, `Files.mismatch`, `Files.isSameFile`, and cleanup through
+`Files.walk`, avoiding compile-time dependence on those Java 11/12 signatures
+when Scala sees the Java 8 boot surface.
 
 The smoke also includes a two-phase macro path: Doppio-hosted scalac first
 emits a blackbox macro implementation class, then a second Doppio-hosted scalac

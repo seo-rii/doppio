@@ -90,6 +90,7 @@ object Hello {
     val macroUse = ScalaMacroUseSmoke.exercise()
     val stackWalker = ScalaStackWalkerSmoke.exercise()
     val durations = ScalaDurationSmoke.exercise()
-    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$collections:$interop:$reflection:$scalaReflect:$functional:$language:$macroUse:$stackWalker:$durations")
+    val nio = ScalaNioSmoke.exercise()
+    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$collections:$interop:$reflection:$scalaReflect:$functional:$language:$macroUse:$stackWalker:$durations:$nio")
   }
 }

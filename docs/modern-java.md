@@ -280,6 +280,8 @@ behavior.
   `Using.resource`, `Try` recovery, `Either.cond`, and `partitionMap`,
   Java collection interop through `scala.jdk.CollectionConverters`, a small
   `Future`/`Promise`/`Await` path running on a Java executor,
+  reflection-backed Scala use of Java NIO `Path.of` factories and
+  `Files.mismatch` paths,
   `scala.concurrent.duration` arithmetic/sorting/parsing/scaling checks,
   classfile
   assertions for `InvokeDynamic`/`LambdaMetafactory` emission, representative
