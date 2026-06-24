@@ -280,6 +280,9 @@ behavior.
   `Using.resource`, `Try` recovery, `Either.cond`, and `partitionMap`,
   Java collection interop through `scala.jdk.CollectionConverters`, a small
   `Future`/`Promise`/`Await` path running on a Java executor,
+  Java concurrency interop covering `CompletableFuture` chaining and recovery,
+  `ConcurrentHashMap` compute/merge paths, atomics, `CopyOnWriteArrayList`,
+  `ThreadLocal`, `ReentrantLock`, and synchronized Java maps,
   Scala source-level `java.lang.invoke.MethodHandles` lookup/adaptation
   coverage for selected static, virtual, constructor, and combinator flows,
   runtime JAR/ZIP/classpath resource reads through `JarOutputStream`,
