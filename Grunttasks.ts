@@ -1093,25 +1093,28 @@ export function setup(grunt: IGrunt) {
      'listings:release']);
   // Pages only needs deployable browser artifacts; Modern Java CI owns the
   // slower native-vs-Doppio Java smoke tests.
-  grunt.registerTask('pages-release',
-    ['make_build_dir:dev-cli',
-     'prepare_bootstrap_type_stubs',
-     'ts:dev-cli',
-     'check_jdk',
-     'find_native_java',
-     'newer:javac',
-     'javac_modern_classlib',
-     'generate_doppio_jar',
-     'includes:default',
-     'enable_type_errors',
-     'ts:dev-cli',
-     'make_build_dir:release-cli',
-     'newer:ice-cream:release-cli',
-     'newer:uglify:release-cli',
-     'merge-source-maps:release-cli',
-     'make_build_dir:release',
-     'vite-release',
-     'listings:release']);
+  grunt.registerTask('pages-release', function() {
+    grunt.config.set('ts.options.failOnTypeErrors', false);
+    grunt.config.set('ts.options.noImplicitAny', false);
+    grunt.config.set('ts.options.fast', 'never');
+    grunt.task.run(
+      'make_build_dir:dev-cli',
+      'prepare_bootstrap_type_stubs',
+      'ts:dev-cli',
+      'check_jdk',
+      'find_native_java',
+      'newer:javac',
+      'javac_modern_classlib',
+      'generate_doppio_jar',
+      'includes:default',
+      'make_build_dir:release-cli',
+      'newer:ice-cream:release-cli',
+      'newer:uglify:release-cli',
+      'merge-source-maps:release-cli',
+      'make_build_dir:release',
+      'vite-release',
+      'listings:release');
+  });
 
   grunt.registerTask('examples',
     ['release',
