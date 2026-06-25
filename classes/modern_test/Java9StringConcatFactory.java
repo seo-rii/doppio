@@ -1,6 +1,10 @@
 package classes.modern_test;
 
 public class Java9StringConcatFactory {
+  private enum Choice {
+    ALPHA
+  }
+
   private static class ObservableValue {
     static int calls = 0;
     private final String label;
@@ -48,5 +52,12 @@ public class Java9StringConcatFactory {
     System.out.println("object=" + observable);
     System.out.println("calls=" + ObservableValue.calls);
     System.out.println("missing=" + missing);
+    System.out.println("object-direct=" + (Object) new StringBuilder("builder"));
+    System.out.println("enum-direct=" + Choice.ALPHA);
+    System.out.println("class-direct=" + Java9StringConcatFactory.class);
+    String intArrayConcat = "int-array=" + (Object) new int[] { 1, 2 };
+    String objectArrayConcat = "object-array=" + (Object) new String[] { "a", "b" };
+    System.out.println(intArrayConcat.startsWith("int-array=[I@"));
+    System.out.println(objectArrayConcat.startsWith("object-array=[Ljava.lang.String;@"));
   }
 }

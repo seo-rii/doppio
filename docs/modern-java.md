@@ -374,7 +374,9 @@ behavior.
   followed by a reference argument, boxed `Byte`, `Short`, `Integer`, `Long`,
   `Boolean`, `Character`, `Float`, and `Double` object arguments, selected
   floating-point `.0`, negative-zero, `NaN`, and infinity rendering,
-  observable user-object `toString()` dispatch, null reference conversion, and
+  observable user-object `toString()` dispatch, null reference conversion,
+  direct `StringBuilder`, enum, and `Class` reference conversion,
+  primitive/object array identity-display prefix checks, and
   `makeConcatWithConstants` static `Class`,
   `MethodType` recipe constants for an ordinary class, an interface,
   an array class, and a `(String)int` method type, plus a

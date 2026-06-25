@@ -73,7 +73,7 @@ The fixture matrix tracks the covered smoke tests and the next fixtures to add:
 | VarHandle descriptors | Covered | `ConstantDescs.CD_VarHandle`, nested `CD_VarHandleDesc`, plus VarHandle bootstrap descriptor constants | Descriptor metadata only, no execution claim | class-library shim |
 | Nominal dynamic-constant descriptors | Partial | `DynamicConstantDesc.resolveConstantDesc` for selected `ConstantBootstraps` descriptors | `nullConstant`, `primitiveClass`, `enumConstant`, `getStaticFinal`, reference `explicitCast`, selected primitive-target `explicitCast` numeric conversion, and selected descriptor-level `invoke` public-static method-handle targets resolve to native-compatible values, including tested primitive return widening; selected bad primitive name, missing enum, bad explicit-cast, and bad invoke result-cast failures use native-style `BootstrapMethodError` wrapping; selected `getStaticFinal` field lookup failures use `NoSuchFieldError` | class-library shim |
 | Dynamic constant bootstrap dispatch | Later | One unsupported `ConstantBootstraps.invoke` shape per fixture | `BootstrapMethodError` or native-equivalent success | `ConstantPool.ts` |
-| `StringConcatFactory` object conversion | Covered | User object whose `toString()` has observable output plus null reference concat | Native-compatible `String.valueOf(Object)` dispatch for the tested reference shapes | invokedynamic concat fast path |
+| `StringConcatFactory` object conversion | Covered | User object whose `toString()` has observable output, null reference concat, direct `StringBuilder`/enum/`Class` references, and primitive/object array prefix checks | Native-compatible `String.valueOf(Object)` dispatch and JVM-style array display prefixes for the tested reference shapes | invokedynamic concat fast path |
 | `ObjectMethods.bootstrap` fallback | Later | Record-like component handle that is not a plain field getter | Native-compatible failure or general helper path | record `invokedynamic` fast path |
 
 ## Access Model
@@ -185,7 +185,9 @@ handles, dynamic constants, and record object-method linkage:
   `Boolean`, `Character`, `Float`, and `Double`, including selected
   floating-point `.0`, negative-zero, `NaN`, and infinity rendering, without
   invoking arbitrary Java `toString()` code, plus one observable user object
-  `toString()` dispatch and one null reference concat.
+  `toString()` dispatch, one null reference concat, direct `StringBuilder`,
+  enum, and `Class` reference conversion, and primitive/object array
+  identity-display prefix checks.
 - Java 11 `CONSTANT_Dynamic` parsing and `ldc` resolution have a targeted fast
   path for selected `java.lang.invoke.ConstantBootstraps` methods:
   `nullConstant`, `primitiveClass`, `enumConstant`, `getStaticFinal`, and
@@ -324,4 +326,5 @@ handles, dynamic constants, and record object-method linkage:
 - `StringConcatFactory` object/reference arguments still need broader
   `String.valueOf(Object)` coverage beyond the tested boxed primitive wrappers,
   selected floating-point `.0`/negative-zero/`NaN`/infinity rendering edges,
-  observable user object, and null reference concat.
+  observable user object, null reference concat, direct `StringBuilder`, enum,
+  and `Class` references, and primitive/object array prefix shapes.
