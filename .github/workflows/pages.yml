@@ -66,12 +66,8 @@ jobs:
     name: Browser smoke
     runs-on: ubuntu-latest
     timeout-minutes: 35
-    container:
-      image: mcr.microsoft.com/playwright:v1.57.0-noble
-      options: --ipc=host
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
 
     steps:
       - name: Check out repository
@@ -93,6 +89,9 @@ jobs:
         run: |
           npm install -g yarn@1.22.22
           TRAVIS=true yarn install --frozen-lockfile --ignore-engines
+
+      - name: Install Playwright Chromium
+        run: ./node_modules/.bin/playwright install --with-deps chromium
 
       - name: Build Pages artifact
         run: ./ci/build_pages.sh
