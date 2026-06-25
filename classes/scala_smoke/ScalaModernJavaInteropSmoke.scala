@@ -1,4 +1,5 @@
 import java.time.{Clock, Duration, Instant, ZoneId}
+import java.util.stream.Stream
 
 object ScalaModernJavaInteropSmoke {
   def exercise(): String = {
@@ -36,9 +37,23 @@ object ScalaModernJavaInteropSmoke {
     val nextLong = randomGeneratorClass
       .getMethod("nextLong", java.lang.Long.TYPE)
       .invoke(randomGenerator, Long.box(1000L))
+    val streamClass = classOf[Stream[_]]
+    val streamList = Stream.of("q", "r", "s")
+      .map((value: String) => value.toUpperCase)
+    val streamToList = streamClass.getMethod("toList")
+      .invoke(streamList)
+      .asInstanceOf[java.util.List[String]]
+    val streamListFailure =
+      try {
+        streamToList.add("T")
+        "mut"
+      } catch {
+        case _: UnsupportedOperationException => "uoe"
+      }
 
     s"$formatted|$upperText|${parsed.length}:${hexClass.getMethod("formatHex", classOf[Array[Byte]]).invoke(hex, parsed)}:$digit|" +
       s"$fixedValue:$fixedMillis:$offsetValue:${classOf[Clock].isInstance(zoned)}|" +
-      s"${randomFactoryClass.getMethod("name").invoke(randomFactory)}:$nextInt:$nextLong"
+      s"${randomFactoryClass.getMethod("name").invoke(randomFactory)}:$nextInt:$nextLong|" +
+      s"${java.lang.String.join("", streamToList)}:$streamListFailure"
   }
 }

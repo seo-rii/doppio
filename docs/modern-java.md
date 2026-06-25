@@ -66,11 +66,14 @@ Java 17 compiler interop note: the Kotlin and Scala compiler smokes now also
 exercise selected Java 17 class-library overlays from generated Kotlin/Scala
 bytecode via reflection, covering `HexFormat`, `InstantSource`, and seeded
 `RandomGeneratorFactory` lookup/output while keeping their compile-time boot
-classpath compatible with the Java 8-era Doppio surface. The Java 17 fixture
-set also covers `ClassLoader.defineClass(String, ByteBuffer, ProtectionDomain)`
-for heap, direct, read-only direct, and sliced buffers without advancing buffer
-positions, which protects compiler and transformer class-loading paths that
-pass class bytes via `ByteBuffer`.
+classpath compatible with the Java 8-era Doppio surface. They also cover Java
+16 `Stream.toList()` from generated compiler output, directly from Kotlin source
+and through the same reflection-backed runtime overlay path for Scala, verifying
+the returned list is unmodifiable. The Java 17 fixture set also covers
+`ClassLoader.defineClass(String, ByteBuffer, ProtectionDomain)` for heap,
+direct, read-only direct, and sliced buffers without advancing buffer
+positions, which protects compiler and transformer class-loading paths that pass
+class bytes via `ByteBuffer`.
 
 Java 9 Unsafe note: the compatibility row above now also includes selected
 `sun.misc.Unsafe.copyMemory(Object, long, Object, long, long)` byte-array
@@ -199,6 +202,8 @@ native-memory fills, including zero-length no-ops.
   source-level use of `MappedByteBuffer`
   covering mmap `load`, full-buffer `force`, reflection-backed range `force`,
   read-only mappings, empty mappings, and range validation, plus Kotlin
+  source-level use of Java 16 `Stream.toList()` and its unmodifiable result
+  behavior, plus Kotlin
   source-level use of concurrent cache
   primitives covering `ConcurrentHashMap` compute/merge paths, atomics,
   `CopyOnWriteArrayList`, `ThreadLocal`, `ReentrantLock.withLock`,
@@ -328,7 +333,8 @@ native-memory fills, including zero-length no-ops.
   over Scala-generated member, method-local, and anonymous class shape
   metadata,
   reflection-backed Scala use of Java NIO `Path.of` factories and
-  `Files.mismatch` paths,
+  `Files.mismatch` paths, reflection-backed Scala use of Java 16
+  `Stream.toList()` and its unmodifiable result behavior,
   `scala.concurrent.duration` arithmetic/sorting/parsing/scaling checks,
   classfile
   assertions for `InvokeDynamic`/`LambdaMetafactory` emission, representative

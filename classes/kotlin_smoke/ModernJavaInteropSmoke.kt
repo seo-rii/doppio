@@ -2,6 +2,7 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
+import java.util.stream.Stream
 
 fun modernJavaInteropSummary(): String {
   val hexClass = Class.forName("java.util.HexFormat")
@@ -38,8 +39,18 @@ fun modernJavaInteropSummary(): String {
   val nextLong = randomGeneratorClass
     .getMethod("nextLong", Long::class.javaPrimitiveType)
     .invoke(randomGenerator, 1000L) as Long
+  val streamList = Stream.of("q", "r", "s")
+    .map { value -> value.uppercase() }
+    .toList()
+  val streamListFailure = try {
+    streamList.add("T")
+    "mut"
+  } catch (e: UnsupportedOperationException) {
+    "uoe"
+  }
 
   return "$formatted|$upperText|${parsed.size}:${hexClass.getMethod("formatHex", ByteArray::class.java).invoke(hex, parsed)}:$digit|" +
       "$fixedValue:$fixedMillis:$offsetValue:${Clock::class.java.isInstance(zoned)}|" +
-      "${randomFactoryClass.getMethod("name").invoke(randomFactory)}:$nextInt:$nextLong"
+      "${randomFactoryClass.getMethod("name").invoke(randomFactory)}:$nextInt:$nextLong|" +
+      "${streamList.joinToString("")}:$streamListFailure"
 }
