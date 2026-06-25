@@ -62,6 +62,12 @@ behavior covering writable, read-only, and empty mappings, plus selected Java
 read-only range no-op, empty-mapping validation order, and range validation
 behavior.
 
+Java 17 compiler interop note: the Kotlin and Scala compiler smokes now also
+exercise selected Java 17 class-library overlays from generated Kotlin/Scala
+bytecode via reflection, covering `HexFormat`, `InstantSource`, and seeded
+`RandomGeneratorFactory` lookup/output while keeping their compile-time boot
+classpath compatible with the Java 8-era Doppio surface.
+
 ## Implementation Order
 
 1. Accept and test simple Java 17-26 class-file containers that do not need new

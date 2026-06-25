@@ -142,6 +142,7 @@ test -f "$out_dir/MethodHandleOwner\$Companion.class"
 test -f "$out_dir/MethodHandleSmokeKt.class"
 test -f "$out_dir/BindingProvider.class"
 test -f "$out_dir/ModernConstructSmokeKt.class"
+test -f "$out_dir/ModernJavaInteropSmokeKt.class"
 test -f "$out_dir/MetadataLevel.class"
 test -f "$out_dir/MultiTag.class"
 test -f "$out_dir/MultiTag\$Container.class"
@@ -261,6 +262,8 @@ default_expected_output="${default_expected_output}
 A1B3G5|tk2|X1,x2,xxx3|low/high/high|IllegalArgumentException"
 default_expected_output="${default_expected_output}
 Companion,Inner,Nested|Nested/ReflectionShapeOwner/ReflectionShapeOwner/true/false/false|Inner/ReflectionShapeOwner/ReflectionShapeOwner/true/false/false|Companion/ReflectionShapeOwner/ReflectionShapeOwner/true/false/false|MethodLocal/null/ReflectionShapeOwner/methodLocalClass/false/true/false|CompanionLocal/null/Companion/companionLocalClass/false/true/false|_/null/ReflectionShapeOwner/anonymousRunnableClass/Runnable/false/false/true"
+default_expected_output="${default_expected_output}
+0f10ff|0A0B|2:cafe:15|2020-01-02T03:04:05Z:1577934245000:2020-01-02T03:04:07Z:true|Random:82:376"
 expected_output="${KOTLIN_SMOKE_EXPECTED_OUTPUT:-"$default_expected_output"}"
 
 native_output="$(java -cp "$runtime_cp" HelloKt)"

@@ -100,5 +100,6 @@ object Hello {
     val annotationMetadata = ScalaAnnotationMetadataSmoke.exercise()
     val reflectionShape = ScalaReflectionShapeSmoke.exercise()
     println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$collections:$interop:$reflection:$scalaReflect:$functional:$language:$macroUse:$stackWalker:$durations:$nio:$methodHandles:$jarZip:$serviceLoader:$resources:$proxyReflection:$concurrency:$annotationMetadata:$reflectionShape")
+    println(ScalaModernJavaInteropSmoke.exercise())
   }
 }

@@ -50,4 +50,5 @@ fun main() {
   println(completableFutureSummary())
   println(enumPolymorphismSummary())
   println(reflectionShapeSummary())
+  println(modernJavaInteropSummary())
 }
