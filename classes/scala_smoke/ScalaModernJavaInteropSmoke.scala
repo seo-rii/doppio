@@ -1,4 +1,5 @@
 import java.time.{Clock, Duration, Instant, ZoneId}
+import java.util.AbstractMap
 import java.util.stream.Stream
 
 object ScalaModernJavaInteropSmoke {
@@ -50,10 +51,24 @@ object ScalaModernJavaInteropSmoke {
       } catch {
         case _: UnsupportedOperationException => "uoe"
       }
+    val entryClass = classOf[java.util.Map.Entry[_, _]]
+    val mutableEntry = new AbstractMap.SimpleEntry[String, String]("entry", "value")
+    val entryCopy = entryClass.getMethod("copyOf", entryClass)
+      .invoke(null, mutableEntry)
+      .asInstanceOf[java.util.Map.Entry[String, String]]
+    mutableEntry.setValue("changed")
+    val entryCopyMutation =
+      try {
+        entryCopy.setValue("again")
+        "mut"
+      } catch {
+        case _: UnsupportedOperationException => "uoe"
+      }
 
     s"$formatted|$upperText|${parsed.length}:${hexClass.getMethod("formatHex", classOf[Array[Byte]]).invoke(hex, parsed)}:$digit|" +
       s"$fixedValue:$fixedMillis:$offsetValue:${classOf[Clock].isInstance(zoned)}|" +
       s"${randomFactoryClass.getMethod("name").invoke(randomFactory)}:$nextInt:$nextLong|" +
-      s"${java.lang.String.join("", streamToList)}:$streamListFailure"
+      s"${java.lang.String.join("", streamToList)}:$streamListFailure|" +
+      s"${entryCopy.getKey}:${entryCopy.getValue}:$entryCopyMutation"
   }
 }

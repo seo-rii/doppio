@@ -87,9 +87,10 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
   `Path.of(URI)`, `Files.mismatch`, `Files.isSameFile`, and path cleanup
   through `Files.walk`;
 - reflection-backed Java 17 class-library interop for `HexFormat`,
-  `InstantSource`, and `RandomGeneratorFactory`, plus reflection-backed Java 16
-  `Stream.toList()` calls, keeping the Scala 2.13 compile classpath on the
-  Java 8 boot surface while checking modern runtime overlays;
+  `InstantSource`, `RandomGeneratorFactory`, and `Map.Entry.copyOf`, plus
+  reflection-backed Java 16 `Stream.toList()` calls, keeping the Scala 2.13
+  compile classpath on the Java 8 boot surface while checking modern runtime
+  overlays;
 - `scala.concurrent.duration` finite duration arithmetic, scanning, sorting,
   parsing, scaling, clamping, and infinite-duration metadata;
 - two-phase Scala 2 macro expansion using `scala.reflect.macros.blackbox`,
@@ -151,10 +152,11 @@ through Java `Class` metadata, checking simple names, declaring/enclosing
 classes, enclosing methods, implemented interfaces, and member/local/anonymous
 flags.
 It now also runs a small reflection-backed Java 17 interop slice from
-Scala-compiled code covering `HexFormat`, `InstantSource`, and a seeded
-`RandomGeneratorFactory` provider, plus a reflection-backed Java 16
-`Stream.toList()` call with an unmodifiable-result check, then compares the same
-output on the host JVM and Doppio.
+Scala-compiled code covering `HexFormat`, `InstantSource`, a seeded
+`RandomGeneratorFactory` provider, and `Map.Entry.copyOf` snapshot behavior,
+plus a reflection-backed Java 16 `Stream.toList()` call with an
+unmodifiable-result check, then compares the same output on the host JVM and
+Doppio.
 
 The smoke also includes a two-phase macro path: Doppio-hosted scalac first
 emits a blackbox macro implementation class, then a second Doppio-hosted scalac

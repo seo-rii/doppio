@@ -2,6 +2,7 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
+import java.util.AbstractMap
 import java.util.stream.Stream
 
 fun modernJavaInteropSummary(): String {
@@ -48,9 +49,19 @@ fun modernJavaInteropSummary(): String {
   } catch (e: UnsupportedOperationException) {
     "uoe"
   }
+  val mutableEntry = AbstractMap.SimpleEntry("entry", "value")
+  val entryCopy = java.util.Map.Entry.copyOf(mutableEntry)
+  mutableEntry.setValue("changed")
+  val entryCopyMutation = try {
+    entryCopy.setValue("again")
+    "mut"
+  } catch (e: UnsupportedOperationException) {
+    "uoe"
+  }
 
   return "$formatted|$upperText|${parsed.size}:${hexClass.getMethod("formatHex", ByteArray::class.java).invoke(hex, parsed)}:$digit|" +
       "$fixedValue:$fixedMillis:$offsetValue:${Clock::class.java.isInstance(zoned)}|" +
       "${randomFactoryClass.getMethod("name").invoke(randomFactory)}:$nextInt:$nextLong|" +
-      "${streamList.joinToString("")}:$streamListFailure"
+      "${streamList.joinToString("")}:$streamListFailure|" +
+      "${entryCopy.key}:${entryCopy.value}:$entryCopyMutation"
 }
