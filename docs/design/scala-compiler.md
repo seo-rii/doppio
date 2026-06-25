@@ -202,6 +202,11 @@ reduced to a focused Java or Scala fixture.
   `methodReference` variable when falling back from the receiver object to the
   resolved declaring-class prototype. The JIT now emits a runtime constant-pool
   method reference local for that fallback, matching the interpreter behavior.
+- Compiler-adjacent bytecode loading paths can define classes from
+  `ByteBuffer` input. Doppio now implements the Java 17
+  `ClassLoader.defineClass(String, ByteBuffer, ProtectionDomain)` direct-buffer
+  native without advancing the buffer position. Coverage lives in
+  `classes/modern_test/Java17ClassLoaderDefineByteBuffer.java`.
 
 Expected blocker areas:
 

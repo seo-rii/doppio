@@ -66,7 +66,11 @@ Java 17 compiler interop note: the Kotlin and Scala compiler smokes now also
 exercise selected Java 17 class-library overlays from generated Kotlin/Scala
 bytecode via reflection, covering `HexFormat`, `InstantSource`, and seeded
 `RandomGeneratorFactory` lookup/output while keeping their compile-time boot
-classpath compatible with the Java 8-era Doppio surface.
+classpath compatible with the Java 8-era Doppio surface. The Java 17 fixture
+set also covers `ClassLoader.defineClass(String, ByteBuffer, ProtectionDomain)`
+for heap, direct, read-only direct, and sliced buffers without advancing buffer
+positions, which protects compiler and transformer class-loading paths that
+pass class bytes via `ByteBuffer`.
 
 ## Implementation Order
 

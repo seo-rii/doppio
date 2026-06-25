@@ -677,9 +677,52 @@ export default function (): any {
     }
 
     public static 'defineClass2(Ljava/lang/String;Ljava/nio/ByteBuffer;IILjava/security/ProtectionDomain;Ljava/lang/String;)Ljava/lang/Class;'(thread: JVMThread, javaThis: JVMTypes.java_lang_ClassLoader, name: JVMTypes.java_lang_String, b: JVMTypes.java_nio_ByteBuffer, off: number, len: number, pd: JVMTypes.java_security_ProtectionDomain, source: JVMTypes.java_lang_String): JVMTypes.java_lang_Class {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+      if (b === null) {
+        thread.throwNewException('Ljava/lang/NullPointerException;', '');
+        return null;
+      }
+
+      var limit = (<any> b)['java/nio/Buffer/limit'];
+      if (off < 0 || len < 0 || off > limit - len) {
+        thread.throwNewException('Ljava/lang/IndexOutOfBoundsException;', '');
+        return null;
+      }
+
+      var bytes: Buffer,
+        heapBacking = (<any> b)['java/nio/ByteBuffer/hb'];
+      if (heapBacking !== null && heapBacking !== undefined) {
+        var baseOffset = (<any> b)['java/nio/ByteBuffer/offset'] || 0;
+        bytes = util.byteArray2Buffer(heapBacking.array, baseOffset + off, len);
+      } else {
+        var address = (<any> b)['java/nio/Buffer/address'];
+        if (address === null || address === undefined) {
+          thread.throwNewException('Ljava/lang/IllegalArgumentException;', 'ByteBuffer has no accessible backing storage.');
+          return null;
+        }
+
+        var heap = thread.getJVM().getHeap(),
+          start = address.toNumber() + off,
+          byteArray: number[] = new Array(len);
+        for (var i = 0; i < len; i++) {
+          byteArray[i] = heap.get_signed_byte(start + i);
+        }
+        bytes = util.byteArray2Buffer(byteArray, 0, len);
+      }
+
+      var loader = util.getLoader(thread, javaThis),
+        type = util.int_classname(name.toString()),
+        cls = loader.defineClass(thread, type, bytes, pd);
+      if (cls == null) {
+        return null;
+      }
+      // Ensure that this class is resolved.
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      cls.resolve(thread, (status) => {
+        // NULL status means resolution failed.
+        if (status !== null) {
+          thread.asyncReturn(cls.getClassObject(thread));
+        }
+      }, true);
     }
 
     public static 'resolveClass0(Ljava/lang/Class;)V'(thread: JVMThread, javaThis: JVMTypes.java_lang_ClassLoader, cls: JVMTypes.java_lang_Class): void {

@@ -114,6 +114,12 @@ to `Hello.kt` backend codegen:
   typed-array-backed Java byte arrays with both the view `byteOffset` and the
   Java offset/length. Coverage lives in `classes/test/DefineClassOffset.java`
   and prevents padding bytes from reaching the class parser.
+- `ClassLoader.defineClass(String, ByteBuffer, ProtectionDomain)` now covers
+  ByteBuffer-backed class definitions without advancing the buffer position,
+  including direct-buffer class bytes. Coverage lives in
+  `classes/modern_test/Java17ClassLoaderDefineByteBuffer.java`, which protects
+  compiler and bytecode-transformer class-loading paths that do not hand class
+  bytes through a plain `byte[]`.
 
 ## Fixed Blocker: Kotlin Backend Visibility
 
