@@ -164,6 +164,16 @@ invalid source file and checks the nonzero exit status plus diagnostic source
 filename, line number, error kind, found/required types, source line, caret
 position, and error count.
 
+`ci/scala_record_smoke.sh` compiles a Java 17 record support class with the
+host JDK, then runs Doppio-hosted scalac on a focused Scala interop source that
+consumes the record. The generated Scala program verifies `Class.isRecord()`,
+`RecordComponent` metadata, canonical constructor invocation, component
+accessor reflection, Scala calls to record accessors, value equality, and the
+fork's modern `java.lang.Record` class-library shim. Like the Kotlin record
+smoke, it uses a tiny Java 17 helper to direct-call the Java 16 `Class`
+methods instead of depending on those runtime overlays as Scala compile-time
+APIs.
+
 This is intentionally narrower than the Kotlin smoke. The next Scala compiler
 work should expand source coverage and classpath stress after each blocker is
 reduced to a focused Java or Scala fixture.

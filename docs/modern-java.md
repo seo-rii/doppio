@@ -323,6 +323,11 @@ behavior.
   symbol lookup, case-accessor discovery, and static class lookup, plus
   two-phase Scala 2 blackbox macro expansion, plus string interpolation, then
   runs the generated `Hello` class on both the host JVM and Doppio.
+- The workflow also runs `ci/scala_record_smoke.sh`, a focused Java 17 record
+  interop smoke that compiles a record support class with the host JDK and then
+  verifies Doppio-hosted scalac output against record reflection metadata,
+  canonical constructor invocation, component accessor reflection, Scala calls
+  to record accessors, and the modern `java.lang.Record` class-library shim.
 - Current notes live in `docs/design/scala-compiler.md`.
 
 ## Current Test Targets
