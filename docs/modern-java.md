@@ -140,12 +140,7 @@ native-memory fills, including zero-length no-ops.
   object declaration, companion object, enum, collection pipeline, exception
   handling, nullable safe-call/Elvis flow, nested/inner/local classes, SAM
   conversions, an anonymous object expression, delegated local and custom
-  properties, an inline function, a no-suspension `suspend` function launched
-  through `kotlin.coroutines.startCoroutine`, and a `suspendCoroutine` resume
-  path including delayed continuation resume and resume-time exception
-  propagation, plus Java `Thread`-based and `ExecutorService`-based
-  continuation resumption, a custom `ContinuationInterceptor` event loop with
-  multiple queued suspension resumes, queued suspend control flow through
+  properties, an inline function, queued suspend control flow through
   `try`/`catch`/`finally`, `break`, and `continue`, `Closeable.use`,
   destructuring, range loops, stepped `downTo` loops, `mapIndexed`, and
   `synchronized`, plus top-level, bound, unbound, constructor, and companion
@@ -215,9 +210,13 @@ native-memory fills, including zero-length no-ops.
   synchronized maps, and one-shot thread-local isolation, plus Kotlin contracts
   covering `returns` implications, `callsInPlace` invocation-kind metadata,
   inline contract functions, and nullable smart casts, plus an isolated Kotlin
-  coroutine lowering smoke covering queued `ContinuationInterceptor` resumption
-  through nested `try`/`finally` cleanup and the main Kotlin compiler smoke
-  covering `resumeWithException` through nested `finally` unwinding, plus Kotlin
+  suspend smoke covering no-suspension `startCoroutine`, synchronous and
+  delayed `suspendCoroutine` resume, resume-time exception propagation,
+  Java `Thread` and `ExecutorService` continuation resumption, and a custom
+  `ContinuationInterceptor` event loop, plus an isolated Kotlin coroutine
+  lowering smoke covering queued `ContinuationInterceptor` resumption through
+  nested `try`/`finally` cleanup and the main Kotlin compiler smoke covering
+  `resumeWithException` through nested `finally` unwinding, plus Kotlin
   classpath resource lookup covering `Class.getResource`,
   `ClassLoader.getResource`, `ClassLoader.getResources`,
   `ClassLoader.resources`,
@@ -272,6 +271,11 @@ native-memory fills, including zero-length no-ops.
   compiler smoke split out of the main full-classpath source set so the large
   `java.lang.invoke.MethodHandles` fixture still compares host JVM and Doppio
   output while reducing main-smoke compile variance.
+- The workflow also runs `ci/kotlin_suspend_smoke.sh`, a focused Kotlin
+  compiler smoke split out of the main full-classpath source set so suspend
+  state-machine, cross-thread resume, executor resume, and queued dispatcher
+  coverage still compare host JVM and Doppio output while reducing main-smoke
+  compile variance.
 - The workflow also runs `ci/kotlin_record_smoke.sh`, a focused Kotlin
   `@JvmRecord` smoke compiled with `-jvm-target 17` to cover Kotlin-generated
   record classfiles, record reflection metadata, canonical constructors, and

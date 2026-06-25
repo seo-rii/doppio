@@ -240,45 +240,24 @@ Current verified checks:
   an inline function. A full-classpath local run completed in 222 seconds and
   both the host JVM and Doppio printed
   `OK:FALLBACK:3:9:2:1:accbbb:4:4:7`.
-- A no-suspension `suspend` function, suspend lambda, `Continuation`, and
-  `kotlin.coroutines.startCoroutine` path are now included in the repo smoke. A
-  full-classpath local run completed in 171 seconds; both the host JVM and
-  Doppio printed `suspend=7`. This covers suspend metadata and immediate
-  coroutine completion, but not a real suspension/resume state machine.
-- The smoke now includes custom delegated properties backed by
-  `kotlin.reflect.KProperty` metadata and a `suspendCoroutine` resume path. A
-  full-classpath local run completed in 258 seconds; both the host JVM and
-  Doppio printed `delegate:answer:DelegatedOwner|local:local:top` and
-  `state=14`. This covers synchronous resume through a generated coroutine
-  state machine, but not delayed/asynchronous resumption.
-- A delayed continuation resume and resume-time exception path are now included
-  in the repo smoke. A full-classpath local run completed in 123 seconds. The
-  `startCoroutine` callback remained `pending` until the saved continuation was
-  resumed, then both the host JVM and Doppio printed `pending->delayed=15` and
-  `pending->fail=resume3`. This covers delayed same-thread resumption and
-  exception propagation through the generated state machine.
-- The repo thread-resume smoke completed in 280 seconds with the full classpath,
-  and both the host JVM and Doppio printed `pending->thread=24`. This covers
-  saving a continuation on the main thread, resuming it from a Java `Thread`,
-  joining that thread, and observing the coroutine result after cross-thread
-  completion.
-- A minimal executor-resume smoke compiled in 388 seconds and both the host JVM
-  and Doppio printed `pending->executor=13`. The full smoke with the same
-  executor path is now included in the repo smoke and completed in 522 seconds
-  after the compile timeout was raised to 900 seconds. This covers
-  `Executors.newSingleThreadExecutor()`, `submit`, `Future.get()`, `shutdown`,
-  and continuation resume from an executor worker.
-- A minimal `ContinuationInterceptor` event-loop smoke compiled in 91 seconds
-  and both the host JVM and Doppio printed
-  `pending>1>pending>pending>1>pending>pending>1>dispatch=36`. The repo smoke
-  now includes the same path and completed in 412 seconds with the full
-  classpath. A custom interceptor queues the initial coroutine start plus two
-  suspended continuation resumes, and the test drains the queue between each
-  step to verify that the generated coroutine state machine preserves locals
-  across multiple dispatched suspension points. `ci/kotlin_coroutine_smoke.sh`
-  adds a smaller companion compile that checks nested `try`/`finally` cleanup
-  across the same queued suspension shape with `clean>inner>outer`; a local
-  2026-06-22 run completed in 127 seconds.
+- A no-suspension `suspend` function, suspend lambda, `Continuation`,
+  `kotlin.coroutines.startCoroutine`, synchronous and delayed
+  `suspendCoroutine` resume, resume-time exception propagation, Java
+  `Thread`-based resume, `ExecutorService`-based resume, and a custom
+  `ContinuationInterceptor` event loop are now split into
+  `classes/kotlin_suspend_smoke` and run through
+  `ci/kotlin_suspend_smoke.sh`. This preserves the same host JVM versus Doppio
+  output checks for `suspend=7`, `state=14`, `pending->delayed=15`,
+  `pending->fail=resume3`, `pending->thread=24`, `pending->executor=13`, and
+  `pending>1>pending>pending>1>pending>pending>1>dispatch=36` while reducing
+  compile variance in the main full-classpath smoke.
+- The main smoke still includes custom delegated properties backed by
+  `kotlin.reflect.KProperty` metadata. A full-classpath local run completed in
+  258 seconds; both the host JVM and Doppio printed
+  `delegate:answer:DelegatedOwner|local:local:top`.
+- `ci/kotlin_coroutine_smoke.sh` adds a smaller companion compile that checks
+  nested `try`/`finally` cleanup across the same queued suspension shape with
+  `clean>inner>outer`; a local 2026-06-22 run completed in 127 seconds.
 - A follow-up queued suspend control-flow smoke now adds a three-resume state
   machine through `try`/`catch`/`finally`, `break`, and `continue`, with both
   host JVM and Doppio printing
