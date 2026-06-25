@@ -6195,7 +6195,7 @@ export class InvokeDynamic implements IConstantPoolItem {
     return util.initString(thread.getBsCl(), result);
   }
 
-  public evaluateObjectMethods(thread: JVMThread, args: any[]): any {
+  public evaluateObjectMethods(thread: JVMThread, args: any[], cb: (e?: JVMTypes.java_lang_Throwable, rv?: any) => void): void {
     var self = args[0],
       components = this.objectMethodsComponents;
 
@@ -6206,32 +6206,89 @@ export class InvokeDynamic implements IConstantPoolItem {
           value = self[component.fieldName];
         parts.push(component.name + '=' + this.stringifyObjectMethodValue(component.descriptor, value));
       }
-      return util.initString(thread.getBsCl(), this.objectMethodsRecordName + '[' + parts.join(', ') + ']');
+      cb(null, util.initString(thread.getBsCl(), this.objectMethodsRecordName + '[' + parts.join(', ') + ']'));
+      return;
     } else if (this.objectMethodsMethodName === 'equals') {
-      var other = args[1];
+      var other = args[1],
+        j = 0,
+        compareNext: () => void;
       if (self === other) {
-        return 1;
+        cb(null, 1);
+        return;
       }
       if (other === null || other.getClass() !== self.getClass()) {
-        return 0;
+        cb(null, 0);
+        return;
       }
-      for (var j = 0; j < components.length; j++) {
-        var equalsComponent = components[j];
-        if (!this.objectMethodValuesEqual(equalsComponent.descriptor, self[equalsComponent.fieldName], other[equalsComponent.fieldName])) {
-          return 0;
+      compareNext = () => {
+        while (j < components.length) {
+          var equalsComponent = components[j],
+            descriptor = equalsComponent.descriptor,
+            left = self[equalsComponent.fieldName],
+            right = other[equalsComponent.fieldName];
+          if (descriptor.charAt(0) !== 'L' && descriptor.charAt(0) !== '[') {
+            if (!this.objectMethodValuesEqual(descriptor, left, right)) {
+              cb(null, 0);
+              return;
+            }
+            j++;
+          } else {
+            if (left === right) {
+              j++;
+              continue;
+            }
+            if (left === null || right === null) {
+              cb(null, 0);
+              return;
+            }
+            (<any> left)['equals(Ljava/lang/Object;)Z'](thread, [right], (e?: JVMTypes.java_lang_Throwable, rv?: number) => {
+              if (e) {
+                cb(e);
+              } else if (rv === 0) {
+                cb(null, 0);
+              } else {
+                j++;
+                compareNext();
+              }
+            });
+            return;
+          }
         }
-      }
-      return 1;
+        cb(null, 1);
+      };
+      compareNext();
+      return;
     } else if (this.objectMethodsMethodName === 'hashCode') {
-      var hash = 1;
-      for (var k = 0; k < components.length; k++) {
-        var hashComponent = components[k];
-        hash = ((31 * hash) + this.objectMethodValueHash(hashComponent.descriptor, self[hashComponent.fieldName])) | 0;
-      }
-      return hash;
+      var hash = 1,
+        k = 0,
+        hashNext: () => void;
+      hashNext = () => {
+        while (k < components.length) {
+          var hashComponent = components[k],
+            descriptor = hashComponent.descriptor,
+            value = self[hashComponent.fieldName];
+          if (descriptor.charAt(0) !== 'L' && descriptor.charAt(0) !== '[' || value === null) {
+            hash = ((31 * hash) + this.objectMethodValueHash(descriptor, value)) | 0;
+            k++;
+          } else {
+            (<any> value)['hashCode()I'](thread, [], (e?: JVMTypes.java_lang_Throwable, rv?: number) => {
+              if (e) {
+                cb(e);
+              } else {
+                hash = ((31 * hash) + rv) | 0;
+                k++;
+                hashNext();
+              }
+            });
+            return;
+          }
+        }
+        cb(null, hash);
+      };
+      hashNext();
+      return;
     }
     thread.throwNewException('Ljava/lang/BootstrapMethodError;', `Unsupported ObjectMethods call site: ${this.objectMethodsMethodName}`);
-    return null;
   }
 
   private stringifyConcatArg(thread: JVMThread, type: string, value: any): string {

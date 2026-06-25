@@ -244,7 +244,8 @@ handles, dynamic constants, and record object-method linkage:
   `invokedynamic` fast path for compiler-generated field component handles,
   covering generated `toString`, `equals`, and `hashCode` in the current record
   fixture, including selected `float`/`double` component parity for `NaN` and
-  signed zero.
+  signed zero plus reference-component `equals`/`hashCode` dispatch for equal
+  distinct lists, user-defined value objects, nulls, and array identity.
 - Java 17 public `MethodHandles` overlays that are absent from the Java 8
   class-library image are injected as public native methods on
   `java/lang/invoke/MethodHandles` and delegate to
@@ -321,8 +322,7 @@ handles, dynamic constants, and record object-method linkage:
   `null` cases.
 - The record `ObjectMethods.bootstrap` path currently bypasses the JDK helper
   class and only supports field-backed record components. It does not implement
-  general `ObjectMethods` linkage, arbitrary method-handle components, or
-  reflection metadata.
+  general `ObjectMethods` linkage or arbitrary method-handle components.
 - `StringConcatFactory` object/reference arguments still need broader
   `String.valueOf(Object)` coverage beyond the tested boxed primitive wrappers,
   selected floating-point `.0`/negative-zero/`NaN`/infinity rendering edges,

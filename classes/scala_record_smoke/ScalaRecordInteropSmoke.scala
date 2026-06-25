@@ -19,7 +19,7 @@ object ScalaRecordInteropSmoke {
     )
     val created = constructor.newInstance("rx", Int.box(4), Arrays.asList("z"))
       .asInstanceOf[RecordInteropBox]
-    val same = new RecordInteropBox("scala", 7, value.tags())
+    val same = new RecordInteropBox("scala", 7, Arrays.asList("a", "bb"))
     println(
       RecordInteropSupport.isRecord(cls).toString + "|" +
         cls.getSuperclass.getSimpleName + "|" +

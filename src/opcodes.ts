@@ -1711,8 +1711,16 @@ export class Opcodes {
       return;
     }
     if (callSiteSpecifier.isObjectMethodsCallSite()) {
-      opStack.push(callSiteSpecifier.evaluateObjectMethods(thread, args));
-      frame.pc += 3;
+      callSiteSpecifier.evaluateObjectMethods(thread, args, (e?: JVMTypes.java_lang_Throwable, rv?: any) => {
+        if (e) {
+          thread.throwException(e);
+        } else {
+          opStack.push(rv);
+          frame.pc += 3;
+          thread.setStatus(ThreadStatus.RUNNABLE);
+        }
+      });
+      frame.returnToThreadLoop = true;
       return;
     }
     fcn(thread, null, args);

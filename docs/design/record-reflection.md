@@ -19,7 +19,8 @@ keeping Doppio's Java 8-era `java.lang.Class` implementation in place.
 - `java.lang.Record` is synthesized as a minimal abstract base when it is
   missing from the Java 8 class library.
 - `java.lang.runtime.ObjectMethods.bootstrap` has a targeted fast path for
-  compiler-generated record `toString`, `equals`, and `hashCode`.
+  compiler-generated record `toString`, `equals`, and `hashCode`, including
+  reference-component `equals`/`hashCode` dispatch for field-backed records.
 - `Class.isRecord()` is exposed through a synthetic native bridge backed by the
   parsed `Record` attribute.
 - `Class.getRecordComponents()` is exposed through a native overlay on
