@@ -188,7 +188,8 @@ behavior.
   covering `returns` implications, `callsInPlace` invocation-kind metadata,
   inline contract functions, and nullable smart casts, plus an isolated Kotlin
   coroutine lowering smoke covering queued `ContinuationInterceptor` resumption
-  through nested `try`/`finally` cleanup, plus Kotlin
+  through nested `try`/`finally` cleanup and the main Kotlin compiler smoke
+  covering `resumeWithException` through nested `finally` unwinding, plus Kotlin
   classpath resource lookup covering `Class.getResource`,
   `ClassLoader.getResource`, `ClassLoader.getResources`,
   `ClassLoader.resources`,

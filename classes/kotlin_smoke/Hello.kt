@@ -13,6 +13,7 @@ fun main() {
   println(executorStateSummary())
   println(dispatchedStateSummary())
   println(suspendControlFlowSummary())
+  println(suspendExceptionUnwindSummary())
   println(referenceSequenceSummary())
   println(valueClassSummary())
   println(reifiedArraySummary())
