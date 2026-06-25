@@ -46,6 +46,31 @@ try {
   assert.equal(await page.locator('#document-content table').count() > 0, true);
 
   await page.goto(`${baseUrl}/playground/`, {waitUntil: 'networkidle'});
+  await page.locator('#source-editor').fill(`public class Main {
+  public static void main(String[] args) {
+    System.out.println("Edited Java source persisted");
+  }
+}
+`);
+  await page.locator('[data-language="kotlin"]').click();
+  await page.locator('#source-editor').fill(`fun main() {
+  println("Edited Kotlin source persisted")
+}
+`);
+  await page.reload({waitUntil: 'networkidle'});
+  assert.equal(await page.locator('[data-language="kotlin"]').getAttribute('aria-selected'), 'true');
+  assert.equal(await page.locator('#source-filename').textContent(), 'Main.kt');
+  assert.match(await page.locator('#source-editor').inputValue(), /Edited Kotlin source persisted/);
+  await page.locator('[data-language="java"]').click();
+  assert.match(await page.locator('#source-editor').inputValue(), /Edited Java source persisted/);
+  await page.locator('#reset-button').click();
+  await page.locator('[data-language="kotlin"]').click();
+  await page.locator('#reset-button').click();
+  assert.doesNotMatch(await page.locator('#source-editor').inputValue(), /Edited Kotlin source persisted/);
+  assert.equal(await page.locator('#playground-state').getAttribute('data-state'), 'ready');
+  await page.locator('[data-language="scala"]').click();
+  await page.locator('#reset-button').click();
+
   const languageRuns = [
     ['java', 'Doppio says: Java + Kotlin + Scala'],
     ['kotlin', 'Kotlin@2011 -> Doppio@2014'],

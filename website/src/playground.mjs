@@ -122,7 +122,8 @@ const status = document.querySelector('#playground-state');
 const elapsed = document.querySelector('#elapsed-time');
 const stdin = document.querySelector('#stdin-input');
 const stdinButton = document.querySelector('#stdin-button');
-let activeLanguage = 'java';
+const storedLanguage = localStorage.getItem('doppio-playground-active-language');
+let activeLanguage = languages[storedLanguage] ? storedLanguage : 'java';
 let fileSystem;
 let processModule;
 let activeJvm = null;
@@ -167,6 +168,7 @@ document.querySelectorAll('.language-tab').forEach((tab) => {
     }
     localStorage.setItem(`doppio-playground-${activeLanguage}`, sourceEditor.value);
     activeLanguage = tab.dataset.language;
+    localStorage.setItem('doppio-playground-active-language', activeLanguage);
     const config = languages[activeLanguage];
     document.querySelectorAll('.language-tab').forEach((candidate) => {
       candidate.setAttribute(
@@ -202,8 +204,13 @@ sourceEditor.addEventListener('keydown', (event) => {
 });
 
 resetButton.addEventListener('click', () => {
-  sourceEditor.value = languages[activeLanguage].source;
+  const config = languages[activeLanguage];
+  sourceEditor.value = config.source;
   localStorage.removeItem(`doppio-playground-${activeLanguage}`);
+  output.textContent = `Ready to compile ${config.label}.`;
+  output.classList.add('console-empty');
+  setStatus(`${config.label} source ready`, 'ready');
+  elapsed.textContent = '0.0s';
   sourceEditor.focus();
 });
 
@@ -317,4 +324,16 @@ runButton.addEventListener('click', async () => {
   }
 });
 
-sourceEditor.value = localStorage.getItem('doppio-playground-java') || languages.java.source;
+document.querySelectorAll('.language-tab').forEach((candidate) => {
+  candidate.setAttribute(
+    'aria-selected',
+    candidate.dataset.language === activeLanguage ? 'true' : 'false'
+  );
+});
+const config = languages[activeLanguage];
+sourceEditor.value =
+  localStorage.getItem(`doppio-playground-${activeLanguage}`) || config.source;
+filename.textContent = config.filename;
+output.textContent = `Ready to compile ${config.label}.`;
+output.classList.add('console-empty');
+setStatus(`${config.label} source ready`, 'ready');
