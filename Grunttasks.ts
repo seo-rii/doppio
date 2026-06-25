@@ -1115,6 +1115,21 @@ export function setup(grunt: IGrunt) {
       'vite-release',
       'listings:release');
   });
+  grunt.registerTask('bootstrap-typecheck', function() {
+    grunt.config.set('ts.options.failOnTypeErrors', false);
+    grunt.config.set('ts.options.noImplicitAny', false);
+    grunt.config.set('ts.options.fast', 'never');
+    grunt.task.run(
+      'make_build_dir:dev-cli',
+      'prepare_bootstrap_type_stubs',
+      'ts:dev-cli',
+      'check_jdk',
+      'find_native_java',
+      'newer:javac',
+      'javac_modern_classlib',
+      'generate_doppio_jar',
+      'includes:default');
+  });
 
   grunt.registerTask('examples',
     ['release',

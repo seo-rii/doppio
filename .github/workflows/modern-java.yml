@@ -40,6 +40,7 @@ jobs:
 
       - name: Check TypeScript compiler compatibility
         run: |
+          ./node_modules/.bin/grunt bootstrap-typecheck --grunt-ignore-compile-errors
           yarn typecheck
           yarn typecheck:bootstrap
           yarn typecheck:typescript-7-rc
