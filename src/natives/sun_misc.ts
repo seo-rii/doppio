@@ -369,6 +369,9 @@ export default function (): any {
         srcAddr = srcOffset.toNumber(),
         destAddr = destOffset.toNumber(),
         length = bytes.toNumber();
+      if (length === 0) {
+        return;
+      }
       if (srcBase === null && destBase === null) {
         // memcopy semantics w/ srcoffset/destoffset as absolute offsets.
         heap.memcpy(srcAddr, destAddr, length);
@@ -427,8 +430,27 @@ export default function (): any {
           thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
         }
       } else {
-        // I have no idea what the appropriate semantics are for this.
-        thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. Both src and dest are arrays?');
+        if (util.is_array_type(srcBase.getClass().getInternalName()) && util.is_array_type(destBase.getClass().getInternalName()) &&
+          util.is_primitive_type((<ArrayClassData<any>> srcBase.getClass()).getComponentClass().getInternalName()) &&
+          util.is_primitive_type((<ArrayClassData<any>> destBase.getClass()).getComponentClass().getInternalName())) {
+          const srcArray: JVMTypes.JVMArray<any> = <any> srcBase,
+            destArray: JVMTypes.JVMArray<any> = <any> destBase,
+            srcComponent = srcArray.getClass().getComponentClass().getInternalName(),
+            destComponent = destArray.getClass().getComponentClass().getInternalName();
+          if (srcComponent === 'B' && destComponent === 'B') {
+            const copy: number[] = new Array(length);
+            for (let i = 0; i < length; i++) {
+              copy[i] = srcArray.array[srcAddr + i];
+            }
+            for (let i = 0; i < length; i++) {
+              destArray.array[destAddr + i] = copy[i];
+            }
+          } else {
+            thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. array copyMemory types: ' + srcComponent + ' -> ' + destComponent);
+          }
+        } else {
+          thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. Both src and dest are arrays?');
+        }
       }
     }
 

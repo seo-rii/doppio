@@ -207,6 +207,10 @@ reduced to a focused Java or Scala fixture.
   `ClassLoader.defineClass(String, ByteBuffer, ProtectionDomain)` direct-buffer
   native without advancing the buffer position. Coverage lives in
   `classes/modern_test/Java17ClassLoaderDefineByteBuffer.java`.
+- Unsafe byte-array bulk copies now cover
+  `sun.misc.Unsafe.copyMemory(Object, long, Object, long, long)` for
+  `byte[]` to `byte[]`, including overlapping ranges. Coverage lives in
+  `classes/modern_test/Java9UnsafeCopyMemoryArrays.java`.
 
 Expected blocker areas:
 

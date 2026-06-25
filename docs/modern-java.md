@@ -72,6 +72,11 @@ for heap, direct, read-only direct, and sliced buffers without advancing buffer
 positions, which protects compiler and transformer class-loading paths that
 pass class bytes via `ByteBuffer`.
 
+Java 9 Unsafe note: the compatibility row above now also includes selected
+`sun.misc.Unsafe.copyMemory(Object, long, Object, long, long)` byte-array
+behavior for `byte[]` to `byte[]` copies, including same-array overlapping
+ranges and zero-length no-ops.
+
 ## Implementation Order
 
 1. Accept and test simple Java 17-26 class-file containers that do not need new
