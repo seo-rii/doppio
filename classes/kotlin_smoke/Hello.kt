@@ -48,4 +48,5 @@ fun main() {
   println(unsignedSummary())
   println(completableFutureSummary())
   println(enumPolymorphismSummary())
+  println(reflectionShapeSummary())
 }

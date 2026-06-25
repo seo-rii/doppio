@@ -151,6 +151,11 @@ test -f "$out_dir/MutableBinding.class"
 test -f "$out_dir/MutableDelegateOwner.class"
 test -f "$out_dir/MutableDelegateSmokeKt.class"
 test -f "$out_dir/ReferenceSequenceSmokeKt.class"
+test -f "$out_dir/ReflectionShapeOwner.class"
+test -f "$out_dir/ReflectionShapeOwner\$Companion.class"
+test -f "$out_dir/ReflectionShapeOwner\$Inner.class"
+test -f "$out_dir/ReflectionShapeOwner\$Nested.class"
+test -f "$out_dir/ReflectionShapeSmokeKt.class"
 test -f "$out_dir/ReifiedArraySmokeKt.class"
 test -f "$out_dir/ResourceLookupMarker.class"
 test -f "$out_dir/ResourceLookupSmokeKt.class"
@@ -254,6 +259,8 @@ default_expected_output="${default_expected_output}
 KT2!:5:l"
 default_expected_output="${default_expected_output}
 A1B3G5|tk2|X1,x2,xxx3|low/high/high|IllegalArgumentException"
+default_expected_output="${default_expected_output}
+Companion,Inner,Nested|Nested/ReflectionShapeOwner/ReflectionShapeOwner/true/false/false|Inner/ReflectionShapeOwner/ReflectionShapeOwner/true/false/false|Companion/ReflectionShapeOwner/ReflectionShapeOwner/true/false/false|MethodLocal/null/ReflectionShapeOwner/methodLocalClass/false/true/false|CompanionLocal/null/Companion/companionLocalClass/false/true/false|_/null/ReflectionShapeOwner/anonymousRunnableClass/Runnable/false/false/true"
 expected_output="${KOTLIN_SMOKE_EXPECTED_OUTPUT:-"$default_expected_output"}"
 
 native_output="$(java -cp "$runtime_cp" HelloKt)"

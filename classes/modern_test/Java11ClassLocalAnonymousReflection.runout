@@ -1,0 +1,3 @@
+member:Member:Java11ClassLocalAnonymousReflection:Java11ClassLocalAnonymousReflection:null:-:true:false:false
+local:MethodLocal:null:Java11ClassLocalAnonymousReflection:methodLocalClass:-:false:true:false
+anonymous:_:null:Java11ClassLocalAnonymousReflection:anonymousClass:Runnable:false:false:true

@@ -143,7 +143,9 @@ behavior.
   `provideDelegate`, `getValue`, `setValue`, and generated delegated-property
   references, plus captured local classes, anonymous object lowering,
   inner-class `this$0`, nested companion construction, and synthetic accessor
-  generation, plus interface delegation, delegated `DefaultImpls` forwarding,
+  generation, plus Java reflection over Kotlin nested, inner, companion,
+  method-local, companion-local, and anonymous class shape metadata, plus
+  interface delegation, delegated `DefaultImpls` forwarding,
   and generic bridge methods verified through Java reflection, plus extension
   receiver functions/properties, typealias metadata, use-site variance, star
   projections, generic `Signature` attributes, and inlined sorted comparator

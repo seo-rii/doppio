@@ -1,8 +1,8 @@
 import {Flags, descriptor2typestr, forwardResult, initString, reescapeJVMName, getTypes} from './util';
 import * as util from './util';
 import ByteStream from './ByteStream';
-import {IAttribute, makeAttributes, Signature, RuntimeVisibleAnnotations, Code, Exceptions} from './attributes';
-import {ConstantPool, ConstUTF8, MethodReference, InterfaceMethodReference} from './ConstantPool';
+import {IAttribute, makeAttributes, Signature, RuntimeVisibleAnnotations, Code, Exceptions, InnerClasses} from './attributes';
+import {ConstantPool, ConstUTF8, ClassReference, MethodReference, InterfaceMethodReference} from './ConstantPool';
 import {ReferenceClassData, ArrayClassData, ClassData} from './ClassData';
 import {JVMThread, annotateOpcode, BytecodeStackFrame} from './threading';
 import assert from './assert';
@@ -84,6 +84,40 @@ function kotlinCheckNotNull(thread: JVMThread, value: JVMTypes.java_lang_Object,
 }
 
 var trapped_methods: { [clsName: string]: { [methodName: string]: Function } } = {
+  'java/lang/Class': {
+    'getSimpleName()Ljava/lang/String;': function(thread: JVMThread, javaThis: JVMTypes.java_lang_Class): JVMTypes.java_lang_String {
+      var cls = javaThis.$cls,
+        arraySuffix = '',
+        simpleName: string = null;
+      while (cls instanceof ArrayClassData) {
+        arraySuffix += '[]';
+        cls = cls.getComponentClass();
+      }
+      if (cls instanceof ReferenceClassData) {
+        var myClass = cls.getInternalName(),
+          iclses = <InnerClasses[]> cls.getAttributes('InnerClasses');
+        for (let i = 0; i < iclses.length && simpleName === null; i++) {
+          let innerClassInfo = iclses[i].classes;
+          for (let j = 0; j < innerClassInfo.length; j++) {
+            let entry = innerClassInfo[j],
+              name = (<ClassReference> cls.constantPool.get(entry.innerInfoIndex)).name;
+            if (name === myClass) {
+              simpleName = entry.innerNameIndex <= 0 ? '' : (<ConstUTF8> cls.constantPool.get(entry.innerNameIndex)).value;
+              break;
+            }
+          }
+        }
+      }
+      if (simpleName === null) {
+        simpleName = cls.getExternalName();
+        var packageIndex = simpleName.lastIndexOf('.');
+        if (packageIndex >= 0) {
+          simpleName = simpleName.slice(packageIndex + 1);
+        }
+      }
+      return initString(thread.getBsCl(), simpleName + arraySuffix);
+    }
+  },
   'kotlin/jvm/internal/Intrinsics': {
     'checkNotNull(Ljava/lang/Object;)V': function(thread: JVMThread, value: JVMTypes.java_lang_Object): void {
       if (value === null) {

@@ -409,6 +409,10 @@ Current verified checks:
   `javap` verified captured local-class fields, anonymous `Runnable` object
   lowering, inner-class `this$0`, nested companion construction, and generated
   `access$mix` / `access$getSecret$p` synthetic accessors.
+- The repo smoke now also reflects Kotlin nested, inner, companion,
+  method-local, companion-local, and anonymous classes through Java `Class`
+  metadata, checking declared classes, declaring/enclosing classes, enclosing
+  methods, member/local/anonymous flags, and anonymous interface metadata.
 - A minimal delegation/bridge smoke compiled in 72 seconds and both the host JVM
   and Doppio printed
   `text:7|text:5|5x|text:6|z!|az!|apply:Object:Object,describe:String:CharSequence,describe:String:Object|apply:Object:Object,describe:String:Object|echo:Object:Object,read:Object:`.

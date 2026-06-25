@@ -383,6 +383,28 @@ export default function (): any {
       return null;
     }
 
+    public static 'getSimpleBinaryName0()Ljava/lang/String;'(thread: JVMThread, javaThis: JVMTypes.java_lang_Class): JVMTypes.java_lang_String {
+      if (javaThis.$cls instanceof ReferenceClassData) {
+        var cls = <ReferenceClassData<JVMTypes.java_lang_Object>> javaThis.$cls,
+          myClass = cls.getInternalName(),
+          iclses = <attributes.InnerClasses[]> cls.getAttributes('InnerClasses');
+        for (let i = 0; i < iclses.length; i++) {
+          let innerClassInfo = iclses[i].classes;
+          for (let j = 0; j < innerClassInfo.length; j++) {
+            let entry = innerClassInfo[j],
+              name = (<ConstantPool.ClassReference> cls.constantPool.get(entry.innerInfoIndex)).name;
+            if (name === myClass) {
+              if (entry.innerNameIndex <= 0) {
+                return null;
+              }
+              return util.initString(thread.getBsCl(), (<ConstantPool.ConstUTF8> cls.constantPool.get(entry.innerNameIndex)).value);
+            }
+          }
+        }
+      }
+      return null;
+    }
+
     public static 'getProtectionDomain0()Ljava/security/ProtectionDomain;'(thread: JVMThread, javaThis: JVMTypes.java_lang_Class): JVMTypes.java_security_ProtectionDomain {
       return javaThis.$cls.getProtectionDomain();
     }
