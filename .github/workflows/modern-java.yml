@@ -36,7 +36,7 @@ jobs:
         timeout-minutes: 15
         run: |
           npm install -g yarn@1.22.22
-          yarn install --frozen-lockfile --ignore-engines --network-timeout 600000
+          TRAVIS=true yarn install --frozen-lockfile --ignore-engines --network-timeout 600000
 
       - name: Check TypeScript compiler compatibility
         run: |
