@@ -331,19 +331,32 @@ export default function (): any {
     }
 
     public static 'setMemory(Ljava/lang/Object;JJB)V'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, address: Long, bytes: Long, value: number): void {
+      const bytesNum = bytes.toNumber();
+      if (bytesNum === 0) {
+        return;
+      }
       if (obj === null) {
         // Address is absolute.
         var i: number, addr = address.toNumber(),
-          bytesNum: number = bytes.toNumber(),
           heap = thread.getJVM().getHeap();
         for (i = 0; i < bytesNum; i++) {
           heap.set_signed_byte(addr + i, value);
         }
       } else {
-        // I have no idea what the semantics are when the object is specified.
-        // I think it means use the object as the starting address... which doesn't
-        // make sense for us.
-        thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+        if (util.is_array_type(obj.getClass().getInternalName()) && util.is_primitive_type((<ArrayClassData<any>> obj.getClass()).getComponentClass().getInternalName())) {
+          const destArray: JVMTypes.JVMArray<any> = <any> obj,
+            component = destArray.getClass().getComponentClass().getInternalName(),
+            start = address.toNumber();
+          if (component === 'B') {
+            for (let i = 0; i < bytesNum; i++) {
+              destArray.array[start + i] = value;
+            }
+          } else {
+            thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. setMemory array type: ' + component);
+          }
+        } else {
+          thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+        }
       }
     }
 

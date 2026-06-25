@@ -32,5 +32,12 @@ public class Java9UnsafeCopyMemoryArrays {
     byte[] zeroLength = new byte[] {7, 8, 9};
     unsafe.copyMemory(zeroLength, base, zeroLength, base + 1, 0);
     System.out.println(Arrays.toString(zeroLength));
+
+    byte[] filled = new byte[] {1, 2, 3, 4, 5, 6};
+    unsafe.setMemory(filled, base + 2, 3, (byte) 9);
+    System.out.println(Arrays.toString(filled));
+
+    unsafe.setMemory(filled, base + 1, 0, (byte) 7);
+    System.out.println(Arrays.toString(filled));
   }
 }

@@ -210,7 +210,8 @@ reduced to a focused Java or Scala fixture.
 - Unsafe byte-array bulk copies now cover
   `sun.misc.Unsafe.copyMemory(Object, long, Object, long, long)` for
   `byte[]` to `byte[]`, including overlapping ranges. Coverage lives in
-  `classes/modern_test/Java9UnsafeCopyMemoryArrays.java`.
+  `classes/modern_test/Java9UnsafeCopyMemoryArrays.java`, which also covers
+  `sun.misc.Unsafe.setMemory(Object, long, long, byte)` byte-array fills.
 
 Expected blocker areas:
 
