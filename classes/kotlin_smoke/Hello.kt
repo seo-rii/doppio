@@ -45,7 +45,6 @@ fun main() {
   println(serviceLoaderSummary())
   println(jarZipSummary())
   println(proxyReflectionSummary())
-  println(methodHandleSummary())
   println(unsignedSummary())
   println(completableFutureSummary())
   println(enumPolymorphismSummary())

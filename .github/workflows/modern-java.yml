@@ -75,6 +75,9 @@ jobs:
           KOTLIN_SMOKE_CLASSPATH_MODE: full
         run: ./ci/kotlin_smoke.sh
 
+      - name: Run Kotlin MethodHandles smoke
+        run: ./ci/kotlin_methodhandle_smoke.sh
+
       - name: Run Kotlin coroutine smoke
         run: ./ci/kotlin_coroutine_smoke.sh
 

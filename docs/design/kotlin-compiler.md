@@ -400,11 +400,15 @@ Current verified checks:
   invocation, runtime method and parameter annotations compiled with
   `-java-parameters`, proxy `toString`/`hashCode`/`equals` dispatch,
   `Proxy.isProxyClass`, and `Proxy.getInvocationHandler`.
-- A Kotlin source-level `java.lang.invoke.MethodHandles` smoke is now included
-  in the repo source set. A 2026-06-16 local run through
-  `ci/kotlin_smoke.sh` completed in 435 seconds with the full
-  `kotlinc/lib/*.jar` classpath; the host JVM and Doppio matched the scripted
-  expected output.
+- A Kotlin source-level `java.lang.invoke.MethodHandles` smoke is now split
+  into `classes/kotlin_methodhandle_smoke` and run through
+  `ci/kotlin_methodhandle_smoke.sh`. It was moved out of the main
+  full-classpath source set after local `ci/kotlin_smoke.sh` variance reached
+  862 seconds, close to the 900-second compile timeout. The focused smoke keeps
+  host JVM and Doppio output comparison while reducing the main smoke's largest
+  source file; the split local validation completed the focused MethodHandles
+  smoke in 147 seconds and the remaining full-classpath main smoke in 591
+  seconds.
   This covers Kotlin-compiled calls to `findStatic`, `findConstructor`,
   `findVirtual`, `findGetter`, `findSetter`, `invokeWithArguments`,
   `MethodHandle.asType`, reference casts, primitive unboxing/widening, boxed
@@ -814,7 +818,8 @@ and full-classpath modes.
 
 1. Keep the repo fixture for interface default-method specificity green.
 2. Keep `ci/kotlin_smoke.sh` green in CI while broadening the checked Kotlin
-   sources.
+   sources, and split very large or high-risk surfaces into focused smoke
+   scripts when that preserves coverage and reduces timeout variance.
 3. Keep broadening the Kotlin smoke in small increments that distinguish
    event-loop asynchronous resumption, more complex control-flow bytecode, and
    broader JVM bytecode emission.
