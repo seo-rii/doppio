@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 
-const baseUrl = process.env.DOPPIO_PAGES_URL || 'http://127.0.0.1:4173';
+const baseUrl = (process.env.DOPPIO_PAGES_URL || 'http://127.0.0.1:4173').replace(/\/+$/, '');
 const executablePath = process.env.DOPPIO_CHROMIUM_EXECUTABLE || undefined;
 const browser = await chromium.launch({
   executablePath,

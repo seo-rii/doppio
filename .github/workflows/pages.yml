@@ -20,6 +20,8 @@ jobs:
     name: Build and deploy Pages
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -64,10 +66,15 @@ jobs:
 
   browser-smoke:
     name: Browser smoke
+    needs: deploy
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    container:
+      image: mcr.microsoft.com/playwright:v1.57.0-noble
+      options: --ipc=host
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
 
     steps:
       - name: Check out repository
@@ -79,22 +86,12 @@ jobs:
           node-version: 24
           cache: yarn
 
-      - name: Set up Java 17
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 17
-
       - name: Install dependencies
         run: |
           npm install -g yarn@1.22.22
           TRAVIS=true yarn install --frozen-lockfile --ignore-engines
 
-      - name: Install Playwright Chromium
-        run: ./node_modules/.bin/playwright install --with-deps chromium
-
-      - name: Build Pages artifact
-        run: ./ci/build_pages.sh
-
       - name: Run browser playground smoke
-        run: ./ci/run_pages_browser_smoke.sh
+        env:
+          DOPPIO_PAGES_URL: ${{ needs.deploy.outputs.page_url }}
+        run: yarn site:browser-test
