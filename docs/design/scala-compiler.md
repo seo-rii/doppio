@@ -77,6 +77,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
   `InvocationHandler` dispatch, reflective proxy-method invocation, runtime
   method and parameter annotations, proxy `Object` method dispatch,
   `Proxy.isProxyClass`, and `Proxy.getInvocationHandler`;
+- runtime annotation metadata covering repeatable Java annotations applied
+  from Scala, enum/class/array-valued annotation elements, and Java reflection
+  lookup on Scala-generated classes, methods, and parameters;
 - reflection-backed Java NIO coverage for `Path.of(String, String...)`,
   `Path.of(URI)`, `Files.mismatch`, `Files.isSameFile`, and path cleanup
   through `Files.walk`;
@@ -133,6 +136,9 @@ It now also covers Java dynamic proxies from Scala-compiled code, including
 trait dispatch through `InvocationHandler`, reflective proxy-method invocation,
 runtime annotation metadata on the proxied interface method and parameter, and
 proxy `Object` method behavior.
+The smoke also applies repeatable and rich Java runtime annotations from Scala
+source and reads class, method, and parameter metadata through Java reflection,
+including enum, class, and primitive-array annotation elements.
 
 The smoke also includes a two-phase macro path: Doppio-hosted scalac first
 emits a blackbox macro implementation class, then a second Doppio-hosted scalac

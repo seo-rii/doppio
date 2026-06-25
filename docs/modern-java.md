@@ -296,6 +296,9 @@ behavior.
   `InvocationHandler`, reflective proxy-method invocation, runtime method and
   parameter annotations, proxy `Object` methods, `Proxy.isProxyClass`, and
   `Proxy.getInvocationHandler`,
+  runtime annotation metadata covering repeatable Java annotations applied from
+  Scala, enum/class/array-valued annotation elements, and Java reflection
+  lookup on Scala-generated classes, methods, and parameters,
   reflection-backed Scala use of Java NIO `Path.of` factories and
   `Files.mismatch` paths,
   `scala.concurrent.duration` arithmetic/sorting/parsing/scaling checks,
