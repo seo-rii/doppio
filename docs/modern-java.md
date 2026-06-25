@@ -65,8 +65,9 @@ behavior.
 Java 17 compiler interop note: the Kotlin and Scala compiler smokes now also
 exercise selected Java 17 class-library overlays from generated Kotlin/Scala
 bytecode via reflection, covering `HexFormat`, `InstantSource`, and seeded
-`RandomGeneratorFactory` lookup/output while keeping their compile-time boot
-classpath compatible with the Java 8-era Doppio surface. They also cover Java
+`RandomGeneratorFactory` lookup/output for `Random` and `SplittableRandom`
+providers while keeping their compile-time boot classpath compatible with the
+Java 8-era Doppio surface. They also cover Java
 16 `Stream.toList()` from generated compiler output, directly from Kotlin source
 and through the same reflection-backed runtime overlay path for Scala, verifying
 the returned list is unmodifiable. The same compiler interop slice covers Java

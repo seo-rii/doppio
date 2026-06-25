@@ -40,6 +40,17 @@ fun modernJavaInteropSummary(): String {
   val nextLong = randomGeneratorClass
     .getMethod("nextLong", Long::class.javaPrimitiveType)
     .invoke(randomGenerator, 1000L) as Long
+  val splitFactory = randomFactoryClass.getMethod("of", String::class.java).invoke(null, "SplittableRandom")
+  val splitGenerator = randomFactoryClass
+    .getMethod("create", Long::class.javaPrimitiveType)
+    .invoke(splitFactory, 123L)
+  val splitInt = randomGeneratorClass
+    .getMethod("nextInt", Int::class.javaPrimitiveType)
+    .invoke(splitGenerator, 100) as Int
+  val splitLong = randomGeneratorClass
+    .getMethod("nextLong", Long::class.javaPrimitiveType)
+    .invoke(splitGenerator, 1000L) as Long
+  val splitIsSplittable = randomFactoryClass.getMethod("isSplittable").invoke(splitFactory) as Boolean
   val streamList = Stream.of("q", "r", "s")
     .map { value -> value.uppercase() }
     .toList()
@@ -62,6 +73,7 @@ fun modernJavaInteropSummary(): String {
   return "$formatted|$upperText|${parsed.size}:${hexClass.getMethod("formatHex", ByteArray::class.java).invoke(hex, parsed)}:$digit|" +
       "$fixedValue:$fixedMillis:$offsetValue:${Clock::class.java.isInstance(zoned)}|" +
       "${randomFactoryClass.getMethod("name").invoke(randomFactory)}:$nextInt:$nextLong|" +
+      "${randomFactoryClass.getMethod("name").invoke(splitFactory)}:$splitIsSplittable:$splitInt:$splitLong|" +
       "${streamList.joinToString("")}:$streamListFailure|" +
       "${entryCopy.key}:${entryCopy.value}:$entryCopyMutation"
 }

@@ -38,6 +38,17 @@ object ScalaModernJavaInteropSmoke {
     val nextLong = randomGeneratorClass
       .getMethod("nextLong", java.lang.Long.TYPE)
       .invoke(randomGenerator, Long.box(1000L))
+    val splitFactory = randomFactoryClass.getMethod("of", classOf[String]).invoke(null, "SplittableRandom")
+    val splitGenerator = randomFactoryClass
+      .getMethod("create", java.lang.Long.TYPE)
+      .invoke(splitFactory, Long.box(123L))
+    val splitInt = randomGeneratorClass
+      .getMethod("nextInt", java.lang.Integer.TYPE)
+      .invoke(splitGenerator, Int.box(100))
+    val splitLong = randomGeneratorClass
+      .getMethod("nextLong", java.lang.Long.TYPE)
+      .invoke(splitGenerator, Long.box(1000L))
+    val splitIsSplittable = randomFactoryClass.getMethod("isSplittable").invoke(splitFactory)
     val streamClass = classOf[Stream[_]]
     val streamList = Stream.of("q", "r", "s")
       .map((value: String) => value.toUpperCase)
@@ -68,6 +79,7 @@ object ScalaModernJavaInteropSmoke {
     s"$formatted|$upperText|${parsed.length}:${hexClass.getMethod("formatHex", classOf[Array[Byte]]).invoke(hex, parsed)}:$digit|" +
       s"$fixedValue:$fixedMillis:$offsetValue:${classOf[Clock].isInstance(zoned)}|" +
       s"${randomFactoryClass.getMethod("name").invoke(randomFactory)}:$nextInt:$nextLong|" +
+      s"${randomFactoryClass.getMethod("name").invoke(splitFactory)}:$splitIsSplittable:$splitInt:$splitLong|" +
       s"${java.lang.String.join("", streamToList)}:$streamListFailure|" +
       s"${entryCopy.getKey}:${entryCopy.getValue}:$entryCopyMutation"
   }
