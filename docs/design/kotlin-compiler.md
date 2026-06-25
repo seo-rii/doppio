@@ -328,6 +328,15 @@ Current verified checks:
   `invokedynamic`, sealed interface exhaustiveness, `data object` singleton
   behavior, Kotlin 1.9 `Enum.entries`/`EnumEntries`, property-reference
   classes, and class-literal lookup.
+- A standalone `@JvmRecord` smoke now compiles with `-jvm-target 17` in
+  `ci/kotlin_record_smoke.sh`, separate from the main smoke so the broad
+  Kotlin suite can keep its default target. It verifies Kotlin-generated JVM
+  `Record` classes through `Class.isRecord()`, `RecordComponent` metadata,
+  canonical constructor invocation, component accessor reflection, Kotlin
+  property access, value equality, and `kotlin.Metadata`; the compile path uses
+  the fork's modern `java.lang.Record` class-library shim plus a tiny Java 17
+  helper that direct-calls the Java 16 `Class` methods because those runtime
+  overlays are not exposed as compile-time Kotlin APIs yet.
 - A minimal default-synthetic smoke compiled in 76 seconds and both the host
   JVM and Doppio printed
   `p-box:6!:p-wide:6?:[CORE]:cfg23ab:p-box:6!|p-named:6!|p-full:9!:p-r:3!|q-r:3!|q-r:3?`.
