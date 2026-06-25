@@ -80,6 +80,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - runtime annotation metadata covering repeatable Java annotations applied
   from Scala, enum/class/array-valued annotation elements, and Java reflection
   lookup on Scala-generated classes, methods, and parameters;
+- Java reflection over Scala-generated member, method-local, and anonymous
+  classes, including simple names, declaring/enclosing classes, enclosing
+  methods, implemented interfaces, and member/local/anonymous flags;
 - reflection-backed Java NIO coverage for `Path.of(String, String...)`,
   `Path.of(URI)`, `Files.mismatch`, `Files.isSameFile`, and path cleanup
   through `Files.walk`;
@@ -139,6 +142,10 @@ proxy `Object` method behavior.
 The smoke also applies repeatable and rich Java runtime annotations from Scala
 source and reads class, method, and parameter metadata through Java reflection,
 including enum, class, and primitive-array annotation elements.
+It also reflects Scala-generated member, method-local, and anonymous classes
+through Java `Class` metadata, checking simple names, declaring/enclosing
+classes, enclosing methods, implemented interfaces, and member/local/anonymous
+flags.
 
 The smoke also includes a two-phase macro path: Doppio-hosted scalac first
 emits a blackbox macro implementation class, then a second Doppio-hosted scalac

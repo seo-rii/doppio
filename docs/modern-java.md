@@ -300,7 +300,9 @@ behavior.
   `Proxy.getInvocationHandler`,
   runtime annotation metadata covering repeatable Java annotations applied from
   Scala, enum/class/array-valued annotation elements, and Java reflection
-  lookup on Scala-generated classes, methods, and parameters,
+  lookup on Scala-generated classes, methods, and parameters, Java reflection
+  over Scala-generated member, method-local, and anonymous class shape
+  metadata,
   reflection-backed Scala use of Java NIO `Path.of` factories and
   `Files.mismatch` paths,
   `scala.concurrent.duration` arithmetic/sorting/parsing/scaling checks,

@@ -98,6 +98,7 @@ object Hello {
     val proxyReflection = ScalaProxyReflectionSmoke.exercise()
     val concurrency = ScalaConcurrentSmoke.exercise()
     val annotationMetadata = ScalaAnnotationMetadataSmoke.exercise()
-    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$collections:$interop:$reflection:$scalaReflect:$functional:$language:$macroUse:$stackWalker:$durations:$nio:$methodHandles:$jarZip:$serviceLoader:$resources:$proxyReflection:$concurrency:$annotationMetadata")
+    val reflectionShape = ScalaReflectionShapeSmoke.exercise()
+    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$collections:$interop:$reflection:$scalaReflect:$functional:$language:$macroUse:$stackWalker:$durations:$nio:$methodHandles:$jarZip:$serviceLoader:$resources:$proxyReflection:$concurrency:$annotationMetadata:$reflectionShape")
   }
 }
