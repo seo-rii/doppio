@@ -75,9 +75,10 @@ pass class bytes via `ByteBuffer`.
 Java 9 Unsafe note: the compatibility row above now also includes selected
 `sun.misc.Unsafe.copyMemory(Object, long, Object, long, long)` byte-array
 behavior for `byte[]` to `byte[]` copies, including same-array overlapping
-ranges and zero-length no-ops, plus selected
-`sun.misc.Unsafe.setMemory(Object, long, long, byte)` behavior for `byte[]`
-fills and zero-length no-ops.
+ranges and zero-length no-ops, plus selected native-memory transfers through
+`byte[]`. It also includes selected
+`sun.misc.Unsafe.setMemory(Object, long, long, byte)` behavior for `byte[]` and
+native-memory fills, including zero-length no-ops.
 
 ## Implementation Order
 

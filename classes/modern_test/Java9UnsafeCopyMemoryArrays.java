@@ -39,5 +39,21 @@ public class Java9UnsafeCopyMemoryArrays {
 
     unsafe.setMemory(filled, base + 1, 0, (byte) 7);
     System.out.println(Arrays.toString(filled));
+
+    long address = unsafe.allocateMemory(6);
+    try {
+      unsafe.setMemory(null, address, 6, (byte) -1);
+      unsafe.copyMemory(source, base + 1, null, address + 1, 4);
+      byte[] fromNative = new byte[] {0, 0, 0, 0, 0, 0};
+      unsafe.copyMemory(null, address, fromNative, base, 6);
+      System.out.println(Arrays.toString(fromNative));
+
+      unsafe.setMemory(null, address + 2, 2, (byte) 7);
+      byte[] afterNativeSet = new byte[] {0, 0, 0, 0, 0, 0};
+      unsafe.copyMemory(null, address, afterNativeSet, base, 6);
+      System.out.println(Arrays.toString(afterNativeSet));
+    } finally {
+      unsafe.freeMemory(address);
+    }
   }
 }

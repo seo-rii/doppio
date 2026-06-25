@@ -122,8 +122,9 @@ to `Hello.kt` backend codegen:
   bytes through a plain `byte[]`.
 - `sun.misc.Unsafe.copyMemory(Object, long, Object, long, long)` now covers
   `byte[]` to `byte[]` copies, including overlapping ranges in the same array,
+  plus selected `byte[]` to native-memory and native-memory to `byte[]` copies,
   and `sun.misc.Unsafe.setMemory(Object, long, long, byte)` now covers
-  `byte[]` fills. Coverage lives in
+  `byte[]` and native-memory fills. Coverage lives in
   `classes/modern_test/Java9UnsafeCopyMemoryArrays.java` and protects compiler
   and runtime-library byte-buffer shuffling paths that bypass `System.arraycopy`
   or `Arrays.fill`.
