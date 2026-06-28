@@ -258,17 +258,20 @@ Current verified checks:
 - `ci/kotlin_coroutine_smoke.sh` adds a smaller companion compile that checks
   nested `try`/`finally` cleanup across the same queued suspension shape with
   `clean>inner>outer`; a local 2026-06-22 run completed in 127 seconds.
-- A follow-up queued suspend control-flow smoke now adds a three-resume state
-  machine through `try`/`catch`/`finally`, `break`, and `continue`, with both
-  host JVM and Doppio printing
+- A queued suspend control-flow smoke now lives in
+  `classes/kotlin_suspend_control_smoke` and runs through
+  `ci/kotlin_suspend_control_smoke.sh`. It covers a three-resume state machine
+  through `try`/`catch`/`finally`, `break`, and `continue`, with both host JVM
+  and Doppio printing
   `pending|d1:pending|r1:pending|d1:pending|r2:pending|d1:pending|r3:pending|d1:done12|loop0>wait:v0>finally0:5>loop1>wait:v1>catch:neg1>finally1:12>loop2>wait:v2>finally2:12>outer:12`.
-  A 2026-06-23 local minimal-classpath Doppio compiler run completed in 869
-  seconds.
-- The same queued suspend control-flow smoke now also resumes a suspended
-  continuation with `resumeWithException`, catches that exception inside the
-  generated state machine, and verifies nested `finally` unwinding after the
-  catch return. The expected line is
+  It also resumes a suspended continuation with `resumeWithException`, catches
+  that exception inside the generated state machine, and verifies nested
+  `finally` unwinding after the catch return. The expected line is
   `pending|d1:pending|r1:pending|d1:pending|x2:pending|d1:done12|wait:first>after-first:2>wait:second>catch:bad>inner-finally:12>outer-finally:112`.
+  The split local validation completed the focused smoke in 150 seconds and
+  the remaining full-classpath main smoke in 800 seconds, confirming coverage
+  preservation while showing that full-classpath timing variance is still a
+  tracking risk.
 - A minimal callable-reference and lazy-sequence smoke compiled in 175 seconds
   and both the host JVM and Doppio printed `a2|b7|c4|d9:20:8:7:10`. The repo
   smoke now includes the same path and completed in 234 seconds with the full

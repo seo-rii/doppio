@@ -140,10 +140,9 @@ native-memory fills, including zero-length no-ops.
   object declaration, companion object, enum, collection pipeline, exception
   handling, nullable safe-call/Elvis flow, nested/inner/local classes, SAM
   conversions, an anonymous object expression, delegated local and custom
-  properties, an inline function, queued suspend control flow through
-  `try`/`catch`/`finally`, `break`, and `continue`, `Closeable.use`,
-  destructuring, range loops, stepped `downTo` loops, `mapIndexed`, and
-  `synchronized`, plus top-level, bound, unbound, constructor, and companion
+  properties, an inline function, `Closeable.use`, destructuring, range loops,
+  stepped `downTo` loops, `mapIndexed`, and `synchronized`, plus top-level,
+  bound, unbound, constructor, and companion
   callable references used through lazy `Sequence` pipelines, plus
   `@JvmInline value class` boxing, interface dispatch, nullable handling, map
   keys, and sorting, plus reified generic type checks, `T::class.java`,
@@ -215,8 +214,9 @@ native-memory fills, including zero-length no-ops.
   Java `Thread` and `ExecutorService` continuation resumption, and a custom
   `ContinuationInterceptor` event loop, plus an isolated Kotlin coroutine
   lowering smoke covering queued `ContinuationInterceptor` resumption through
-  nested `try`/`finally` cleanup and the main Kotlin compiler smoke covering
-  `resumeWithException` through nested `finally` unwinding, plus Kotlin
+  nested `try`/`finally` cleanup, plus a focused queued suspend control-flow
+  smoke covering `try`/`catch`/`finally`, `break`, `continue`, and
+  `resumeWithException` unwinding, plus Kotlin
   classpath resource lookup covering `Class.getResource`,
   `ClassLoader.getResource`, `ClassLoader.getResources`,
   `ClassLoader.resources`,
@@ -276,6 +276,11 @@ native-memory fills, including zero-length no-ops.
   state-machine, cross-thread resume, executor resume, and queued dispatcher
   coverage still compare host JVM and Doppio output while reducing main-smoke
   compile variance.
+- The workflow also runs `ci/kotlin_suspend_control_smoke.sh`, a focused Kotlin
+  compiler smoke split out of the main full-classpath source set so queued
+  suspend control flow through `try`/`catch`/`finally`, `break`, `continue`,
+  and `resumeWithException` unwinding still compares host JVM and Doppio output
+  while reducing main-smoke compile variance.
 - The workflow also runs `ci/kotlin_record_smoke.sh`, a focused Kotlin
   `@JvmRecord` smoke compiled with `-jvm-target 17` to cover Kotlin-generated
   record classfiles, record reflection metadata, canonical constructors, and

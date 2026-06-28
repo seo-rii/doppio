@@ -5,8 +5,6 @@ fun main() {
   println(localSummary())
   println(delegateSummary())
   println(bytecodeSummary())
-  println(suspendControlFlowSummary())
-  println(suspendExceptionUnwindSummary())
   println(referenceSequenceSummary())
   println(valueClassSummary())
   println(reifiedArraySummary())
