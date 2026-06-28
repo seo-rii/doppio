@@ -524,22 +524,29 @@ Current verified checks:
   It covers Kotlin `Duration` value-class arithmetic, `runningFold`,
   sorting/comparison, nanosecond-to-microsecond conversion, duration division,
   ISO parsing, scaling, range coercion, and finite/infinite checks.
-- A minimal file I/O smoke compiled with the repo suite in 364 seconds and
-  both the host JVM and Doppio printed
+- A focused Kotlin I/O smoke now lives in `classes/kotlin_io_smoke` and runs
+  through `ci/kotlin_io_smoke.sh`, comparing the generated output on both the
+  host JVM and Doppio. The split local validation completed the focused smoke
+  in 229 seconds and the remaining full-classpath main smoke in 578 seconds.
+- The focused I/O smoke includes file I/O helpers; both runtimes print
   `0:5:a,1:4:b,2:5:g|aaa|input.txt:17,nested/out.txt:17|616c706861|txt/out/nested/out.txt|true/true`.
   `javap` verified `FilesKt.writeText`, `appendText`, `readLines`,
   `useLines`, `copyTo`, `walkTopDown`, `relativeTo`,
   `getInvariantSeparatorsPath`, `readBytes`, `CloseableKt.closeFinally`,
   `LambdaMetafactory` bootstrap methods for Kotlin lambdas, `StackMapTable`,
   and `kotlin.Metadata`.
-- A minimal NIO path smoke compiled with the repo suite in 384 seconds and
-  both the host JVM and Doppio printed
-  `0:5:d,1:7:e,2:4:z|64656c74|input.txt:false,nested:true|input.txt:19,nested/moved.txt:19|input.txt/runtime-nio/nested/moved.txt|true/true/true`.
+- The focused I/O smoke includes NIO path coverage; both runtimes print
+  `0:5:d,1:7:e,2:4:z|64656c74|-1/5/5/-1|input.txt:false,nested:true|input.txt:19,nested/moved.txt:19|input.txt/runtime-nio/nested/moved.txt|true/true/true/true/true`.
   `javap` verified `Paths.get`, `Files.exists`, `createDirectories`, `write`,
-  `readAllLines`, `readAllBytes`, `copy`, `move`, `list`, `walk`,
-  `isDirectory`, `isRegularFile`, `size`, and `isSameFile`, explicit stream
-  close paths in `finally` blocks, `LambdaMetafactory` bootstrap methods for
-  Kotlin lambdas, `StackMapTable`, and `kotlin.Metadata`.
+  `readAllLines`, `readAllBytes`, `copy`, `move`, `Files.mismatch`, `list`,
+  `walk`, `isDirectory`, `isRegularFile`, `size`, and `isSameFile`, explicit
+  stream close paths in `finally` blocks, `LambdaMetafactory` bootstrap
+  methods for Kotlin lambdas, `StackMapTable`, and `kotlin.Metadata`.
+- The focused I/O smoke includes `MappedByteBuffer` coverage; both runtimes
+  print
+  `aZcdYf:aZRSYf:ZRS:true:true:true:true:true:true:IndexOutOfBoundsException:0:true:true`.
+  This covers mmap `load`, full-buffer `force`, reflection-backed range
+  `force`, read-only mappings, empty mappings, and range validation.
 - A minimal concurrent cache smoke compiled with the repo suite in 363 seconds
   and both the host JVM and Doppio printed
   `a=123,b=12,c=89|true|true:y:Y11|abc:false:true:1|main:11/worker:3/main:11/main:11|locked:3:hold:1:true|k=1,z=12|11`.
@@ -550,8 +557,7 @@ Current verified checks:
   `ReentrantLock` lowered through `Lock.lock` / `unlock`, synchronized map
   `monitorenter` / `monitorexit`, `LambdaMetafactory`, `StackMapTable`, and
   `kotlin.Metadata`.
-- A minimal classpath resource lookup smoke compiled with the repo suite in
-  387 seconds and both the host JVM and Doppio printed
+- The focused I/O smoke includes classpath resource lookup; both runtimes print
   `ffffff|4:cafebabe|1:1:true|true:true:true`. This covers Kotlin-generated
   class and module resource discovery while avoiding environment-specific
   absolute paths in the expected output. `javap` verified
@@ -561,8 +567,8 @@ Current verified checks:
   `Class.getResource`, `URL.openStream`, `Collections.list`,
   `URL.toExternalForm`, exception-table-backed context restoration,
   `LambdaMetafactory`, `StackMapTable`, and `kotlin.Metadata`.
-- A minimal `ServiceLoader` smoke compiled with the repo suite in 392 seconds
-  and both the host JVM and Doppio printed
+- The focused I/O smoke includes `ServiceLoader` provider discovery; both
+  runtimes print
   `alpha=7,beta=11|2|alpha=7,beta=11|AlphaServiceLookupPlugin>BetaServiceLookupPlugin|true`.
   The CI script now creates a generated `META-INF/services/ServiceLookupPlugin`
   resource next to the compiled Kotlin classes, including a comment and a
@@ -572,8 +578,8 @@ Current verified checks:
   dispatch, public no-arg provider constructors, duplicate-provider collapse,
   fresh instances after `reload`, `LambdaMetafactory`, `StackMapTable`, and
   `kotlin.Metadata`.
-- A minimal jar/zip classpath smoke compiled with the repo suite in 412
-  seconds and both the host JVM and Doppio printed
+- The focused I/O smoke includes jar/zip classpath behavior; both runtimes
+  print
   `jarzip:false:META-INF/MANIFEST.MF,META-INF/services/example.Service,META-INF/versions/17/pkg/data.txt,pkg/data.txt:alpha/beta:pkg.Provider:11:6e30506e:6e30506e:true|META-INF/MANIFEST.MF=META-INF,META-INF/services/example.Service=META-INF,META-INF/versions/17/pkg/data.txt=META-INF,pkg/data.txt=alpha|jar:jar:alpha/beta:pkg.Provider:true`.
   This covers runtime jar creation and classpath-style reads while avoiding
   absolute paths in the expected output. `javap` verified `JarOutputStream`,

@@ -190,17 +190,8 @@ native-memory fills, including zero-length no-ops.
   `replaceFirst`, `split`, `trimIndent`/`lineSequence`, regex options, and
   string range replacement, plus Kotlin `Duration` stdlib value-class
   arithmetic, sorting, ISO parsing, scaling, range coercion, and
-  finite/infinite checks, plus Kotlin file I/O helpers covering
-  `writeText`, `appendText`, `readLines`, `useLines`, `copyTo`,
-  `walkTopDown`, relative path normalization, file metadata, and byte reads,
-  plus Kotlin source-level use of Java NIO `Path`/`Files` covering
-  `Paths.get`, directory creation, line and byte reads/writes, copy/move,
-  `Files.list`, `Files.walk`, metadata predicates, path normalization, and
-  same-file checks, `Path.of` factories, and `Files.mismatch`, plus Kotlin
-  source-level use of `MappedByteBuffer`
-  covering mmap `load`, full-buffer `force`, reflection-backed range `force`,
-  read-only mappings, empty mappings, and range validation, plus Kotlin
-  source-level use of Java 16 `Stream.toList()` and its unmodifiable result
+  finite/infinite checks, plus Kotlin source-level use of Java 16
+  `Stream.toList()` and its unmodifiable result
   behavior, plus Kotlin source-level use of Java 17 `Map.Entry.copyOf`
   snapshot and unmodifiable-result behavior, plus Kotlin
   source-level use of concurrent cache
@@ -216,16 +207,10 @@ native-memory fills, including zero-length no-ops.
   lowering smoke covering queued `ContinuationInterceptor` resumption through
   nested `try`/`finally` cleanup, plus a focused queued suspend control-flow
   smoke covering `try`/`catch`/`finally`, `break`, `continue`, and
-  `resumeWithException` unwinding, plus Kotlin
-  classpath resource lookup covering `Class.getResource`,
-  `ClassLoader.getResource`, `ClassLoader.getResources`,
-  `ClassLoader.resources`,
-  `ClassLoader.getSystemResource`, context classloader swap/restore, and class
-  and module resource byte reads, plus `ServiceLoader` provider discovery from
-  generated `META-INF/services` metadata, duplicate-provider collapse, reload,
-  and provider instantiation, plus runtime jar creation and classpath-style
-  reads through `JarOutputStream`, `JarFile`, `Manifest`, `ZipInputStream`,
-  `CRC32`, `URLClassLoader`, and jar URL streams, plus Java dynamic-proxy
+  `resumeWithException` unwinding, plus a focused Kotlin I/O smoke covering
+  file helpers, Java NIO `Path`/`Files`, `MappedByteBuffer`, classpath resource
+  lookup, `ServiceLoader`, and runtime jar/zip/classpath-style reads, plus
+  Java dynamic-proxy
   interop covering a Kotlin interface proxy, `InvocationHandler` dispatch,
   reflective proxy-method invocation, runtime method and parameter
   annotations, proxy `Object` method dispatch, `Proxy.isProxyClass`, and
@@ -281,6 +266,11 @@ native-memory fills, including zero-length no-ops.
   suspend control flow through `try`/`catch`/`finally`, `break`, `continue`,
   and `resumeWithException` unwinding still compares host JVM and Doppio output
   while reducing main-smoke compile variance.
+- The workflow also runs `ci/kotlin_io_smoke.sh`, a focused Kotlin compiler
+  smoke split out of the main full-classpath source set so file I/O, Java
+  NIO, mmap forcing, classpath resources, `ServiceLoader`, and jar/zip coverage
+  still compare host JVM and Doppio output while reducing main-smoke compile
+  variance.
 - The workflow also runs `ci/kotlin_record_smoke.sh`, a focused Kotlin
   `@JvmRecord` smoke compiled with `-jvm-target 17` to cover Kotlin-generated
   record classfiles, record reflection metadata, canonical constructors, and

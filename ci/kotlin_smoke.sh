@@ -119,7 +119,6 @@ test -f "$out_dir/EmptyStage.class"
 test -f "$out_dir/EnumPolymorphismSmokeKt.class"
 test -f "$out_dir/ExtensionVarianceSmokeKt.class"
 test -f "$out_dir/ExtensionVarianceSmokeKt\$starKeys\$\$inlined\$sortedBy\$1.class"
-test -f "$out_dir/FileIoSmokeKt.class"
 test -f "$out_dir/GenericCell.class"
 test -f "$out_dir/InlineControlSmokeKt.class"
 test -f "$out_dir/InlineControlSmokeKt\$crossCompute\$runner\$1.class"
@@ -132,7 +131,6 @@ test -f "$out_dir/InitializationDelegateOwner\$special\$\$inlined\$vetoable\$1.c
 test -f "$out_dir/InitializationDelegateSmokeKt.class"
 test -f "$out_dir/InitializationRecorder.class"
 test -f "$out_dir/InteropKt.class"
-test -f "$out_dir/JarZipSmokeKt.class"
 test -f "$out_dir/JvmInteropOwner.class"
 test -f "$out_dir/JvmInteropOwner\$Companion.class"
 test -f "$out_dir/JvmInteropSingleton.class"
@@ -143,8 +141,6 @@ test -f "$out_dir/ModernJavaInteropSmokeKt.class"
 test -f "$out_dir/MetadataLevel.class"
 test -f "$out_dir/MultiTag.class"
 test -f "$out_dir/MultiTag\$Container.class"
-test -f "$out_dir/NioPathSmokeKt.class"
-test -f "$out_dir/MappedBufferSmokeKt.class"
 test -f "$out_dir/MutableBinding.class"
 test -f "$out_dir/MutableDelegateOwner.class"
 test -f "$out_dir/MutableDelegateSmokeKt.class"
@@ -155,8 +151,6 @@ test -f "$out_dir/ReflectionShapeOwner\$Inner.class"
 test -f "$out_dir/ReflectionShapeOwner\$Nested.class"
 test -f "$out_dir/ReflectionShapeSmokeKt.class"
 test -f "$out_dir/ReifiedArraySmokeKt.class"
-test -f "$out_dir/ResourceLookupMarker.class"
-test -f "$out_dir/ResourceLookupSmokeKt.class"
 test -f "$out_dir/ResultExceptionSmokeKt.class"
 test -f "$out_dir/ResultSmokeException.class"
 test -f "$out_dir/RoutedStage.class"
@@ -164,14 +158,10 @@ test -f "$out_dir/RoutedStage\$ALPHA.class"
 test -f "$out_dir/RoutedStage\$BETA.class"
 test -f "$out_dir/RoutedStage\$GAMMA.class"
 test -f "$out_dir/RuntimeSmokeTag.class"
-test -f "$out_dir/AlphaServiceLookupPlugin.class"
-test -f "$out_dir/BetaServiceLookupPlugin.class"
 test -f "$out_dir/ProxyReflectionService.class"
 test -f "$out_dir/ProxyReflectionSmokeKt.class"
 test -f "$out_dir/ProxyReflectionTag.class"
 test -f "$out_dir/RichTag.class"
-test -f "$out_dir/ServiceLoaderSmokeKt.class"
-test -f "$out_dir/ServiceLookupPlugin.class"
 test -f "$out_dir/SequenceBuilderSmokeKt.class"
 test -f "$out_dir/SequenceBuilderSmokeKt\$sequenceBuilderSummary\$iteratorValues\$1.class"
 test -f "$out_dir/SequenceBuilderSmokeKt\$sequenceBuilderSummary\$seq\$1.class"
@@ -207,14 +197,6 @@ test -f "$out_dir/WhenMappingSmokeKt.class"
 test -f "$out_dir/WhenMappingSmokeKt\$WhenMappings.class"
 test -f "$out_dir/META-INF/main.kotlin_module"
 
-mkdir -p "$out_dir/META-INF/services"
-cat > "$out_dir/META-INF/services/ServiceLookupPlugin" <<'SERVICE_LOOKUP_PROVIDERS'
-# Kotlin smoke service providers
-AlphaServiceLookupPlugin
-AlphaServiceLookupPlugin
-BetaServiceLookupPlugin
-SERVICE_LOOKUP_PROVIDERS
-
 runtime_cp="$out_dir"
 runtime_cp="$runtime_cp:$stdlib_jar"
 default_expected_output="$(printf 'hi\nname=2,4:5\nmode-FAST:3:2,3:caught\nOK:FALLBACK:3:9:2:1:accbbb:4:4:7\ndelegate:answer:DelegatedOwner|local:local:top\ntry>catch>finally:boom:8:true:x3:10:12:4:sync\na2|b7|c4|d9:20:8:7:10\nv1,v4,v7:22:box4:v7:none|v11:a\nString:3:a|bb|ccc:Number:2:1|2:i[3,1,4,9,1,5]=23:zamm|zbbmm:1-4-9:2345:String:int\nclass:field:getter:ctor,_:method:arg:kt3\nABG:1:15:kt5:StagePayload:EmptyStage:true\np-box:6!:p-wide:6?:[CORE]:cfg23ab:p-box:6!|p-named:6!|p-full:9!:p-r:3!|q-r:3!|q-r:3?\n1357:nilpe:14:10,30,-1,40:neg|zero|small|big\nenter>body>exit:ok:c10:34:stop3\nkt:java:ok7:IllegalArgumentException:fieldconst:top-3:o5obj:5:11111111\nbind:primary:MutableDelegateOwner:primary:0|bind:primary:MutableDelegateOwner:primary:30|alt:secondary:MutableDelegateOwner:secondary:30|local:local:top:local:0|local:local:top:local:10\n234:yx:true:11:45|89:yx:true:8:5\ntext:7|text:5|5x|text:6|z!|az!|apply:Object:Object,describe:String:CharSequence,describe:String:Object|apply:Object:Object,describe:String:Object|echo:Object:Object,read:Object:\nclass-a,class-b|class:HIGH:AnnotationMetadataOwner:1,2,3|ctor-a,ctor-b|ctor:LOW:String:4,5|field-a,field-b|field:LOW:int:6|method-a,method-b|method:LOW:long:7,8|arg-a,arg-b|arg:LOW:double:9|kt3\n5/1/5:1|5|3|p0:b:1,p1:aa:2|kt:2|ktxy|1,2|kt:2|xy:2|n:Integer,s:String,z:null\ns|[a]|kn|<GO>|x1|(xy)|{q}|ad|text\n16|1:2:2,1:4:4,2:1:2,2:2:4,2:3:6,2:4:8,3:2:6#6|p357|q46|ok1:neg1:For input string: "x":ok7|2:ccc\nfalse/true|KT:5:1|KT:5:1|kt|2/9/6|companion>observed:start->kt>guarded:2?1>guarded:2?9>lazy>nested\n24678|k0=4,k1=16,k2=36,k3=49,k4=64|e=20,o=7|12,21,8|24|67|8|678/24|2:4;4:6;6:7|abc|22,44,66,77,88|1:3:7:13:20:28|71|2,1,0,9\n1:2|start>after1|0=3,1=8,2=10|start>after1>start>after1>afterAll>done|abcd|789/IllegalStateException|3,6,12,24|xyyzzz:23')"
@@ -225,21 +207,9 @@ default_expected_output="${default_expected_output}
 default_expected_output="${default_expected_output}
 3250|0,500,1500,1250|-1000,0,1500,3000|1|2.0|1250|2250|3|true:true:true"
 default_expected_output="${default_expected_output}
-0:5:a,1:4:b,2:5:g|aaa|input.txt:17,nested/out.txt:17|616c706861|txt/out/nested/out.txt|true/true"
-default_expected_output="${default_expected_output}
-0:5:d,1:7:e,2:4:z|64656c74|-1/5/5/-1|input.txt:false,nested:true|input.txt:19,nested/moved.txt:19|input.txt/runtime-nio/nested/moved.txt|true/true/true/true/true"
-default_expected_output="${default_expected_output}
-aZcdYf:aZRSYf:ZRS:true:true:true:true:true:true:IndexOutOfBoundsException:0:true:true"
-default_expected_output="${default_expected_output}
 a=123,b=12,c=89|true|true:y:Y11|abc:false:true:1|main:11/worker:3/main:11/main:11|locked:3:hold:1:true|k=1,z=12|11"
 default_expected_output="${default_expected_output}
 KT2|missing|before>body7>after|7|1002"
-default_expected_output="${default_expected_output}
-ffffff|4:cafebabe|1:1:true|true:true:true"
-default_expected_output="${default_expected_output}
-alpha=7,beta=11|2|alpha=7,beta=11|AlphaServiceLookupPlugin>BetaServiceLookupPlugin|true"
-default_expected_output="${default_expected_output}
-jarzip:false:META-INF/MANIFEST.MF,META-INF/services/example.Service,META-INF/versions/17/pkg/data.txt,pkg/data.txt:alpha/beta:pkg.Provider:11:6e30506e:6e30506e:true|META-INF/MANIFEST.MF=META-INF,META-INF/services/example.Service=META-INF,META-INF/versions/17/pkg/data.txt=META-INF,pkg/data.txt=alpha|jar:jar:alpha/beta:pkg.Provider:true"
 default_expected_output="${default_expected_output}
 iface/transform/value|dyn|KT5|XY3|cba|null|ProxyReflectionService(dyn)|321|true|true|true|transform:2,getLabel:0,transform:2,maybe:1,maybe:1,toString:0,hashCode:0,equals:1"
 default_expected_output="${default_expected_output}
