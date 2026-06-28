@@ -62,10 +62,11 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - Java concurrency interop covering `CompletableFuture` chaining and recovery,
   `ConcurrentHashMap` compute/merge paths, atomics, `CopyOnWriteArrayList`,
   `ThreadLocal`, `ReentrantLock`, and synchronized Java maps;
-- source-level `java.lang.invoke.MethodHandles` coverage for selected static,
-  virtual, and constructor lookup, `MethodHandle.asType`, `invokeWithArguments`,
-  and basic combinators including `bindTo`, `insertArguments`, `dropArguments`,
-  `filterReturnValue`, and `guardWithTest`;
+- a focused source-level `java.lang.invoke.MethodHandles` smoke for selected
+  static, virtual, and constructor lookup, `MethodHandle.asType`,
+  `invokeWithArguments`, and basic combinators including `bindTo`,
+  `insertArguments`, `dropArguments`, `filterReturnValue`, and
+  `guardWithTest`;
 - runtime JAR/ZIP/classpath resource coverage through `JarOutputStream`,
   `JarFile`, `ZipInputStream`, and `URLClassLoader` resource reads;
 - `ServiceLoader` discovery from generated `META-INF/services` metadata,
@@ -127,9 +128,14 @@ It also covers Scala-compiled reflection-backed Java NIO calls through
 `Path.of` factories, `Files.mismatch`, `Files.isSameFile`, and cleanup through
 `Files.walk`, avoiding compile-time dependence on those Java 11/12 signatures
 when Scala sees the Java 8 boot surface.
-It now includes a direct Scala source-level `java.lang.invoke.MethodHandles`
-smoke for selected static, virtual, constructor, adaptation, and basic
-combinator flows that Kotlin already stresses more broadly.
+The direct Scala source-level `java.lang.invoke.MethodHandles` smoke now lives
+in `classes/scala_methodhandle_smoke` and runs through
+`ci/scala_methodhandle_smoke.sh`. It covers selected static, virtual,
+constructor, adaptation, and basic combinator flows that Kotlin already
+stresses more broadly while keeping the main Scala compiler smoke output
+smaller and easier to isolate. The split local validation completed the
+focused MethodHandles smoke in 77 seconds and the remaining main Scala compiler
+smoke in 454 seconds using Scala 2.13.18.
 It also includes a Scala runtime JAR/ZIP smoke that writes a manifest-bearing
 JAR, reads entries and manifest metadata through `JarFile`, scans the same
 archive through `ZipInputStream`, and verifies classpath-style resource lookup

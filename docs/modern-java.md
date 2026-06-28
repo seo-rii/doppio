@@ -323,8 +323,9 @@ native-memory fills, including zero-length no-ops.
   Java concurrency interop covering `CompletableFuture` chaining and recovery,
   `ConcurrentHashMap` compute/merge paths, atomics, `CopyOnWriteArrayList`,
   `ThreadLocal`, `ReentrantLock`, and synchronized Java maps,
-  Scala source-level `java.lang.invoke.MethodHandles` lookup/adaptation
-  coverage for selected static, virtual, constructor, and combinator flows,
+  a focused Scala source-level `java.lang.invoke.MethodHandles`
+  lookup/adaptation smoke for selected static, virtual, constructor, and
+  combinator flows,
   runtime JAR/ZIP/classpath resource reads through `JarOutputStream`,
   `JarFile`, `ZipInputStream`, and `URLClassLoader`,
   `ServiceLoader` provider discovery from generated `META-INF/services`
