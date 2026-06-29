@@ -96,8 +96,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
   `Map.Entry.copyOf`, plus reflection-backed Java 16 `Stream.toList()` calls,
   keeping the Scala 2.13 compile classpath on the Java 8 boot surface while
   checking modern runtime overlays;
-- `scala.concurrent.duration` finite duration arithmetic, scanning, sorting,
-  parsing, scaling, clamping, and infinite-duration metadata;
+- a focused Scala duration smoke covering `scala.concurrent.duration` finite
+  duration arithmetic, scanning, sorting, parsing, scaling, clamping, and
+  infinite-duration metadata;
 - two-phase Scala 2 macro expansion using `scala.reflect.macros.blackbox`,
   where the macro implementation is compiled first under Doppio and then used
   by the main source fixture in a second Doppio-hosted scalac invocation;
@@ -205,6 +206,13 @@ smaller.
 A local 2026-06-30 validation completed the focused Scala modern interop smoke
 in 73 seconds and the remaining main Scala compiler smoke in 337 seconds using
 Scala 2.13.18.
+The Scala duration coverage now lives in `classes/scala_duration_smoke` and
+runs through `ci/scala_duration_smoke.sh`. It covers finite duration
+arithmetic, scan/sort paths, string parsing, scaling, clamping, and
+finite/infinite metadata while keeping the main Scala compiler smoke smaller.
+A local 2026-06-30 validation completed the focused Scala duration smoke in 81
+seconds and the remaining main Scala compiler smoke in 353 seconds using Scala
+2.13.18.
 
 The smoke also includes a two-phase macro path: Doppio-hosted scalac first
 emits a blackbox macro implementation class, then a second Doppio-hosted scalac

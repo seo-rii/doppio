@@ -100,7 +100,6 @@ test -f "$out_dir/Metric.class"
 test -f "$out_dir/ScalaCollectionSmoke.class"
 test -f "$out_dir/ScalaFunctionalSmoke.class"
 test -f "$out_dir/ScalaInteropSmoke.class"
-test -f "$out_dir/ScalaDurationSmoke.class"
 test -f "$out_dir/ScalaLanguageSmoke.class"
 test -f "$out_dir/ScalaLibrarySmoke.class"
 test -f "$out_dir/ScalaMacroUseSmoke.class"
@@ -138,6 +137,10 @@ if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
 fi
 if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
   expected_output="${expected_output/:-1\/5\/5\/-1:true:true:10:nested\/left.txt/}"
+fi
+if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
+  scala_duration_expected_output=":3250|0,500,1500,1250|-1000,0,1500,3000|1|2.0|1250|2250|3|true:false:true"
+  expected_output="${expected_output/$scala_duration_expected_output/}"
 fi
 if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
   scala_proxy_expected_output=":iface:transform:value:dyn:SC5:XY3:cba:null:ScalaProxyService(dyn):654:true:true:true:transform:2,label:0,transform:2,maybe:1,maybe:1,toString:0,hashCode:0,equals:1"

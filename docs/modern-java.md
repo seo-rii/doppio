@@ -350,7 +350,8 @@ native-memory fills, including zero-length no-ops.
   covering reflection-backed Scala use of Java 16 `Stream.toList()` and its
   unmodifiable result behavior plus reflection-backed Scala use of Java 17
   `Map.Entry.copyOf` snapshot and unmodifiable-result behavior,
-  `scala.concurrent.duration` arithmetic/sorting/parsing/scaling checks,
+  a focused Scala duration smoke covering `scala.concurrent.duration`
+  arithmetic/sorting/parsing/scaling checks,
   classfile
   assertions for `InvokeDynamic`/`LambdaMetafactory` emission, representative
   generic `Signature` metadata, path-dependent types, higher-kinded implicit

@@ -129,5 +129,8 @@ jobs:
       - name: Run Scala modern interop smoke
         run: ./ci/scala_modern_interop_smoke.sh
 
+      - name: Run Scala duration smoke
+        run: ./ci/scala_duration_smoke.sh
+
       - name: Run Scala compiler smoke
         run: ./ci/scala_smoke.sh
