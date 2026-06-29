@@ -91,6 +91,5 @@ object Hello {
     val stackWalker = ScalaStackWalkerSmoke.exercise()
     val durations = ScalaDurationSmoke.exercise()
     println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$collections:$interop:$reflection:$scalaReflect:$functional:$language:$macroUse:$stackWalker:$durations")
-    println(ScalaModernJavaInteropSmoke.exercise())
   }
 }

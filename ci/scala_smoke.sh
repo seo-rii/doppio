@@ -104,7 +104,6 @@ test -f "$out_dir/ScalaDurationSmoke.class"
 test -f "$out_dir/ScalaLanguageSmoke.class"
 test -f "$out_dir/ScalaLibrarySmoke.class"
 test -f "$out_dir/ScalaMacroUseSmoke.class"
-test -f "$out_dir/ScalaModernJavaInteropSmoke.class"
 test -f "$out_dir/ScalaReflectSmoke.class"
 test -f "$out_dir/ScalaReflectSmoke\$ReflectBox.class"
 test -f "$out_dir/ScalaStackWalkerSmoke.class"
@@ -160,11 +159,6 @@ if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
   scala_io_expected_output=":jarzip:false:META-INF/MANIFEST.MF,META-INF/services/example.Service,META-INF/versions/17/pkg/data.txt,pkg/data.txt:scala/jar:scala.Provider:10:true:true|META-INF/MANIFEST.MF=META-INF,META-INF/services/example.Service=META-INF,META-INF/versions/17/pkg/data.txt=META-INF,pkg/data.txt=scala|jar:jar:scala/jar:scala.Provider:true:svc:alpha=7,beta=11:2:alpha=7,beta=11:AlphaScalaServiceLookupPlugin>BetaScalaServiceLookupPlugin:true:res:scala-resource/lookup:scala-root:out>macro:out>macro:2/2:true:true:true:true:true:true"
   expected_output="${expected_output/$scala_io_expected_output/}"
 fi
-if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
-  expected_output="${expected_output}
-0f10ff|0A0B|2:cafe:15|2020-01-02T03:04:05Z:1577934245000:2020-01-02T03:04:07Z:true|Random:82:376|SplittableRandom:true:88:574|QRS:uoe|entry:value:uoe"
-fi
-
 native_output="$(java -cp "$runtime_cp" Hello)"
 if [ "$native_output" != "$expected_output" ]; then
   echo "Unexpected native JVM output: $native_output" >&2

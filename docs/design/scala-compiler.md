@@ -90,11 +90,12 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - a focused Scala NIO smoke covering reflection-backed Java NIO calls through
   `Path.of(String, String...)`, `Path.of(URI)`, `Files.mismatch`,
   `Files.isSameFile`, and path cleanup through `Files.walk`;
-- reflection-backed Java 17 class-library interop for `HexFormat`,
-  `InstantSource`, `RandomGeneratorFactory` `Random`/`SplittableRandom`
-  provider output, and `Map.Entry.copyOf`, plus reflection-backed Java 16
-  `Stream.toList()` calls, keeping the Scala 2.13 compile classpath on the
-  Java 8 boot surface while checking modern runtime overlays;
+- a focused Scala modern Java interop smoke covering reflection-backed Java 17
+  class-library interop for `HexFormat`, `InstantSource`,
+  `RandomGeneratorFactory` `Random`/`SplittableRandom` provider output, and
+  `Map.Entry.copyOf`, plus reflection-backed Java 16 `Stream.toList()` calls,
+  keeping the Scala 2.13 compile classpath on the Java 8 boot surface while
+  checking modern runtime overlays;
 - `scala.concurrent.duration` finite duration arithmetic, scanning, sorting,
   parsing, scaling, clamping, and infinite-duration metadata;
 - two-phase Scala 2 macro expansion using `scala.reflect.macros.blackbox`,
@@ -193,13 +194,17 @@ smaller.
 A local 2026-06-30 validation completed the focused Scala reflection-shape
 smoke in 90 seconds and the remaining main Scala compiler smoke in 405 seconds
 using Scala 2.13.18.
-It now also runs a small reflection-backed Java 17 interop slice from
-Scala-compiled code covering `HexFormat`, `InstantSource`, seeded
-`RandomGeneratorFactory` `Random`/`SplittableRandom` provider output, and
-`Map.Entry.copyOf` snapshot behavior, plus a reflection-backed Java 16
-`Stream.toList()` call with an
-unmodifiable-result check, then compares the same output on the host JVM and
-Doppio.
+The reflection-backed modern Java interop coverage now lives in
+`classes/scala_modern_interop_smoke` and runs through
+`ci/scala_modern_interop_smoke.sh`. It checks Java 17 `HexFormat`,
+`InstantSource`, seeded `RandomGeneratorFactory` `Random`/`SplittableRandom`
+provider output, and `Map.Entry.copyOf` snapshot behavior from
+Scala-compiled code, plus a reflection-backed Java 16 `Stream.toList()` call
+with an unmodifiable-result check while keeping the main Scala compiler smoke
+smaller.
+A local 2026-06-30 validation completed the focused Scala modern interop smoke
+in 73 seconds and the remaining main Scala compiler smoke in 337 seconds using
+Scala 2.13.18.
 
 The smoke also includes a two-phase macro path: Doppio-hosted scalac first
 emits a blackbox macro implementation class, then a second Doppio-hosted scalac

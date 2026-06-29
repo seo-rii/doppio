@@ -62,18 +62,18 @@ behavior covering writable, read-only, and empty mappings, plus selected Java
 read-only range no-op, empty-mapping validation order, and range validation
 behavior.
 
-Java 17 compiler interop note: the Kotlin and Scala compiler smokes now also
-exercise selected Java 17 class-library overlays from generated Kotlin/Scala
-bytecode via reflection, covering `HexFormat`, `InstantSource`, and seeded
-`RandomGeneratorFactory` lookup/output for `Random` and `SplittableRandom`
-providers while keeping their compile-time boot classpath compatible with the
-Java 8-era Doppio surface. They also cover Java
-16 `Stream.toList()` from generated compiler output, directly from Kotlin source
-and through the same reflection-backed runtime overlay path for Scala, verifying
-the returned list is unmodifiable. The same compiler interop slice covers Java
-17 `Map.Entry.copyOf` snapshot and unmodifiable-result behavior, directly from
-Kotlin source and through reflection from Scala. The Java 17 fixture set also
-covers
+Java 17 compiler interop note: the Kotlin compiler smoke and focused Scala
+modern interop smoke now also exercise selected Java 17 class-library overlays
+from generated Kotlin/Scala bytecode via reflection, covering `HexFormat`,
+`InstantSource`, and seeded `RandomGeneratorFactory` lookup/output for
+`Random` and `SplittableRandom` providers while keeping their compile-time boot
+classpath compatible with the Java 8-era Doppio surface. They also cover Java
+16 `Stream.toList()` from generated compiler output, directly from Kotlin
+source and through the same reflection-backed runtime overlay path for Scala,
+verifying the returned list is unmodifiable. The same compiler interop slice
+covers Java 17 `Map.Entry.copyOf` snapshot and unmodifiable-result behavior,
+directly from Kotlin source and through reflection from Scala. The Java 17
+fixture set also covers
 `ClassLoader.defineClass(String, ByteBuffer, ProtectionDomain)` for heap,
 direct, read-only direct, and sliced buffers without advancing buffer
 positions, which protects compiler and transformer class-loading paths that pass
@@ -346,10 +346,10 @@ native-memory fills, including zero-length no-ops.
   class shape metadata,
   a focused Scala NIO smoke covering reflection-backed Scala use of Java NIO
   `Path.of` factories, `Files.mismatch`, `Files.isSameFile`, and
-  `Files.walk` cleanup paths, reflection-backed Scala use of Java 16
-  `Stream.toList()` and its unmodifiable result behavior, reflection-backed
-  Scala use of Java 17 `Map.Entry.copyOf` snapshot and unmodifiable-result
-  behavior,
+  `Files.walk` cleanup paths, a focused Scala modern Java interop smoke
+  covering reflection-backed Scala use of Java 16 `Stream.toList()` and its
+  unmodifiable result behavior plus reflection-backed Scala use of Java 17
+  `Map.Entry.copyOf` snapshot and unmodifiable-result behavior,
   `scala.concurrent.duration` arithmetic/sorting/parsing/scaling checks,
   classfile
   assertions for `InvokeDynamic`/`LambdaMetafactory` emission, representative
