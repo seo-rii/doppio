@@ -79,9 +79,10 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
   Scala trait proxy, `InvocationHandler` dispatch, reflective proxy-method
   invocation, runtime method and parameter annotations, proxy `Object` method
   dispatch, `Proxy.isProxyClass`, and `Proxy.getInvocationHandler`;
-- runtime annotation metadata covering repeatable Java annotations applied
-  from Scala, enum/class/array-valued annotation elements, and Java reflection
-  lookup on Scala-generated classes, methods, and parameters;
+- a focused Scala annotation smoke covering runtime annotation metadata for
+  repeatable Java annotations applied from Scala, enum/class/array-valued
+  annotation elements, and Java reflection lookup on Scala-generated classes,
+  methods, and parameters;
 - Java reflection over Scala-generated member, method-local, and anonymous
   classes, including simple names, declaring/enclosing classes, enclosing
   methods, implemented interfaces, and member/local/anonymous flags;
@@ -172,9 +173,15 @@ smaller.
 A local 2026-06-29 validation completed the focused Scala proxy smoke in 79
 seconds and the remaining main Scala compiler smoke in 422 seconds using Scala
 2.13.18.
-The smoke also applies repeatable and rich Java runtime annotations from Scala
-source and reads class, method, and parameter metadata through Java reflection,
-including enum, class, and primitive-array annotation elements.
+The runtime annotation metadata coverage now lives in
+`classes/scala_annotation_smoke` and runs through
+`ci/scala_annotation_smoke.sh`. It applies repeatable and rich Java runtime
+annotations from Scala source and reads class, method, and parameter metadata
+through Java reflection, including enum, class, and primitive-array annotation
+elements while keeping the main Scala compiler smoke smaller.
+A local 2026-06-30 validation completed the focused Scala annotation smoke in
+395 seconds and the remaining main Scala compiler smoke in 484 seconds using
+Scala 2.13.18.
 It also reflects Scala-generated member, method-local, and anonymous classes
 through Java `Class` metadata, checking simple names, declaring/enclosing
 classes, enclosing methods, implemented interfaces, and member/local/anonymous

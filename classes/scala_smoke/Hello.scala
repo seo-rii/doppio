@@ -90,9 +90,8 @@ object Hello {
     val macroUse = ScalaMacroUseSmoke.exercise()
     val stackWalker = ScalaStackWalkerSmoke.exercise()
     val durations = ScalaDurationSmoke.exercise()
-    val annotationMetadata = ScalaAnnotationMetadataSmoke.exercise()
     val reflectionShape = ScalaReflectionShapeSmoke.exercise()
-    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$collections:$interop:$reflection:$scalaReflect:$functional:$language:$macroUse:$stackWalker:$durations:$annotationMetadata:$reflectionShape")
+    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$collections:$interop:$reflection:$scalaReflect:$functional:$language:$macroUse:$stackWalker:$durations:$reflectionShape")
     println(ScalaModernJavaInteropSmoke.exercise())
   }
 }

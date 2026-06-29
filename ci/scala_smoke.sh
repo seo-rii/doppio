@@ -58,6 +58,7 @@ support_dir="$work_dir/support"
 out_dir="$work_dir/out"
 main_source_cp="$support_dir:$macro_out_dir:$source_cp"
 runtime_cp="$out_dir:$macro_out_dir:$support_dir:$library_jar:$reflect_jar"
+java_sources=("$source_dir"/*.java)
 
 rm -rf "$macro_out_dir" "$support_dir" "$out_dir"
 mkdir -p "$macro_out_dir" "$support_dir" "$out_dir"
@@ -76,7 +77,9 @@ timeout -s INT "${compile_timeout}s" \
   -d "$macro_out_dir" \
   "$macro_source_dir"/*.scala
 
-javac --release 8 -d "$support_dir" "$source_dir"/*.java
+if [ -e "${java_sources[0]}" ]; then
+  javac --release 8 -d "$support_dir" "${java_sources[@]}"
+fi
 
 timeout -s INT "${compile_timeout}s" \
   node --max-old-space-size=4096 --no-deprecation "$runner" \
@@ -89,17 +92,11 @@ timeout -s INT "${compile_timeout}s" \
 compile_end="$(date +%s)"
 
 test -f "$macro_out_dir/ScalaMacroSmoke.class"
-test -f "$support_dir/ScalaMultiTag.class"
-test -f "$support_dir/ScalaMultiTags.class"
-test -f "$support_dir/ScalaRichTag.class"
-test -f "$support_dir/ScalaTagLevel.class"
 test -f "$out_dir/Hello.class"
 test -f "$out_dir/AdvancedScalaSmoke.class"
 test -f "$out_dir/Add.class"
 test -f "$out_dir/Lit.class"
 test -f "$out_dir/Metric.class"
-test -f "$out_dir/ScalaAnnotationMetadataSmoke.class"
-test -f "$out_dir/ScalaAnnotationMetadataOwner.class"
 test -f "$out_dir/ScalaCollectionSmoke.class"
 test -f "$out_dir/ScalaFunctionalSmoke.class"
 test -f "$out_dir/ScalaInteropSmoke.class"
@@ -156,6 +153,10 @@ fi
 if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
   scala_concurrent_expected_output=":SC2!:5:l|a=5,b=12,c=8|true|true:y:Y11:4/8|abc:false:true:1|main:11/worker:3/main:11/main:11|locked:3:hold:1:true|k=1,z=12|11"
   expected_output="${expected_output/$scala_concurrent_expected_output/}"
+fi
+if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
+  scala_annotation_expected_output=":class-a,class-b|class:HIGH:ScalaAnnotationMetadataOwner:1,2,3|method-a,method-b|method:LOW:Long:7,8|arg-a,arg-b|arg:LOW:Double:9|arg-a,arg-b|kt3"
+  expected_output="${expected_output/$scala_annotation_expected_output/}"
 fi
 if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
   scala_io_expected_output=":jarzip:false:META-INF/MANIFEST.MF,META-INF/services/example.Service,META-INF/versions/17/pkg/data.txt,pkg/data.txt:scala/jar:scala.Provider:10:true:true|META-INF/MANIFEST.MF=META-INF,META-INF/services/example.Service=META-INF,META-INF/versions/17/pkg/data.txt=META-INF,pkg/data.txt=scala|jar:jar:scala/jar:scala.Provider:true:svc:alpha=7,beta=11:2:alpha=7,beta=11:AlphaScalaServiceLookupPlugin>BetaScalaServiceLookupPlugin:true:res:scala-resource/lookup:scala-root:out>macro:out>macro:2/2:true:true:true:true:true:true"

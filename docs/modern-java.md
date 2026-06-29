@@ -338,11 +338,11 @@ native-memory fills, including zero-length no-ops.
   Scala trait proxy, `InvocationHandler`, reflective proxy-method invocation,
   runtime method and parameter annotations, proxy `Object` methods,
   `Proxy.isProxyClass`, and `Proxy.getInvocationHandler`,
-  runtime annotation metadata covering repeatable Java annotations applied from
-  Scala, enum/class/array-valued annotation elements, and Java reflection
-  lookup on Scala-generated classes, methods, and parameters, Java reflection
-  over Scala-generated member, method-local, and anonymous class shape
-  metadata,
+  a focused Scala annotation smoke covering runtime annotation metadata for
+  repeatable Java annotations applied from Scala, enum/class/array-valued
+  annotation elements, and Java reflection lookup on Scala-generated classes,
+  methods, and parameters, Java reflection over Scala-generated member,
+  method-local, and anonymous class shape metadata,
   a focused Scala NIO smoke covering reflection-backed Scala use of Java NIO
   `Path.of` factories, `Files.mismatch`, `Files.isSameFile`, and
   `Files.walk` cleanup paths, reflection-backed Scala use of Java 16
