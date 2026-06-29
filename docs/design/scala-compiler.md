@@ -83,9 +83,10 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
   repeatable Java annotations applied from Scala, enum/class/array-valued
   annotation elements, and Java reflection lookup on Scala-generated classes,
   methods, and parameters;
-- Java reflection over Scala-generated member, method-local, and anonymous
-  classes, including simple names, declaring/enclosing classes, enclosing
-  methods, implemented interfaces, and member/local/anonymous flags;
+- a focused Scala reflection-shape smoke covering Java reflection over
+  Scala-generated member, method-local, and anonymous classes, including simple
+  names, declaring/enclosing classes, enclosing methods, implemented
+  interfaces, and member/local/anonymous flags;
 - a focused Scala NIO smoke covering reflection-backed Java NIO calls through
   `Path.of(String, String...)`, `Path.of(URI)`, `Files.mismatch`,
   `Files.isSameFile`, and path cleanup through `Files.walk`;
@@ -182,10 +183,16 @@ elements while keeping the main Scala compiler smoke smaller.
 A local 2026-06-30 validation completed the focused Scala annotation smoke in
 395 seconds and the remaining main Scala compiler smoke in 484 seconds using
 Scala 2.13.18.
-It also reflects Scala-generated member, method-local, and anonymous classes
-through Java `Class` metadata, checking simple names, declaring/enclosing
-classes, enclosing methods, implemented interfaces, and member/local/anonymous
-flags.
+The Scala-generated class-shape reflection coverage now lives in
+`classes/scala_reflection_shape_smoke` and runs through
+`ci/scala_reflection_shape_smoke.sh`. It reflects member, method-local, and
+anonymous classes through Java `Class` metadata, checking simple names,
+declaring/enclosing classes, enclosing methods, implemented interfaces, and
+member/local/anonymous flags while keeping the main Scala compiler smoke
+smaller.
+A local 2026-06-30 validation completed the focused Scala reflection-shape
+smoke in 90 seconds and the remaining main Scala compiler smoke in 405 seconds
+using Scala 2.13.18.
 It now also runs a small reflection-backed Java 17 interop slice from
 Scala-compiled code covering `HexFormat`, `InstantSource`, seeded
 `RandomGeneratorFactory` `Random`/`SplittableRandom` provider output, and

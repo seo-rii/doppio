@@ -107,12 +107,6 @@ test -f "$out_dir/ScalaMacroUseSmoke.class"
 test -f "$out_dir/ScalaModernJavaInteropSmoke.class"
 test -f "$out_dir/ScalaReflectSmoke.class"
 test -f "$out_dir/ScalaReflectSmoke\$ReflectBox.class"
-test -f "$out_dir/ScalaReflectionShapeOwner.class"
-test -f "$out_dir/ScalaReflectionShapeOwner\$Member.class"
-test -f "$out_dir/ScalaReflectionShapeOwner\$MethodLocal\$1.class"
-test -f "$out_dir/ScalaReflectionShapeOwner\$\$anon\$1.class"
-test -f "$out_dir/ScalaReflectionShapeSmoke.class"
-test -f "$out_dir/ScalaReflectionShapeSmoke\$.class"
 test -f "$out_dir/ScalaStackWalkerSmoke.class"
 test -f "$out_dir/SmokeCodec.class"
 test -f "$out_dir/SmokeFolder.class"
@@ -157,6 +151,10 @@ fi
 if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
   scala_annotation_expected_output=":class-a,class-b|class:HIGH:ScalaAnnotationMetadataOwner:1,2,3|method-a,method-b|method:LOW:Long:7,8|arg-a,arg-b|arg:LOW:Double:9|arg-a,arg-b|kt3"
   expected_output="${expected_output/$scala_annotation_expected_output/}"
+fi
+if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
+  scala_reflection_shape_expected_output=":member/Member/ScalaReflectionShapeOwner/ScalaReflectionShapeOwner/null/-/true/false/false|local/MethodLocal\$1/null/ScalaReflectionShapeOwner/methodLocalClass/-/false/true/false|anonymous/_/null/ScalaReflectionShapeOwner/anonymousRunnableClass/Runnable/false/false/true"
+  expected_output="${expected_output/$scala_reflection_shape_expected_output/}"
 fi
 if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
   scala_io_expected_output=":jarzip:false:META-INF/MANIFEST.MF,META-INF/services/example.Service,META-INF/versions/17/pkg/data.txt,pkg/data.txt:scala/jar:scala.Provider:10:true:true|META-INF/MANIFEST.MF=META-INF,META-INF/services/example.Service=META-INF,META-INF/versions/17/pkg/data.txt=META-INF,pkg/data.txt=scala|jar:jar:scala/jar:scala.Provider:true:svc:alpha=7,beta=11:2:alpha=7,beta=11:AlphaScalaServiceLookupPlugin>BetaScalaServiceLookupPlugin:true:res:scala-resource/lookup:scala-root:out>macro:out>macro:2/2:true:true:true:true:true:true"
