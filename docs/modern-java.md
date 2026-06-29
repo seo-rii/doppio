@@ -318,10 +318,10 @@ native-memory fills, including zero-length no-ops.
   metadata with retained-class-reference guards, a focused `scala-reflect`
   runtime universe smoke covering runtime mirror creation, `typeOf`,
   constructor/member symbol lookup, case-accessor discovery, and static class
-  lookup,
-  Scala 2.13 functional/library paths including `Function.chain`,
-  composed function adapters, `Option.when`/`Option.unless`,
-  `Using.resource`, `Try` recovery, `Either.cond`, and `partitionMap`,
+  lookup, a focused Scala functional/library smoke covering `Function.chain`,
+  composed function adapters, `Option.when`/`Option.unless`, `Using.resource`,
+  `Try` recovery, `Either.cond`, `partitionMap`, and lambda-heavy classfile
+  emission,
   Java collection interop through `scala.jdk.CollectionConverters`, a small
   `Future`/`Promise`/`Await` path running on a Java executor,
   a focused Scala concurrency smoke covering Java concurrency interop through
@@ -356,8 +356,8 @@ native-memory fills, including zero-length no-ops.
   `Map.Entry.copyOf` snapshot and unmodifiable-result behavior,
   a focused Scala duration smoke covering `scala.concurrent.duration`
   arithmetic/sorting/parsing/scaling checks,
-  classfile
-  assertions for `InvokeDynamic`/`LambdaMetafactory` emission, representative
+  classfile assertions for `InvokeDynamic`/`LambdaMetafactory` emission in the
+  main and focused functional Scala smokes, representative
   generic `Signature` metadata, path-dependent types, higher-kinded implicit
   typeclass lookup, self-types, by-name argument evaluation, extractor
   matching, and `@switch` lowering, and a diagnostic smoke covering type-mismatch

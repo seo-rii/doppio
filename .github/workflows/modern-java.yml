@@ -126,6 +126,9 @@ jobs:
       - name: Run Scala runtime reflection smoke
         run: ./ci/scala_reflect_smoke.sh
 
+      - name: Run Scala functional smoke
+        run: ./ci/scala_functional_smoke.sh
+
       - name: Run Scala reflection-shape smoke
         run: ./ci/scala_reflection_shape_smoke.sh
 

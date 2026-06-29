@@ -50,9 +50,10 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - Scala 2.13 collection-library coverage for `LazyList`, extractor `unapply`,
   `Regex`, `TreeMap`, `ArraySeq`, `groupMap`, map views, and right-biased
   `Either`;
-- Scala 2.13 functional/library coverage for `Function.chain`, composed
+- a focused Scala functional/library smoke covering `Function.chain`, composed
   function adapters, `Option.when`/`Option.unless`, `Using.resource`,
-  `Try.map`/`filter`/`recover`, `Either.cond`, and `partitionMap`;
+  `Try.map`/`filter`/`recover`, `Either.cond`, `partitionMap`, and
+  lambda-heavy classfile emission;
 - Scala language/type-system coverage for path-dependent types, higher-kinded
   implicit typeclass lookup, self-types, by-name argument evaluation, extractor
   matching, and `@switch` lowering;
@@ -113,12 +114,10 @@ source fixture, checks the emitted class files, and compares generated program
 output on the host JVM and Doppio. The smoke now includes a Scala 2.13
 collection/extractor slice covering `LazyList`, extractor `unapply`, `Regex`,
 `TreeMap`, `ArraySeq`, `groupMap`, map views, and right-biased `Either`, plus
-functional/library coverage for `Function.chain`, composed function adapters,
-`Option.when`/`Option.unless`, `Using.resource`, `Try` recovery, `Either.cond`,
-and `partitionMap`, plus language/type-system coverage for path-dependent
-types, higher-kinded implicit typeclass lookup, self-types, by-name argument
-evaluation, extractor matching, and `@switch` lowering, plus Java collection
-interop and a small asynchronous `Future` path. A local
+language/type-system coverage for path-dependent types, higher-kinded implicit
+typeclass lookup, self-types, by-name argument evaluation, extractor matching,
+and `@switch` lowering, plus Java collection interop and a small asynchronous
+`Future` path. A local
 2026-06-21 run of the expanded smoke completed in 303 seconds using Scala
 2.13.18.
 A local 2026-06-23 run with the language/type-system smoke completed in
@@ -228,16 +227,25 @@ compiler smoke smaller.
 A local 2026-06-30 validation completed the focused Scala runtime reflection
 smoke in 76 seconds and the remaining main Scala compiler smoke in 250 seconds
 using Scala 2.13.18.
+The Scala functional/library coverage now lives in
+`classes/scala_functional_smoke` and runs through
+`ci/scala_functional_smoke.sh`. It checks `Function.chain`, composed function
+adapters, `Option.when`/`Option.unless`, `Using.resource`, `Try` recovery,
+`Either.cond`, `partitionMap`, and generated `InvokeDynamic` entries backed by
+`LambdaMetafactory` while keeping the main Scala compiler smoke smaller.
+A local 2026-06-30 validation completed the focused Scala functional smoke in
+74 seconds and the remaining main Scala compiler smoke in 241 seconds using
+Scala 2.13.18.
 
 The smoke also includes a two-phase macro path: Doppio-hosted scalac first
 emits a blackbox macro implementation class, then a second Doppio-hosted scalac
 pass expands calls from the normal smoke source set against that generated
 classpath entry.
 
-The same smoke now inspects generated classfiles with `javap -v` and asserts
-that Scala lambda-heavy classes contain `InvokeDynamic` entries backed by
-`LambdaMetafactory`. A local 2026-06-22 run of the checked smoke completed in
-409 seconds using Scala 2.13.18.
+The main smoke and focused functional smoke inspect generated classfiles with
+`javap -v` and assert that Scala lambda-heavy classes contain `InvokeDynamic`
+entries backed by `LambdaMetafactory`. A local 2026-06-22 run of the checked
+smoke completed in 409 seconds using Scala 2.13.18.
 It also asserts representative Java `Signature` metadata for a generic case
 class method, a generic trait method, and a specialized generic class method.
 

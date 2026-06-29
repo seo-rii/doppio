@@ -98,7 +98,6 @@ test -f "$out_dir/Add.class"
 test -f "$out_dir/Lit.class"
 test -f "$out_dir/Metric.class"
 test -f "$out_dir/ScalaCollectionSmoke.class"
-test -f "$out_dir/ScalaFunctionalSmoke.class"
 test -f "$out_dir/ScalaInteropSmoke.class"
 test -f "$out_dir/ScalaLanguageSmoke.class"
 test -f "$out_dir/ScalaLibrarySmoke.class"
@@ -111,14 +110,13 @@ test -f "$out_dir/scalasmoke/ScalaPackageReflectionSmoke.class"
 test -f "$out_dir/scalasmoke/SmokeColors.class"
 test -f "$out_dir/scalasmoke/SpecializedBox.class"
 test -f "$out_dir/scalasmoke/package.class"
-test -f "$out_dir/FunctionalCloseRecorder.class"
 test -f "$out_dir/SmokeExpr.class"
 test -f "$out_dir/SmokeBox.class"
 test -f "$out_dir/SmokeStage.class"
 test -f "$out_dir/ZeroExpr.class"
 
 scala_indy_dump="$work_dir/scala-indy-javap.txt"
-javap -classpath "$runtime_cp" -v 'ScalaFunctionalSmoke$' 'ScalaInteropSmoke$' 'Hello$' > "$scala_indy_dump"
+javap -classpath "$runtime_cp" -v 'ScalaInteropSmoke$' 'Hello$' > "$scala_indy_dump"
 grep -q 'InvokeDynamic' "$scala_indy_dump"
 grep -q 'LambdaMetafactory' "$scala_indy_dump"
 
@@ -146,6 +144,10 @@ fi
 if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
   scala_reflect_expected_output=":ReflectBox:2:name/value:true"
   expected_output="${expected_output/$scala_reflect_expected_output/}"
+fi
+if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
+  scala_functional_expected_output=":f17/14/p17+c14/u7/alpha>bb>close/t49+13/x|_=24/ok49"
+  expected_output="${expected_output/$scala_functional_expected_output/}"
 fi
 if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
   scala_proxy_expected_output=":iface:transform:value:dyn:SC5:XY3:cba:null:ScalaProxyService(dyn):654:true:true:true:transform:2,label:0,transform:2,maybe:1,maybe:1,toString:0,hashCode:0,equals:1"
