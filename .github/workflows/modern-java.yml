@@ -108,5 +108,8 @@ jobs:
       - name: Run Scala MethodHandles smoke
         run: ./ci/scala_methodhandle_smoke.sh
 
+      - name: Run Scala I/O smoke
+        run: ./ci/scala_io_smoke.sh
+
       - name: Run Scala compiler smoke
         run: ./ci/scala_smoke.sh

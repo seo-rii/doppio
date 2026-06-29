@@ -67,11 +67,11 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
   `invokeWithArguments`, and basic combinators including `bindTo`,
   `insertArguments`, `dropArguments`, `filterReturnValue`, and
   `guardWithTest`;
-- runtime JAR/ZIP/classpath resource coverage through `JarOutputStream`,
-  `JarFile`, `ZipInputStream`, and `URLClassLoader` resource reads;
-- `ServiceLoader` discovery from generated `META-INF/services` metadata,
-  including duplicate-provider collapse and reload;
-- classpath resource lookup through `Class.getResource`,
+- a focused Scala I/O smoke covering runtime JAR/ZIP/classpath resource reads
+  through `JarOutputStream`, `JarFile`, `ZipInputStream`, and
+  `URLClassLoader`, `ServiceLoader` discovery from generated
+  `META-INF/services` metadata including duplicate-provider collapse and
+  reload, and classpath resource lookup through `Class.getResource`,
   `ClassLoader.getResource`, `getResources`, `getResourceAsStream`,
   `getSystemResource`, and reflection-backed Java 9 `ClassLoader.resources`;
 - Java dynamic-proxy interop covering a Scala trait proxy,
@@ -136,16 +136,19 @@ stresses more broadly while keeping the main Scala compiler smoke output
 smaller and easier to isolate. The split local validation completed the
 focused MethodHandles smoke in 77 seconds and the remaining main Scala compiler
 smoke in 454 seconds using Scala 2.13.18.
-It also includes a Scala runtime JAR/ZIP smoke that writes a manifest-bearing
-JAR, reads entries and manifest metadata through `JarFile`, scans the same
-archive through `ZipInputStream`, and verifies classpath-style resource lookup
-through `URLClassLoader`.
-The classpath stress slice now also creates `META-INF/services` metadata for
-Scala-compiled provider classes and verifies `ServiceLoader` discovery,
-duplicate-provider collapse, and reload behavior.
-It also creates runtime resource files in both compiled output classpath roots
-and verifies class-relative, loader-relative, system, enumeration, stream, and
-Java 9 `ClassLoader.resources` lookup paths from Scala-compiled code.
+The Scala runtime JAR/ZIP, `ServiceLoader`, and classpath resource lookup
+coverage now lives in `classes/scala_io_smoke` and runs through
+`ci/scala_io_smoke.sh`. The focused smoke writes a manifest-bearing JAR, reads
+entries and manifest metadata through `JarFile`, scans the same archive through
+`ZipInputStream`, verifies classpath-style resource lookup through
+`URLClassLoader`, creates `META-INF/services` metadata for Scala-compiled
+provider classes, checks duplicate-provider collapse and reload behavior, and
+verifies class-relative, loader-relative, system, enumeration, stream, and Java
+9 `ClassLoader.resources` lookup paths from Scala-compiled code while keeping
+the main Scala compiler smoke smaller.
+A local 2026-06-29 validation completed the focused Scala I/O smoke in 202
+seconds and the remaining main Scala compiler smoke in 540 seconds using Scala
+2.13.18.
 It now also covers Java dynamic proxies from Scala-compiled code, including
 trait dispatch through `InvocationHandler`, reflective proxy-method invocation,
 runtime annotation metadata on the proxied interface method and parameter, and

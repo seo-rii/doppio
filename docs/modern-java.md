@@ -326,11 +326,11 @@ native-memory fills, including zero-length no-ops.
   a focused Scala source-level `java.lang.invoke.MethodHandles`
   lookup/adaptation smoke for selected static, virtual, constructor, and
   combinator flows,
-  runtime JAR/ZIP/classpath resource reads through `JarOutputStream`,
-  `JarFile`, `ZipInputStream`, and `URLClassLoader`,
-  `ServiceLoader` provider discovery from generated `META-INF/services`
-  metadata including duplicate-provider collapse and reload,
-  classpath resource lookup through `Class.getResource`,
+  a focused Scala I/O smoke covering runtime JAR/ZIP/classpath resource reads
+  through `JarOutputStream`, `JarFile`, `ZipInputStream`, and
+  `URLClassLoader`, `ServiceLoader` provider discovery from generated
+  `META-INF/services` metadata including duplicate-provider collapse and
+  reload, and classpath resource lookup through `Class.getResource`,
   `ClassLoader.getResource`, `getResources`, `getResourceAsStream`,
   `getSystemResource`, and reflection-backed `ClassLoader.resources`,
   Java dynamic-proxy interop through a Scala trait proxy,

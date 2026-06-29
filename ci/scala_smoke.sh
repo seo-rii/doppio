@@ -105,7 +105,6 @@ test -f "$out_dir/ScalaCollectionSmoke.class"
 test -f "$out_dir/ScalaConcurrentSmoke.class"
 test -f "$out_dir/ScalaFunctionalSmoke.class"
 test -f "$out_dir/ScalaInteropSmoke.class"
-test -f "$out_dir/ScalaJarZipSmoke.class"
 test -f "$out_dir/ScalaDurationSmoke.class"
 test -f "$out_dir/ScalaLanguageSmoke.class"
 test -f "$out_dir/ScalaLibrarySmoke.class"
@@ -121,12 +120,7 @@ test -f "$out_dir/ScalaReflectionShapeOwner\$MethodLocal\$1.class"
 test -f "$out_dir/ScalaReflectionShapeOwner\$\$anon\$1.class"
 test -f "$out_dir/ScalaReflectionShapeSmoke.class"
 test -f "$out_dir/ScalaReflectionShapeSmoke\$.class"
-test -f "$out_dir/ScalaResourceLookupSmoke.class"
-test -f "$out_dir/ScalaServiceLoaderSmoke.class"
 test -f "$out_dir/ScalaStackWalkerSmoke.class"
-test -f "$out_dir/ScalaServiceLookupPlugin.class"
-test -f "$out_dir/AlphaScalaServiceLookupPlugin.class"
-test -f "$out_dir/BetaScalaServiceLookupPlugin.class"
 test -f "$out_dir/SmokeCodec.class"
 test -f "$out_dir/SmokeFolder.class"
 test -f "$out_dir/scalasmoke/PackageRegistry.class"
@@ -152,22 +146,13 @@ grep -Fq '// <B:Ljava/lang/Object;>(Lscala/Function1<TA;TB;>;)LSmokeBox<TB;>;' "
 grep -Fq '// (TA;)Ljava/lang/String;' "$scala_signature_dump"
 grep -Fq '// (TA;)Lscala/Tuple2<TA;TA;>;' "$scala_signature_dump"
 
-mkdir -p "$out_dir/META-INF/services"
-mkdir -p "$out_dir/scalasmoke/resources" "$macro_out_dir/scalasmoke/resources"
-cat > "$out_dir/META-INF/services/ScalaServiceLookupPlugin" <<'SCALA_SERVICE_PROVIDERS'
-# Scala smoke service providers
-AlphaScalaServiceLookupPlugin
-AlphaScalaServiceLookupPlugin
-BetaScalaServiceLookupPlugin
-SCALA_SERVICE_PROVIDERS
-printf 'scala-resource\nlookup\n' > "$out_dir/scalasmoke/resources/runtime.txt"
-printf 'scala-root\n' > "$out_dir/scala-root-resource.txt"
-printf 'out\n' > "$out_dir/scalasmoke/resources/duplicate.txt"
-printf 'macro\n' > "$macro_out_dir/scalasmoke/resources/duplicate.txt"
-
 expected_output="${SCALA_SMOKE_EXPECTED_OUTPUT:-"scala:38:parse>run:i=39:SCALA:a,bb:sc|even4:25:12:1=4,2=2,3=4:b:4/ccc:4/aa:2:g2:t5:String:3:z:2:1,3,5,7:1=8,2=5:a5|z2:134:k10:r6:r0a1b2:2:2,1:5:f32:worker:3:c1:describe/getName/total:pkg-worker-11:20:red-green-blue:23:ReflectBox:2:name/value:true:f17/14/p17+c14/u7/alpha>bb>close/t49+13/x|_=24/ok49:L:a7:R:b3:some(i2)|none|some(i4):a1,b2,c3:op7:12:2:dozen/sx/seven:m22:macro:cs:5:leaf:(I)Ljava/lang/String;:(I)Ljava/lang/String;:ScalaStackWalkerSmoke$|outer:(Ljava/lang/String;)Ljava/lang/String;:(Ljava/lang/String;)Ljava/lang/String;:ScalaStackWalkerSmoke$|exercise:()Ljava/lang/String;:()Ljava/lang/String;:ScalaStackWalkerSmoke$:(I)Ljava/lang/String;:UnsupportedOperationException:3250|0,500,1500,1250|-1000,0,1500,3000|1|2.0|1250|2250|3|true:false:true:-1/5/5/-1:true:true:10:nested/left.txt:mh:8:b7:cal:ala:const:MH:empty/filled:jarzip:false:META-INF/MANIFEST.MF,META-INF/services/example.Service,META-INF/versions/17/pkg/data.txt,pkg/data.txt:scala/jar:scala.Provider:10:true:true|META-INF/MANIFEST.MF=META-INF,META-INF/services/example.Service=META-INF,META-INF/versions/17/pkg/data.txt=META-INF,pkg/data.txt=scala|jar:jar:scala/jar:scala.Provider:true:svc:alpha=7,beta=11:2:alpha=7,beta=11:AlphaScalaServiceLookupPlugin>BetaScalaServiceLookupPlugin:true:res:scala-resource/lookup:scala-root:out>macro:out>macro:2/2:true:true:true:true:true:true:iface:transform:value:dyn:SC5:XY3:cba:null:ScalaProxyService(dyn):654:true:true:true:transform:2,label:0,transform:2,maybe:1,maybe:1,toString:0,hashCode:0,equals:1:SC2!:5:l|a=5,b=12,c=8|true|true:y:Y11:4/8|abc:false:true:1|main:11/worker:3/main:11/main:11|locked:3:hold:1:true|k=1,z=12|11:class-a,class-b|class:HIGH:ScalaAnnotationMetadataOwner:1,2,3|method-a,method-b|method:LOW:Long:7,8|arg-a,arg-b|arg:LOW:Double:9|arg-a,arg-b|kt3:member/Member/ScalaReflectionShapeOwner/ScalaReflectionShapeOwner/null/-/true/false/false|local/MethodLocal\$1/null/ScalaReflectionShapeOwner/methodLocalClass/-/false/true/false|anonymous/_/null/ScalaReflectionShapeOwner/anonymousRunnableClass/Runnable/false/false/true"}"
 if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
   expected_output="${expected_output/:mh:8:b7:cal:ala:const:MH:empty\/filled/}"
+fi
+if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
+  scala_io_expected_output=":jarzip:false:META-INF/MANIFEST.MF,META-INF/services/example.Service,META-INF/versions/17/pkg/data.txt,pkg/data.txt:scala/jar:scala.Provider:10:true:true|META-INF/MANIFEST.MF=META-INF,META-INF/services/example.Service=META-INF,META-INF/versions/17/pkg/data.txt=META-INF,pkg/data.txt=scala|jar:jar:scala/jar:scala.Provider:true:svc:alpha=7,beta=11:2:alpha=7,beta=11:AlphaScalaServiceLookupPlugin>BetaScalaServiceLookupPlugin:true:res:scala-resource/lookup:scala-root:out>macro:out>macro:2/2:true:true:true:true:true:true"
+  expected_output="${expected_output/$scala_io_expected_output/}"
 fi
 if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
   expected_output="${expected_output}
