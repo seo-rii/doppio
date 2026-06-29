@@ -117,5 +117,8 @@ jobs:
       - name: Run Scala proxy smoke
         run: ./ci/scala_proxy_smoke.sh
 
+      - name: Run Scala concurrency smoke
+        run: ./ci/scala_concurrent_smoke.sh
+
       - name: Run Scala compiler smoke
         run: ./ci/scala_smoke.sh

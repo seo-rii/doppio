@@ -320,9 +320,10 @@ native-memory fills, including zero-length no-ops.
   `Using.resource`, `Try` recovery, `Either.cond`, and `partitionMap`,
   Java collection interop through `scala.jdk.CollectionConverters`, a small
   `Future`/`Promise`/`Await` path running on a Java executor,
-  Java concurrency interop covering `CompletableFuture` chaining and recovery,
-  `ConcurrentHashMap` compute/merge paths, atomics, `CopyOnWriteArrayList`,
-  `ThreadLocal`, `ReentrantLock`, and synchronized Java maps,
+  a focused Scala concurrency smoke covering Java concurrency interop through
+  `CompletableFuture` chaining and recovery, `ConcurrentHashMap` compute/merge
+  paths, atomics, `CopyOnWriteArrayList`, `ThreadLocal`, `ReentrantLock`, and
+  synchronized Java maps,
   a focused Scala source-level `java.lang.invoke.MethodHandles`
   lookup/adaptation smoke for selected static, virtual, constructor, and
   combinator flows,

@@ -59,9 +59,10 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - Java collection interop through `scala.jdk.CollectionConverters`, mutable
   Java list/map wrappers, and a small `Future`/`Promise`/`Await` path running
   on a Java executor;
-- Java concurrency interop covering `CompletableFuture` chaining and recovery,
-  `ConcurrentHashMap` compute/merge paths, atomics, `CopyOnWriteArrayList`,
-  `ThreadLocal`, `ReentrantLock`, and synchronized Java maps;
+- a focused Scala concurrency smoke covering Java concurrency interop through
+  `CompletableFuture` chaining and recovery, `ConcurrentHashMap` compute/merge
+  paths, atomics, `CopyOnWriteArrayList`, `ThreadLocal`, `ReentrantLock`, and
+  synchronized Java maps;
 - a focused source-level `java.lang.invoke.MethodHandles` smoke for selected
   static, virtual, and constructor lookup, `MethodHandle.asType`,
   `invokeWithArguments`, and basic combinators including `bindTo`,
@@ -113,13 +114,20 @@ functional/library coverage for `Function.chain`, composed function adapters,
 and `partitionMap`, plus language/type-system coverage for path-dependent
 types, higher-kinded implicit typeclass lookup, self-types, by-name argument
 evaluation, extractor matching, and `@switch` lowering, plus Java collection
-interop, a small asynchronous `Future` path, and Java concurrency primitives
-including `CompletableFuture`, `ConcurrentHashMap`, atomics,
-`CopyOnWriteArrayList`, `ThreadLocal`, and `ReentrantLock`. A local
+interop and a small asynchronous `Future` path. A local
 2026-06-21 run of the expanded smoke completed in 303 seconds using Scala
 2.13.18.
 A local 2026-06-23 run with the language/type-system smoke completed in
 488 seconds using Scala 2.13.18.
+The Java concurrency interop coverage now lives in
+`classes/scala_concurrent_smoke` and runs through
+`ci/scala_concurrent_smoke.sh`. It covers `CompletableFuture` chaining and
+recovery, `ConcurrentHashMap` compute/merge paths, atomics,
+`CopyOnWriteArrayList`, `ThreadLocal`, `ReentrantLock`, and synchronized Java
+maps while keeping the main Scala compiler smoke smaller.
+A local 2026-06-29 validation completed the focused Scala concurrency smoke in
+81 seconds and the remaining main Scala compiler smoke in 313 seconds using
+Scala 2.13.18.
 The smoke now also covers `scala.concurrent.duration` finite duration
 arithmetic, scan/sort paths, string parsing, scaling, clamping, and
 finite/infinite metadata. A local 2026-06-24 run with this duration slice

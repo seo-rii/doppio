@@ -101,7 +101,6 @@ test -f "$out_dir/Metric.class"
 test -f "$out_dir/ScalaAnnotationMetadataSmoke.class"
 test -f "$out_dir/ScalaAnnotationMetadataOwner.class"
 test -f "$out_dir/ScalaCollectionSmoke.class"
-test -f "$out_dir/ScalaConcurrentSmoke.class"
 test -f "$out_dir/ScalaFunctionalSmoke.class"
 test -f "$out_dir/ScalaInteropSmoke.class"
 test -f "$out_dir/ScalaDurationSmoke.class"
@@ -153,6 +152,10 @@ fi
 if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
   scala_proxy_expected_output=":iface:transform:value:dyn:SC5:XY3:cba:null:ScalaProxyService(dyn):654:true:true:true:transform:2,label:0,transform:2,maybe:1,maybe:1,toString:0,hashCode:0,equals:1"
   expected_output="${expected_output/$scala_proxy_expected_output/}"
+fi
+if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
+  scala_concurrent_expected_output=":SC2!:5:l|a=5,b=12,c=8|true|true:y:Y11:4/8|abc:false:true:1|main:11/worker:3/main:11/main:11|locked:3:hold:1:true|k=1,z=12|11"
+  expected_output="${expected_output/$scala_concurrent_expected_output/}"
 fi
 if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
   scala_io_expected_output=":jarzip:false:META-INF/MANIFEST.MF,META-INF/services/example.Service,META-INF/versions/17/pkg/data.txt,pkg/data.txt:scala/jar:scala.Provider:10:true:true|META-INF/MANIFEST.MF=META-INF,META-INF/services/example.Service=META-INF,META-INF/versions/17/pkg/data.txt=META-INF,pkg/data.txt=scala|jar:jar:scala/jar:scala.Provider:true:svc:alpha=7,beta=11:2:alpha=7,beta=11:AlphaScalaServiceLookupPlugin>BetaScalaServiceLookupPlugin:true:res:scala-resource/lookup:scala-root:out>macro:out>macro:2/2:true:true:true:true:true:true"
