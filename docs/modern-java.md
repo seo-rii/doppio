@@ -342,8 +342,9 @@ native-memory fills, including zero-length no-ops.
   lookup on Scala-generated classes, methods, and parameters, Java reflection
   over Scala-generated member, method-local, and anonymous class shape
   metadata,
-  reflection-backed Scala use of Java NIO `Path.of` factories and
-  `Files.mismatch` paths, reflection-backed Scala use of Java 16
+  a focused Scala NIO smoke covering reflection-backed Scala use of Java NIO
+  `Path.of` factories, `Files.mismatch`, `Files.isSameFile`, and
+  `Files.walk` cleanup paths, reflection-backed Scala use of Java 16
   `Stream.toList()` and its unmodifiable result behavior, reflection-backed
   Scala use of Java 17 `Map.Entry.copyOf` snapshot and unmodifiable-result
   behavior,

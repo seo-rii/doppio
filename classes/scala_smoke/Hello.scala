@@ -90,12 +90,11 @@ object Hello {
     val macroUse = ScalaMacroUseSmoke.exercise()
     val stackWalker = ScalaStackWalkerSmoke.exercise()
     val durations = ScalaDurationSmoke.exercise()
-    val nio = ScalaNioSmoke.exercise()
     val proxyReflection = ScalaProxyReflectionSmoke.exercise()
     val concurrency = ScalaConcurrentSmoke.exercise()
     val annotationMetadata = ScalaAnnotationMetadataSmoke.exercise()
     val reflectionShape = ScalaReflectionShapeSmoke.exercise()
-    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$collections:$interop:$reflection:$scalaReflect:$functional:$language:$macroUse:$stackWalker:$durations:$nio:$proxyReflection:$concurrency:$annotationMetadata:$reflectionShape")
+    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$collections:$interop:$reflection:$scalaReflect:$functional:$language:$macroUse:$stackWalker:$durations:$proxyReflection:$concurrency:$annotationMetadata:$reflectionShape")
     println(ScalaModernJavaInteropSmoke.exercise())
   }
 }

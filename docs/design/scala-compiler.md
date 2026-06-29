@@ -84,9 +84,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - Java reflection over Scala-generated member, method-local, and anonymous
   classes, including simple names, declaring/enclosing classes, enclosing
   methods, implemented interfaces, and member/local/anonymous flags;
-- reflection-backed Java NIO coverage for `Path.of(String, String...)`,
-  `Path.of(URI)`, `Files.mismatch`, `Files.isSameFile`, and path cleanup
-  through `Files.walk`;
+- a focused Scala NIO smoke covering reflection-backed Java NIO calls through
+  `Path.of(String, String...)`, `Path.of(URI)`, `Files.mismatch`,
+  `Files.isSameFile`, and path cleanup through `Files.walk`;
 - reflection-backed Java 17 class-library interop for `HexFormat`,
   `InstantSource`, `RandomGeneratorFactory` `Random`/`SplittableRandom`
   provider output, and `Map.Entry.copyOf`, plus reflection-backed Java 16
@@ -124,10 +124,15 @@ The smoke now also covers `scala.concurrent.duration` finite duration
 arithmetic, scan/sort paths, string parsing, scaling, clamping, and
 finite/infinite metadata. A local 2026-06-24 run with this duration slice
 completed in 300 seconds using Scala 2.13.18.
-It also covers Scala-compiled reflection-backed Java NIO calls through
+The Scala-compiled reflection-backed Java NIO coverage now lives in
+`classes/scala_nio_smoke` and runs through `ci/scala_nio_smoke.sh`. It covers
 `Path.of` factories, `Files.mismatch`, `Files.isSameFile`, and cleanup through
 `Files.walk`, avoiding compile-time dependence on those Java 11/12 signatures
-when Scala sees the Java 8 boot surface.
+when Scala sees the Java 8 boot surface while keeping the main Scala compiler
+smoke smaller.
+A local 2026-06-29 validation completed the focused Scala NIO smoke in 117
+seconds and the remaining main Scala compiler smoke in 540 seconds using Scala
+2.13.18.
 The direct Scala source-level `java.lang.invoke.MethodHandles` smoke now lives
 in `classes/scala_methodhandle_smoke` and runs through
 `ci/scala_methodhandle_smoke.sh`. It covers selected static, virtual,

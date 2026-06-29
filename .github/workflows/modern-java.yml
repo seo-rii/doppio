@@ -111,5 +111,8 @@ jobs:
       - name: Run Scala I/O smoke
         run: ./ci/scala_io_smoke.sh
 
+      - name: Run Scala NIO smoke
+        run: ./ci/scala_nio_smoke.sh
+
       - name: Run Scala compiler smoke
         run: ./ci/scala_smoke.sh
