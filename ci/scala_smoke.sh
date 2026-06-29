@@ -91,7 +91,6 @@ compile_end="$(date +%s)"
 test -f "$macro_out_dir/ScalaMacroSmoke.class"
 test -f "$support_dir/ScalaMultiTag.class"
 test -f "$support_dir/ScalaMultiTags.class"
-test -f "$support_dir/ScalaProxyTag.class"
 test -f "$support_dir/ScalaRichTag.class"
 test -f "$support_dir/ScalaTagLevel.class"
 test -f "$out_dir/Hello.class"
@@ -110,7 +109,6 @@ test -f "$out_dir/ScalaLanguageSmoke.class"
 test -f "$out_dir/ScalaLibrarySmoke.class"
 test -f "$out_dir/ScalaMacroUseSmoke.class"
 test -f "$out_dir/ScalaModernJavaInteropSmoke.class"
-test -f "$out_dir/ScalaProxyReflectionSmoke.class"
 test -f "$out_dir/ScalaReflectSmoke.class"
 test -f "$out_dir/ScalaReflectSmoke\$ReflectBox.class"
 test -f "$out_dir/ScalaReflectionShapeOwner.class"
@@ -151,6 +149,10 @@ if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
 fi
 if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
   expected_output="${expected_output/:-1\/5\/5\/-1:true:true:10:nested\/left.txt/}"
+fi
+if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
+  scala_proxy_expected_output=":iface:transform:value:dyn:SC5:XY3:cba:null:ScalaProxyService(dyn):654:true:true:true:transform:2,label:0,transform:2,maybe:1,maybe:1,toString:0,hashCode:0,equals:1"
+  expected_output="${expected_output/$scala_proxy_expected_output/}"
 fi
 if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
   scala_io_expected_output=":jarzip:false:META-INF/MANIFEST.MF,META-INF/services/example.Service,META-INF/versions/17/pkg/data.txt,pkg/data.txt:scala/jar:scala.Provider:10:true:true|META-INF/MANIFEST.MF=META-INF,META-INF/services/example.Service=META-INF,META-INF/versions/17/pkg/data.txt=META-INF,pkg/data.txt=scala|jar:jar:scala/jar:scala.Provider:true:svc:alpha=7,beta=11:2:alpha=7,beta=11:AlphaScalaServiceLookupPlugin>BetaScalaServiceLookupPlugin:true:res:scala-resource/lookup:scala-root:out>macro:out>macro:2/2:true:true:true:true:true:true"

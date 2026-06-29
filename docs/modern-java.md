@@ -333,10 +333,10 @@ native-memory fills, including zero-length no-ops.
   reload, and classpath resource lookup through `Class.getResource`,
   `ClassLoader.getResource`, `getResources`, `getResourceAsStream`,
   `getSystemResource`, and reflection-backed `ClassLoader.resources`,
-  Java dynamic-proxy interop through a Scala trait proxy,
-  `InvocationHandler`, reflective proxy-method invocation, runtime method and
-  parameter annotations, proxy `Object` methods, `Proxy.isProxyClass`, and
-  `Proxy.getInvocationHandler`,
+  a focused Scala proxy smoke covering Java dynamic-proxy interop through a
+  Scala trait proxy, `InvocationHandler`, reflective proxy-method invocation,
+  runtime method and parameter annotations, proxy `Object` methods,
+  `Proxy.isProxyClass`, and `Proxy.getInvocationHandler`,
   runtime annotation metadata covering repeatable Java annotations applied from
   Scala, enum/class/array-valued annotation elements, and Java reflection
   lookup on Scala-generated classes, methods, and parameters, Java reflection

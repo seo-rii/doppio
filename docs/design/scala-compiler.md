@@ -74,10 +74,10 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
   reload, and classpath resource lookup through `Class.getResource`,
   `ClassLoader.getResource`, `getResources`, `getResourceAsStream`,
   `getSystemResource`, and reflection-backed Java 9 `ClassLoader.resources`;
-- Java dynamic-proxy interop covering a Scala trait proxy,
-  `InvocationHandler` dispatch, reflective proxy-method invocation, runtime
-  method and parameter annotations, proxy `Object` method dispatch,
-  `Proxy.isProxyClass`, and `Proxy.getInvocationHandler`;
+- a focused Scala proxy smoke covering Java dynamic-proxy interop through a
+  Scala trait proxy, `InvocationHandler` dispatch, reflective proxy-method
+  invocation, runtime method and parameter annotations, proxy `Object` method
+  dispatch, `Proxy.isProxyClass`, and `Proxy.getInvocationHandler`;
 - runtime annotation metadata covering repeatable Java annotations applied
   from Scala, enum/class/array-valued annotation elements, and Java reflection
   lookup on Scala-generated classes, methods, and parameters;
@@ -154,10 +154,16 @@ the main Scala compiler smoke smaller.
 A local 2026-06-29 validation completed the focused Scala I/O smoke in 202
 seconds and the remaining main Scala compiler smoke in 540 seconds using Scala
 2.13.18.
-It now also covers Java dynamic proxies from Scala-compiled code, including
-trait dispatch through `InvocationHandler`, reflective proxy-method invocation,
-runtime annotation metadata on the proxied interface method and parameter, and
-proxy `Object` method behavior.
+The Java dynamic-proxy interop coverage now lives in
+`classes/scala_proxy_smoke` and runs through `ci/scala_proxy_smoke.sh`. It
+covers a Scala trait proxy, `InvocationHandler` dispatch, reflective
+proxy-method invocation, runtime annotation metadata on the proxied interface
+method and parameter, proxy `Object` method behavior, `Proxy.isProxyClass`, and
+`Proxy.getInvocationHandler` while keeping the main Scala compiler smoke
+smaller.
+A local 2026-06-29 validation completed the focused Scala proxy smoke in 79
+seconds and the remaining main Scala compiler smoke in 422 seconds using Scala
+2.13.18.
 The smoke also applies repeatable and rich Java runtime annotations from Scala
 source and reads class, method, and parameter metadata through Java reflection,
 including enum, class, and primitive-array annotation elements.
