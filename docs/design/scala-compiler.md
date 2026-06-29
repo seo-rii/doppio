@@ -44,9 +44,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - a focused Scala StackWalker smoke covering source-level Java `StackWalker`
   retained-class-reference frame descriptor and `MethodType` metadata plus the
   no-retain `getMethodType` guard;
-- `scala-reflect` runtime universe coverage for runtime mirror creation,
-  `typeOf`, constructor/member symbol lookup, case-accessor discovery, and
-  static class lookup;
+- a focused `scala-reflect` runtime universe smoke covering runtime mirror
+  creation, `typeOf`, constructor/member symbol lookup, case-accessor
+  discovery, and static class lookup;
 - Scala 2.13 collection-library coverage for `LazyList`, extractor `unapply`,
   `Regex`, `TreeMap`, `ArraySeq`, `groupMap`, map views, and right-biased
   `Either`;
@@ -220,6 +220,14 @@ class-reference frame descriptor and `MethodType` metadata plus the no-retain
 A local 2026-06-30 validation completed the focused Scala StackWalker smoke in
 58 seconds and the remaining main Scala compiler smoke in 310 seconds using
 Scala 2.13.18.
+The `scala-reflect` runtime universe coverage now lives in
+`classes/scala_reflect_smoke` and runs through `ci/scala_reflect_smoke.sh`. It
+checks runtime mirror creation, `typeOf`, constructor/member symbol lookup,
+case-accessor discovery, and static class lookup while keeping the main Scala
+compiler smoke smaller.
+A local 2026-06-30 validation completed the focused Scala runtime reflection
+smoke in 76 seconds and the remaining main Scala compiler smoke in 250 seconds
+using Scala 2.13.18.
 
 The smoke also includes a two-phase macro path: Doppio-hosted scalac first
 emits a blackbox macro implementation class, then a second Doppio-hosted scalac

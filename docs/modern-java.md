@@ -315,7 +315,10 @@ native-memory fills, including zero-length no-ops.
   objects, `Enumeration`, `@BeanProperty`, Java reflection over
   Scala-generated members, specialized class generation, a focused Scala
   StackWalker smoke covering Java `StackWalker` frame descriptor/`MethodType`
-  metadata with retained-class-reference guards,
+  metadata with retained-class-reference guards, a focused `scala-reflect`
+  runtime universe smoke covering runtime mirror creation, `typeOf`,
+  constructor/member symbol lookup, case-accessor discovery, and static class
+  lookup,
   Scala 2.13 functional/library paths including `Function.chain`,
   composed function adapters, `Option.when`/`Option.unless`,
   `Using.resource`, `Try` recovery, `Either.cond`, and `partitionMap`,
@@ -359,11 +362,8 @@ native-memory fills, including zero-length no-ops.
   typeclass lookup, self-types, by-name argument evaluation, extractor
   matching, and `@switch` lowering, and a diagnostic smoke covering type-mismatch
   source filename, line number, found/required types, caret, and error count,
-  and `scala-reflect`
-  runtime universe use covering runtime mirror creation, `typeOf`, member
-  symbol lookup, case-accessor discovery, and static class lookup, plus
-  two-phase Scala 2 blackbox macro expansion, plus string interpolation, then
-  runs the generated `Hello` class on both the host JVM and Doppio.
+  plus two-phase Scala 2 blackbox macro expansion, plus string interpolation,
+  then runs the generated `Hello` class on both the host JVM and Doppio.
 - The workflow also runs `ci/scala_record_smoke.sh`, a focused Java 17 record
   interop smoke that compiles a record support class with the host JDK and then
   verifies Doppio-hosted scalac output against record reflection metadata,

@@ -84,10 +84,9 @@ object Hello {
     val collections = ScalaCollectionSmoke.exercise()
     val interop = ScalaInteropSmoke.exercise()
     val reflection = scalasmoke.ScalaPackageReflectionSmoke.exercise()
-    val scalaReflect = ScalaReflectSmoke.exercise()
     val functional = ScalaFunctionalSmoke.exercise()
     val language = ScalaLanguageSmoke.exercise()
     val macroUse = ScalaMacroUseSmoke.exercise()
-    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$collections:$interop:$reflection:$scalaReflect:$functional:$language:$macroUse")
+    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$collections:$interop:$reflection:$functional:$language:$macroUse")
   }
 }
