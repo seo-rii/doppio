@@ -41,9 +41,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - package object initialization, package-scoped classes/objects,
   `Enumeration`, `@BeanProperty`, Java reflection over Scala-generated members,
   and specialized class generation;
-- source-level Java `StackWalker` usage covering retained-class-reference frame
-  descriptor and `MethodType` metadata plus the no-retain `getMethodType`
-  guard;
+- a focused Scala StackWalker smoke covering source-level Java `StackWalker`
+  retained-class-reference frame descriptor and `MethodType` metadata plus the
+  no-retain `getMethodType` guard;
 - `scala-reflect` runtime universe coverage for runtime mirror creation,
   `typeOf`, constructor/member symbol lookup, case-accessor discovery, and
   static class lookup;
@@ -213,6 +213,13 @@ finite/infinite metadata while keeping the main Scala compiler smoke smaller.
 A local 2026-06-30 validation completed the focused Scala duration smoke in 81
 seconds and the remaining main Scala compiler smoke in 353 seconds using Scala
 2.13.18.
+The Scala StackWalker coverage now lives in `classes/scala_stackwalker_smoke`
+and runs through `ci/scala_stackwalker_smoke.sh`. It checks retained
+class-reference frame descriptor and `MethodType` metadata plus the no-retain
+`getMethodType` guard while keeping the main Scala compiler smoke smaller.
+A local 2026-06-30 validation completed the focused Scala StackWalker smoke in
+58 seconds and the remaining main Scala compiler smoke in 310 seconds using
+Scala 2.13.18.
 
 The smoke also includes a two-phase macro path: Doppio-hosted scalac first
 emits a blackbox macro implementation class, then a second Doppio-hosted scalac

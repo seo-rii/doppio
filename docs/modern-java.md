@@ -313,8 +313,9 @@ native-memory fills, including zero-length no-ops.
   arguments, case-class `copy`, `@tailrec`, varargs with `ClassTag`, `Try`,
   tuple ordering, package object initialization, package-scoped classes and
   objects, `Enumeration`, `@BeanProperty`, Java reflection over
-  Scala-generated members, specialized class generation, Java `StackWalker`
-  frame descriptor/`MethodType` metadata with retained-class-reference guards,
+  Scala-generated members, specialized class generation, a focused Scala
+  StackWalker smoke covering Java `StackWalker` frame descriptor/`MethodType`
+  metadata with retained-class-reference guards,
   Scala 2.13 functional/library paths including `Function.chain`,
   composed function adapters, `Option.when`/`Option.unless`,
   `Using.resource`, `Try` recovery, `Either.cond`, and `partitionMap`,

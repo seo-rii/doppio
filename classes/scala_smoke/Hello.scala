@@ -88,7 +88,6 @@ object Hello {
     val functional = ScalaFunctionalSmoke.exercise()
     val language = ScalaLanguageSmoke.exercise()
     val macroUse = ScalaMacroUseSmoke.exercise()
-    val stackWalker = ScalaStackWalkerSmoke.exercise()
-    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$collections:$interop:$reflection:$scalaReflect:$functional:$language:$macroUse:$stackWalker")
+    println(s"${box.name}:${box.value}:$stages:$option:$either:$advanced:$library:$collections:$interop:$reflection:$scalaReflect:$functional:$language:$macroUse")
   }
 }

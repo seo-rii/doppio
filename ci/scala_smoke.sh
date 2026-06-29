@@ -105,7 +105,6 @@ test -f "$out_dir/ScalaLibrarySmoke.class"
 test -f "$out_dir/ScalaMacroUseSmoke.class"
 test -f "$out_dir/ScalaReflectSmoke.class"
 test -f "$out_dir/ScalaReflectSmoke\$ReflectBox.class"
-test -f "$out_dir/ScalaStackWalkerSmoke.class"
 test -f "$out_dir/SmokeCodec.class"
 test -f "$out_dir/SmokeFolder.class"
 test -f "$out_dir/scalasmoke/PackageRegistry.class"
@@ -141,6 +140,10 @@ fi
 if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
   scala_duration_expected_output=":3250|0,500,1500,1250|-1000,0,1500,3000|1|2.0|1250|2250|3|true:false:true"
   expected_output="${expected_output/$scala_duration_expected_output/}"
+fi
+if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
+  scala_stackwalker_expected_output=":5:leaf:(I)Ljava/lang/String;:(I)Ljava/lang/String;:ScalaStackWalkerSmoke$|outer:(Ljava/lang/String;)Ljava/lang/String;:(Ljava/lang/String;)Ljava/lang/String;:ScalaStackWalkerSmoke$|exercise:()Ljava/lang/String;:()Ljava/lang/String;:ScalaStackWalkerSmoke$:(I)Ljava/lang/String;:UnsupportedOperationException"
+  expected_output="${expected_output/$scala_stackwalker_expected_output/}"
 fi
 if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
   scala_proxy_expected_output=":iface:transform:value:dyn:SC5:XY3:cba:null:ScalaProxyService(dyn):654:true:true:true:transform:2,label:0,transform:2,maybe:1,maybe:1,toString:0,hashCode:0,equals:1"

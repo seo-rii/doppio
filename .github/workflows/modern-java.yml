@@ -132,5 +132,8 @@ jobs:
       - name: Run Scala duration smoke
         run: ./ci/scala_duration_smoke.sh
 
+      - name: Run Scala StackWalker smoke
+        run: ./ci/scala_stackwalker_smoke.sh
+
       - name: Run Scala compiler smoke
         run: ./ci/scala_smoke.sh
