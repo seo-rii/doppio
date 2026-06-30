@@ -167,7 +167,6 @@ test -f "$out_dir/StageNode.class"
 test -f "$out_dir/StagePayload.class"
 test -f "$out_dir/Sink.class"
 test -f "$out_dir/StringCell.class"
-test -f "$out_dir/TextRegexSmokeKt.class"
 test -f "$out_dir/TextStep.class"
 test -f "$out_dir/VarianceBox.class"
 test -f "$out_dir/ValueClassSmokeKt.class"
@@ -183,8 +182,6 @@ runtime_cp="$runtime_cp:$stdlib_jar"
 default_expected_output="$(printf 'hi\nname=2,4:5\nmode-FAST:3:2,3:caught\nOK:FALLBACK:3:9:2:1:accbbb:4:4:7\ndelegate:answer:DelegatedOwner|local:local:top\ntry>catch>finally:boom:8:true:x3:10:12:4:sync\na2|b7|c4|d9:20:8:7:10\nv1,v4,v7:22:box4:v7:none|v11:a\nString:3:a|bb|ccc:Number:2:1|2:i[3,1,4,9,1,5]=23:zamm|zbbmm:1-4-9:2345:String:int\nclass:field:getter:ctor,_:method:arg:kt3\nABG:1:15:kt5:StagePayload:EmptyStage:true\np-box:6!:p-wide:6?:[CORE]:cfg23ab:p-box:6!|p-named:6!|p-full:9!:p-r:3!|q-r:3!|q-r:3?\n1357:nilpe:14:10,30,-1,40:neg|zero|small|big\nenter>body>exit:ok:c10:34:stop3\nkt:java:ok7:IllegalArgumentException:fieldconst:top-3:o5obj:5:11111111\nbind:primary:MutableDelegateOwner:primary:0|bind:primary:MutableDelegateOwner:primary:30|alt:secondary:MutableDelegateOwner:secondary:30|local:local:top:local:0|local:local:top:local:10\n234:yx:true:11:45|89:yx:true:8:5\ntext:7|text:5|5x|text:6|z!|az!|apply:Object:Object,describe:String:CharSequence,describe:String:Object|apply:Object:Object,describe:String:Object|echo:Object:Object,read:Object:\nclass-a,class-b|class:HIGH:AnnotationMetadataOwner:1,2,3|ctor-a,ctor-b|ctor:LOW:String:4,5|field-a,field-b|field:LOW:int:6|method-a,method-b|method:LOW:long:7,8|arg-a,arg-b|arg:LOW:double:9|kt3\n5/1/5:1|5|3|p0:b:1,p1:aa:2|kt:2|ktxy|1,2|kt:2|xy:2|n:Integer,s:String,z:null\ns|[a]|kn|<GO>|x1|(xy)|{q}|ad|text\n16|1:2:2,1:4:4,2:1:2,2:2:4,2:3:6,2:4:8,3:2:6#6|p357|q46|ok1:neg1:For input string: "x":ok7|2:ccc\nfalse/true|KT:5:1|KT:5:1|kt|2/9/6|companion>observed:start->kt>guarded:2?1>guarded:2?9>lazy>nested\n24678|k0=4,k1=16,k2=36,k3=49,k4=64|e=20,o=7|12,21,8|24|67|8|678/24|2:4;4:6;6:7|abc|22,44,66,77,88|1:3:7:13:20:28|71|2,1,0,9\n1:2|start>after1|0=3,1=8,2=10|start>after1>start>after1>afterAll>done|abcd|789/IllegalStateException|3,6,12,24|xyyzzz:23')"
 default_expected_output="${default_expected_output}
 44|12|IllegalStateException/99/77|0=ok44,1=errIllegalStateException:again,2=errUnsupportedOperationException:manual|6:body>recover:inner>finally|IllegalArgumentException:root|two|enter:a>ok:a>mapped:44>enter:b>fail:b:ResultSmokeException:boom>recover:boom>enter:c>ok:c>recoverCatching:bad4>else:again"
-default_expected_output="${default_expected_output}
-0:a:2:0-2,1:bb:25:5-9,2:c:457:12-16|A:1; BB:32; C:654; bad=x|first b=2|a|bb|c|0:5:a,1:6:b,2:5:g|KT/42|true|KOTin"
 expected_output="${KOTLIN_SMOKE_EXPECTED_OUTPUT:-"$default_expected_output"}"
 
 native_output="$(java -cp "$runtime_cp" HelloKt)"

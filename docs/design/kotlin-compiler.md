@@ -520,8 +520,12 @@ Current verified checks:
   `ResultKt.throwOnFailure`, exception tables for inline `runCatching` /
   `mapCatching` / `recoverCatching` / `try` / `finally`, `StackMapTable`,
   and `kotlin.Metadata`.
-- A minimal text/regex smoke compiled with the repo suite in 324 seconds and
-  both the host JVM and Doppio printed
+- A focused Kotlin text/regex smoke now lives in
+  `classes/kotlin_text_regex_smoke` and runs through
+  `ci/kotlin_text_regex_smoke.sh`. A focused local run completed in 114 seconds
+  and a follow-up run through the remaining full-classpath
+  `ci/kotlin_smoke.sh` completed in 352 seconds. Both the host JVM and Doppio
+  printed
   `0:a:2:0-2,1:bb:25:5-9,2:c:457:12-16|A:1; BB:32; C:654; bad=x|first b=2|a|bb|c|0:5:a,1:6:b,2:5:g|KT/42|true|KOTin`.
   `javap` verified `Regex.findAll`, JDK 8 named-group extension lookup,
   lazy `SequencesKt.mapIndexed` / `joinToString`, transform replacement,
