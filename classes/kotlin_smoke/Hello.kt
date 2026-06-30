@@ -18,5 +18,4 @@ fun main() {
   println(captureShapeSummary())
   println(delegationBridgeSummary())
   println(annotationMetadataSummary())
-  println(extensionVarianceSummary())
 }

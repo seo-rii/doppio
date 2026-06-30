@@ -454,11 +454,14 @@ Current verified checks:
   the full classpath. Java reflection verified bridge methods at runtime, and
   `javap` verified interface `DefaultImpls`, delegation forwarding fields,
   generic signatures, and `ACC_BRIDGE` / `ACC_SYNTHETIC` methods.
-- A minimal extension/typealias/variance smoke compiled in 90 seconds and both
-  the host JVM and Doppio printed
+- A focused Kotlin extension/typealias/variance smoke now lives in
+  `classes/kotlin_extension_variance_smoke` and runs through
+  `ci/kotlin_extension_variance_smoke.sh`. A focused local run completed in 112
+  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_smoke.sh` completed in 217 seconds. Both the host JVM and Doppio
+  printed
   `5/1/5:1|5|3|p0:b:1,p1:aa:2|kt:2|ktxy|1,2|kt:2|xy:2|n:Integer,s:String,z:null`.
-  The repo smoke now includes the same path and completed in 255 seconds with
-  the full classpath. `javap` verified top-level extension receiver methods,
+  `javap` verified top-level extension receiver methods,
   the `bump$default` default-argument bridge, extension property accessors,
   `ScoreMap` and `PairList` typealias metadata, generic class signatures,
   use-site variance and star-projection `Signature` attributes, and the
