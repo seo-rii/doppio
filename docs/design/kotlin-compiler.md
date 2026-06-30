@@ -472,12 +472,15 @@ Current verified checks:
   bound-reference classes, extension property-reference lowering, the
   `decorate$default` bridge, invokedynamic lambda sites, and runtime-visible
   receiver-parameter annotations.
-- A minimal control-flow bytecode smoke compiled in 82 seconds and both the
-  host JVM and Doppio printed
+- A focused Kotlin control-flow smoke now lives in
+  `classes/kotlin_control_flow_smoke` and runs through
+  `ci/kotlin_control_flow_smoke.sh`. A focused local run completed in 100
+  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_smoke.sh` completed in 235 seconds. Both the host JVM and Doppio
+  printed
   `16|1:2:2,1:4:4,2:1:2,2:2:4,2:3:6,2:4:8,3:2:6#6|p357|q46|ok1:neg1:For input string: "x":ok7|2:ccc`.
-  The repo smoke now includes the same path and completed in 305 seconds with
-  the full classpath. `javap` verified tailrec/default bridges, labeled loop
-  lowering, local default-vararg helpers, spread-array calls, inline
+  `javap` verified tailrec/default bridges, labeled loop lowering, local
+  default-vararg helpers, spread-array calls, inline
   `runCatching` / `fold`, labeled `return@` lowering, `Exception table`
   entries, and `StackMapTable` metadata.
 - A focused Kotlin initialization/delegate smoke now lives in

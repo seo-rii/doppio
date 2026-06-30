@@ -126,6 +126,9 @@ jobs:
       - name: Run Kotlin Result/exception smoke
         run: ./ci/kotlin_result_exception_smoke.sh
 
+      - name: Run Kotlin control-flow smoke
+        run: ./ci/kotlin_control_flow_smoke.sh
+
       - name: Run Kotlin initialization/delegate smoke
         run: ./ci/kotlin_initialization_delegate_smoke.sh
 
