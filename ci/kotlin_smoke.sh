@@ -142,11 +142,6 @@ test -f "$out_dir/MutableBinding.class"
 test -f "$out_dir/MutableDelegateOwner.class"
 test -f "$out_dir/MutableDelegateSmokeKt.class"
 test -f "$out_dir/ReferenceSequenceSmokeKt.class"
-test -f "$out_dir/ReflectionShapeOwner.class"
-test -f "$out_dir/ReflectionShapeOwner\$Companion.class"
-test -f "$out_dir/ReflectionShapeOwner\$Inner.class"
-test -f "$out_dir/ReflectionShapeOwner\$Nested.class"
-test -f "$out_dir/ReflectionShapeSmokeKt.class"
 test -f "$out_dir/ReifiedArraySmokeKt.class"
 test -f "$out_dir/ResultExceptionSmokeKt.class"
 test -f "$out_dir/ResultSmokeException.class"
@@ -197,8 +192,6 @@ default_expected_output="${default_expected_output}
 3250|0,500,1500,1250|-1000,0,1500,3000|1|2.0|1250|2250|3|true:true:true"
 default_expected_output="${default_expected_output}
 a=123,b=12,c=89|true|true:y:Y11|abc:false:true:1|main:11/worker:3/main:11/main:11|locked:3:hold:1:true|k=1,z=12|11"
-default_expected_output="${default_expected_output}
-Companion,Inner,Nested|Nested/ReflectionShapeOwner/ReflectionShapeOwner/true/false/false|Inner/ReflectionShapeOwner/ReflectionShapeOwner/true/false/false|Companion/ReflectionShapeOwner/ReflectionShapeOwner/true/false/false|MethodLocal/null/ReflectionShapeOwner/methodLocalClass/false/true/false|CompanionLocal/null/Companion/companionLocalClass/false/true/false|_/null/ReflectionShapeOwner/anonymousRunnableClass/Runnable/false/false/true"
 default_expected_output="${default_expected_output}
 0f10ff|0A0B|2:cafe:15|2020-01-02T03:04:05Z:1577934245000:2020-01-02T03:04:07Z:true|Random:82:376|SplittableRandom:true:88:574|QRS:uoe|entry:value:uoe"
 expected_output="${KOTLIN_SMOKE_EXPECTED_OUTPUT:-"$default_expected_output"}"

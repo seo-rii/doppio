@@ -93,6 +93,9 @@ jobs:
       - name: Run Kotlin reflect smoke
         run: ./ci/kotlin_reflect_smoke.sh
 
+      - name: Run Kotlin reflection shape smoke
+        run: ./ci/kotlin_reflection_shape_smoke.sh
+
       - name: Run Kotlin unsigned smoke
         run: ./ci/kotlin_unsigned_smoke.sh
 
