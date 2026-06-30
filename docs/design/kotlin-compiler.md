@@ -601,12 +601,15 @@ Current verified checks:
   A local 2026-06-30 validation completed the focused unsigned smoke in 92
   seconds and the remaining full-classpath Kotlin compiler smoke in 527
   seconds.
-- A Kotlin source-level `CompletableFuture` smoke covers Java SAM conversion
-  into `CompletableFuture.supplyAsync`, executor-backed asynchronous
-  completion, `thenApply`, `thenCompose`, `handle`, `thenCombine`,
-  `applyToEither`, `allOf`, `join`, and timed `get`. Both the host JVM and
-  Doppio print `KT2!:5:l`. A 2026-06-20 full-classpath run completed in 544
-  seconds.
+- A focused Kotlin source-level `CompletableFuture` smoke now lives in
+  `classes/kotlin_completable_future_smoke` and runs through
+  `ci/kotlin_completable_future_smoke.sh`. It covers Java SAM conversion into
+  `CompletableFuture.supplyAsync`, executor-backed asynchronous completion,
+  `thenApply`, `thenCompose`, `handle`, `thenCombine`, `applyToEither`,
+  `allOf`, `join`, and timed `get`. Both the host JVM and Doppio print
+  `KT2!:5:l`. A local 2026-06-30 validation completed the focused
+  CompletableFuture smoke in 74 seconds and the remaining full-classpath
+  Kotlin compiler smoke in 404 seconds.
 - A Kotlin contracts smoke covers `ExperimentalContracts`, `returns`
   implications, `callsInPlace` with `AT_MOST_ONCE` and `EXACTLY_ONCE`, inline
   contract functions, nullable smart casts in the caller, and lambda capture

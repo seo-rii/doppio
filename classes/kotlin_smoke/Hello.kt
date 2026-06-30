@@ -30,7 +30,6 @@ fun main() {
   println(concurrentCacheSummary())
   println(contractSmokeSummary())
   println(proxyReflectionSummary())
-  println(completableFutureSummary())
   println(enumPolymorphismSummary())
   println(reflectionShapeSummary())
   println(modernJavaInteropSummary())

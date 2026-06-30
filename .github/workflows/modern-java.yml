@@ -96,6 +96,9 @@ jobs:
       - name: Run Kotlin unsigned smoke
         run: ./ci/kotlin_unsigned_smoke.sh
 
+      - name: Run Kotlin CompletableFuture smoke
+        run: ./ci/kotlin_completable_future_smoke.sh
+
       - name: Cache Scala compiler
         uses: actions/cache@v5
         with:

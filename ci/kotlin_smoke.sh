@@ -92,7 +92,6 @@ test -f "$out_dir/BytecodeSmokeKt.class"
 test -f "$out_dir/CollectionBuilderSmokeKt.class"
 test -f "$out_dir/CollectionBuilderSmokeKt\$collectionBuilderSummary\$\$inlined\$groupingBy\$1.class"
 test -f "$out_dir/ConcurrentCacheSmokeKt.class"
-test -f "$out_dir/CompletableFutureSmokeKt.class"
 test -f "$out_dir/ContractSmokeKt.class"
 test -f "$out_dir/ControlFlowSmokeKt.class"
 test -f "$out_dir/CaptureOwner.class"
@@ -211,8 +210,6 @@ default_expected_output="${default_expected_output}
 KT2|missing|before>body7>after|7|1002"
 default_expected_output="${default_expected_output}
 iface/transform/value|dyn|KT5|XY3|cba|null|ProxyReflectionService(dyn)|321|true|true|true|transform:2,getLabel:0,transform:2,maybe:1,maybe:1,toString:0,hashCode:0,equals:1"
-default_expected_output="${default_expected_output}
-KT2!:5:l"
 default_expected_output="${default_expected_output}
 A1B3G5|tk2|X1,x2,xxx3|low/high/high|IllegalArgumentException"
 default_expected_output="${default_expected_output}
