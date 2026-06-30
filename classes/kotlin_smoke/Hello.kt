@@ -23,5 +23,4 @@ fun main() {
   println(controlFlowSummary())
   println(initializationDelegateSummary())
   println(collectionBuilderSummary())
-  println(sequenceBuilderSummary())
 }

@@ -126,6 +126,9 @@ jobs:
       - name: Run Kotlin Result/exception smoke
         run: ./ci/kotlin_result_exception_smoke.sh
 
+      - name: Run Kotlin sequence-builder smoke
+        run: ./ci/kotlin_sequence_builder_smoke.sh
+
       - name: Cache Scala compiler
         uses: actions/cache@v5
         with:

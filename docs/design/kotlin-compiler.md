@@ -501,16 +501,19 @@ Current verified checks:
   `associateWith`, `runningFold`, `reduceIndexed`, `toSortedMap`,
   `invokedynamic` `Function1` lambdas, `StackMapTable`, and
   `kotlin.Metadata`.
-- A minimal sequence-builder smoke compiled in 81 seconds and both the host
-  JVM and Doppio printed
+- A focused Kotlin sequence-builder smoke now lives in
+  `classes/kotlin_sequence_builder_smoke` and runs through
+  `ci/kotlin_sequence_builder_smoke.sh`. A focused local run completed in 78
+  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_smoke.sh` completed in 290 seconds. Both the host JVM and Doppio
+  printed
   `1:2|start>after1|0=3,1=8,2=10|start>after1>start>after1>afterAll>done|abcd|789/IllegalStateException|3,6,12,24|xyyzzz:23`.
-  The repo smoke now includes the same path and completed in 335 seconds with
-  the full classpath. `javap` verified `SequencesKt.sequence`, `iterator`,
-  `asSequence`, `constrainOnce`, `generateSequence`, `windowed`, `onEach`,
-  `zipWithNext`, generated `RestrictedSuspendLambda` classes,
-  `SequenceScope.yield` / `yieldAll`, `Continuation`, `invokeSuspend`,
-  `COROUTINE_SUSPENDED`, `ResultKt.throwOnFailure`, `DebugMetadata`,
-  `StackMapTable`, and `kotlin.Metadata`.
+  `javap` verified `SequencesKt.sequence`, `iterator`, `asSequence`,
+  `constrainOnce`, `generateSequence`, `windowed`, `onEach`, `zipWithNext`,
+  generated `RestrictedSuspendLambda` classes, `SequenceScope.yield` /
+  `yieldAll`, `Continuation`, `invokeSuspend`, `COROUTINE_SUSPENDED`,
+  `ResultKt.throwOnFailure`, `DebugMetadata`, `StackMapTable`, and
+  `kotlin.Metadata`.
 - A focused Kotlin Result/exception smoke now lives in
   `classes/kotlin_result_exception_smoke` and runs through
   `ci/kotlin_result_exception_smoke.sh`. A focused local run completed in 103
