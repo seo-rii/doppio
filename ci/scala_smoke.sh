@@ -96,7 +96,6 @@ test -f "$out_dir/Hello.class"
 test -f "$out_dir/AdvancedScalaSmoke.class"
 test -f "$out_dir/Add.class"
 test -f "$out_dir/Lit.class"
-test -f "$out_dir/ScalaInteropSmoke.class"
 test -f "$out_dir/ScalaMacroUseSmoke.class"
 test -f "$out_dir/scalasmoke/PackageRegistry.class"
 test -f "$out_dir/scalasmoke/PackageWorker.class"
@@ -110,7 +109,7 @@ test -f "$out_dir/SmokeStage.class"
 test -f "$out_dir/ZeroExpr.class"
 
 scala_indy_dump="$work_dir/scala-indy-javap.txt"
-javap -classpath "$runtime_cp" -v 'ScalaInteropSmoke$' 'Hello$' > "$scala_indy_dump"
+javap -classpath "$runtime_cp" -v 'AdvancedScalaSmoke$' 'Hello$' > "$scala_indy_dump"
 grep -q 'InvokeDynamic' "$scala_indy_dump"
 grep -q 'LambdaMetafactory' "$scala_indy_dump"
 
@@ -154,6 +153,10 @@ fi
 if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
   scala_library_expected_output=":1=4,2=2,3=4:b:4/ccc:4/aa:2:g2:t5:String:3:z:2"
   expected_output="${expected_output/$scala_library_expected_output/}"
+fi
+if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
+  scala_interop_expected_output=":r0a1b2:2:2,1:5:f32"
+  expected_output="${expected_output/$scala_interop_expected_output/}"
 fi
 if [ -z "${SCALA_SMOKE_EXPECTED_OUTPUT:-}" ]; then
   scala_proxy_expected_output=":iface:transform:value:dyn:SC5:XY3:cba:null:ScalaProxyService(dyn):654:true:true:true:transform:2,label:0,transform:2,maybe:1,maybe:1,toString:0,hashCode:0,equals:1"

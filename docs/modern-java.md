@@ -328,8 +328,9 @@ native-memory fills, including zero-length no-ops.
   composed function adapters, `Option.when`/`Option.unless`, `Using.resource`,
   `Try` recovery, `Either.cond`, `partitionMap`, and lambda-heavy classfile
   emission,
-  Java collection interop through `scala.jdk.CollectionConverters`, a small
-  `Future`/`Promise`/`Await` path running on a Java executor,
+  a focused Scala Java collection/Future interop smoke covering
+  `scala.jdk.CollectionConverters`, mutable Java list/map wrappers, and a
+  small `Future`/`Promise`/`Await` path running on a Java executor,
   a focused Scala concurrency smoke covering Java concurrency interop through
   `CompletableFuture` chaining and recovery, `ConcurrentHashMap` compute/merge
   paths, atomics, `CopyOnWriteArrayList`, `ThreadLocal`, `ReentrantLock`, and

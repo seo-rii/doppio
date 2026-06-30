@@ -57,9 +57,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - a focused Scala language/type-system smoke covering path-dependent types,
   higher-kinded implicit typeclass lookup, self-types, by-name argument
   evaluation, extractor matching, and `@switch` lowering;
-- Java collection interop through `scala.jdk.CollectionConverters`, mutable
-  Java list/map wrappers, and a small `Future`/`Promise`/`Await` path running
-  on a Java executor;
+- a focused Scala Java collection/Future interop smoke covering
+  `scala.jdk.CollectionConverters`, mutable Java list/map wrappers, and a
+  small `Future`/`Promise`/`Await` path running on a Java executor;
 - a focused Scala concurrency smoke covering Java concurrency interop through
   `CompletableFuture` chaining and recovery, `ConcurrentHashMap` compute/merge
   paths, atomics, `CopyOnWriteArrayList`, `ThreadLocal`, `ReentrantLock`, and
@@ -255,6 +255,14 @@ checks `groupMapReduce`, implicit value classes, default arguments, case-class
 keeping the main Scala compiler smoke smaller.
 A local 2026-06-30 validation completed the focused Scala library smoke in 78
 seconds and the remaining main Scala compiler smoke in 206 seconds using Scala
+2.13.18.
+The Scala Java collection/Future interop coverage now lives in
+`classes/scala_interop_smoke` and runs through `ci/scala_interop_smoke.sh`. It
+checks `scala.jdk.CollectionConverters` wrappers for mutable Java lists and
+maps plus a small `Future`/`Promise`/`Await` path on a Java executor, while
+keeping the main Scala compiler smoke smaller.
+A local 2026-06-30 validation completed the focused Scala interop smoke in 63
+seconds and the remaining main Scala compiler smoke in 188 seconds using Scala
 2.13.18.
 
 The smoke also includes a two-phase macro path: Doppio-hosted scalac first
