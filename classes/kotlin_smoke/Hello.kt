@@ -28,7 +28,6 @@ fun main() {
   println(textRegexSummary())
   println(durationSummary())
   println(concurrentCacheSummary())
-  println(contractSmokeSummary())
   println(proxyReflectionSummary())
   println(enumPolymorphismSummary())
   println(reflectionShapeSummary())

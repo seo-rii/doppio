@@ -610,12 +610,15 @@ Current verified checks:
   `KT2!:5:l`. A local 2026-06-30 validation completed the focused
   CompletableFuture smoke in 74 seconds and the remaining full-classpath
   Kotlin compiler smoke in 404 seconds.
-- A Kotlin contracts smoke covers `ExperimentalContracts`, `returns`
-  implications, `callsInPlace` with `AT_MOST_ONCE` and `EXACTLY_ONCE`, inline
-  contract functions, nullable smart casts in the caller, and lambda capture
-  through an exactly-once block. Both the host JVM and Doppio print
-  `KT2|missing|before>body7>after|7|1002`. A 2026-06-21 full-classpath run
-  completed in 600 seconds.
+- A focused Kotlin contracts smoke now lives in `classes/kotlin_contract_smoke`
+  and runs through `ci/kotlin_contract_smoke.sh`. It covers
+  `ExperimentalContracts`, `returns` implications, `callsInPlace` with
+  `AT_MOST_ONCE` and `EXACTLY_ONCE`, inline contract functions, nullable smart
+  casts in the caller, and lambda capture through an exactly-once block. Both
+  the host JVM and Doppio print `KT2|missing|before>body7>after|7|1002`.
+  A local 2026-06-30 validation completed the focused contracts smoke in 80
+  seconds and the remaining full-classpath Kotlin compiler smoke in 385
+  seconds.
 - A minimal enum-polymorphism smoke covers enum constants with class bodies,
   overridden properties and methods, `Enum.entries`, `enumValues`,
   `enumValueOf`, `valueOf`, and `when` dispatch over those constants. Both the
