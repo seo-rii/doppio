@@ -320,8 +320,10 @@ native-memory fills, including zero-length no-ops.
   constructor/member symbol lookup, case-accessor discovery, and static class
   lookup, a focused Scala collection-library smoke covering `LazyList`,
   extractor `unapply`, `Regex`, `TreeMap`, `ArraySeq`, `groupMap`, map views,
-  and right-biased `Either`, a focused Scala functional/library smoke covering
-  `Function.chain`,
+  and right-biased `Either`, a focused Scala language/type-system smoke
+  covering path-dependent types, higher-kinded implicit typeclass lookup,
+  self-types, by-name argument evaluation, extractor matching, and `@switch`
+  lowering, a focused Scala functional/library smoke covering `Function.chain`,
   composed function adapters, `Option.when`/`Option.unless`, `Using.resource`,
   `Try` recovery, `Either.cond`, `partitionMap`, and lambda-heavy classfile
   emission,

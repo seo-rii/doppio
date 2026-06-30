@@ -54,9 +54,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
   function adapters, `Option.when`/`Option.unless`, `Using.resource`,
   `Try.map`/`filter`/`recover`, `Either.cond`, `partitionMap`, and
   lambda-heavy classfile emission;
-- Scala language/type-system coverage for path-dependent types, higher-kinded
-  implicit typeclass lookup, self-types, by-name argument evaluation, extractor
-  matching, and `@switch` lowering;
+- a focused Scala language/type-system smoke covering path-dependent types,
+  higher-kinded implicit typeclass lookup, self-types, by-name argument
+  evaluation, extractor matching, and `@switch` lowering;
 - Java collection interop through `scala.jdk.CollectionConverters`, mutable
   Java list/map wrappers, and a small `Future`/`Promise`/`Await` path running
   on a Java executor;
@@ -111,12 +111,9 @@ The smoke compares the generated program output on the host JVM and Doppio.
 
 The initial Scala 2.13 compiler smoke now passes under Doppio. It compiles the
 source fixture, checks the emitted class files, and compares generated program
-output on the host JVM and Doppio. The smoke now includes language/type-system
-coverage for path-dependent types, higher-kinded implicit typeclass lookup,
-self-types, by-name argument evaluation, extractor matching, and `@switch`
-lowering, plus Java collection interop and a small asynchronous `Future` path. A
-local
-2026-06-21 run of the expanded smoke completed in 303 seconds using Scala
+output on the host JVM and Doppio. The smoke now includes Java collection
+interop and a small asynchronous `Future` path. A local 2026-06-21 run of the
+expanded smoke completed in 303 seconds using Scala
 2.13.18.
 A local 2026-06-23 run with the language/type-system smoke completed in
 488 seconds using Scala 2.13.18.
@@ -242,6 +239,15 @@ The Scala collection-library coverage now lives in
 A local 2026-06-30 validation completed the focused Scala collection smoke in
 80 seconds and the remaining main Scala compiler smoke in 225 seconds using
 Scala 2.13.18.
+The Scala language/type-system coverage now lives in
+`classes/scala_language_smoke` and runs through
+`ci/scala_language_smoke.sh`. It checks path-dependent types, higher-kinded
+implicit typeclass lookup, self-types, by-name argument evaluation, extractor
+matching, and `@switch` lowering while keeping the main Scala compiler smoke
+smaller.
+A local 2026-06-30 validation completed the focused Scala language smoke in 70
+seconds and the remaining main Scala compiler smoke in 237 seconds using Scala
+2.13.18.
 
 The smoke also includes a two-phase macro path: Doppio-hosted scalac first
 emits a blackbox macro implementation class, then a second Doppio-hosted scalac
