@@ -126,6 +126,9 @@ jobs:
       - name: Run Kotlin Result/exception smoke
         run: ./ci/kotlin_result_exception_smoke.sh
 
+      - name: Run Kotlin receiver-lambda smoke
+        run: ./ci/kotlin_receiver_lambda_smoke.sh
+
       - name: Run Kotlin control-flow smoke
         run: ./ci/kotlin_control_flow_smoke.sh
 
