@@ -35,9 +35,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
   `Option`, and `Either`;
 - `PartialFunction.collect`, for-comprehension desugaring, `lazy val`, and
   `try`/`catch`/`finally`;
-- a multi-file source set using `groupMapReduce`, implicit value classes,
-  default arguments, case-class `copy`, `@tailrec`, varargs with `ClassTag`,
-  `Try`, and tuple ordering;
+- a focused Scala library/lowering smoke covering `groupMapReduce`, implicit
+  value classes, default arguments, case-class `copy`, `@tailrec`, varargs
+  with `ClassTag`, `Try`, and tuple ordering;
 - package object initialization, package-scoped classes/objects,
   `Enumeration`, `@BeanProperty`, Java reflection over Scala-generated members,
   and specialized class generation;
@@ -247,6 +247,14 @@ matching, and `@switch` lowering while keeping the main Scala compiler smoke
 smaller.
 A local 2026-06-30 validation completed the focused Scala language smoke in 70
 seconds and the remaining main Scala compiler smoke in 237 seconds using Scala
+2.13.18.
+The Scala library/lowering coverage now lives in
+`classes/scala_library_smoke` and runs through `ci/scala_library_smoke.sh`. It
+checks `groupMapReduce`, implicit value classes, default arguments, case-class
+`copy`, `@tailrec`, varargs with `ClassTag`, `Try`, and tuple ordering while
+keeping the main Scala compiler smoke smaller.
+A local 2026-06-30 validation completed the focused Scala library smoke in 78
+seconds and the remaining main Scala compiler smoke in 206 seconds using Scala
 2.13.18.
 
 The smoke also includes a two-phase macro path: Doppio-hosted scalac first
