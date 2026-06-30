@@ -21,5 +21,4 @@ fun main() {
   println(extensionVarianceSummary())
   println(receiverLambdaSummary())
   println(controlFlowSummary())
-  println(initializationDelegateSummary())
 }
