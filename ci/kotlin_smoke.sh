@@ -134,7 +134,6 @@ test -f "$out_dir/JvmInteropSingleton.class"
 test -f "$out_dir/JvmInteropSmokeFile.class"
 test -f "$out_dir/BindingProvider.class"
 test -f "$out_dir/ModernConstructSmokeKt.class"
-test -f "$out_dir/ModernJavaInteropSmokeKt.class"
 test -f "$out_dir/MetadataLevel.class"
 test -f "$out_dir/MultiTag.class"
 test -f "$out_dir/MultiTag\$Container.class"
@@ -192,8 +191,6 @@ default_expected_output="${default_expected_output}
 3250|0,500,1500,1250|-1000,0,1500,3000|1|2.0|1250|2250|3|true:true:true"
 default_expected_output="${default_expected_output}
 a=123,b=12,c=89|true|true:y:Y11|abc:false:true:1|main:11/worker:3/main:11/main:11|locked:3:hold:1:true|k=1,z=12|11"
-default_expected_output="${default_expected_output}
-0f10ff|0A0B|2:cafe:15|2020-01-02T03:04:05Z:1577934245000:2020-01-02T03:04:07Z:true|Random:82:376|SplittableRandom:true:88:574|QRS:uoe|entry:value:uoe"
 expected_output="${KOTLIN_SMOKE_EXPECTED_OUTPUT:-"$default_expected_output"}"
 
 native_output="$(java -cp "$runtime_cp" HelloKt)"

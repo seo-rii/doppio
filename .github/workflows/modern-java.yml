@@ -111,6 +111,9 @@ jobs:
       - name: Run Kotlin proxy smoke
         run: ./ci/kotlin_proxy_smoke.sh
 
+      - name: Run Kotlin modern Java interop smoke
+        run: ./ci/kotlin_modern_java_interop_smoke.sh
+
       - name: Cache Scala compiler
         uses: actions/cache@v5
         with:
