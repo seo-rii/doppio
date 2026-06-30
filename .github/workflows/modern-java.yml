@@ -123,6 +123,9 @@ jobs:
       - name: Run Kotlin text/regex smoke
         run: ./ci/kotlin_text_regex_smoke.sh
 
+      - name: Run Kotlin Result/exception smoke
+        run: ./ci/kotlin_result_exception_smoke.sh
+
       - name: Cache Scala compiler
         uses: actions/cache@v5
         with:

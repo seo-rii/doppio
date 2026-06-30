@@ -511,8 +511,12 @@ Current verified checks:
   `SequenceScope.yield` / `yieldAll`, `Continuation`, `invokeSuspend`,
   `COROUTINE_SUSPENDED`, `ResultKt.throwOnFailure`, `DebugMetadata`,
   `StackMapTable`, and `kotlin.Metadata`.
-- A minimal Result/exception smoke compiled with the repo suite in 336 seconds
-  and both the host JVM and Doppio printed
+- A focused Kotlin Result/exception smoke now lives in
+  `classes/kotlin_result_exception_smoke` and runs through
+  `ci/kotlin_result_exception_smoke.sh`. A focused local run completed in 103
+  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_smoke.sh` completed in 336 seconds. Both the host JVM and Doppio
+  printed
   `44|12|IllegalStateException/99/77|0=ok44,1=errIllegalStateException:again,2=errUnsupportedOperationException:manual|6:body>recover:inner>finally|IllegalArgumentException:root|two|enter:a>ok:a>mapped:44>enter:b>fail:b:ResultSmokeException:boom>recover:boom>enter:c>ok:c>recoverCatching:bad4>else:again`.
   `javap` verified `Result.constructor-impl`, `ResultKt.createFailure`,
   `Result.isSuccess-impl`, `Result.isFailure-impl`,
