@@ -450,12 +450,15 @@ Current verified checks:
   through Java `Class` metadata, checking declared classes,
   declaring/enclosing classes, enclosing methods, member/local/anonymous flags,
   and anonymous interface metadata on both the host JVM and Doppio.
-- A minimal delegation/bridge smoke compiled in 72 seconds and both the host JVM
-  and Doppio printed
+- A focused Kotlin delegation/bridge smoke now lives in
+  `classes/kotlin_delegation_bridge_smoke` and runs through
+  `ci/kotlin_delegation_bridge_smoke.sh`. A focused local run completed in 74
+  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_smoke.sh` completed in 214 seconds. Both the host JVM and Doppio
+  printed
   `text:7|text:5|5x|text:6|z!|az!|apply:Object:Object,describe:String:CharSequence,describe:String:Object|apply:Object:Object,describe:String:Object|echo:Object:Object,read:Object:`.
-  The repo smoke now includes the same path and completed in 233 seconds with
-  the full classpath. Java reflection verified bridge methods at runtime, and
-  `javap` verified interface `DefaultImpls`, delegation forwarding fields,
+  Java reflection verified bridge methods at runtime, and `javap` verified
+  interface `DefaultImpls`, delegation forwarding fields,
   generic signatures, and `ACC_BRIDGE` / `ACC_SYNTHETIC` methods.
 - A focused Kotlin extension/typealias/variance smoke now lives in
   `classes/kotlin_extension_variance_smoke` and runs through

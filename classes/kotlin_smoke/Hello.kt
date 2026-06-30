@@ -16,5 +16,4 @@ fun main() {
   println(jvmInteropSummary())
   println(mutableDelegateSummary())
   println(captureShapeSummary())
-  println(delegationBridgeSummary())
 }

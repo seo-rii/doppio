@@ -129,6 +129,9 @@ jobs:
       - name: Run Kotlin annotation metadata smoke
         run: ./ci/kotlin_annotation_metadata_smoke.sh
 
+      - name: Run Kotlin delegation bridge smoke
+        run: ./ci/kotlin_delegation_bridge_smoke.sh
+
       - name: Run Kotlin extension variance smoke
         run: ./ci/kotlin_extension_variance_smoke.sh
 
