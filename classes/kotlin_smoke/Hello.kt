@@ -28,7 +28,6 @@ fun main() {
   println(textRegexSummary())
   println(durationSummary())
   println(concurrentCacheSummary())
-  println(proxyReflectionSummary())
   println(reflectionShapeSummary())
   println(modernJavaInteropSummary())
 }

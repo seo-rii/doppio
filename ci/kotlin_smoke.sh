@@ -151,9 +151,6 @@ test -f "$out_dir/ReifiedArraySmokeKt.class"
 test -f "$out_dir/ResultExceptionSmokeKt.class"
 test -f "$out_dir/ResultSmokeException.class"
 test -f "$out_dir/RuntimeSmokeTag.class"
-test -f "$out_dir/ProxyReflectionService.class"
-test -f "$out_dir/ProxyReflectionSmokeKt.class"
-test -f "$out_dir/ProxyReflectionTag.class"
 test -f "$out_dir/RichTag.class"
 test -f "$out_dir/SequenceBuilderSmokeKt.class"
 test -f "$out_dir/SequenceBuilderSmokeKt\$sequenceBuilderSummary\$iteratorValues\$1.class"
@@ -200,8 +197,6 @@ default_expected_output="${default_expected_output}
 3250|0,500,1500,1250|-1000,0,1500,3000|1|2.0|1250|2250|3|true:true:true"
 default_expected_output="${default_expected_output}
 a=123,b=12,c=89|true|true:y:Y11|abc:false:true:1|main:11/worker:3/main:11/main:11|locked:3:hold:1:true|k=1,z=12|11"
-default_expected_output="${default_expected_output}
-iface/transform/value|dyn|KT5|XY3|cba|null|ProxyReflectionService(dyn)|321|true|true|true|transform:2,getLabel:0,transform:2,maybe:1,maybe:1,toString:0,hashCode:0,equals:1"
 default_expected_output="${default_expected_output}
 Companion,Inner,Nested|Nested/ReflectionShapeOwner/ReflectionShapeOwner/true/false/false|Inner/ReflectionShapeOwner/ReflectionShapeOwner/true/false/false|Companion/ReflectionShapeOwner/ReflectionShapeOwner/true/false/false|MethodLocal/null/ReflectionShapeOwner/methodLocalClass/false/true/false|CompanionLocal/null/Companion/companionLocalClass/false/true/false|_/null/ReflectionShapeOwner/anonymousRunnableClass/Runnable/false/false/true"
 default_expected_output="${default_expected_output}
