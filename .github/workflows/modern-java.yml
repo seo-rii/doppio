@@ -144,6 +144,9 @@ jobs:
       - name: Run Scala package smoke
         run: ./ci/scala_package_smoke.sh
 
+      - name: Run Scala macro smoke
+        run: ./ci/scala_macro_smoke.sh
+
       - name: Run Scala reflection-shape smoke
         run: ./ci/scala_reflection_shape_smoke.sh
 

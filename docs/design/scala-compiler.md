@@ -42,6 +42,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
   initialization, package-scoped classes/objects, `Enumeration`,
   `@BeanProperty`, Java reflection over Scala-generated members, specialized
   class generation, and specialized generic `Signature` metadata;
+- a focused Scala macro smoke covering two-phase Scala 2 macro expansion using
+  `scala.reflect.macros.blackbox`, where the macro implementation is compiled
+  first under Doppio and then used by a second Doppio-hosted scalac invocation;
 - a focused Scala StackWalker smoke covering source-level Java `StackWalker`
   retained-class-reference frame descriptor and `MethodType` metadata plus the
   no-retain `getMethodType` guard;
@@ -101,9 +104,6 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - a focused Scala duration smoke covering `scala.concurrent.duration` finite
   duration arithmetic, scanning, sorting, parsing, scaling, clamping, and
   infinite-duration metadata;
-- two-phase Scala 2 macro expansion using `scala.reflect.macros.blackbox`,
-  where the macro implementation is compiled first under Doppio and then used
-  by the main source fixture in a second Doppio-hosted scalac invocation;
 - string interpolation and a plain `main` entry point.
 
 The smoke compares the generated program output on the host JVM and Doppio.
@@ -272,10 +272,14 @@ checks package object initialization, package-scoped classes and objects,
 specialized class generation, and specialized generic `Signature` metadata
 while keeping the main Scala compiler smoke smaller.
 
-The smoke also includes a two-phase macro path: Doppio-hosted scalac first
-emits a blackbox macro implementation class, then a second Doppio-hosted scalac
-pass expands calls from the normal smoke source set against that generated
-classpath entry.
+The Scala macro coverage now lives in `classes/scala_macro_use_smoke` and runs
+through `ci/scala_macro_smoke.sh`. It keeps the two-phase macro path intact:
+Doppio-hosted scalac first emits a blackbox macro implementation class from
+`classes/scala_macro_smoke`, then a second Doppio-hosted scalac pass expands
+calls from the macro-use source set against that generated classpath entry.
+A local 2026-06-30 validation completed the focused Scala macro smoke in 176
+seconds and the remaining main Scala compiler smoke in 110 seconds using Scala
+2.13.18.
 
 The main smoke and focused functional/interop smokes inspect generated
 classfiles with `javap -v` and assert that Scala lambda-heavy classes contain

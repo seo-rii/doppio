@@ -370,7 +370,8 @@ native-memory fills, including zero-length no-ops.
   typeclass lookup, self-types, by-name argument evaluation, extractor
   matching, and `@switch` lowering, and a diagnostic smoke covering type-mismatch
   source filename, line number, found/required types, caret, and error count,
-  plus two-phase Scala 2 blackbox macro expansion, plus string interpolation,
+  plus a focused two-phase Scala 2 blackbox macro expansion smoke, plus string
+  interpolation,
   then runs the generated `Hello` class on both the host JVM and Doppio.
 - The workflow also runs `ci/scala_record_smoke.sh`, a focused Java 17 record
   interop smoke that compiles a record support class with the host JDK and then
