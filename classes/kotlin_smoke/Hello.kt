@@ -17,5 +17,4 @@ fun main() {
   println(mutableDelegateSummary())
   println(captureShapeSummary())
   println(delegationBridgeSummary())
-  println(annotationMetadataSummary())
 }

@@ -126,6 +126,9 @@ jobs:
       - name: Run Kotlin Result/exception smoke
         run: ./ci/kotlin_result_exception_smoke.sh
 
+      - name: Run Kotlin annotation metadata smoke
+        run: ./ci/kotlin_annotation_metadata_smoke.sh
+
       - name: Run Kotlin extension variance smoke
         run: ./ci/kotlin_extension_variance_smoke.sh
 

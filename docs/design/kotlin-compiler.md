@@ -309,12 +309,15 @@ Current verified checks:
   observed through `java.lang.reflect`, plus generated
   `RuntimeVisibleAnnotations`, `RuntimeVisibleParameterAnnotations`, and
   `MethodParameters` attributes.
-- A minimal annotation-metadata smoke compiled in 76 seconds and both the host
-  JVM and Doppio printed
+- A focused Kotlin annotation-metadata smoke now lives in
+  `classes/kotlin_annotation_metadata_smoke` and runs through
+  `ci/kotlin_annotation_metadata_smoke.sh`. A focused local run completed in 87
+  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_smoke.sh` completed in 211 seconds. Both the host JVM and Doppio
+  printed
   `class-a,class-b|class:HIGH:AnnotationMetadataOwner:1,2,3|ctor-a,ctor-b|ctor:LOW:String:4,5|field-a,field-b|field:LOW:int:6|method-a,method-b|method:LOW:long:7,8|arg-a,arg-b|arg:LOW:double:9|kt3`.
-  The repo smoke now includes the same path and completed in 244 seconds with
-  the full classpath. Java reflection verified `getAnnotationsByType` over
-  repeatable annotations plus enum, `KClass`, and `IntArray` annotation
+  Java reflection verified `getAnnotationsByType` over repeatable annotations
+  plus enum, `KClass`, and `IntArray` annotation
   elements. `javap` verified `MultiTag$Container`, Java `@Repeatable`,
   `RuntimeVisibleAnnotations`, `RuntimeVisibleParameterAnnotations`, and
   `AnnotationDefault` metadata.
