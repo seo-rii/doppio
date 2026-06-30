@@ -47,9 +47,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - a focused `scala-reflect` runtime universe smoke covering runtime mirror
   creation, `typeOf`, constructor/member symbol lookup, case-accessor
   discovery, and static class lookup;
-- Scala 2.13 collection-library coverage for `LazyList`, extractor `unapply`,
-  `Regex`, `TreeMap`, `ArraySeq`, `groupMap`, map views, and right-biased
-  `Either`;
+- a focused Scala 2.13 collection-library smoke covering `LazyList`, extractor
+  `unapply`, `Regex`, `TreeMap`, `ArraySeq`, `groupMap`, map views, and
+  right-biased `Either`;
 - a focused Scala functional/library smoke covering `Function.chain`, composed
   function adapters, `Option.when`/`Option.unless`, `Using.resource`,
   `Try.map`/`filter`/`recover`, `Either.cond`, `partitionMap`, and
@@ -111,13 +111,11 @@ The smoke compares the generated program output on the host JVM and Doppio.
 
 The initial Scala 2.13 compiler smoke now passes under Doppio. It compiles the
 source fixture, checks the emitted class files, and compares generated program
-output on the host JVM and Doppio. The smoke now includes a Scala 2.13
-collection/extractor slice covering `LazyList`, extractor `unapply`, `Regex`,
-`TreeMap`, `ArraySeq`, `groupMap`, map views, and right-biased `Either`, plus
-language/type-system coverage for path-dependent types, higher-kinded implicit
-typeclass lookup, self-types, by-name argument evaluation, extractor matching,
-and `@switch` lowering, plus Java collection interop and a small asynchronous
-`Future` path. A local
+output on the host JVM and Doppio. The smoke now includes language/type-system
+coverage for path-dependent types, higher-kinded implicit typeclass lookup,
+self-types, by-name argument evaluation, extractor matching, and `@switch`
+lowering, plus Java collection interop and a small asynchronous `Future` path. A
+local
 2026-06-21 run of the expanded smoke completed in 303 seconds using Scala
 2.13.18.
 A local 2026-06-23 run with the language/type-system smoke completed in
@@ -235,6 +233,14 @@ adapters, `Option.when`/`Option.unless`, `Using.resource`, `Try` recovery,
 `LambdaMetafactory` while keeping the main Scala compiler smoke smaller.
 A local 2026-06-30 validation completed the focused Scala functional smoke in
 74 seconds and the remaining main Scala compiler smoke in 241 seconds using
+Scala 2.13.18.
+The Scala collection-library coverage now lives in
+`classes/scala_collection_smoke` and runs through
+`ci/scala_collection_smoke.sh`. It checks `LazyList`, extractor `unapply`,
+`Regex`, `TreeMap`, `ArraySeq`, `groupMap`, map views, and right-biased
+`Either` while keeping the main Scala compiler smoke smaller.
+A local 2026-06-30 validation completed the focused Scala collection smoke in
+80 seconds and the remaining main Scala compiler smoke in 225 seconds using
 Scala 2.13.18.
 
 The smoke also includes a two-phase macro path: Doppio-hosted scalac first
