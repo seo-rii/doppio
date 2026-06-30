@@ -38,9 +38,10 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - a focused Scala library/lowering smoke covering `groupMapReduce`, implicit
   value classes, default arguments, case-class `copy`, `@tailrec`, varargs
   with `ClassTag`, `Try`, and tuple ordering;
-- package object initialization, package-scoped classes/objects,
-  `Enumeration`, `@BeanProperty`, Java reflection over Scala-generated members,
-  and specialized class generation;
+- a focused Scala package/reflection smoke covering package object
+  initialization, package-scoped classes/objects, `Enumeration`,
+  `@BeanProperty`, Java reflection over Scala-generated members, specialized
+  class generation, and specialized generic `Signature` metadata;
 - a focused Scala StackWalker smoke covering source-level Java `StackWalker`
   retained-class-reference frame descriptor and `MethodType` metadata plus the
   no-retain `getMethodType` guard;
@@ -262,20 +263,27 @@ checks `scala.jdk.CollectionConverters` wrappers for mutable Java lists and
 maps plus a small `Future`/`Promise`/`Await` path on a Java executor, while
 keeping the main Scala compiler smoke smaller.
 A local 2026-06-30 validation completed the focused Scala interop smoke in 63
-seconds and the remaining main Scala compiler smoke in 188 seconds using Scala
-2.13.18.
+seconds, the focused Scala package/reflection smoke in 140 seconds, and the
+remaining main Scala compiler smoke in 379 seconds using Scala 2.13.18.
+The Scala package/reflection coverage now lives in
+`classes/scala_package_smoke` and runs through `ci/scala_package_smoke.sh`. It
+checks package object initialization, package-scoped classes and objects,
+`Enumeration`, `@BeanProperty`, Java reflection over Scala-generated members,
+specialized class generation, and specialized generic `Signature` metadata
+while keeping the main Scala compiler smoke smaller.
 
 The smoke also includes a two-phase macro path: Doppio-hosted scalac first
 emits a blackbox macro implementation class, then a second Doppio-hosted scalac
 pass expands calls from the normal smoke source set against that generated
 classpath entry.
 
-The main smoke and focused functional smoke inspect generated classfiles with
-`javap -v` and assert that Scala lambda-heavy classes contain `InvokeDynamic`
-entries backed by `LambdaMetafactory`. A local 2026-06-22 run of the checked
-smoke completed in 409 seconds using Scala 2.13.18.
-It also asserts representative Java `Signature` metadata for a generic case
-class method, a generic trait method, and a specialized generic class method.
+The main smoke and focused functional/interop smokes inspect generated
+classfiles with `javap -v` and assert that Scala lambda-heavy classes contain
+`InvokeDynamic` entries backed by `LambdaMetafactory`. A local 2026-06-22 run
+of the checked smoke completed in 409 seconds using Scala 2.13.18. The main
+smoke also asserts representative Java `Signature` metadata for a generic case
+class method and a generic trait method, while the focused package smoke checks
+the specialized generic class method.
 
 `ci/scala_diagnostic_smoke.sh` runs Doppio-hosted scalac on an intentionally
 invalid source file and checks the nonzero exit status plus diagnostic source

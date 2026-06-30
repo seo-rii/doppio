@@ -312,9 +312,10 @@ native-memory fills, including zero-length no-ops.
   `try`/`catch`/`finally`, a focused Scala library/lowering smoke covering
   `groupMapReduce`, implicit value classes, default arguments, case-class
   `copy`, `@tailrec`, varargs with `ClassTag`, `Try`, and tuple ordering,
-  package object initialization, package-scoped classes and objects,
-  `Enumeration`, `@BeanProperty`, Java reflection over
-  Scala-generated members, specialized class generation, a focused Scala
+  a focused Scala package/reflection smoke covering package object
+  initialization, package-scoped classes and objects, `Enumeration`,
+  `@BeanProperty`, Java reflection over Scala-generated members, specialized
+  class generation, and specialized generic `Signature` metadata, a focused Scala
   StackWalker smoke covering Java `StackWalker` frame descriptor/`MethodType`
   metadata with retained-class-reference guards, a focused `scala-reflect`
   runtime universe smoke covering runtime mirror creation, `typeOf`,
