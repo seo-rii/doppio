@@ -22,5 +22,4 @@ fun main() {
   println(receiverLambdaSummary())
   println(controlFlowSummary())
   println(initializationDelegateSummary())
-  println(collectionBuilderSummary())
 }
