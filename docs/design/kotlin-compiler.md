@@ -592,11 +592,15 @@ Current verified checks:
   deliberately uses `Multi-Release: false` so it proves ordinary
   jar/zip/resource behavior first. 2026-06-15 full-classpath regression runs
   after the multi-release `JarFile` parity fix completed in 518-855 seconds.
-- A minimal unsigned Kotlin smoke covers `UInt`, `ULong`, `UByte`,
-  unsigned-array construction, wraparound arithmetic, unsigned sorting,
-  filtering, map lookup by unsigned keys, and byte-to-hex rendering. Both the
-  host JVM and Doppio print
+- A focused unsigned Kotlin smoke now lives in `classes/kotlin_unsigned_smoke`
+  and runs through `ci/kotlin_unsigned_smoke.sh`. It covers `UInt`, `ULong`,
+  `UByte`, unsigned-array construction, wraparound arithmetic, unsigned
+  sorting, filtering, map lookup by unsigned keys, and byte-to-hex rendering.
+  Both the host JVM and Doppio print
   `3:4:0fa0ff:2,9,18446744073709551615:4294967295,4:wrap:true:true`.
+  A local 2026-06-30 validation completed the focused unsigned smoke in 92
+  seconds and the remaining full-classpath Kotlin compiler smoke in 527
+  seconds.
 - A Kotlin source-level `CompletableFuture` smoke covers Java SAM conversion
   into `CompletableFuture.supplyAsync`, executor-backed asynchronous
   completion, `thenApply`, `thenCompose`, `handle`, `thenCombine`,

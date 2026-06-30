@@ -30,7 +30,6 @@ fun main() {
   println(concurrentCacheSummary())
   println(contractSmokeSummary())
   println(proxyReflectionSummary())
-  println(unsignedSummary())
   println(completableFutureSummary())
   println(enumPolymorphismSummary())
   println(reflectionShapeSummary())

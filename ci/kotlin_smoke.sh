@@ -187,7 +187,6 @@ test -f "$out_dir/Sink.class"
 test -f "$out_dir/StringCell.class"
 test -f "$out_dir/TextRegexSmokeKt.class"
 test -f "$out_dir/TextStep.class"
-test -f "$out_dir/UnsignedSmokeKt.class"
 test -f "$out_dir/VarianceBox.class"
 test -f "$out_dir/ValueClassSmokeKt.class"
 test -f "$out_dir/ValueStage.class"
@@ -212,8 +211,6 @@ default_expected_output="${default_expected_output}
 KT2|missing|before>body7>after|7|1002"
 default_expected_output="${default_expected_output}
 iface/transform/value|dyn|KT5|XY3|cba|null|ProxyReflectionService(dyn)|321|true|true|true|transform:2,getLabel:0,transform:2,maybe:1,maybe:1,toString:0,hashCode:0,equals:1"
-default_expected_output="${default_expected_output}
-3:4:0fa0ff:2,9,18446744073709551615:4294967295,4:wrap:true:true"
 default_expected_output="${default_expected_output}
 KT2!:5:l"
 default_expected_output="${default_expected_output}
