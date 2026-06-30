@@ -529,8 +529,11 @@ Current verified checks:
   `MatchResult.Destructured`, `RegexOption` set construction,
   `StringsKt.replaceRange`, `LambdaMetafactory` bootstrap methods for the
   Kotlin lambdas, `StackMapTable`, and `kotlin.Metadata`.
-- A minimal duration smoke compiled with the repo suite in 731 seconds and
-  both the host JVM and Doppio printed
+- A focused Kotlin duration smoke now lives in `classes/kotlin_duration_smoke`
+  and runs through `ci/kotlin_duration_smoke.sh`. A focused local run completed
+  in 85 seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_smoke.sh` completed in 343 seconds. Both the host JVM and Doppio
+  printed
   `3250|0,500,1500,1250|-1000,0,1500,3000|1|2.0|1250|2250|3|true:true:true`.
   It covers Kotlin `Duration` value-class arithmetic, `runningFold`,
   sorting/comparison, nanosecond-to-microsecond conversion, duration division,

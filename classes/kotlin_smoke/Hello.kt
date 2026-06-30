@@ -26,5 +26,4 @@ fun main() {
   println(sequenceBuilderSummary())
   println(resultExceptionSummary())
   println(textRegexSummary())
-  println(durationSummary())
 }
