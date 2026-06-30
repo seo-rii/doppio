@@ -27,5 +27,4 @@ fun main() {
   println(resultExceptionSummary())
   println(textRegexSummary())
   println(durationSummary())
-  println(concurrentCacheSummary())
 }

@@ -558,8 +558,12 @@ Current verified checks:
   `aZcdYf:aZRSYf:ZRS:true:true:true:true:true:true:IndexOutOfBoundsException:0:true:true`.
   This covers mmap `load`, full-buffer `force`, reflection-backed range
   `force`, read-only mappings, empty mappings, and range validation.
-- A minimal concurrent cache smoke compiled with the repo suite in 363 seconds
-  and both the host JVM and Doppio printed
+- A focused Kotlin concurrency smoke now lives in
+  `classes/kotlin_concurrency_smoke` and runs through
+  `ci/kotlin_concurrency_smoke.sh`. A focused local run completed in 85 seconds
+  and a follow-up run through the remaining full-classpath
+  `ci/kotlin_smoke.sh` completed in 368 seconds. Both the host JVM and Doppio
+  printed
   `a=123,b=12,c=89|true|true:y:Y11|abc:false:true:1|main:11/worker:3/main:11/main:11|locked:3:hold:1:true|k=1,z=12|11`.
   `javap` verified `ConcurrentHashMap.computeIfAbsent`, `compute`, `merge`,
   `putIfAbsent`, `replace`, `AtomicInteger`, `AtomicReference.compareAndSet`,

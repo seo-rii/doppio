@@ -91,7 +91,6 @@ test -f "$out_dir/AdvancedKt.class"
 test -f "$out_dir/BytecodeSmokeKt.class"
 test -f "$out_dir/CollectionBuilderSmokeKt.class"
 test -f "$out_dir/CollectionBuilderSmokeKt\$collectionBuilderSummary\$\$inlined\$groupingBy\$1.class"
-test -f "$out_dir/ConcurrentCacheSmokeKt.class"
 test -f "$out_dir/ControlFlowSmokeKt.class"
 test -f "$out_dir/CaptureOwner.class"
 test -f "$out_dir/CaptureOwner\$Nested.class"
@@ -189,8 +188,6 @@ default_expected_output="${default_expected_output}
 0:a:2:0-2,1:bb:25:5-9,2:c:457:12-16|A:1; BB:32; C:654; bad=x|first b=2|a|bb|c|0:5:a,1:6:b,2:5:g|KT/42|true|KOTin"
 default_expected_output="${default_expected_output}
 3250|0,500,1500,1250|-1000,0,1500,3000|1|2.0|1250|2250|3|true:true:true"
-default_expected_output="${default_expected_output}
-a=123,b=12,c=89|true|true:y:Y11|abc:false:true:1|main:11/worker:3/main:11/main:11|locked:3:hold:1:true|k=1,z=12|11"
 expected_output="${KOTLIN_SMOKE_EXPECTED_OUTPUT:-"$default_expected_output"}"
 
 native_output="$(java -cp "$runtime_cp" HelloKt)"
