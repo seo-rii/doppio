@@ -114,7 +114,6 @@ test -f "$out_dir/DelegateSmokeKt.class"
 test -f "$out_dir/DiagnosticKind.class"
 test -f "$out_dir/DurationSmokeKt.class"
 test -f "$out_dir/EmptyStage.class"
-test -f "$out_dir/EnumPolymorphismSmokeKt.class"
 test -f "$out_dir/ExtensionVarianceSmokeKt.class"
 test -f "$out_dir/ExtensionVarianceSmokeKt\$starKeys\$\$inlined\$sortedBy\$1.class"
 test -f "$out_dir/GenericCell.class"
@@ -151,10 +150,6 @@ test -f "$out_dir/ReflectionShapeSmokeKt.class"
 test -f "$out_dir/ReifiedArraySmokeKt.class"
 test -f "$out_dir/ResultExceptionSmokeKt.class"
 test -f "$out_dir/ResultSmokeException.class"
-test -f "$out_dir/RoutedStage.class"
-test -f "$out_dir/RoutedStage\$ALPHA.class"
-test -f "$out_dir/RoutedStage\$BETA.class"
-test -f "$out_dir/RoutedStage\$GAMMA.class"
 test -f "$out_dir/RuntimeSmokeTag.class"
 test -f "$out_dir/ProxyReflectionService.class"
 test -f "$out_dir/ProxyReflectionSmokeKt.class"
@@ -207,8 +202,6 @@ default_expected_output="${default_expected_output}
 a=123,b=12,c=89|true|true:y:Y11|abc:false:true:1|main:11/worker:3/main:11/main:11|locked:3:hold:1:true|k=1,z=12|11"
 default_expected_output="${default_expected_output}
 iface/transform/value|dyn|KT5|XY3|cba|null|ProxyReflectionService(dyn)|321|true|true|true|transform:2,getLabel:0,transform:2,maybe:1,maybe:1,toString:0,hashCode:0,equals:1"
-default_expected_output="${default_expected_output}
-A1B3G5|tk2|X1,x2,xxx3|low/high/high|IllegalArgumentException"
 default_expected_output="${default_expected_output}
 Companion,Inner,Nested|Nested/ReflectionShapeOwner/ReflectionShapeOwner/true/false/false|Inner/ReflectionShapeOwner/ReflectionShapeOwner/true/false/false|Companion/ReflectionShapeOwner/ReflectionShapeOwner/true/false/false|MethodLocal/null/ReflectionShapeOwner/methodLocalClass/false/true/false|CompanionLocal/null/Companion/companionLocalClass/false/true/false|_/null/ReflectionShapeOwner/anonymousRunnableClass/Runnable/false/false/true"
 default_expected_output="${default_expected_output}

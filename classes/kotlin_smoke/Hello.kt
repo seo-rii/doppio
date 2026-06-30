@@ -29,7 +29,6 @@ fun main() {
   println(durationSummary())
   println(concurrentCacheSummary())
   println(proxyReflectionSummary())
-  println(enumPolymorphismSummary())
   println(reflectionShapeSummary())
   println(modernJavaInteropSummary())
 }

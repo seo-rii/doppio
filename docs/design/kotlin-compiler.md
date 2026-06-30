@@ -619,11 +619,15 @@ Current verified checks:
   A local 2026-06-30 validation completed the focused contracts smoke in 80
   seconds and the remaining full-classpath Kotlin compiler smoke in 385
   seconds.
-- A minimal enum-polymorphism smoke covers enum constants with class bodies,
-  overridden properties and methods, `Enum.entries`, `enumValues`,
-  `enumValueOf`, `valueOf`, and `when` dispatch over those constants. Both the
-  host JVM and Doppio print
+- A focused enum-polymorphism smoke now lives in `classes/kotlin_enum_smoke`
+  and runs through `ci/kotlin_enum_smoke.sh`. It covers enum constants with
+  class bodies, overridden properties and methods, `Enum.entries`,
+  `enumValues`, `enumValueOf`, `valueOf`, and `when` dispatch over those
+  constants. Both the host JVM and Doppio print
   `A1B3G5|tk2|X1,x2,xxx3|low/high/high|IllegalArgumentException`.
+  A local 2026-06-30 validation completed the focused enum smoke in 83
+  seconds and the remaining full-classpath Kotlin compiler smoke in 388
+  seconds.
 - The repo bytecode-shape smoke completed in 406 seconds with the full
   classpath, and both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering

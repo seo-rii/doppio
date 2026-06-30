@@ -102,6 +102,9 @@ jobs:
       - name: Run Kotlin contract smoke
         run: ./ci/kotlin_contract_smoke.sh
 
+      - name: Run Kotlin enum smoke
+        run: ./ci/kotlin_enum_smoke.sh
+
       - name: Cache Scala compiler
         uses: actions/cache@v5
         with:
