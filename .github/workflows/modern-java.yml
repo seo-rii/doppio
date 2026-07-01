@@ -141,6 +141,9 @@ jobs:
       - name: Run Kotlin value-class smoke
         run: ./ci/kotlin_value_class_smoke.sh
 
+      - name: Run Kotlin reified/array smoke
+        run: ./ci/kotlin_reified_array_smoke.sh
+
       - name: Run Kotlin delegation bridge smoke
         run: ./ci/kotlin_delegation_bridge_smoke.sh
 

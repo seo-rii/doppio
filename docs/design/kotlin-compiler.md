@@ -294,11 +294,14 @@ Current verified checks:
   property access, nullable boxing, `Any` boxing, `Map` key equality/hash
   behavior, sorted-list comparison, and the generated
   `box-impl`/`unbox-impl`/`equals-impl`/`hashCode-impl` methods.
-- A minimal reified-generic and array-lowering smoke compiled in 160 seconds
-  and both the host JVM and Doppio printed
+- A focused Kotlin reified-generic and array-lowering smoke now lives in
+  `classes/kotlin_reified_array_smoke` and runs through
+  `ci/kotlin_reified_array_smoke.sh`. A focused local run completed in 79
+  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_smoke.sh` completed in 220 seconds. Both the host JVM and Doppio
+  printed
   `String:3:a|bb|ccc:Number:2:1|2:i[3,1,4,9,1,5]=23:zamm|zbbmm:1-4-9:2345:String:int`.
-  The repo smoke now includes the same path and completed in 256 seconds with
-  the full classpath. It covers `inline reified` `is`/`as?` checks,
+  It covers `inline reified` `is`/`as?` checks,
   `T::class.java`, primitive and object arrays, spread varargs, `copyOf`,
   `toTypedArray`, `IntArray` construction, component-type reflection, and the
   generated `reifiedOperationMarker`/`instanceof`/`checkcast`/`newarray`/

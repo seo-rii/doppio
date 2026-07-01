@@ -6,7 +6,6 @@ fun main() {
   println(delegateSummary())
   println(bytecodeSummary())
   println(referenceSequenceSummary())
-  println(reifiedArraySummary())
   println(annotationReflectionSummary())
   println(modernConstructSummary())
   println(inlineControlSummary())
