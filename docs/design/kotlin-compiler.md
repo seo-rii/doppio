@@ -709,10 +709,13 @@ Current verified checks:
   A local 2026-06-30 validation completed the focused enum smoke in 83
   seconds and the remaining full-classpath Kotlin compiler smoke in 388
   seconds.
-- The repo bytecode-shape smoke completed in 406 seconds with the full
-  classpath, and both the host JVM and Doppio printed
-  `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin lowering
-  for `try`/`catch`/`finally`, `Closeable.use`, destructuring via
+- A focused Kotlin bytecode-runtime smoke now lives in
+  `classes/kotlin_bytecode_runtime_smoke` and runs through
+  `ci/kotlin_bytecode_runtime_smoke.sh`. A focused local run completed in 241
+  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_smoke.sh` completed in 251 seconds. Both the host JVM and Doppio
+  printed `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin
+  lowering for `try`/`catch`/`finally`, `Closeable.use`, destructuring via
   `componentN`, `1..n` loops, stepped `downTo` loops, `mapIndexed`, and
   `synchronized`.
 

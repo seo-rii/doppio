@@ -4,5 +4,4 @@ fun main() {
   println(advancedSummary())
   println(localSummary())
   println(delegateSummary())
-  println(bytecodeSummary())
 }

@@ -67,6 +67,9 @@ jobs:
       - name: Run Kotlin bytecode smoke
         run: ./ci/kotlin_bytecode_smoke.sh
 
+      - name: Run Kotlin bytecode runtime smoke
+        run: ./ci/kotlin_bytecode_runtime_smoke.sh
+
       - name: Run Kotlin record smoke
         run: ./ci/kotlin_record_smoke.sh
 
