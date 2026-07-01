@@ -8,7 +8,6 @@ fun main() {
   println(referenceSequenceSummary())
   println(annotationReflectionSummary())
   println(modernConstructSummary())
-  println(inlineControlSummary())
   println(jvmInteropSummary())
   println(mutableDelegateSummary())
 }

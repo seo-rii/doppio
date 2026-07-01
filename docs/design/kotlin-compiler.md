@@ -376,13 +376,15 @@ Current verified checks:
   verifies the generated `$WhenMappings` class while covering static
   enum-switch int arrays, `NoSuchFieldError` exception table, enum
   `tableswitch`, string `lookupswitch`, and subjectless range branch lowering.
-- A minimal inline control-flow smoke compiled in 77 seconds and both the host
-  JVM and Doppio printed `enter>body>exit:ok:c10:34:stop3`. The repo smoke now
-  includes the same path and completed in 223 seconds with the full classpath.
-  `javap` verified inline `try/finally` `InlineMarker.finallyStart`/
-  `finallyEnd`, non-local return lowering, `crossinline` Runnable classes,
-  retained `noinline` `Function1` storage, and the noinline lambda
-  `invokedynamic` site.
+- A focused Kotlin inline control-flow smoke now lives in
+  `classes/kotlin_inline_control_smoke` and runs through
+  `ci/kotlin_inline_control_smoke.sh`. A focused local run completed in 81
+  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_smoke.sh` completed in 170 seconds. Both the host JVM and Doppio
+  printed `enter>body>exit:ok:c10:34:stop3`. The focused script verifies
+  inline `try/finally` `InlineMarker.finallyStart`/`finallyEnd`, non-local
+  return lowering, `crossinline` Runnable classes, retained `noinline`
+  `Function1` storage, and the noinline lambda `invokedynamic` site.
 - A minimal JVM interop annotation smoke compiled in 111 seconds and both the
   host JVM and Doppio printed
   `kt:java:ok7:IllegalArgumentException:fieldconst:top-3:o5obj:5:11111111`.
