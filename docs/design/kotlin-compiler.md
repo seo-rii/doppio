@@ -277,13 +277,6 @@ Current verified checks:
   the remaining full-classpath main smoke in 800 seconds, confirming coverage
   preservation while showing that full-classpath timing variance is still a
   tracking risk.
-- A minimal callable-reference and lazy-sequence smoke compiled in 175 seconds
-  and both the host JVM and Doppio printed `a2|b7|c4|d9:20:8:7:10`. The repo
-  smoke now includes the same path and completed in 234 seconds with the full
-  classpath. It covers top-level, bound instance, unbound instance,
-  constructor, and companion-object callable references combined with
-  `generateSequence`, `map`, `filter`, `flatMap`, `zip`, `joinToString`, and
-  `fold`.
 - A focused Kotlin `@JvmInline value class` smoke now lives in
   `classes/kotlin_value_class_smoke` and runs through
   `ci/kotlin_value_class_smoke.sh`. A focused local run completed in 79
@@ -460,6 +453,15 @@ Current verified checks:
   Runtime reflection verifies `@JvmStatic`, `@JvmField`, `const val`,
   `@Volatile`, `@Synchronized`, top-level `@JvmName`, object static access,
   declared exception metadata, and Java parameter metadata.
+- A focused Kotlin callable-reference/sequence smoke now lives in
+  `classes/kotlin_reference_sequence_smoke` and runs through
+  `ci/kotlin_reference_sequence_smoke.sh`. A focused local run completed in
+  155 seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_smoke.sh` completed in 226 seconds. Both the host JVM and Doppio
+  printed `a2|b7|c4|d9:20:8:7:10`. This covers top-level callable
+  references, bound and unbound member references, constructor references,
+  companion references, `generateSequence`, `map`, `filter`, `flatMap`,
+  `zip`, `joinToString`, and `fold`.
 - A focused Kotlin captured-class shape smoke now lives in
   `classes/kotlin_capture_shape_smoke` and runs through
   `ci/kotlin_capture_shape_smoke.sh`. A focused local run completed in 97
