@@ -324,13 +324,16 @@ Current verified checks:
   `KCallable.callBy` default constructor and method arguments, sealed subclass
   enumeration, and object-instance lookup through the real `kotlin-reflect.jar`
   runtime.
-- A minimal modern-construct smoke compiled in 77 seconds and both the host JVM
-  and Doppio printed `ABG:1:15:kt5:StagePayload:EmptyStage:true`. The repo
-  smoke now includes the same path and completed in 185 seconds with the full
-  classpath. It covers Kotlin `fun interface` SAM conversion through
-  `invokedynamic`, sealed interface exhaustiveness, `data object` singleton
-  behavior, Kotlin 1.9 `Enum.entries`/`EnumEntries`, property-reference
-  classes, and class-literal lookup.
+- A focused Kotlin modern-construct smoke now lives in
+  `classes/kotlin_modern_construct_smoke` and runs through
+  `ci/kotlin_modern_construct_smoke.sh`. A focused local run completed in 185
+  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_smoke.sh` completed in 213 seconds. Both the host JVM and Doppio
+  printed `ABG:1:15:kt5:StagePayload:EmptyStage:true`. It covers Kotlin
+  `fun interface` SAM conversion through `invokedynamic`, sealed interface
+  exhaustiveness, `data object` singleton behavior, Kotlin 1.9
+  `Enum.entries`/`EnumEntries`, property-reference classes, and class-literal
+  lookup.
 - A standalone `@JvmRecord` smoke now compiles with `-jvm-target 17` in
   `ci/kotlin_record_smoke.sh`, separate from the main smoke so the broad
   Kotlin suite can keep its default target. It verifies Kotlin-generated JVM
