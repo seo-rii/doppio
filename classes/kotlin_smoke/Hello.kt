@@ -10,7 +10,6 @@ fun main() {
   println(reifiedArraySummary())
   println(annotationReflectionSummary())
   println(modernConstructSummary())
-  println(whenMappingSummary())
   println(inlineControlSummary())
   println(jvmInteropSummary())
   println(mutableDelegateSummary())

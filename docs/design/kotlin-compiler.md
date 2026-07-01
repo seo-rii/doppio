@@ -361,13 +361,15 @@ Current verified checks:
   `@JvmOverloads` constructors and methods observed through Java reflection,
   interface `DefaultImpls`, data-class `copy$default`, and
   `kotlin.jvm.internal.DefaultConstructorMarker` constructor lowering.
-- A minimal enum/string `when` lowering smoke compiled in 74 seconds and both
-  the host JVM and Doppio printed
-  `1357:nilpe:14:10,30,-1,40:neg|zero|small|big`. The repo smoke now includes
-  the same path and completed in 208 seconds with the full classpath. `javap`
-  verified the generated `$WhenMappings` class, static enum-switch int arrays,
-  `NoSuchFieldError` exception table, enum `tableswitch`, string
-  `lookupswitch`, and subjectless range branch lowering.
+- A focused Kotlin enum/string `when` lowering smoke now lives in
+  `classes/kotlin_when_mapping_smoke` and runs through
+  `ci/kotlin_when_mapping_smoke.sh`. A focused local run completed in 96
+  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_smoke.sh` completed in 261 seconds. Both the host JVM and Doppio
+  printed `1357:nilpe:14:10,30,-1,40:neg|zero|small|big`. The focused script
+  verifies the generated `$WhenMappings` class while covering static
+  enum-switch int arrays, `NoSuchFieldError` exception table, enum
+  `tableswitch`, string `lookupswitch`, and subjectless range branch lowering.
 - A minimal inline control-flow smoke compiled in 77 seconds and both the host
   JVM and Doppio printed `enter>body>exit:ok:c10:34:stop3`. The repo smoke now
   includes the same path and completed in 223 seconds with the full classpath.

@@ -135,6 +135,9 @@ jobs:
       - name: Run Kotlin default/synthetic smoke
         run: ./ci/kotlin_default_synthetic_smoke.sh
 
+      - name: Run Kotlin when-mapping smoke
+        run: ./ci/kotlin_when_mapping_smoke.sh
+
       - name: Run Kotlin delegation bridge smoke
         run: ./ci/kotlin_delegation_bridge_smoke.sh
 
