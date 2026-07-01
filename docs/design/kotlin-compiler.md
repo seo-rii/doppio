@@ -299,15 +299,6 @@ Current verified checks:
   `toTypedArray`, `IntArray` construction, component-type reflection, and the
   generated `reifiedOperationMarker`/`instanceof`/`checkcast`/`newarray`/
   `anewarray` bytecode shape.
-- A minimal runtime-annotation reflection smoke compiled with
-  `-java-parameters` in 105 seconds and both the host JVM and Doppio printed
-  `class:field:getter:ctor,_:method:arg:kt3`. The repo smoke now includes the
-  same Kotlin compiler option and completed in 184 seconds with the full
-  classpath. It covers runtime-retained annotations with class, field, getter,
-  constructor-parameter, function, and function-parameter use-site targets
-  observed through `java.lang.reflect`, plus generated
-  `RuntimeVisibleAnnotations`, `RuntimeVisibleParameterAnnotations`, and
-  `MethodParameters` attributes.
 - A focused Kotlin annotation-metadata smoke now lives in
   `classes/kotlin_annotation_metadata_smoke` and runs through
   `ci/kotlin_annotation_metadata_smoke.sh`. A focused local run completed in 87
@@ -462,6 +453,15 @@ Current verified checks:
   references, bound and unbound member references, constructor references,
   companion references, `generateSequence`, `map`, `filter`, `flatMap`,
   `zip`, `joinToString`, and `fold`.
+- A focused Kotlin annotation reflection smoke now lives in
+  `classes/kotlin_annotation_reflection_smoke` and runs through
+  `ci/kotlin_annotation_reflection_smoke.sh`. A focused local run completed in
+  96 seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_smoke.sh` completed in 167 seconds. Both the host JVM and Doppio
+  printed `class:field:getter:ctor,_:method:arg:kt3`. It verifies runtime
+  annotation retention on classes, fields, property getters, constructor
+  parameters, functions, and value parameters through Java reflection with
+  Kotlin output compiled using `-java-parameters`.
 - A focused Kotlin captured-class shape smoke now lives in
   `classes/kotlin_capture_shape_smoke` and runs through
   `ci/kotlin_capture_shape_smoke.sh`. A focused local run completed in 97

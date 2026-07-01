@@ -5,6 +5,5 @@ fun main() {
   println(localSummary())
   println(delegateSummary())
   println(bytecodeSummary())
-  println(annotationReflectionSummary())
   println(modernConstructSummary())
 }
