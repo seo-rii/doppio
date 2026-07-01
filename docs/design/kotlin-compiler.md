@@ -350,11 +350,14 @@ Current verified checks:
   the fork's modern `java.lang.Record` class-library shim plus a tiny Java 17
   helper that direct-calls the Java 16 `Class` methods because those runtime
   overlays are not exposed as compile-time Kotlin APIs yet.
-- A minimal default-synthetic smoke compiled in 76 seconds and both the host
-  JVM and Doppio printed
+- A focused Kotlin default/synthetic smoke now lives in
+  `classes/kotlin_default_synthetic_smoke` and runs through
+  `ci/kotlin_default_synthetic_smoke.sh`. A focused local run completed in 136
+  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_smoke.sh` completed in 331 seconds. Both the host JVM and Doppio
+  printed
   `p-box:6!:p-wide:6?:[CORE]:cfg23ab:p-box:6!|p-named:6!|p-full:9!:p-r:3!|q-r:3!|q-r:3?`.
-  The repo smoke now includes the same path and completed in 214 seconds with
-  the full classpath. It covers default-argument `$default` dispatch,
+  It covers default-argument `$default` dispatch,
   `@JvmOverloads` constructors and methods observed through Java reflection,
   interface `DefaultImpls`, data-class `copy$default`, and
   `kotlin.jvm.internal.DefaultConstructorMarker` constructor lowering.
