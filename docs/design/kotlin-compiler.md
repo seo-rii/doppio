@@ -256,10 +256,14 @@ Current verified checks:
   `pending->fail=resume3`, `pending->thread=24`, `pending->executor=13`, and
   `pending>1>pending>pending>1>pending>pending>1>dispatch=36` while reducing
   compile variance in the main full-classpath smoke.
-- The main smoke still includes custom delegated properties backed by
-  `kotlin.reflect.KProperty` metadata. A full-classpath local run completed in
-  258 seconds; both the host JVM and Doppio printed
-  `delegate:answer:DelegatedOwner|local:local:top`.
+- A focused Kotlin read-only delegated-property smoke now lives in
+  `classes/kotlin_readonly_delegate_smoke` and runs through
+  `ci/kotlin_readonly_delegate_smoke.sh`. A focused local run completed in 96
+  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_smoke.sh` completed in 124 seconds. Both the host JVM and Doppio
+  printed `delegate:answer:DelegatedOwner|local:local:top`. It covers custom
+  delegated properties backed by `kotlin.reflect.KProperty` metadata for both
+  member and local delegated properties.
 - `ci/kotlin_coroutine_smoke.sh` adds a smaller companion compile that checks
   nested `try`/`finally` cleanup across the same queued suspension shape with
   `clean>inner>outer`; a local 2026-06-22 run completed in 127 seconds.

@@ -3,5 +3,4 @@ fun main() {
   println(smokeSummary())
   println(advancedSummary())
   println(localSummary())
-  println(delegateSummary())
 }
