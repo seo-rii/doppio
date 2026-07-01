@@ -448,6 +448,16 @@ Current verified checks:
   `setValue`, generated `$$delegatedProperties`, and mutable property-reference
   lowering through `MutablePropertyReference0Impl` and
   `MutablePropertyReference1Impl`.
+- A focused Kotlin JVM interop smoke now lives in
+  `classes/kotlin_jvm_interop_smoke` and runs through
+  `ci/kotlin_jvm_interop_smoke.sh`. A focused local run completed in 98
+  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_smoke.sh` completed in 240 seconds. Both the host JVM and Doppio
+  printed
+  `kt:java:ok7:IllegalArgumentException:fieldconst:top-3:o5obj:5:11111111`.
+  Runtime reflection verifies `@JvmStatic`, `@JvmField`, `const val`,
+  `@Volatile`, `@Synchronized`, top-level `@JvmName`, object static access,
+  declared exception metadata, and Java parameter metadata.
 - A focused Kotlin captured-class shape smoke now lives in
   `classes/kotlin_capture_shape_smoke` and runs through
   `ci/kotlin_capture_shape_smoke.sh`. A focused local run completed in 97

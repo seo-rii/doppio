@@ -144,6 +144,9 @@ jobs:
       - name: Run Kotlin reified/array smoke
         run: ./ci/kotlin_reified_array_smoke.sh
 
+      - name: Run Kotlin JVM interop smoke
+        run: ./ci/kotlin_jvm_interop_smoke.sh
+
       - name: Run Kotlin inline-control smoke
         run: ./ci/kotlin_inline_control_smoke.sh
 
