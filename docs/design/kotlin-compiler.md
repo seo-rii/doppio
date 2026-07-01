@@ -440,14 +440,16 @@ Current verified checks:
   discovery and invocation without requiring the Kotlin source frontend to
   hard-code those signatures. This extends the source-level Kotlin coverage
   after the matching Java 17 fixtures passed native-JVM and Doppio comparison.
-- A minimal mutable delegated-property smoke compiled in 104 seconds and both
-  the host JVM and Doppio printed
+- A focused Kotlin mutable delegated-property smoke now lives in
+  `classes/kotlin_mutable_delegate_smoke` and runs through
+  `ci/kotlin_mutable_delegate_smoke.sh`. A focused local run completed in 183
+  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_smoke.sh` completed in 347 seconds. Both the host JVM and Doppio
+  printed
   `bind:primary:MutableDelegateOwner:primary:0|bind:primary:MutableDelegateOwner:primary:30|alt:secondary:MutableDelegateOwner:secondary:30|local:local:top:local:0|local:local:top:local:10`.
-  The repo smoke now includes the same path and completed in 232 seconds with
-  the full classpath. `javap` verified `provideDelegate`, `getValue`,
-  `setValue`, generated `$$delegatedProperties`, and mutable property-reference
-  lowering through `MutablePropertyReference0Impl` and
-  `MutablePropertyReference1Impl`.
+  `javap` verified `provideDelegate`, `getValue`, `setValue`, generated
+  `$$delegatedProperties`, and mutable property-reference lowering through
+  `MutablePropertyReference0Impl` and `MutablePropertyReference1Impl`.
 - A focused Kotlin JVM interop smoke now lives in
   `classes/kotlin_jvm_interop_smoke` and runs through
   `ci/kotlin_jvm_interop_smoke.sh`. A focused local run completed in 98
