@@ -3,9 +3,9 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 version="${SCALA_COMPILER_VERSION:-2.13.18}"
-cache_dir="${SCALA_SMOKE_CACHE_DIR:-"$repo_root/build/scala-smoke-cache"}"
-work_dir="${SCALA_SMOKE_WORK_DIR:-"$repo_root/build/scala-smoke"}"
-source_dir="${SCALA_SMOKE_SOURCE_DIR:-"$repo_root/classes/scala_smoke"}"
+cache_dir="${SCALA_CORE_SMOKE_CACHE_DIR:-"$repo_root/build/scala-smoke-cache"}"
+work_dir="${SCALA_CORE_SMOKE_WORK_DIR:-"$repo_root/build/scala-core-smoke"}"
+source_dir="${SCALA_CORE_SMOKE_SOURCE_DIR:-"$repo_root/classes/scala_core_smoke"}"
 runner="$repo_root/build/release-cli/console/runner.js"
 
 download_jar() {
@@ -52,47 +52,59 @@ fi
 
 compiler_cp="$compiler_jar:$library_jar:$reflect_jar:$diff_utils_jar:$jline_jar"
 source_cp="$library_jar"
-support_dir="$work_dir/support"
 out_dir="$work_dir/out"
-main_source_cp="$support_dir:$source_cp"
-runtime_cp="$out_dir:$support_dir:$library_jar"
-java_sources=("$source_dir"/*.java)
+runtime_cp="$out_dir:$library_jar"
 
-rm -rf "$support_dir" "$out_dir"
-mkdir -p "$support_dir" "$out_dir"
+rm -rf "$out_dir"
+mkdir -p "$out_dir"
 
-compile_timeout="${SCALA_SMOKE_COMPILE_TIMEOUT_SECONDS:-900}"
-run_timeout="${SCALA_SMOKE_RUN_TIMEOUT_SECONDS:-60}"
+compile_timeout="${SCALA_CORE_SMOKE_COMPILE_TIMEOUT_SECONDS:-420}"
+run_timeout="${SCALA_CORE_SMOKE_RUN_TIMEOUT_SECONDS:-60}"
+kill_after="${SCALA_CORE_SMOKE_KILL_AFTER_SECONDS:-30}"
 responsiveness="${DOPPIO_SCALA_RESPONSIVENESS:-100000}"
 
 compile_start="$(date +%s)"
-if [ -e "${java_sources[0]}" ]; then
-  javac --release 8 -d "$support_dir" "${java_sources[@]}"
-fi
-
-timeout -s INT "${compile_timeout}s" \
+timeout -k "${kill_after}s" -s INT "${compile_timeout}s" \
   node --max-old-space-size=4096 --no-deprecation "$runner" \
   "-Xresponsiveness:$responsiveness" \
   -cp "$compiler_cp" \
   scala.tools.nsc.Main \
-  -classpath "$main_source_cp" \
+  -classpath "$source_cp" \
   -d "$out_dir" \
   "$source_dir"/*.scala
 compile_end="$(date +%s)"
 
 test -f "$out_dir/Hello.class"
+test -f "$out_dir/AdvancedScalaSmoke.class"
+test -f "$out_dir/Add.class"
+test -f "$out_dir/Lit.class"
+test -f "$out_dir/SmokeExpr.class"
+test -f "$out_dir/SmokeBox.class"
+test -f "$out_dir/SmokeStage.class"
+test -f "$out_dir/ZeroExpr.class"
 
-expected_output="${SCALA_SMOKE_EXPECTED_OUTPUT:-"scala"}"
+scala_indy_dump="$work_dir/scala-indy-javap.txt"
+javap -classpath "$runtime_cp" -v 'AdvancedScalaSmoke$' 'Hello$' > "$scala_indy_dump"
+grep -q 'InvokeDynamic' "$scala_indy_dump"
+grep -q 'LambdaMetafactory' "$scala_indy_dump"
+
+scala_signature_dump="$work_dir/scala-signature-javap.txt"
+javap -classpath "$runtime_cp" -v SmokeBox Formatter > "$scala_signature_dump"
+grep -Fq '// <B:Ljava/lang/Object;>(Lscala/Function1<TA;TB;>;)LSmokeBox<TB;>;' "$scala_signature_dump"
+grep -Fq '// (TA;)Ljava/lang/String;' "$scala_signature_dump"
+
+expected_output="${SCALA_CORE_SMOKE_EXPECTED_OUTPUT:-"scala:38:parse>run:i=39:SCALA:a,bb:sc|even4:25:12"}"
+
 native_output="$(java -cp "$runtime_cp" Hello)"
 if [ "$native_output" != "$expected_output" ]; then
   echo "Unexpected native JVM output: $native_output" >&2
   exit 1
 fi
 
-doppio_output="$(timeout -s INT "${run_timeout}s" node --no-deprecation "$runner" -cp "$runtime_cp" Hello)"
+doppio_output="$(timeout -k "${kill_after}s" -s INT "${run_timeout}s" node --no-deprecation "$runner" -cp "$runtime_cp" Hello)"
 if [ "$doppio_output" != "$expected_output" ]; then
   echo "Unexpected Doppio output: $doppio_output" >&2
   exit 1
 fi
 
-echo "Scala compiler smoke passed in $((compile_end - compile_start))s using Scala $version."
+echo "Scala core smoke passed in $((compile_end - compile_start))s using Scala $version."

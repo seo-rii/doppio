@@ -281,13 +281,19 @@ A local 2026-06-30 validation completed the focused Scala macro smoke in 176
 seconds and the remaining main Scala compiler smoke in 110 seconds using Scala
 2.13.18.
 
-The main smoke and focused functional/interop smokes inspect generated
-classfiles with `javap -v` and assert that Scala lambda-heavy classes contain
-`InvokeDynamic` entries backed by `LambdaMetafactory`. A local 2026-06-22 run
-of the checked smoke completed in 409 seconds using Scala 2.13.18. The main
-smoke also asserts representative Java `Signature` metadata for a generic case
-class method and a generic trait method, while the focused package smoke checks
-the specialized generic class method.
+The Scala core smoke now lives in `classes/scala_core_smoke` and runs through
+`ci/scala_core_smoke.sh`. It covers sealed traits, case classes and objects,
+generic case classes, variance, anonymous trait implementation, pattern
+matching with guards, for-comprehension lowering, partial functions, `Option`,
+`Either`, lazy vals, exception handling, Scala lambdas, and representative Java
+`Signature` metadata for a generic case-class method and a generic trait
+method. The core smoke also inspects generated classfiles with `javap -v` and
+asserts that Scala lambda-heavy classes contain `InvokeDynamic` entries backed
+by `LambdaMetafactory`. A local 2026-07-02 validation completed the focused
+Scala core smoke in 154 seconds and the remaining main Scala compiler smoke in
+68 seconds using Scala 2.13.18. The main smoke now keeps the full compiler
+classpath stress while compiling only a minimal `Hello` program that prints
+`scala`.
 
 `ci/scala_diagnostic_smoke.sh` runs Doppio-hosted scalac on an intentionally
 invalid source file and checks the nonzero exit status plus diagnostic source
