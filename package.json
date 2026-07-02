@@ -88,6 +88,8 @@
     "site:browser-test": "node ci/pages_browser_smoke.mjs",
     "site:build": "vite build --config vite.site.config.mjs",
     "site:check": "node ci/check_pages_site.mjs",
+    "ci:check-pages-workflow": "node ci/check_pages_workflow.mjs",
+    "ci:check-pages-workflow:test": "node ci/check_pages_workflow_test.mjs",
     "ci:check-modern-java-workflow": "node ci/check_modern_java_workflow.mjs",
     "ci:check-modern-java-workflow:test": "node ci/check_modern_java_workflow_test.mjs",
     "typecheck": "tsc --project tsconfig.json --noEmit",

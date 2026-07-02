@@ -32,6 +32,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
+      - name: Check Pages workflow settings
+        run: node ci/check_pages_workflow.mjs
+
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
@@ -63,6 +66,9 @@ jobs:
       - name: Deploy Pages
         id: deployment
         uses: actions/deploy-pages@v5
+        with:
+          timeout: '1200000'
+          reporting_interval: '10000'
 
   browser-smoke:
     name: Browser smoke
