@@ -382,6 +382,11 @@ native-memory fills, including zero-length no-ops.
 
 ## Current Test Targets
 
+- `yarn ci:check-modern-java-workflow:test` covers the workflow checker itself,
+  and `yarn ci:check-modern-java-workflow` verifies that every
+  `ci/kotlin_*_smoke.sh` and `ci/scala_*_smoke.sh` script is referenced by the
+  Modern Java workflow, so newly added compiler smokes fail fast if they are not
+  wired into CI.
 - `grunt --grunt-ignore-compile-errors test-modern-java` compiles and checks the
   current modern fixtures: Java 9 module metadata, private interface methods,
   `Flow.Publisher`, `Flow.Subscriber`, `Flow.Subscription`, and

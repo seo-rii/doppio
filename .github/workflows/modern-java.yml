@@ -46,6 +46,11 @@ jobs:
           yarn typecheck:typescript-7-rc
           yarn typecheck:typescript-7-rc-bootstrap
 
+      - name: Check compiler smoke workflow coverage
+        run: |
+          yarn ci:check-modern-java-workflow:test
+          yarn ci:check-modern-java-workflow
+
       - name: Build release browser bundle
         run: ./node_modules/.bin/grunt --stack release --grunt-ignore-compile-errors
 
