@@ -225,14 +225,15 @@ Current verified checks:
   interface `DefaultImpls`, and `kotlin.Metadata`. This focused bytecode smoke
   uses the minimal compiler classpath; full-classpath stress remains covered by
   `ci/kotlin_smoke.sh`.
-- The same smoke now passes with the full `kotlinc/lib/*.jar` classpath. A
-  local 2026-06-14 run completed in 83 seconds and produced `HelloKt`,
-  `ConstructsKt`, `SmokePoint`, `SmokeNamed`, `SmokeBox`, `SmokeTag`, and
-  `META-INF/main.kotlin_module`; both the host JVM and Doppio printed
-  `hi` / `name=2,4:5`. A follow-up run through `ci/kotlin_smoke.sh` completed
-  in 183 seconds, so runtime variance is still a real tracking point. The
-  `Modern Java` workflow runs this full-classpath mode with
-  `KOTLIN_SMOKE_CLASSPATH_MODE=full`.
+- A focused Kotlin basic-construct smoke now lives in
+  `classes/kotlin_basic_construct_smoke` and runs through
+  `ci/kotlin_basic_construct_smoke.sh`. It compiles and runs a data class,
+  annotation class, interface default implementation, generic class, default
+  arguments, string templates, and a lambda. Both the host JVM and Doppio print
+  `name=2,4:5`. A focused local run completed in 122 seconds and the remaining
+  full-classpath `ci/kotlin_smoke.sh` completed in 99 seconds. The full smoke
+  now keeps the broad compiler classpath stress while compiling only the
+  `HelloKt` program that prints `hi`.
 - A focused Kotlin advanced-construct smoke now lives in
   `classes/kotlin_advanced_construct_smoke` and runs through
   `ci/kotlin_advanced_construct_smoke.sh`. It compiles and runs sealed

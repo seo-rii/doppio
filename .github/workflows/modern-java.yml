@@ -73,6 +73,9 @@ jobs:
       - name: Run Kotlin read-only delegate smoke
         run: ./ci/kotlin_readonly_delegate_smoke.sh
 
+      - name: Run Kotlin basic construct smoke
+        run: ./ci/kotlin_basic_construct_smoke.sh
+
       - name: Run Kotlin advanced construct smoke
         run: ./ci/kotlin_advanced_construct_smoke.sh
 
