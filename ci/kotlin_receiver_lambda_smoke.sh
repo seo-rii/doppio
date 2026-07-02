@@ -72,6 +72,13 @@ test -f "$out_dir/ReceiverPipeline.class"
 test -f "$out_dir/META-INF/main.kotlin_module"
 
 runtime_cp="$out_dir:$stdlib_jar"
+bytecode_dump="$work_dir/kotlin-receiver-lambda-javap.txt"
+javap -classpath "$runtime_cp" -v ReceiverLambdaSmokeKt > "$bytecode_dump"
+grep -Fq 'InvokeDynamic' "$bytecode_dump"
+grep -Fq 'java/lang/invoke/LambdaMetafactory.metafactory' "$bytecode_dump"
+grep -Fq 'Lkotlin/ExtensionFunctionType;' "$bytecode_dump"
+grep -Fq 'LReceiverMarker;' "$bytecode_dump"
+
 expected_output="${KOTLIN_RECEIVER_LAMBDA_SMOKE_EXPECTED_OUTPUT:-"s|[a]|kn|<GO>|x1|(xy)|{q}|ad|text"}"
 
 native_output="$(java -cp "$runtime_cp" KotlinReceiverLambdaHelloKt)"

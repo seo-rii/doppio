@@ -520,12 +520,11 @@ Current verified checks:
   `ci/kotlin_receiver_lambda_smoke.sh`. A focused local run completed in 83
   seconds and a follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 230 seconds. Both the host JVM and Doppio
-  printed `s|[a]|kn|<GO>|x1|(xy)|{q}|ad|text`. `javap` verified
-  `ExtensionFunctionType` metadata, `BuilderBlock` typealias metadata,
-  `Function2` receiver-lambda signatures, extension callable-reference and
-  bound-reference classes, extension property-reference lowering, the
-  `decorate$default` bridge, invokedynamic lambda sites, and runtime-visible
-  receiver-parameter annotations.
+  printed `s|[a]|kn|<GO>|x1|(xy)|{q}|ad|text`. The smoke script now asserts
+  with `javap -v` that the generated classfile contains `InvokeDynamic`
+  entries backed by `LambdaMetafactory`, `ExtensionFunctionType` metadata, and
+  the runtime-visible receiver-parameter annotation used by the extension
+  receiver.
 - A focused Kotlin control-flow smoke now lives in
   `classes/kotlin_control_flow_smoke` and runs through
   `ci/kotlin_control_flow_smoke.sh`. A focused local run completed in 100
