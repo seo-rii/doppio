@@ -35,8 +35,8 @@ if (!timeoutMatch) {
 }
 
 const timeoutMs = Number(timeoutMatch[1]);
-if (!Number.isFinite(timeoutMs) || timeoutMs < 1200000) {
-  fail('Pages deploy timeout must be at least 1200000 ms.');
+if (!Number.isFinite(timeoutMs) || timeoutMs !== 600000) {
+  fail('Pages deploy timeout must stay at the deploy-pages maximum of 600000 ms.');
 }
 
 const intervalMatch = deployInputs.match(/^\s+reporting_interval:\s+['"]?([0-9]+)['"]?/m);

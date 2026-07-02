@@ -37,7 +37,7 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v5
         with:
-          timeout: '1200000'
+          timeout: '600000'
           reporting_interval: '10000'
 `);
   const completeResult = runChecker(complete);
@@ -64,7 +64,7 @@ jobs:
     throw new Error(`expected missing timeout to fail:\n${missingTimeoutResult.stdout}\n${missingTimeoutResult.stderr}`);
   }
 
-  const shortTimeout = writeWorkflow(root, `
+  const lowTimeout = writeWorkflow(root, `
 concurrency:
   group: pages-\${{ github.ref }}
   cancel-in-progress: true
@@ -76,12 +76,32 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v5
         with:
-          timeout: '600000'
+          timeout: '300000'
           reporting_interval: '10000'
 `);
-  const shortTimeoutResult = runChecker(shortTimeout);
-  if (shortTimeoutResult.status === 0 || !shortTimeoutResult.stderr.includes('at least 1200000')) {
-    throw new Error(`expected short timeout to fail:\n${shortTimeoutResult.stdout}\n${shortTimeoutResult.stderr}`);
+  const lowTimeoutResult = runChecker(lowTimeout);
+  if (lowTimeoutResult.status === 0 || !lowTimeoutResult.stderr.includes('maximum of 600000')) {
+    throw new Error(`expected low timeout to fail:\n${lowTimeoutResult.stdout}\n${lowTimeoutResult.stderr}`);
+  }
+
+  const highTimeout = writeWorkflow(root, `
+concurrency:
+  group: pages-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    steps:
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+        with:
+          timeout: '1200000'
+          reporting_interval: '10000'
+`);
+  const highTimeoutResult = runChecker(highTimeout);
+  if (highTimeoutResult.status === 0 || !highTimeoutResult.stderr.includes('maximum of 600000')) {
+    throw new Error(`expected high timeout to fail:\n${highTimeoutResult.stdout}\n${highTimeoutResult.stderr}`);
   }
 
   const wrongAction = writeWorkflow(root, `
@@ -96,7 +116,7 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
         with:
-          timeout: '1200000'
+          timeout: '600000'
           reporting_interval: '10000'
 `);
   const wrongActionResult = runChecker(wrongAction);
