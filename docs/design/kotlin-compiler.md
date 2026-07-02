@@ -239,12 +239,15 @@ Current verified checks:
   207 seconds and both the host JVM and Doppio printed
   `mode-FAST:3:2,3:caught`; this construct set is now included in
   `classes/kotlin_smoke`.
-- The current smoke also compiles and runs nullable safe-call/Elvis flow,
-  nested and inner classes, a function-local class, `Runnable`/`Comparator` SAM
-  conversions, an anonymous object expression, a delegated local property, and
-  an inline function. A full-classpath local run completed in 222 seconds and
-  both the host JVM and Doppio printed
-  `OK:FALLBACK:3:9:2:1:accbbb:4:4:7`.
+- A focused Kotlin local-interop smoke now lives in
+  `classes/kotlin_local_interop_smoke` and runs through
+  `ci/kotlin_local_interop_smoke.sh`. It compiles and runs nullable
+  safe-call/Elvis flow, nested and inner classes, a function-local class,
+  `Runnable`/`Comparator` SAM conversions, an anonymous object expression, a
+  delegated local property, and an inline function. A focused local run
+  completed in 288 seconds and the remaining full-classpath
+  `ci/kotlin_smoke.sh` completed in 211 seconds. Both the host JVM and Doppio
+  print `OK:FALLBACK:3:9:2:1:accbbb:4:4:7`.
 - A no-suspension `suspend` function, suspend lambda, `Continuation`,
   `kotlin.coroutines.startCoroutine`, synchronous and delayed
   `suspendCoroutine` resume, resume-time exception propagation, Java

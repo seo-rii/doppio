@@ -73,6 +73,9 @@ jobs:
       - name: Run Kotlin read-only delegate smoke
         run: ./ci/kotlin_readonly_delegate_smoke.sh
 
+      - name: Run Kotlin local interop smoke
+        run: ./ci/kotlin_local_interop_smoke.sh
+
       - name: Run Kotlin record smoke
         run: ./ci/kotlin_record_smoke.sh
 
