@@ -233,12 +233,14 @@ Current verified checks:
   in 183 seconds, so runtime variance is still a real tracking point. The
   `Modern Java` workflow runs this full-classpath mode with
   `KOTLIN_SMOKE_CLASSPATH_MODE=full`.
-- A further local reduction compiled and ran sealed class/data subclass,
-  `object`, companion object, enum, collection pipeline (`listOf`, `map`,
-  `filter`, `joinToString`), and exception handling constructs. It completed in
-  207 seconds and both the host JVM and Doppio printed
-  `mode-FAST:3:2,3:caught`; this construct set is now included in
-  `classes/kotlin_smoke`.
+- A focused Kotlin advanced-construct smoke now lives in
+  `classes/kotlin_advanced_construct_smoke` and runs through
+  `ci/kotlin_advanced_construct_smoke.sh`. It compiles and runs sealed
+  class/data subclass, `object`, companion object, enum, collection pipeline
+  (`listOf`, `map`, `filter`, `joinToString`), and exception handling
+  constructs. A focused local run completed in 244 seconds and the remaining
+  full-classpath `ci/kotlin_smoke.sh` completed in 187 seconds. Both the host
+  JVM and Doppio print `mode-FAST:3:2,3:caught`.
 - A focused Kotlin local-interop smoke now lives in
   `classes/kotlin_local_interop_smoke` and runs through
   `ci/kotlin_local_interop_smoke.sh`. It compiles and runs nullable
