@@ -206,6 +206,12 @@ grep -Fq 'BytecodeValue."box-impl":(I)LBytecodeValue;' "$kotlin_bytecode_dump"
 grep -Fq 'BytecodeValue."unbox-impl":()I' "$kotlin_bytecode_dump"
 grep -Fq 'ACC_BRIDGE, ACC_SYNTHETIC' "$kotlin_bytecode_dump"
 grep -Fq 'kotlin.Metadata(' "$kotlin_bytecode_dump"
+grep -Fq 'SourceFile: "BytecodeSmoke.kt"' "$kotlin_bytecode_dump"
+grep -Fq 'LineNumberTable:' "$kotlin_bytecode_dump"
+grep -Fq 'BootstrapMethods:' "$kotlin_bytecode_dump"
+grep -Fq 'MethodParameters:' "$kotlin_bytecode_dump"
+grep -Fq '      prefix' "$kotlin_bytecode_dump"
+grep -Fq '      suffix' "$kotlin_bytecode_dump"
 
 kotlin_metadata_dump="$work_dir/kotlin-metadata.javap"
 javap -classpath "$out_dir" -v \
@@ -223,6 +229,11 @@ grep -Fq '// Ljava/lang/Object;LBytecodeStep<Ljava/lang/CharSequence;Ljava/lang/
 grep -Fq 'ACC_BRIDGE, ACC_SYNTHETIC' "$kotlin_metadata_dump"
 grep -Fq 'BytecodeStep$DefaultImpls' "$kotlin_metadata_dump"
 grep -Fq 'kotlin.Metadata(' "$kotlin_metadata_dump"
+grep -Fq 'SourceFile: "BytecodeSmoke.kt"' "$kotlin_metadata_dump"
+grep -Fq 'LineNumberTable:' "$kotlin_metadata_dump"
+grep -Fq 'InnerClasses:' "$kotlin_metadata_dump"
+grep -Fq '      value' "$kotlin_metadata_dump"
+grep -Fq '      suffix' "$kotlin_metadata_dump"
 
 runtime_cp="$out_dir:$stdlib_jar"
 expected_output="$(cat <<'KOTLIN_BYTECODE_EXPECTED'

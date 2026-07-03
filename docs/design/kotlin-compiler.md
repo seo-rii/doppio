@@ -222,9 +222,10 @@ Current verified checks:
   `LambdaMetafactory`, receiver `ExtensionFunctionType` metadata, value-class
   `box-impl`/`unbox-impl` lowering, runtime-visible annotation and parameter
   metadata, `MethodParameters`, generic `Signature` attributes, bridge methods,
-  interface `DefaultImpls`, and `kotlin.Metadata`. This focused bytecode smoke
-  uses the minimal compiler classpath; full-classpath stress remains covered by
-  `ci/kotlin_smoke.sh`.
+  debug `SourceFile`/`LineNumberTable` attributes, bootstrap metadata,
+  parameter names, interface `DefaultImpls`, `InnerClasses`, and
+  `kotlin.Metadata`. This focused bytecode smoke uses the minimal compiler
+  classpath; full-classpath stress remains covered by `ci/kotlin_smoke.sh`.
 - A focused Kotlin basic-construct smoke now lives in
   `classes/kotlin_basic_construct_smoke` and runs through
   `ci/kotlin_basic_construct_smoke.sh`. It compiles and runs a data class,
