@@ -36,6 +36,9 @@ try {
 jobs:
   test:
     steps:
+      - name: Build release browser bundle
+        timeout-minutes: 20
+        run: ./node_modules/.bin/grunt --stack release --grunt-ignore-compile-errors
       - run: ./ci/kotlin_alpha_smoke.sh
       - run: ./ci/scala_beta_smoke.sh
 `);
@@ -48,6 +51,9 @@ jobs:
 jobs:
   test:
     steps:
+      - name: Build release browser bundle
+        timeout-minutes: 20
+        run: ./node_modules/.bin/grunt --stack release --grunt-ignore-compile-errors
       - run: ./ci/kotlin_alpha_smoke.sh
 `);
   const missingResult = runChecker(missing.ciDir, missing.workflowPath);
@@ -59,6 +65,9 @@ jobs:
 jobs:
   test:
     steps:
+      - name: Build release browser bundle
+        timeout-minutes: 20
+        run: ./node_modules/.bin/grunt --stack release --grunt-ignore-compile-errors
       - run: ./ci/kotlin_alpha_smoke.sh
       - run: ./ci/scala_beta_smoke.sh
       - run: ./ci/kotlin_missing_smoke.sh
@@ -66,6 +75,25 @@ jobs:
   const unknownResult = runChecker(unknown.ciDir, unknown.workflowPath);
   if (unknownResult.status === 0 || !unknownResult.stderr.includes('ci/kotlin_missing_smoke.sh')) {
     throw new Error(`expected unknown Kotlin smoke to fail:\n${unknownResult.stdout}\n${unknownResult.stderr}`);
+  }
+
+  const missingReleaseTimeout = writeFixture(root, `
+jobs:
+  test:
+    steps:
+      - name: Build release browser bundle
+        run: ./node_modules/.bin/grunt --stack release --grunt-ignore-compile-errors
+      - run: ./ci/kotlin_alpha_smoke.sh
+      - run: ./ci/scala_beta_smoke.sh
+`);
+  const missingReleaseTimeoutResult = runChecker(missingReleaseTimeout.ciDir, missingReleaseTimeout.workflowPath);
+  if (
+    missingReleaseTimeoutResult.status === 0 ||
+    !missingReleaseTimeoutResult.stderr.includes('Build release browser bundle')
+  ) {
+    throw new Error(
+      `expected missing release bundle timeout to fail:\n${missingReleaseTimeoutResult.stdout}\n${missingReleaseTimeoutResult.stderr}`
+    );
   }
 } finally {
   fs.rmSync(root, { recursive: true, force: true });

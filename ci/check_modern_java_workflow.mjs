@@ -42,4 +42,17 @@ if (missingScripts.length > 0 || unknownScripts.length > 0) {
   process.exit(1);
 }
 
+const releaseBundleStep = workflow.match(/- name:\s*Build release browser bundle\n(?<body>(?:\s{8}[^\n]*\n)*)/);
+const releaseTimeoutMatch = releaseBundleStep?.groups?.body.match(/^\s+timeout-minutes:\s*(\d+)\s*$/m);
+if (!releaseBundleStep || !releaseTimeoutMatch) {
+  console.error('Modern Java workflow must set timeout-minutes on "Build release browser bundle".');
+  process.exit(1);
+}
+
+const releaseTimeoutMinutes = Number(releaseTimeoutMatch[1]);
+if (!Number.isInteger(releaseTimeoutMinutes) || releaseTimeoutMinutes < 5 || releaseTimeoutMinutes > 30) {
+  console.error('Modern Java workflow release bundle timeout must be between 5 and 30 minutes.');
+  process.exit(1);
+}
+
 console.log(`Modern Java workflow references ${expectedScripts.length} Kotlin/Scala smoke scripts.`);
