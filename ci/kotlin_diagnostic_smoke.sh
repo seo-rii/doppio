@@ -38,7 +38,9 @@ mkdir -p "$out_dir"
 cat > "$source_file" <<'KOTLIN_DIAGNOSTIC_SOURCE'
 fun main() {
   val number: Int = "not-an-int"
+  val text = "abc".definitelyMissing
   println(number)
+  println(text)
 }
 KOTLIN_DIAGNOSTIC_SOURCE
 
@@ -71,6 +73,9 @@ fi
 grep -Fq "DiagnosticSmoke.kt:2:19: error: initializer type mismatch: expected 'Int', actual 'String'." "$log_file"
 grep -Fq '  val number: Int = "not-an-int"' "$log_file"
 grep -Fq '                  ^' "$log_file"
+grep -Fq "DiagnosticSmoke.kt:3:20: error: unresolved reference 'definitelyMissing'." "$log_file"
+grep -Fq '  val text = "abc".definitelyMissing' "$log_file"
+grep -Fq '                   ^^^^^^^^^^^^^^^^^' "$log_file"
 
 if find "$out_dir" -type f | grep -q .; then
   echo "Unexpected output files from failed diagnostic compile." >&2

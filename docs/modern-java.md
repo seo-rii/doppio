@@ -284,8 +284,8 @@ native-memory fills, including zero-length no-ops.
   `kotlin-compiler.jar`.
 - The workflow also runs `ci/kotlin_diagnostic_smoke.sh`, which compiles an
   intentionally invalid Kotlin source under Doppio and checks the nonzero exit
-  status, type-mismatch diagnostic, source line, caret position, and absence of
-  generated output files.
+  status, type-mismatch and unresolved-reference diagnostics, source lines,
+  caret positions, and absence of generated output files.
 - The workflow also runs `ci/kotlin_reflect_smoke.sh`, a smaller
   `kotlin-reflect.jar` runtime smoke. Doppio compiles the source with explicit
   `kotlin-stdlib.jar` and `kotlin-reflect.jar` source classpath, then both the
