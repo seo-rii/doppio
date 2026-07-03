@@ -241,8 +241,11 @@ native-memory fills, including zero-length no-ops.
   sorting, filtering, map keys, and hexadecimal byte rendering, plus Kotlin
   source-level Java `CompletableFuture` interop covering SAM conversion,
   executor-backed completion, composition, recovery, combination, racing, and
-  timed retrieval, plus Kotlin contracts covering inline call-in-place behavior
-  and nullable smart casts, then runs the
+  timed retrieval, plus focused Kotlin SAM conversion coverage for Kotlin
+  `fun interface` adapters and Java `Runnable`, `Comparator`, `Supplier`,
+  `IntUnaryOperator`, `Predicate`, and `Callable` lambdas with
+  `InvokeDynamic`/`LambdaMetafactory` classfile checks, plus Kotlin contracts
+  covering inline call-in-place behavior and nullable smart casts, then runs the
   generated code on both the host JVM and Doppio with `kotlin-stdlib.jar`.
 - The workflow also runs `ci/kotlin_bytecode_smoke.sh`, a smaller focused
   Kotlin compiler smoke that inspects representative generated classfiles with

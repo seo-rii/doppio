@@ -251,6 +251,13 @@ Current verified checks:
   completed in 288 seconds and the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 211 seconds. Both the host JVM and Doppio
   print `OK:FALLBACK:3:9:2:1:accbbb:4:4:7`.
+- A focused Kotlin SAM smoke now lives in `classes/kotlin_sam_smoke` and runs
+  through `ci/kotlin_sam_smoke.sh`. It compiles Kotlin `fun interface` adapters
+  and Java SAM conversions for `Runnable`, `Comparator`, `Supplier`,
+  `IntUnaryOperator`, `Predicate`, and `Callable`, then checks the generated
+  `SamSmokeKt` class with `javap -v` for `InvokeDynamic`,
+  `LambdaMetafactory`, and the expected SAM descriptors before comparing host
+  JVM and Doppio output.
 - A no-suspension `suspend` function, suspend lambda, `Continuation`,
   `kotlin.coroutines.startCoroutine`, synchronous and delayed
   `suspendCoroutine` resume, resume-time exception propagation, Java

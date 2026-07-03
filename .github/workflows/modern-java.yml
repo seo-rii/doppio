@@ -122,6 +122,9 @@ jobs:
       - name: Run Kotlin CompletableFuture smoke
         run: ./ci/kotlin_completable_future_smoke.sh
 
+      - name: Run Kotlin SAM smoke
+        run: ./ci/kotlin_sam_smoke.sh
+
       - name: Run Kotlin contract smoke
         run: ./ci/kotlin_contract_smoke.sh
 
