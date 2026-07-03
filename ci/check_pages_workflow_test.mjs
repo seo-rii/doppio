@@ -33,10 +33,16 @@ concurrency:
 jobs:
   deploy:
     steps:
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          name: github-pages-\${{ github.run_attempt }}
+          path: docs
       - name: Deploy Pages
         id: deployment
         uses: actions/deploy-pages@v5
         with:
+          artifact_name: github-pages-\${{ github.run_attempt }}
           timeout: '600000'
           reporting_interval: '10000'
 `);
@@ -53,10 +59,16 @@ concurrency:
 jobs:
   deploy:
     steps:
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          name: github-pages-\${{ github.run_attempt }}
+          path: docs
       - name: Deploy Pages
         id: deployment
         uses: actions/deploy-pages@v5
         with:
+          artifact_name: github-pages-\${{ github.run_attempt }}
           reporting_interval: '10000'
 `);
   const missingTimeoutResult = runChecker(missingTimeout);
@@ -72,10 +84,16 @@ concurrency:
 jobs:
   deploy:
     steps:
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          name: github-pages-\${{ github.run_attempt }}
+          path: docs
       - name: Deploy Pages
         id: deployment
         uses: actions/deploy-pages@v5
         with:
+          artifact_name: github-pages-\${{ github.run_attempt }}
           timeout: '300000'
           reporting_interval: '10000'
 `);
@@ -92,10 +110,16 @@ concurrency:
 jobs:
   deploy:
     steps:
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          name: github-pages-\${{ github.run_attempt }}
+          path: docs
       - name: Deploy Pages
         id: deployment
         uses: actions/deploy-pages@v5
         with:
+          artifact_name: github-pages-\${{ github.run_attempt }}
           timeout: '1200000'
           reporting_interval: '10000'
 `);
@@ -112,16 +136,82 @@ concurrency:
 jobs:
   deploy:
     steps:
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          name: github-pages-\${{ github.run_attempt }}
+          path: docs
       - name: Deploy Pages
         id: deployment
         uses: actions/deploy-pages@v4
         with:
+          artifact_name: github-pages-\${{ github.run_attempt }}
           timeout: '600000'
           reporting_interval: '10000'
 `);
   const wrongActionResult = runChecker(wrongAction);
   if (wrongActionResult.status === 0 || !wrongActionResult.stderr.includes('deploy-pages@v5')) {
     throw new Error(`expected wrong deploy action to fail:\n${wrongActionResult.stdout}\n${wrongActionResult.stderr}`);
+  }
+
+  const missingAttemptArtifactName = writeWorkflow(root, `
+concurrency:
+  group: pages-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    steps:
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+        with:
+          timeout: '600000'
+          reporting_interval: '10000'
+`);
+  const missingAttemptArtifactNameResult = runChecker(missingAttemptArtifactName);
+  if (
+    missingAttemptArtifactNameResult.status === 0 ||
+    !missingAttemptArtifactNameResult.stderr.includes('github.run_attempt')
+  ) {
+    throw new Error(
+      `expected missing run-attempt artifact name to fail:\n${missingAttemptArtifactNameResult.stdout}\n${missingAttemptArtifactNameResult.stderr}`
+    );
+  }
+
+  const mismatchedDeployArtifactName = writeWorkflow(root, `
+concurrency:
+  group: pages-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    steps:
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          name: github-pages-\${{ github.run_attempt }}
+          path: docs
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+        with:
+          artifact_name: github-pages
+          timeout: '600000'
+          reporting_interval: '10000'
+`);
+  const mismatchedDeployArtifactNameResult = runChecker(mismatchedDeployArtifactName);
+  if (
+    mismatchedDeployArtifactNameResult.status === 0 ||
+    !mismatchedDeployArtifactNameResult.stderr.includes('artifact_name')
+  ) {
+    throw new Error(
+      `expected mismatched deploy artifact name to fail:\n${mismatchedDeployArtifactNameResult.stdout}\n${mismatchedDeployArtifactNameResult.stderr}`
+    );
   }
 } finally {
   fs.rmSync(root, { recursive: true, force: true });

@@ -21,6 +21,20 @@ if (!/uses:\s+actions\/deploy-pages@v5/.test(workflow)) {
   fail('Pages workflow must use actions/deploy-pages@v5.');
 }
 
+const expectedArtifactName = 'github-pages-${{ github.run_attempt }}';
+const uploadStepMatch = workflow.match(
+  /- name:\s+Upload Pages artifact[\s\S]*?uses:\s+actions\/upload-pages-artifact@v5[\s\S]*?with:\s*\n([\s\S]*?)(?:\n\s{6}- name:|\n\s{2}[A-Za-z0-9_-]+:|\n?$)/
+);
+if (!uploadStepMatch) {
+  fail('Pages workflow must configure the Upload Pages artifact step.');
+}
+
+const uploadInputs = uploadStepMatch[1];
+const uploadNameMatch = uploadInputs.match(/^\s+name:\s+(.+?)\s*$/m);
+if (!uploadNameMatch || uploadNameMatch[1] !== expectedArtifactName) {
+  fail('Pages upload artifact name must include github.run_attempt to support failed-job reruns.');
+}
+
 const deployStepMatch = workflow.match(
   /- name:\s+Deploy Pages[\s\S]*?uses:\s+actions\/deploy-pages@v5[\s\S]*?with:\s*\n([\s\S]*?)(?:\n\s{6}- name:|\n\s{2}[A-Za-z0-9_-]+:|\n?$)/
 );
@@ -29,6 +43,11 @@ if (!deployStepMatch) {
 }
 
 const deployInputs = deployStepMatch[1];
+const deployArtifactMatch = deployInputs.match(/^\s+artifact_name:\s+(.+?)\s*$/m);
+if (!deployArtifactMatch || deployArtifactMatch[1] !== expectedArtifactName) {
+  fail('Pages deploy artifact_name must match the run-attempt-specific upload artifact name.');
+}
+
 const timeoutMatch = deployInputs.match(/^\s+timeout:\s+['"]?([0-9]+)['"]?/m);
 if (!timeoutMatch) {
   fail('Pages deploy step must set a timeout input.');
