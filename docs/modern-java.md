@@ -331,8 +331,8 @@ native-memory fills, including zero-length no-ops.
   self-types, by-name argument evaluation, extractor matching, and `@switch`
   lowering, a focused Scala functional/library smoke covering `Function.chain`,
   composed function adapters, `Option.when`/`Option.unless`, `Using.resource`,
-  `Try` recovery, `Either.cond`, `partitionMap`, and lambda-heavy classfile
-  emission,
+  close-failure suppressed-exception preservation, `Try` recovery,
+  `Either.cond`, `partitionMap`, and lambda-heavy classfile emission,
   a focused Scala Java collection/Future interop smoke covering
   `scala.jdk.CollectionConverters`, mutable Java list/map wrappers, and a
   small `Future`/`Promise`/`Await` path running on a Java executor,

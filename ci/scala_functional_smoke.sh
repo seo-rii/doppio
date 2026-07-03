@@ -84,7 +84,7 @@ javap -classpath "$runtime_cp" -v 'ScalaFunctionalSmoke$' > "$scala_indy_dump"
 grep -q 'InvokeDynamic' "$scala_indy_dump"
 grep -q 'LambdaMetafactory' "$scala_indy_dump"
 
-expected_output="f17/14/p17+c14/u7/alpha>bb>close/t49+13/x|_=24/ok49"
+expected_output="f17/14/p17+c14/u7/alpha>bb>close/sbody/close/t49+13/x|_=24/ok49"
 
 native_output="$(java -cp "$runtime_cp" ScalaFunctionalHello)"
 if [ "$native_output" != "$expected_output" ]; then

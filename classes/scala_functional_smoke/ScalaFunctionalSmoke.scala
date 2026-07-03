@@ -13,6 +13,16 @@ final class FunctionalCloseRecorder(private val log: ListBuffer[String]) extends
   }
 }
 
+final class FunctionalThrowingCloseRecorder extends AutoCloseable {
+  def fail(): Nothing = {
+    throw new IllegalStateException("body")
+  }
+
+  override def close(): Unit = {
+    throw new IllegalArgumentException("close")
+  }
+}
+
 object ScalaFunctionalSmoke {
   def exercise(): String = {
     val chained = Function.chain(List[Int => Int](_ + 2, _ * 3, _ - 1))(4)
@@ -27,6 +37,11 @@ object ScalaFunctionalSmoke {
     val usingValue = Using.resource(new FunctionalCloseRecorder(closeLog)) { recorder =>
       recorder.mark("alpha") + recorder.mark("bb")
     }
+    val suppressed = Try {
+      Using.resource(new FunctionalThrowingCloseRecorder)(_.fail())
+    }.failed.map { error =>
+      s"${error.getMessage}/${error.getSuppressed.head.getMessage}"
+    }.get
     val successful = Try("42".toInt)
       .map(_ + usingValue)
       .filter(_ % 7 == 0)
@@ -43,6 +58,6 @@ object ScalaFunctionalSmoke {
       .map(_.toLowerCase)
       .fold(identity, identity)
 
-    s"f$chained/$composed/$options/u$usingValue/${closeLog.mkString(">")}/t$successful+$recovered/${invalid.mkString("|")}=${valid.sum}/$either"
+    s"f$chained/$composed/$options/u$usingValue/${closeLog.mkString(">")}/s$suppressed/t$successful+$recovered/${invalid.mkString("|")}=${valid.sum}/$either"
   }
 }

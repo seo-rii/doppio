@@ -56,8 +56,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
   right-biased `Either`;
 - a focused Scala functional/library smoke covering `Function.chain`, composed
   function adapters, `Option.when`/`Option.unless`, `Using.resource`,
-  `Try.map`/`filter`/`recover`, `Either.cond`, `partitionMap`, and
-  lambda-heavy classfile emission;
+  close-failure suppressed-exception preservation, `Try.map`/`filter`/
+  `recover`, `Either.cond`, `partitionMap`, and lambda-heavy classfile
+  emission;
 - a focused Scala language/type-system smoke covering path-dependent types,
   higher-kinded implicit typeclass lookup, self-types, by-name argument
   evaluation, extractor matching, and `@switch` lowering;
@@ -226,12 +227,12 @@ using Scala 2.13.18.
 The Scala functional/library coverage now lives in
 `classes/scala_functional_smoke` and runs through
 `ci/scala_functional_smoke.sh`. It checks `Function.chain`, composed function
-adapters, `Option.when`/`Option.unless`, `Using.resource`, `Try` recovery,
-`Either.cond`, `partitionMap`, and generated `InvokeDynamic` entries backed by
+adapters, `Option.when`/`Option.unless`, `Using.resource` including
+close-failure suppressed-exception preservation, `Try` recovery, `Either.cond`,
+`partitionMap`, and generated `InvokeDynamic` entries backed by
 `LambdaMetafactory` while keeping the main Scala compiler smoke smaller.
-A local 2026-06-30 validation completed the focused Scala functional smoke in
-74 seconds and the remaining main Scala compiler smoke in 241 seconds using
-Scala 2.13.18.
+A local 2026-07-03 validation completed the focused Scala functional smoke in
+153 seconds using Scala 2.13.18.
 The Scala collection-library coverage now lives in
 `classes/scala_collection_smoke` and runs through
 `ci/scala_collection_smoke.sh`. It checks `LazyList`, extractor `unapply`,
