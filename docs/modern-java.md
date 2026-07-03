@@ -140,8 +140,9 @@ native-memory fills, including zero-length no-ops.
   object declaration, companion object, enum, collection pipeline, exception
   handling, nullable safe-call/Elvis flow, nested/inner/local classes, SAM
   conversions, an anonymous object expression, delegated local and custom
-  properties, an inline function, `Closeable.use`, destructuring, range loops,
-  stepped `downTo` loops, `mapIndexed`, and `synchronized`, plus top-level,
+  properties, an inline function, `Closeable.use` including close-failure
+  suppressed-exception preservation, destructuring, range loops, stepped
+  `downTo` loops, `mapIndexed`, and `synchronized`, plus top-level,
   bound, unbound, constructor, and companion
   callable references used through lazy `Sequence` pipelines, plus
   `@JvmInline value class` boxing, interface dispatch, nullable handling, map

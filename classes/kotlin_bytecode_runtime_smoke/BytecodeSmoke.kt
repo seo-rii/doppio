@@ -12,6 +12,16 @@ class ClosingSmoke : Closeable {
   }
 }
 
+class ThrowingCloseSmoke : Closeable {
+  fun fail(): Nothing {
+    throw IllegalStateException("body")
+  }
+
+  override fun close() {
+    throw IllegalArgumentException("close")
+  }
+}
+
 class ComponentSmoke(private val first: Int, private val second: String) {
   operator fun component1(): Int = first
   operator fun component2(): String = second
@@ -31,6 +41,11 @@ fun bytecodeSummary(): String {
 
   val closeable = ClosingSmoke()
   val useValue = closeable.use { it.payload() + 1 }
+  val suppressedSummary = try {
+    ThrowingCloseSmoke().use { it.fail() }
+  } catch (e: IllegalStateException) {
+    e.message + "/" + e.suppressed.single().message
+  }
 
   val (number, label) = ComponentSmoke(3, "x")
   var rangeTotal = 0
@@ -45,5 +60,6 @@ fun bytecodeSummary(): String {
   val sync = synchronized(BytecodeLock) { "sync" }
 
   return trace.joinToString(">") + ":" + caught + ":" + useValue + ":" + closeable.closed +
-    ":" + label + number + ":" + rangeTotal + ":" + steppedTotal + ":" + indexed + ":" + sync
+    ":" + suppressedSummary + ":" + label + number + ":" + rangeTotal + ":" + steppedTotal +
+    ":" + indexed + ":" + sync
 }

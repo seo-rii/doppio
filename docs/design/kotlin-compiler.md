@@ -727,11 +727,11 @@ Current verified checks:
   seconds.
 - A focused Kotlin bytecode-runtime smoke now lives in
   `classes/kotlin_bytecode_runtime_smoke` and runs through
-  `ci/kotlin_bytecode_runtime_smoke.sh`. A focused local run completed in 241
-  seconds and a follow-up run through the remaining full-classpath
-  `ci/kotlin_smoke.sh` completed in 251 seconds. Both the host JVM and Doppio
-  printed `try>catch>finally:boom:8:true:x3:10:12:4:sync`. This covers Kotlin
-  lowering for `try`/`catch`/`finally`, `Closeable.use`, destructuring via
+  `ci/kotlin_bytecode_runtime_smoke.sh`. A focused local run completed in 135
+  seconds. Both the host JVM and Doppio printed
+  `try>catch>finally:boom:8:true:body/close:x3:10:12:4:sync`. This covers
+  Kotlin lowering for `try`/`catch`/`finally`, `Closeable.use` including
+  close-failure suppressed-exception preservation, destructuring via
   `componentN`, `1..n` loops, stepped `downTo` loops, `mapIndexed`, and
   `synchronized`.
 
