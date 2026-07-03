@@ -372,7 +372,8 @@ native-memory fills, including zero-length no-ops.
   generic `Signature` metadata, path-dependent types, higher-kinded implicit
   typeclass lookup, self-types, by-name argument evaluation, extractor
   matching, and `@switch` lowering, and a diagnostic smoke covering type-mismatch
-  source filename, line number, found/required types, caret, and error count,
+  and missing-member source filename, line number, found/required types,
+  source lines, carets, and multi-error count,
   plus a focused two-phase Scala 2 blackbox macro expansion smoke, plus string
   interpolation,
   then runs the generated `Hello` class on both the host JVM and Doppio.

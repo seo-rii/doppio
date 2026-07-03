@@ -296,9 +296,9 @@ classpath stress while compiling only a minimal `Hello` program that prints
 `scala`.
 
 `ci/scala_diagnostic_smoke.sh` runs Doppio-hosted scalac on an intentionally
-invalid source file and checks the nonzero exit status plus diagnostic source
-filename, line number, error kind, found/required types, source line, caret
-position, and error count.
+invalid source pair and checks the nonzero exit status plus diagnostic source
+filenames, line numbers, type-mismatch found/required types, missing-member
+error kind, source lines, caret positions, and multi-error count.
 
 `ci/scala_record_smoke.sh` compiles a Java 17 record support class with the
 host JDK, then runs Doppio-hosted scalac on a focused Scala interop source that

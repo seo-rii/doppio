@@ -53,6 +53,7 @@ compiler_cp="$compiler_jar:$library_jar:$reflect_jar:$diff_utils_jar:$jline_jar"
 source_cp="$library_jar:$reflect_jar"
 out_dir="$work_dir/out"
 source_file="$work_dir/DiagnosticSmoke.scala"
+missing_member_source_file="$work_dir/MissingMemberSmoke.scala"
 log_file="$work_dir/diagnostic.log"
 
 rm -rf "$work_dir"
@@ -62,6 +63,11 @@ object DiagnosticSmoke {
   val number: Int = "not-an-int"
 }
 SCALA_DIAGNOSTIC_SOURCE
+cat > "$missing_member_source_file" <<'SCALA_MISSING_MEMBER_SOURCE'
+object MissingMemberSmoke {
+  val text = "abc".definitelyMissing
+}
+SCALA_MISSING_MEMBER_SOURCE
 
 compile_timeout="${SCALA_DIAGNOSTIC_SMOKE_COMPILE_TIMEOUT_SECONDS:-300}"
 responsiveness="${DOPPIO_SCALA_RESPONSIVENESS:-100000}"
@@ -74,7 +80,8 @@ timeout -s INT "${compile_timeout}s" \
   scala.tools.nsc.Main \
   -classpath "$source_cp" \
   -d "$out_dir" \
-  "$source_file" > "$log_file" 2>&1
+  "$source_file" \
+  "$missing_member_source_file" > "$log_file" 2>&1
 status="$?"
 set -e
 
@@ -94,7 +101,10 @@ grep -Fq 'found   : String("not-an-int")' "$log_file"
 grep -Fq 'required: Int' "$log_file"
 grep -Fq '  val number: Int = "not-an-int"' "$log_file"
 grep -Fq '                    ^' "$log_file"
-grep -Fq '1 error' "$log_file"
+grep -Fq 'MissingMemberSmoke.scala:2: error: value definitelyMissing is not a member of String' "$log_file"
+grep -Fq '  val text = "abc".definitelyMissing' "$log_file"
+grep -Fq '                   ^' "$log_file"
+grep -Fq '2 errors' "$log_file"
 
 if find "$out_dir" -type f -name '*.class' | grep -q .; then
   echo "Unexpected class files from failed diagnostic compile." >&2
