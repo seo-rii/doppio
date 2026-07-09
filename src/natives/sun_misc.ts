@@ -314,10 +314,28 @@ export default function (): any {
       return Long.fromNumber(heap.malloc(size.toNumber()));
     }
 
-    public static 'reallocateMemory(JJ)J'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, arg0: Long, arg1: Long): Long {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+    public static 'reallocateMemory(JJ)J'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, address: Long, size: Long): Long {
+      const heap = thread.getJVM().getHeap(),
+        oldAddr = address.toNumber(),
+        newSize = size.toNumber();
+      if (newSize === 0) {
+        if (oldAddr !== 0) {
+          heap.free(oldAddr);
+        }
+        return Long.ZERO;
+      }
+      if (oldAddr === 0) {
+        return Long.fromNumber(heap.malloc(newSize));
+      }
+
+      // Heap tracks allocation size classes per 4096-byte chunk, matching pageSize().
+      const heapInternals: any = heap,
+        oldClass = heapInternals._sizeMap[oldAddr & ~(4096 - 1)],
+        oldSize = Math.pow(2, oldClass),
+        newAddr = heap.malloc(newSize);
+      heap.memcpy(oldAddr, newAddr, Math.min(oldSize, newSize));
+      heap.free(oldAddr);
+      return Long.fromNumber(newAddr);
     }
 
     public static 'setMemory(Ljava/lang/Object;JJB)V'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, address: Long, bytes: Long, value: number): void {

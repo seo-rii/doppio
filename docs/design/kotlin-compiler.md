@@ -128,9 +128,11 @@ to `Hello.kt` backend codegen:
   memory scalar access now covers selected `short`, `char`, `int`, `long`,
   `float`, `double`, and address reads/writes. Coverage lives in
   `classes/modern_test/Java9UnsafeCopyMemoryArrays.java` and
-  `classes/modern_test/Java9UnsafeNativeMemoryPrimitives.java`; these protect
-  compiler and runtime-library byte-buffer shuffling paths that bypass
-  `System.arraycopy` or `Arrays.fill`.
+  `classes/modern_test/Java9UnsafeNativeMemoryPrimitives.java`;
+  `classes/modern_test/Java9UnsafeReallocateMemory.java` covers selected
+  native-memory growth, shrinkage, allocation-from-zero, and zero-size free
+  behavior. These protect compiler and runtime-library byte-buffer shuffling
+  paths that bypass `System.arraycopy` or `Arrays.fill`.
 
 ## Fixed Blocker: Kotlin Backend Visibility
 

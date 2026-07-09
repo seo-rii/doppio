@@ -348,6 +348,9 @@ reduced to a focused Java or Scala fixture.
   native-memory fills. `classes/modern_test/Java9UnsafeNativeMemoryPrimitives.java`
   covers selected native scalar reads/writes for `short`, `char`, `int`,
   `long`, `float`, `double`, and Doppio's 32-bit address model.
+  `classes/modern_test/Java9UnsafeReallocateMemory.java` covers selected
+  native-memory growth, shrinkage, allocation-from-zero, and zero-size free
+  behavior.
 
 Expected blocker areas:
 
