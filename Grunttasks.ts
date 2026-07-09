@@ -447,6 +447,13 @@ export function setup(grunt: IGrunt) {
           ext: '.class'
         }]
       },
+      array_ops: {
+        files: [{
+          expand: true,
+          src: 'classes/test/ArrayOps.java',
+          ext: '.class'
+        }]
+      },
       examples: {
         files: [{
           expand: true,
@@ -459,6 +466,11 @@ export function setup(grunt: IGrunt) {
       default: {
         expand: true,
         src: 'classes/test/*.java',
+        ext: '.runout'
+      },
+      array_ops: {
+        expand: true,
+        src: 'classes/test/ArrayOps.java',
         ext: '.runout'
       }
     },
@@ -618,6 +630,12 @@ export function setup(grunt: IGrunt) {
         files: [{
           expand: true,
           src: ['classes/test/*.runout']
+        }]
+      },
+      array_ops: {
+        files: [{
+          expand: true,
+          src: ['classes/test/ArrayOps.runout']
         }]
       },
       modern_java17: {
@@ -1130,6 +1148,34 @@ export function setup(grunt: IGrunt) {
       'generate_doppio_jar',
       'includes:default');
   });
+  grunt.registerTask('modern-ci-release-cli', function() {
+    grunt.config.set('ts.options.failOnTypeErrors', false);
+    grunt.config.set('ts.options.noImplicitAny', false);
+    grunt.config.set('ts.options.fast', 'never');
+    grunt.task.run(
+      'make_build_dir:dev-cli',
+      'prepare_bootstrap_type_stubs',
+      'ts:dev-cli',
+      'check_jdk',
+      'find_native_java',
+      'newer:javac',
+      'javac_modern_classlib',
+      'generate_doppio_jar',
+      'includes:default',
+      'make_build_dir:release-cli',
+      'newer:ice-cream:release-cli',
+      'newer:uglify:release-cli',
+      'merge-source-maps:release-cli',
+      'launcher:doppio',
+      'launcher:doppioh');
+  });
+  grunt.registerTask('modern-ci-array-runout', [
+    'check_jdk',
+    'find_native_java',
+    'newer:javac:array_ops',
+    'run_java:array_ops',
+    'lineending:array_ops'
+  ]);
 
   grunt.registerTask('examples',
     ['release',
@@ -1146,8 +1192,7 @@ export function setup(grunt: IGrunt) {
   grunt.registerTask('test',
     ['release-cli',
      'unit_test']);
-  var modernJavaTestTasks = [
-    'release-cli',
+  var modernJavaRuntimeTestTasks = [
     'javac_modern_classlib',
     'generate_doppio_jar',
     'javac_modern_multirelease_jar',
@@ -1204,8 +1249,10 @@ export function setup(grunt: IGrunt) {
     'lineending:modern_java17',
     'unit_test:modern_java17'
   ];
+  var modernJavaTestTasks = ['modern-ci-release-cli'].concat(modernJavaRuntimeTestTasks);
   grunt.registerTask('test-modern-java', modernJavaTestTasks);
   grunt.registerTask('test-modern-java17', modernJavaTestTasks);
+  grunt.registerTask('test-modern-java-runtime', modernJavaRuntimeTestTasks);
   grunt.registerTask('build-test-dev',
     [
       'make_build_dir:dev-cli',

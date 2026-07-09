@@ -36,9 +36,15 @@ try {
 jobs:
   test:
     steps:
-      - name: Build release browser bundle
-        timeout-minutes: 30
-        run: ./node_modules/.bin/grunt --stack release --grunt-ignore-compile-errors
+      - name: Build release CLI runner
+        timeout-minutes: 20
+        run: ./node_modules/.bin/grunt --stack modern-ci-release-cli --grunt-ignore-compile-errors
+      - name: Run modern Java compatibility tests
+        run: ./node_modules/.bin/grunt --stack test-modern-java-runtime --grunt-ignore-compile-errors
+      - name: Run core array compatibility smoke
+        run: |
+          ./node_modules/.bin/grunt --stack modern-ci-array-runout --grunt-ignore-compile-errors
+          node build/release-cli/console/test_runner.js classes/test/ArrayOps --makefile
       - run: ./ci/kotlin_alpha_smoke.sh
       - run: ./ci/scala_beta_smoke.sh
 `);
@@ -51,9 +57,15 @@ jobs:
 jobs:
   test:
     steps:
-      - name: Build release browser bundle
-        timeout-minutes: 30
-        run: ./node_modules/.bin/grunt --stack release --grunt-ignore-compile-errors
+      - name: Build release CLI runner
+        timeout-minutes: 20
+        run: ./node_modules/.bin/grunt --stack modern-ci-release-cli --grunt-ignore-compile-errors
+      - name: Run modern Java compatibility tests
+        run: ./node_modules/.bin/grunt --stack test-modern-java-runtime --grunt-ignore-compile-errors
+      - name: Run core array compatibility smoke
+        run: |
+          ./node_modules/.bin/grunt --stack modern-ci-array-runout --grunt-ignore-compile-errors
+          node build/release-cli/console/test_runner.js classes/test/ArrayOps --makefile
       - run: ./ci/kotlin_alpha_smoke.sh
 `);
   const missingResult = runChecker(missing.ciDir, missing.workflowPath);
@@ -65,9 +77,15 @@ jobs:
 jobs:
   test:
     steps:
-      - name: Build release browser bundle
-        timeout-minutes: 30
-        run: ./node_modules/.bin/grunt --stack release --grunt-ignore-compile-errors
+      - name: Build release CLI runner
+        timeout-minutes: 20
+        run: ./node_modules/.bin/grunt --stack modern-ci-release-cli --grunt-ignore-compile-errors
+      - name: Run modern Java compatibility tests
+        run: ./node_modules/.bin/grunt --stack test-modern-java-runtime --grunt-ignore-compile-errors
+      - name: Run core array compatibility smoke
+        run: |
+          ./node_modules/.bin/grunt --stack modern-ci-array-runout --grunt-ignore-compile-errors
+          node build/release-cli/console/test_runner.js classes/test/ArrayOps --makefile
       - run: ./ci/kotlin_alpha_smoke.sh
       - run: ./ci/scala_beta_smoke.sh
       - run: ./ci/kotlin_missing_smoke.sh
@@ -81,18 +99,100 @@ jobs:
 jobs:
   test:
     steps:
-      - name: Build release browser bundle
-        run: ./node_modules/.bin/grunt --stack release --grunt-ignore-compile-errors
+      - name: Build release CLI runner
+        run: ./node_modules/.bin/grunt --stack modern-ci-release-cli --grunt-ignore-compile-errors
+      - name: Run modern Java compatibility tests
+        run: ./node_modules/.bin/grunt --stack test-modern-java-runtime --grunt-ignore-compile-errors
+      - name: Run core array compatibility smoke
+        run: |
+          ./node_modules/.bin/grunt --stack modern-ci-array-runout --grunt-ignore-compile-errors
+          node build/release-cli/console/test_runner.js classes/test/ArrayOps --makefile
       - run: ./ci/kotlin_alpha_smoke.sh
       - run: ./ci/scala_beta_smoke.sh
 `);
   const missingReleaseTimeoutResult = runChecker(missingReleaseTimeout.ciDir, missingReleaseTimeout.workflowPath);
   if (
     missingReleaseTimeoutResult.status === 0 ||
-    !missingReleaseTimeoutResult.stderr.includes('Build release browser bundle')
+    !missingReleaseTimeoutResult.stderr.includes('Build release CLI runner')
   ) {
     throw new Error(
-      `expected missing release bundle timeout to fail:\n${missingReleaseTimeoutResult.stdout}\n${missingReleaseTimeoutResult.stderr}`
+      `expected missing release CLI runner timeout to fail:\n${missingReleaseTimeoutResult.stdout}\n${missingReleaseTimeoutResult.stderr}`
+    );
+  }
+
+  const wrongReleaseTarget = writeFixture(root, `
+jobs:
+  test:
+    steps:
+      - name: Build release CLI runner
+        timeout-minutes: 20
+        run: ./node_modules/.bin/grunt --stack release --grunt-ignore-compile-errors
+      - name: Run modern Java compatibility tests
+        run: ./node_modules/.bin/grunt --stack test-modern-java-runtime --grunt-ignore-compile-errors
+      - name: Run core array compatibility smoke
+        run: |
+          ./node_modules/.bin/grunt --stack modern-ci-array-runout --grunt-ignore-compile-errors
+          node build/release-cli/console/test_runner.js classes/test/ArrayOps --makefile
+      - run: ./ci/kotlin_alpha_smoke.sh
+      - run: ./ci/scala_beta_smoke.sh
+`);
+  const wrongReleaseTargetResult = runChecker(wrongReleaseTarget.ciDir, wrongReleaseTarget.workflowPath);
+  if (
+    wrongReleaseTargetResult.status === 0 ||
+    !wrongReleaseTargetResult.stderr.includes('modern-ci-release-cli')
+  ) {
+    throw new Error(
+      `expected wrong release target to fail:\n${wrongReleaseTargetResult.stdout}\n${wrongReleaseTargetResult.stderr}`
+    );
+  }
+
+  const missingArrayRunout = writeFixture(root, `
+jobs:
+  test:
+    steps:
+      - name: Build release CLI runner
+        timeout-minutes: 20
+        run: ./node_modules/.bin/grunt --stack modern-ci-release-cli --grunt-ignore-compile-errors
+      - name: Run modern Java compatibility tests
+        run: ./node_modules/.bin/grunt --stack test-modern-java-runtime --grunt-ignore-compile-errors
+      - name: Run core array compatibility smoke
+        run: node build/release-cli/console/test_runner.js classes/test/ArrayOps --makefile
+      - run: ./ci/kotlin_alpha_smoke.sh
+      - run: ./ci/scala_beta_smoke.sh
+`);
+  const missingArrayRunoutResult = runChecker(missingArrayRunout.ciDir, missingArrayRunout.workflowPath);
+  if (
+    missingArrayRunoutResult.status === 0 ||
+    !missingArrayRunoutResult.stderr.includes('modern-ci-array-runout')
+  ) {
+    throw new Error(
+      `expected missing ArrayOps runout generation to fail:\n${missingArrayRunoutResult.stdout}\n${missingArrayRunoutResult.stderr}`
+    );
+  }
+
+  const compilerSmokeBeforeBuild = writeFixture(root, `
+jobs:
+  test:
+    steps:
+      - run: ./ci/kotlin_alpha_smoke.sh
+      - name: Build release CLI runner
+        timeout-minutes: 20
+        run: ./node_modules/.bin/grunt --stack modern-ci-release-cli --grunt-ignore-compile-errors
+      - name: Run modern Java compatibility tests
+        run: ./node_modules/.bin/grunt --stack test-modern-java-runtime --grunt-ignore-compile-errors
+      - name: Run core array compatibility smoke
+        run: |
+          ./node_modules/.bin/grunt --stack modern-ci-array-runout --grunt-ignore-compile-errors
+          node build/release-cli/console/test_runner.js classes/test/ArrayOps --makefile
+      - run: ./ci/scala_beta_smoke.sh
+`);
+  const compilerSmokeBeforeBuildResult = runChecker(compilerSmokeBeforeBuild.ciDir, compilerSmokeBeforeBuild.workflowPath);
+  if (
+    compilerSmokeBeforeBuildResult.status === 0 ||
+    !compilerSmokeBeforeBuildResult.stderr.includes('before Kotlin/Scala compiler smokes')
+  ) {
+    throw new Error(
+      `expected compiler smoke before runner build to fail:\n${compilerSmokeBeforeBuildResult.stdout}\n${compilerSmokeBeforeBuildResult.stderr}`
     );
   }
 } finally {
