@@ -288,9 +288,11 @@ generic case classes, variance, anonymous trait implementation, pattern
 matching with guards, for-comprehension lowering, partial functions, `Option`,
 `Either`, lazy vals, exception handling, Scala lambdas, and representative Java
 `Signature` metadata for a generic case-class method and a generic trait
-method. The core smoke also inspects generated classfiles with `javap -v` and
+method. The core smoke also inspects generated classfiles with `javap -v`,
 asserts that Scala lambda-heavy classes contain `InvokeDynamic` entries backed
-by `LambdaMetafactory`. A local 2026-07-02 validation completed the focused
+by `LambdaMetafactory`, and checks debug/source metadata plus Scala-specific
+`ScalaSignature`, `ScalaInlineInfo`, and `ScalaSig` attributes. A local
+2026-07-02 validation completed the focused
 Scala core smoke in 154 seconds and the remaining main Scala compiler smoke in
 68 seconds using Scala 2.13.18. The main smoke now keeps the full compiler
 classpath stress while compiling only a minimal `Hello` program that prints

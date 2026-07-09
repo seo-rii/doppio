@@ -371,9 +371,11 @@ native-memory fills, including zero-length no-ops.
   arithmetic/sorting/parsing/scaling checks,
   classfile assertions for `InvokeDynamic`/`LambdaMetafactory` emission in the
   main and focused functional Scala smokes, representative
-  generic `Signature` metadata, path-dependent types, higher-kinded implicit
-  typeclass lookup, self-types, by-name argument evaluation, extractor
-  matching, and `@switch` lowering, and a diagnostic smoke covering type-mismatch
+  generic `Signature` metadata, Scala `SourceFile`/`LineNumberTable`,
+  `ScalaSignature`, `ScalaInlineInfo`, and `ScalaSig` classfile attributes,
+  path-dependent types, higher-kinded implicit typeclass lookup, self-types,
+  by-name argument evaluation, extractor matching, and `@switch` lowering,
+  and a diagnostic smoke covering type-mismatch
   and missing-member source filename, line number, found/required types,
   source lines, carets, and multi-error count,
   plus a focused two-phase Scala 2 blackbox macro expansion smoke, plus string
