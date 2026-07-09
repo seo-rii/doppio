@@ -122,12 +122,14 @@ to `Hello.kt` backend codegen:
   bytes through a plain `byte[]`.
 - `sun.misc.Unsafe.copyMemory(Object, long, Object, long, long)` now covers
   `byte[]` to `byte[]` copies, aligned same-type primitive-array copies,
-  selected `byte[]` to native-memory and native-memory to `byte[]` copies, and
-  overlapping ranges in the same array. `sun.misc.Unsafe.setMemory(Object,
+  selected primitive-array to native-memory and native-memory to
+  primitive-array transfers, and overlapping ranges in the same array.
+  `sun.misc.Unsafe.setMemory(Object,
   long, long, byte)` now covers `byte[]` and native-memory fills, while native
   memory scalar access now covers selected `short`, `char`, `int`, `long`,
   `float`, `double`, and address reads/writes. Coverage lives in
-  `classes/modern_test/Java9UnsafeCopyMemoryArrays.java` and
+  `classes/modern_test/Java9UnsafeCopyMemoryArrays.java`,
+  `classes/modern_test/Java9UnsafeCopyMemoryNativePrimitives.java`, and
   `classes/modern_test/Java9UnsafeNativeMemoryPrimitives.java`;
   `classes/modern_test/Java9UnsafeReallocateMemory.java` covers selected
   native-memory growth, shrinkage, allocation-from-zero, and zero-size free

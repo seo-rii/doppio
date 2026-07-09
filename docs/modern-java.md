@@ -84,7 +84,7 @@ Java 9 Unsafe note: the compatibility row above now also includes selected
 behavior for `byte[]` to `byte[]` copies, aligned same-type `short[]`,
 `char[]`, `int[]`, and `long[]` copies, including same-array overlapping
 ranges and zero-length no-ops, plus selected native-memory transfers through
-`byte[]`. It also includes selected
+`byte[]` and aligned primitive arrays. It also includes selected
 `sun.misc.Unsafe.setMemory(Object, long, long, byte)` behavior for `byte[]` and
 native-memory fills, including zero-length no-ops, and selected native-memory
 primitive scalar accessors for `short`, `char`, `int`, `long`, `float`,

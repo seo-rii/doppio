@@ -400,30 +400,101 @@ export default function (): any {
         // OK, so... destBase is an array, destOffset is a byte offset from the
         // start of the array. Need to copy data from the heap directly into the array.
         if (util.is_array_type(destBase.getClass().getInternalName()) && util.is_primitive_type((<ArrayClassData<any>> destBase.getClass()).getComponentClass().getInternalName())) {
-          const destArray: JVMTypes.JVMArray<any> = <any> destBase;
-          switch (destArray.getClass().getComponentClass().getInternalName()) {
+          const destArray: JVMTypes.JVMArray<any> = <any> destBase,
+            destComponent = destArray.getClass().getComponentClass().getInternalName();
+          switch (destComponent) {
             case 'B':
               for (let i = 0; i < length; i++) {
                 destArray.array[destAddr + i] = heap.get_signed_byte(srcAddr + i);
               }
               break;
-            /*case 'C':
-              break;
-            case 'D':
-              break;
-            case 'F':
-              break;
-            case 'I':
-              break;
-            case 'J':
+            case 'C':
+              if (destAddr % 2 !== 0 || length % 2 !== 0) {
+                thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. unaligned destArray type: ' + destComponent);
+                break;
+              }
+              {
+                const srcBytes = heap.get_buffer(srcAddr, length),
+                  destIndex = destAddr / 2,
+                  elementCount = length / 2;
+                for (let i = 0; i < elementCount; i++) {
+                  destArray.array[destIndex + i] = srcBytes.readUInt16LE(i * 2);
+                }
+              }
               break;
             case 'S':
+              if (destAddr % 2 !== 0 || length % 2 !== 0) {
+                thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. unaligned destArray type: ' + destComponent);
+                break;
+              }
+              {
+                const srcBytes = heap.get_buffer(srcAddr, length),
+                  destIndex = destAddr / 2,
+                  elementCount = length / 2;
+                for (let i = 0; i < elementCount; i++) {
+                  destArray.array[destIndex + i] = srcBytes.readInt16LE(i * 2);
+                }
+              }
               break;
-            case 'Z':
-              break;*/
+            case 'F':
+              if (destAddr % 4 !== 0 || length % 4 !== 0) {
+                thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. unaligned destArray type: ' + destComponent);
+                break;
+              }
+              {
+                const srcBytes = heap.get_buffer(srcAddr, length),
+                  destIndex = destAddr / 4,
+                  elementCount = length / 4;
+                for (let i = 0; i < elementCount; i++) {
+                  destArray.array[destIndex + i] = srcBytes.readFloatLE(i * 4);
+                }
+              }
+              break;
+            case 'I':
+              if (destAddr % 4 !== 0 || length % 4 !== 0) {
+                thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. unaligned destArray type: ' + destComponent);
+                break;
+              }
+              {
+                const srcBytes = heap.get_buffer(srcAddr, length),
+                  destIndex = destAddr / 4,
+                  elementCount = length / 4;
+                for (let i = 0; i < elementCount; i++) {
+                  destArray.array[destIndex + i] = srcBytes.readInt32LE(i * 4);
+                }
+              }
+              break;
+            case 'D':
+              if (destAddr % 8 !== 0 || length % 8 !== 0) {
+                thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. unaligned destArray type: ' + destComponent);
+                break;
+              }
+              {
+                const srcBytes = heap.get_buffer(srcAddr, length),
+                  destIndex = destAddr / 8,
+                  elementCount = length / 8;
+                for (let i = 0; i < elementCount; i++) {
+                  destArray.array[destIndex + i] = srcBytes.readDoubleLE(i * 8);
+                }
+              }
+              break;
+            case 'J':
+              if (destAddr % 8 !== 0 || length % 8 !== 0) {
+                thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. unaligned destArray type: ' + destComponent);
+                break;
+              }
+              {
+                const srcBytes = heap.get_buffer(srcAddr, length),
+                  destIndex = destAddr / 8,
+                  elementCount = length / 8;
+                for (let i = 0; i < elementCount; i++) {
+                  destArray.array[destIndex + i] = Long.fromBits(srcBytes.readInt32LE(i * 8), srcBytes.readInt32LE((i * 8) + 4));
+                }
+              }
+              break;
             default:
               // I have no idea what the appropriate semantics are for this.
-              thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. destArray type: ' + destArray.getClass().getComponentClass().getInternalName());
+              thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. destArray type: ' + destComponent);
               break;
           }
         } else {
@@ -433,17 +504,103 @@ export default function (): any {
       } else if (srcBase !== null && destBase === null) {
         // srcBase is an array, destOffset is an address where the contents of srcBase should be copied.
         if (util.is_array_type(srcBase.getClass().getInternalName()) && util.is_primitive_type((<ArrayClassData<any>> srcBase.getClass()).getComponentClass().getInternalName())) {
-          const srcArray: JVMTypes.JVMArray<any> = <any> srcBase;
-          switch (srcArray.getClass().getComponentClass().getInternalName()) {
+          const srcArray: JVMTypes.JVMArray<any> = <any> srcBase,
+            srcComponent = srcArray.getClass().getComponentClass().getInternalName();
+          switch (srcComponent) {
             case 'B':
-            case 'C':
               for (let i = 0; i < length; i++) {
                 heap.set_signed_byte(destAddr + i, srcArray.array[srcAddr + i]);
               }
               break;
+            case 'C':
+              if (srcAddr % 2 !== 0 || length % 2 !== 0) {
+                thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. unaligned srcArray type: ' + srcComponent);
+                break;
+              }
+              {
+                const destBytes = heap.get_buffer(destAddr, length),
+                  srcIndex = srcAddr / 2,
+                  elementCount = length / 2;
+                for (let i = 0; i < elementCount; i++) {
+                  destBytes.writeUInt16LE(srcArray.array[srcIndex + i], i * 2);
+                }
+              }
+              break;
+            case 'S':
+              if (srcAddr % 2 !== 0 || length % 2 !== 0) {
+                thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. unaligned srcArray type: ' + srcComponent);
+                break;
+              }
+              {
+                const destBytes = heap.get_buffer(destAddr, length),
+                  srcIndex = srcAddr / 2,
+                  elementCount = length / 2;
+                for (let i = 0; i < elementCount; i++) {
+                  destBytes.writeInt16LE(srcArray.array[srcIndex + i], i * 2);
+                }
+              }
+              break;
+            case 'F':
+              if (srcAddr % 4 !== 0 || length % 4 !== 0) {
+                thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. unaligned srcArray type: ' + srcComponent);
+                break;
+              }
+              {
+                const destBytes = heap.get_buffer(destAddr, length),
+                  srcIndex = srcAddr / 4,
+                  elementCount = length / 4;
+                for (let i = 0; i < elementCount; i++) {
+                  destBytes.writeFloatLE(srcArray.array[srcIndex + i], i * 4);
+                }
+              }
+              break;
+            case 'I':
+              if (srcAddr % 4 !== 0 || length % 4 !== 0) {
+                thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. unaligned srcArray type: ' + srcComponent);
+                break;
+              }
+              {
+                const destBytes = heap.get_buffer(destAddr, length),
+                  srcIndex = srcAddr / 4,
+                  elementCount = length / 4;
+                for (let i = 0; i < elementCount; i++) {
+                  destBytes.writeInt32LE(srcArray.array[srcIndex + i], i * 4);
+                }
+              }
+              break;
+            case 'D':
+              if (srcAddr % 8 !== 0 || length % 8 !== 0) {
+                thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. unaligned srcArray type: ' + srcComponent);
+                break;
+              }
+              {
+                const destBytes = heap.get_buffer(destAddr, length),
+                  srcIndex = srcAddr / 8,
+                  elementCount = length / 8;
+                for (let i = 0; i < elementCount; i++) {
+                  destBytes.writeDoubleLE(srcArray.array[srcIndex + i], i * 8);
+                }
+              }
+              break;
+            case 'J':
+              if (srcAddr % 8 !== 0 || length % 8 !== 0) {
+                thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. unaligned srcArray type: ' + srcComponent);
+                break;
+              }
+              {
+                const destBytes = heap.get_buffer(destAddr, length),
+                  srcIndex = srcAddr / 8,
+                  elementCount = length / 8;
+                for (let i = 0; i < elementCount; i++) {
+                  const value: Long = srcArray.array[srcIndex + i];
+                  destBytes.writeInt32LE(value.getLowBits(), i * 8);
+                  destBytes.writeInt32LE(value.getHighBits(), (i * 8) + 4);
+                }
+              }
+              break;
             default:
               // I have no idea what the appropriate semantics are for this.
-              thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. srcArray:' + srcArray.getClass().getComponentClass().getInternalName());
+              thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. srcArray:' + srcComponent);
               break;
           }
         } else {

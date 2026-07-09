@@ -342,10 +342,13 @@ reduced to a focused Java or Scala fixture.
 - Unsafe bulk and native-memory paths now cover
   `sun.misc.Unsafe.copyMemory(Object, long, Object, long, long)` for
   `byte[]` to `byte[]`, aligned same-type primitive arrays, overlapping
-  ranges, and selected native-memory `byte[]` transfers. Coverage lives in
+  ranges, and selected native-memory primitive-array transfers. Coverage lives in
   `classes/modern_test/Java9UnsafeCopyMemoryArrays.java`, which also covers
   `sun.misc.Unsafe.setMemory(Object, long, long, byte)` byte-array and
-  native-memory fills. `classes/modern_test/Java9UnsafeNativeMemoryPrimitives.java`
+  native-memory fills.
+  `classes/modern_test/Java9UnsafeCopyMemoryNativePrimitives.java` covers
+  selected aligned primitive array native-memory transfers.
+  `classes/modern_test/Java9UnsafeNativeMemoryPrimitives.java`
   covers selected native scalar reads/writes for `short`, `char`, `int`,
   `long`, `float`, `double`, and Doppio's 32-bit address model.
   `classes/modern_test/Java9UnsafeReallocateMemory.java` covers selected
