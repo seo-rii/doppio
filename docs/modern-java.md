@@ -86,7 +86,9 @@ behavior for `byte[]` to `byte[]` copies, aligned same-type `short[]`,
 ranges and zero-length no-ops, plus selected native-memory transfers through
 `byte[]`. It also includes selected
 `sun.misc.Unsafe.setMemory(Object, long, long, byte)` behavior for `byte[]` and
-native-memory fills, including zero-length no-ops.
+native-memory fills, including zero-length no-ops, and selected native-memory
+primitive scalar accessors for `short`, `char`, `int`, `long`, `float`,
+`double`, and Doppio's 32-bit address model.
 
 ## Implementation Order
 

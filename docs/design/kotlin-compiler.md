@@ -121,13 +121,16 @@ to `Hello.kt` backend codegen:
   compiler and bytecode-transformer class-loading paths that do not hand class
   bytes through a plain `byte[]`.
 - `sun.misc.Unsafe.copyMemory(Object, long, Object, long, long)` now covers
-  `byte[]` to `byte[]` copies, including overlapping ranges in the same array,
-  plus selected `byte[]` to native-memory and native-memory to `byte[]` copies,
-  and `sun.misc.Unsafe.setMemory(Object, long, long, byte)` now covers
-  `byte[]` and native-memory fills. Coverage lives in
-  `classes/modern_test/Java9UnsafeCopyMemoryArrays.java` and protects compiler
-  and runtime-library byte-buffer shuffling paths that bypass `System.arraycopy`
-  or `Arrays.fill`.
+  `byte[]` to `byte[]` copies, aligned same-type primitive-array copies,
+  selected `byte[]` to native-memory and native-memory to `byte[]` copies, and
+  overlapping ranges in the same array. `sun.misc.Unsafe.setMemory(Object,
+  long, long, byte)` now covers `byte[]` and native-memory fills, while native
+  memory scalar access now covers selected `short`, `char`, `int`, `long`,
+  `float`, `double`, and address reads/writes. Coverage lives in
+  `classes/modern_test/Java9UnsafeCopyMemoryArrays.java` and
+  `classes/modern_test/Java9UnsafeNativeMemoryPrimitives.java`; these protect
+  compiler and runtime-library byte-buffer shuffling paths that bypass
+  `System.arraycopy` or `Arrays.fill`.
 
 ## Fixed Blocker: Kotlin Backend Visibility
 

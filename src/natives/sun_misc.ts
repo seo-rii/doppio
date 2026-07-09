@@ -246,24 +246,20 @@ export default function (): any {
       heap.set_signed_byte(address.toNumber(), val);
     }
 
-    public static 'getShort(J)S'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, arg0: Long): number {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return 0;
+    public static 'getShort(J)S'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, address: Long): number {
+      return thread.getJVM().getHeap().get_buffer(address.toNumber(), 2).readInt16LE(0);
     }
 
-    public static 'putShort(JS)V'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, arg0: Long, arg1: number): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'putShort(JS)V'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, address: Long, value: number): void {
+      thread.getJVM().getHeap().get_buffer(address.toNumber(), 2).writeInt16LE(value, 0);
     }
 
-    public static 'getChar(J)C'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, arg0: Long): number {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return 0;
+    public static 'getChar(J)C'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, address: Long): number {
+      return thread.getJVM().getHeap().get_buffer(address.toNumber(), 2).readUInt16LE(0);
     }
 
-    public static 'putChar(JC)V'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, arg0: Long, arg1: number): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'putChar(JC)V'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, address: Long, value: number): void {
+      thread.getJVM().getHeap().get_buffer(address.toNumber(), 2).writeUInt16LE(value, 0);
     }
 
     public static 'getInt(J)I'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, address: Long): number {
@@ -289,34 +285,28 @@ export default function (): any {
       heap.store_word(addr + 4, value.getHighBits());
     }
 
-    public static 'getFloat(J)F'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, arg0: Long): number {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return 0;
+    public static 'getFloat(J)F'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, address: Long): number {
+      return thread.getJVM().getHeap().get_buffer(address.toNumber(), 4).readFloatLE(0);
     }
 
-    public static 'putFloat(JF)V'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, arg0: Long, arg1: number): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'putFloat(JF)V'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, address: Long, value: number): void {
+      thread.getJVM().getHeap().get_buffer(address.toNumber(), 4).writeFloatLE(value, 0);
     }
 
-    public static 'getDouble(J)D'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, arg0: Long): number {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return 0;
+    public static 'getDouble(J)D'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, address: Long): number {
+      return thread.getJVM().getHeap().get_buffer(address.toNumber(), 8).readDoubleLE(0);
     }
 
-    public static 'putDouble(JD)V'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, arg0: Long, arg1: number): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'putDouble(JD)V'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, address: Long, value: number): void {
+      thread.getJVM().getHeap().get_buffer(address.toNumber(), 8).writeDoubleLE(value, 0);
     }
 
-    public static 'getAddress(J)J'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, arg0: Long): Long {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+    public static 'getAddress(J)J'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, address: Long): Long {
+      return Long.fromNumber(thread.getJVM().getHeap().get_buffer(address.toNumber(), 4).readUInt32LE(0));
     }
 
-    public static 'putAddress(JJ)V'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, arg0: Long, arg1: Long): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'putAddress(JJ)V'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, address: Long, value: Long): void {
+      thread.getJVM().getHeap().get_buffer(address.toNumber(), 4).writeUInt32LE(value.getLowBitsUnsigned(), 0);
     }
 
     public static 'allocateMemory(J)J'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, size: Long): Long {

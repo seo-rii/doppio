@@ -339,13 +339,15 @@ reduced to a focused Java or Scala fixture.
   `ClassLoader.defineClass(String, ByteBuffer, ProtectionDomain)` direct-buffer
   native without advancing the buffer position. Coverage lives in
   `classes/modern_test/Java17ClassLoaderDefineByteBuffer.java`.
-- Unsafe byte-array bulk copies now cover
+- Unsafe bulk and native-memory paths now cover
   `sun.misc.Unsafe.copyMemory(Object, long, Object, long, long)` for
-  `byte[]` to `byte[]`, including overlapping ranges, and selected
-  native-memory `byte[]` transfers. Coverage lives in
+  `byte[]` to `byte[]`, aligned same-type primitive arrays, overlapping
+  ranges, and selected native-memory `byte[]` transfers. Coverage lives in
   `classes/modern_test/Java9UnsafeCopyMemoryArrays.java`, which also covers
   `sun.misc.Unsafe.setMemory(Object, long, long, byte)` byte-array and
-  native-memory fills.
+  native-memory fills. `classes/modern_test/Java9UnsafeNativeMemoryPrimitives.java`
+  covers selected native scalar reads/writes for `short`, `char`, `int`,
+  `long`, `float`, `double`, and Doppio's 32-bit address model.
 
 Expected blocker areas:
 
