@@ -29,6 +29,38 @@ public class Java9UnsafeCopyMemoryArrays {
     unsafe.copyMemory(overlapLeft, base + 2, overlapLeft, base + 1, 3);
     System.out.println(Arrays.toString(overlapLeft));
 
+    long intBase = unsafe.arrayBaseOffset(int[].class);
+    long intScale = unsafe.arrayIndexScale(int[].class);
+    int[] intSource = new int[] {10, 11, 12, 13, 14};
+    int[] intDest = new int[] {-1, -1, -1, -1, -1, -1};
+    unsafe.copyMemory(intSource, intBase + intScale, intDest, intBase + (2 * intScale), 3 * intScale);
+    System.out.println(Arrays.toString(intDest));
+
+    int[] intOverlap = new int[] {0, 1, 2, 3, 4, 5};
+    unsafe.copyMemory(intOverlap, intBase + intScale, intOverlap, intBase + (2 * intScale), 3 * intScale);
+    System.out.println(Arrays.toString(intOverlap));
+
+    long longBase = unsafe.arrayBaseOffset(long[].class);
+    long longScale = unsafe.arrayIndexScale(long[].class);
+    long[] longSource = new long[] {100L, 101L, 102L, 103L};
+    long[] longDest = new long[] {-1L, -1L, -1L, -1L};
+    unsafe.copyMemory(longSource, longBase + longScale, longDest, longBase + longScale, 2 * longScale);
+    System.out.println(Arrays.toString(longDest));
+
+    long charBase = unsafe.arrayBaseOffset(char[].class);
+    long charScale = unsafe.arrayIndexScale(char[].class);
+    char[] charSource = new char[] {'a', 'b', 'c', 'd'};
+    char[] charDest = new char[] {'x', 'x', 'x', 'x', 'x'};
+    unsafe.copyMemory(charSource, charBase + charScale, charDest, charBase, 3 * charScale);
+    System.out.println(Arrays.toString(charDest));
+
+    long shortBase = unsafe.arrayBaseOffset(short[].class);
+    long shortScale = unsafe.arrayIndexScale(short[].class);
+    short[] shortSource = new short[] {3, 4, 5, 6};
+    short[] shortDest = new short[] {-1, -1, -1, -1};
+    unsafe.copyMemory(shortSource, shortBase, shortDest, shortBase + shortScale, 3 * shortScale);
+    System.out.println(Arrays.toString(shortDest));
+
     byte[] zeroLength = new byte[] {7, 8, 9};
     unsafe.copyMemory(zeroLength, base, zeroLength, base + 1, 0);
     System.out.println(Arrays.toString(zeroLength));

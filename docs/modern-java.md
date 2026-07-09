@@ -80,8 +80,9 @@ positions, which protects compiler and transformer class-loading paths that pass
 class bytes via `ByteBuffer`.
 
 Java 9 Unsafe note: the compatibility row above now also includes selected
-`sun.misc.Unsafe.copyMemory(Object, long, Object, long, long)` byte-array
-behavior for `byte[]` to `byte[]` copies, including same-array overlapping
+`sun.misc.Unsafe.copyMemory(Object, long, Object, long, long)` primitive-array
+behavior for `byte[]` to `byte[]` copies, aligned same-type `short[]`,
+`char[]`, `int[]`, and `long[]` copies, including same-array overlapping
 ranges and zero-length no-ops, plus selected native-memory transfers through
 `byte[]`. It also includes selected
 `sun.misc.Unsafe.setMemory(Object, long, long, byte)` behavior for `byte[]` and

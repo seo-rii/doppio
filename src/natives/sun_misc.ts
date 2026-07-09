@@ -450,13 +450,42 @@ export default function (): any {
             destArray: JVMTypes.JVMArray<any> = <any> destBase,
             srcComponent = srcArray.getClass().getComponentClass().getInternalName(),
             destComponent = destArray.getClass().getComponentClass().getInternalName();
-          if (srcComponent === 'B' && destComponent === 'B') {
-            const copy: number[] = new Array(length);
-            for (let i = 0; i < length; i++) {
-              copy[i] = srcArray.array[srcAddr + i];
+          if (srcComponent === destComponent) {
+            let scale: number;
+            switch (srcComponent) {
+              case 'B':
+              case 'Z':
+                scale = 1;
+                break;
+              case 'C':
+              case 'S':
+                scale = 2;
+                break;
+              case 'F':
+              case 'I':
+                scale = 4;
+                break;
+              case 'D':
+              case 'J':
+                scale = 8;
+                break;
+              default:
+                scale = 0;
+                break;
             }
-            for (let i = 0; i < length; i++) {
-              destArray.array[destAddr + i] = copy[i];
+            if (scale > 0 && srcAddr % scale === 0 && destAddr % scale === 0 && length % scale === 0) {
+              const srcIndex = srcAddr / scale,
+                destIndex = destAddr / scale,
+                elementCount = length / scale,
+                copy: any[] = new Array(elementCount);
+              for (let i = 0; i < elementCount; i++) {
+                copy[i] = srcArray.array[srcIndex + i];
+              }
+              for (let i = 0; i < elementCount; i++) {
+                destArray.array[destIndex + i] = copy[i];
+              }
+            } else {
+              thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. unaligned array copyMemory type: ' + srcComponent);
             }
           } else {
             thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. array copyMemory types: ' + srcComponent + ' -> ' + destComponent);
