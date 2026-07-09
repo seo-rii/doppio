@@ -142,7 +142,9 @@ native-memory fills, including zero-length no-ops.
   conversions, an anonymous object expression, delegated local and custom
   properties, an inline function, `Closeable.use` including close-failure
   suppressed-exception preservation, destructuring, range loops, stepped
-  `downTo` loops, `mapIndexed`, and `synchronized`, plus top-level,
+  `downTo` loops, `mapIndexed`, `synchronized`, and generated Kotlin
+  `LineNumberTable` metadata flowing into Doppio stack-trace frames, plus
+  top-level,
   bound, unbound, constructor, and companion
   callable references used through lazy `Sequence` pipelines, plus
   `@JvmInline value class` boxing, interface dispatch, nullable handling, map

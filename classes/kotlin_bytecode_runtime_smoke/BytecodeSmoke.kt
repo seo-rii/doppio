@@ -27,6 +27,15 @@ class ComponentSmoke(private val first: Int, private val second: String) {
   operator fun component2(): String = second
 }
 
+fun stackTraceSourceSummary(): String {
+  val frame = try {
+    throw IllegalStateException("stack")
+  } catch (e: IllegalStateException) {
+    e.stackTrace.first { it.className == "BytecodeSmokeKt" && it.methodName == "stackTraceSourceSummary" }
+  }
+  return frame.fileName + ":" + (frame.lineNumber > 0)
+}
+
 fun bytecodeSummary(): String {
   val trace = mutableListOf<String>()
   val caught = try {
@@ -61,5 +70,5 @@ fun bytecodeSummary(): String {
 
   return trace.joinToString(">") + ":" + caught + ":" + useValue + ":" + closeable.closed +
     ":" + suppressedSummary + ":" + label + number + ":" + rangeTotal + ":" + steppedTotal +
-    ":" + indexed + ":" + sync
+    ":" + indexed + ":" + sync + ":" + stackTraceSourceSummary()
 }

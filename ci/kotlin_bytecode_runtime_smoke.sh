@@ -69,7 +69,7 @@ test -f "$out_dir/ComponentSmoke.class"
 test -f "$out_dir/META-INF/main.kotlin_module"
 
 runtime_cp="$out_dir:$stdlib_jar"
-expected_output="${KOTLIN_BYTECODE_RUNTIME_SMOKE_EXPECTED_OUTPUT:-"try>catch>finally:boom:8:true:body/close:x3:10:12:4:sync"}"
+expected_output="${KOTLIN_BYTECODE_RUNTIME_SMOKE_EXPECTED_OUTPUT:-"try>catch>finally:boom:8:true:body/close:x3:10:12:4:sync:BytecodeSmoke.kt:true"}"
 
 native_output="$(java -cp "$runtime_cp" KotlinBytecodeRuntimeHelloKt)"
 if [ "$native_output" != "$expected_output" ]; then
