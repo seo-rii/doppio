@@ -125,12 +125,15 @@ to `Hello.kt` backend codegen:
   selected primitive-array to native-memory and native-memory to
   primitive-array transfers, and overlapping ranges in the same array.
   `sun.misc.Unsafe.setMemory(Object,
-  long, long, byte)` now covers `byte[]` and native-memory fills, while native
-  memory scalar access now covers selected `short`, `char`, `int`, `long`,
-  `float`, `double`, and address reads/writes. Coverage lives in
+  long, long, byte)` now covers `byte[]`, aligned primitive-array, and
+  native-memory fills, while native memory scalar access now covers selected
+  `short`, `char`, `int`, `long`, `float`, `double`, and address reads/writes.
+  Coverage lives in
   `classes/modern_test/Java9UnsafeCopyMemoryArrays.java`,
   `classes/modern_test/Java9UnsafeCopyMemoryNativePrimitives.java`, and
   `classes/modern_test/Java9UnsafeNativeMemoryPrimitives.java`;
+  `classes/modern_test/Java9UnsafeSetMemoryPrimitiveArrays.java` covers
+  primitive-array byte-pattern fills.
   `classes/modern_test/Java9UnsafeReallocateMemory.java` covers selected
   native-memory growth, shrinkage, allocation-from-zero, and zero-size free
   behavior. These protect compiler and runtime-library byte-buffer shuffling

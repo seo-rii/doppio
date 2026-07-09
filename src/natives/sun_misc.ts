@@ -360,7 +360,56 @@ export default function (): any {
               destArray.array[start + i] = value;
             }
           } else {
-            thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. setMemory array type: ' + component);
+            let scale: number;
+            switch (component) {
+              case 'C':
+              case 'S':
+                scale = 2;
+                break;
+              case 'F':
+              case 'I':
+                scale = 4;
+                break;
+              case 'D':
+              case 'J':
+                scale = 8;
+                break;
+              default:
+                scale = 0;
+                break;
+            }
+            if (scale > 0 && start % scale === 0 && bytesNum % scale === 0) {
+              const pattern = new Buffer(scale),
+                startIndex = start / scale,
+                elementCount = bytesNum / scale;
+              pattern.fill(value & 0xff);
+              let element: any;
+              switch (component) {
+                case 'C':
+                  element = pattern.readUInt16LE(0);
+                  break;
+                case 'S':
+                  element = pattern.readInt16LE(0);
+                  break;
+                case 'F':
+                  element = pattern.readFloatLE(0);
+                  break;
+                case 'I':
+                  element = pattern.readInt32LE(0);
+                  break;
+                case 'D':
+                  element = pattern.readDoubleLE(0);
+                  break;
+                case 'J':
+                  element = Long.fromBits(pattern.readInt32LE(0), pattern.readInt32LE(4));
+                  break;
+              }
+              for (let i = 0; i < elementCount; i++) {
+                destArray.array[startIndex + i] = element;
+              }
+            } else {
+              thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented. setMemory array type: ' + component);
+            }
           }
         } else {
           thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');

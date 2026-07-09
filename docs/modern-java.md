@@ -85,10 +85,11 @@ behavior for `byte[]` to `byte[]` copies, aligned same-type `short[]`,
 `char[]`, `int[]`, and `long[]` copies, including same-array overlapping
 ranges and zero-length no-ops, plus selected native-memory transfers through
 `byte[]` and aligned primitive arrays. It also includes selected
-`sun.misc.Unsafe.setMemory(Object, long, long, byte)` behavior for `byte[]` and
-native-memory fills, including zero-length no-ops, and selected native-memory
-primitive scalar accessors for `short`, `char`, `int`, `long`, `float`,
-`double`, and Doppio's 32-bit address model. It also covers selected
+`sun.misc.Unsafe.setMemory(Object, long, long, byte)` behavior for `byte[]`,
+aligned primitive arrays, and native-memory fills, including zero-length
+no-ops, and selected native-memory primitive scalar accessors for `short`,
+`char`, `int`, `long`, `float`, `double`, and Doppio's 32-bit address model.
+It also covers selected
 `sun.misc.Unsafe.reallocateMemory(long, long)` behavior for allocation from
 zero, growth, shrinkage, preserved prefixes, and zero-size frees.
 
