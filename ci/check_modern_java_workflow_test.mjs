@@ -37,7 +37,7 @@ jobs:
   test:
     steps:
       - name: Build release browser bundle
-        timeout-minutes: 20
+        timeout-minutes: 30
         run: ./node_modules/.bin/grunt --stack release --grunt-ignore-compile-errors
       - run: ./ci/kotlin_alpha_smoke.sh
       - run: ./ci/scala_beta_smoke.sh
@@ -52,7 +52,7 @@ jobs:
   test:
     steps:
       - name: Build release browser bundle
-        timeout-minutes: 20
+        timeout-minutes: 30
         run: ./node_modules/.bin/grunt --stack release --grunt-ignore-compile-errors
       - run: ./ci/kotlin_alpha_smoke.sh
 `);
@@ -66,7 +66,7 @@ jobs:
   test:
     steps:
       - name: Build release browser bundle
-        timeout-minutes: 20
+        timeout-minutes: 30
         run: ./node_modules/.bin/grunt --stack release --grunt-ignore-compile-errors
       - run: ./ci/kotlin_alpha_smoke.sh
       - run: ./ci/scala_beta_smoke.sh

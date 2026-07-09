@@ -52,7 +52,7 @@ jobs:
           yarn ci:check-modern-java-workflow
 
       - name: Build release browser bundle
-        timeout-minutes: 20
+        timeout-minutes: 30
         run: ./node_modules/.bin/grunt --stack release --grunt-ignore-compile-errors
 
       - name: Run modern Java compatibility tests
