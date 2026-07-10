@@ -314,25 +314,33 @@ public final class Files {
     Objects.requireNonNull(options);
     boolean replaceExisting = false;
     boolean copyAttributes = false;
+    boolean followLinks = true;
     for (CopyOption option : options) {
       Objects.requireNonNull(option);
       if (option == StandardCopyOption.REPLACE_EXISTING) {
         replaceExisting = true;
       } else if (option == StandardCopyOption.COPY_ATTRIBUTES) {
         copyAttributes = true;
-      } else if (option != LinkOption.NOFOLLOW_LINKS) {
+      } else if (option == LinkOption.NOFOLLOW_LINKS) {
+        followLinks = false;
+      } else {
         throw new UnsupportedOperationException();
       }
     }
     File sourceFile = toFile(source);
     File targetFile = toFile(target);
-    if (!sourceFile.exists()) {
+    boolean sourceSymbolicLink = !followLinks && isSymbolicLink(source);
+    if (!sourceFile.exists() && !sourceSymbolicLink) {
       throw new NoSuchFileException(sourceFile.toString());
     }
-    if (sourceFile.getCanonicalPath().equals(targetFile.getCanonicalPath())) {
+    if (sourceSymbolicLink) {
+      if (sourceFile.getAbsoluteFile().equals(targetFile.getAbsoluteFile())) {
+        return target;
+      }
+    } else if (sourceFile.getCanonicalPath().equals(targetFile.getCanonicalPath())) {
       return target;
     }
-    if (targetFile.exists()) {
+    if (targetFile.exists() || isSymbolicLink(target)) {
       if (!replaceExisting) {
         throw new FileAlreadyExistsException(targetFile.toString());
       }
@@ -346,6 +354,10 @@ public final class Files {
       if (!targetParent.isDirectory()) {
         throw new FileSystemException(targetFile.toString(), null, "Not a directory");
       }
+    }
+    if (sourceSymbolicLink) {
+      createSymbolicLink(target, readSymbolicLink(source));
+      return target;
     }
     if (sourceFile.isDirectory()) {
       if (!targetFile.mkdir()) {

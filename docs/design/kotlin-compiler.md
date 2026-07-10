@@ -154,6 +154,10 @@ to `Hello.kt` backend codegen:
   `classes/modern_test/Java11FilesCopyAttributes.java`, protecting compiler
   and build-cache paths that copy generated classes/resources while preserving
   timestamp-based freshness checks.
+- `Files.copy(..., NOFOLLOW_LINKS)` now copies symbolic-link objects instead
+  of dereferencing them, including dangling links. Coverage lives in
+  `classes/modern_test/Java17FilesCopyNoFollowLinks.java`, protecting
+  classpath and source-tree copy paths that preserve linked dependency layouts.
 - `java.io.FileInputStream`, `java.io.FileOutputStream`, and
   `java.io.UnixFileSystem` `initIDs()` natives are implemented as VM metadata
   no-ops, matching Doppio's dynamic field resolution model. Coverage lives in

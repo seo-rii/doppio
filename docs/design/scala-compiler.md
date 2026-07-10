@@ -386,6 +386,10 @@ reduced to a focused Java or Scala fixture.
   selected file and directory copies, including replacement. Coverage lives in
   `classes/modern_test/Java11FilesCopyAttributes.java`, protecting compiler and
   build-tool copy/cache paths that rely on timestamp-based freshness checks.
+- `Files.copy(..., NOFOLLOW_LINKS)` now copies symbolic-link objects instead
+  of dereferencing them, including dangling links. Coverage lives in
+  `classes/modern_test/Java17FilesCopyNoFollowLinks.java`, protecting compiler
+  and build-tool copy paths that preserve linked source or classpath trees.
 - `java.io.FileInputStream`, `java.io.FileOutputStream`, and
   `java.io.UnixFileSystem` `initIDs()` natives are implemented as VM metadata
   no-ops. Coverage lives in

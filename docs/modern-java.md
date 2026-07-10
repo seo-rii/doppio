@@ -62,8 +62,9 @@ behavior covering writable, read-only, and empty mappings, plus selected Java
 read-only range no-op, empty-mapping validation order, and range validation
 behavior. Selected `Files` hard-link and symbolic-link APIs are also covered,
 including `createLink`, `createSymbolicLink`, `readSymbolicLink`,
-`NOFOLLOW_LINKS` existence checks, hard-link `isSameFile`, and dangling
-symlink cleanup. `java.io.File` disk-space queries now cover
+`NOFOLLOW_LINKS` existence checks, hard-link `isSameFile`, `Files.copy`
+symlink-object preservation with `NOFOLLOW_LINKS`, and dangling symlink
+cleanup. `java.io.File` disk-space queries now cover
 `getTotalSpace()`, `getFreeSpace()`, and `getUsableSpace()` for files and
 directories, plus missing-path zero results, backed by
 `classes/modern_test/Java17FileSpace.java`. NIO `FileStore` space queries now
@@ -1309,8 +1310,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   stream-copy replacement of empty directory targets, stream-copy
   non-empty-directory/missing-parent/parent-file target validation,
   path-copy `COPY_ATTRIBUTES` `lastModifiedTime` preservation for selected
-  file, replacement, and directory copies, `NOFOLLOW_LINKS` option acceptance,
-  and unsupported stream-copy option rejection. The tested move
+  file, replacement, and directory copies, `NOFOLLOW_LINKS` symlink-object
+  copying including dangling links, and unsupported stream-copy option
+  rejection. The tested move
   surface covers plain-file and directory basic movement, target-parent
   validation, same-file no-op, existing target
   rejection/replacement including selected directory targets, missing-source failure, `NOFOLLOW_LINKS`/`ATOMIC_MOVE`
