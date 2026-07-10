@@ -482,8 +482,10 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   entries, null-hostile map/view lookup including the empty-entry-set
   exception, and unmodifiable results,
   `Stream.ofNullable`, three-arg `iterate` on `Stream`/`IntStream`/
-  `LongStream`/`DoubleStream`, ordered sequential object and primitive
-  `takeWhile`/`dropWhile`, primitive `of`/`range`/`rangeClosed` exact-size
+  `LongStream`/`DoubleStream` including lazy predicate/next invocation
+  boundaries and repeated `Iterator.hasNext()` caching, ordered sequential
+  object and primitive `takeWhile`/`dropWhile` including `limit(0)`
+  short-circuiting, primitive `of`/`range`/`rangeClosed` exact-size
   spliterator metadata, close propagation from derived streams, and null
   predicate/operator validation,
   `Collectors.mapping`, `filtering`, `flatMapping`, `collectingAndThen`,
@@ -1172,8 +1174,10 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
 - `java.util.stream.Stream`, `IntStream`, `LongStream`, and `DoubleStream` are
   patched as interface shims that preserve the Java 8 abstract stream surface
   and add tested Java 9 helpers: `Stream.ofNullable`, three-arg object and
-  primitive `iterate`, ordered sequential object and primitive `takeWhile` and
-  `dropWhile`, close propagation from the derived stream, `concat` close
+  primitive `iterate` including lazy predicate/next invocation boundaries and
+  repeated `Iterator.hasNext()` caching, ordered sequential object and
+  primitive `takeWhile` and `dropWhile` including `limit(0)` short-circuiting,
+  close propagation from the derived stream, `concat` close
   exception suppression including duplicate throwable handling, and null
   predicate/operator validation.
 - The tested Java 16 surface covers `Stream.toList()` order preservation,
