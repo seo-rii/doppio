@@ -1796,7 +1796,7 @@ export class MethodReference implements IConstantPoolItem {
 		            }
 		          };
 		          method = <Method> syntheticMethod;
-		        } else if (syntheticCls.getInternalName() === 'Ljava/util/concurrent/CompletableFuture;' &&
+		        } else if (syntheticCls.isSubclass(thread.getBsCl().getResolvedClass('Ljava/util/concurrent/CompletableFuture;')) &&
 		            (this.signature === 'completeAsync(Ljava/util/function/Supplier;)Ljava/util/concurrent/CompletableFuture;' ||
 		             this.signature === 'completeAsync(Ljava/util/function/Supplier;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;' ||
 		             this.signature === 'completeOnTimeout(Ljava/lang/Object;JLjava/util/concurrent/TimeUnit;)Ljava/util/concurrent/CompletableFuture;' ||
@@ -4292,19 +4292,20 @@ export class MethodReference implements IConstantPoolItem {
 	        (<any> thread).stack.push(new NativeStackFrame(syntheticThreadMethod, [this].concat(args)));
 	        thread.setStatus(ThreadStatus.RUNNABLE);
 	      };
-	    } else if ((this.fullSignature === 'java/util/concurrent/CompletableFuture/completeAsync(Ljava/util/function/Supplier;)Ljava/util/concurrent/CompletableFuture;' ||
-	        this.fullSignature === 'java/util/concurrent/CompletableFuture/completeAsync(Ljava/util/function/Supplier;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;' ||
-	        this.fullSignature === 'java/util/concurrent/CompletableFuture/completeOnTimeout(Ljava/lang/Object;JLjava/util/concurrent/TimeUnit;)Ljava/util/concurrent/CompletableFuture;' ||
-	        this.fullSignature === 'java/util/concurrent/CompletableFuture/exceptionallyAsync(Ljava/util/function/Function;)Ljava/util/concurrent/CompletableFuture;' ||
-	        this.fullSignature === 'java/util/concurrent/CompletableFuture/exceptionallyAsync(Ljava/util/function/Function;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;' ||
-	        this.fullSignature === 'java/util/concurrent/CompletableFuture/exceptionallyCompose(Ljava/util/function/Function;)Ljava/util/concurrent/CompletableFuture;' ||
-	        this.fullSignature === 'java/util/concurrent/CompletableFuture/exceptionallyComposeAsync(Ljava/util/function/Function;)Ljava/util/concurrent/CompletableFuture;' ||
-	        this.fullSignature === 'java/util/concurrent/CompletableFuture/exceptionallyComposeAsync(Ljava/util/function/Function;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;' ||
-	        this.fullSignature === 'java/util/concurrent/CompletableFuture/copy()Ljava/util/concurrent/CompletableFuture;' ||
-	        this.fullSignature === 'java/util/concurrent/CompletableFuture/defaultExecutor()Ljava/util/concurrent/Executor;' ||
-	        this.fullSignature === 'java/util/concurrent/CompletableFuture/minimalCompletionStage()Ljava/util/concurrent/CompletionStage;' ||
-	        this.fullSignature === 'java/util/concurrent/CompletableFuture/newIncompleteFuture()Ljava/util/concurrent/CompletableFuture;' ||
-	        this.fullSignature === 'java/util/concurrent/CompletableFuture/orTimeout(JLjava/util/concurrent/TimeUnit;)Ljava/util/concurrent/CompletableFuture;') &&
+	    } else if (this.method.cls.isSubclass(thread.getBsCl().getResolvedClass('Ljava/util/concurrent/CompletableFuture;')) &&
+	        (this.signature === 'completeAsync(Ljava/util/function/Supplier;)Ljava/util/concurrent/CompletableFuture;' ||
+	        this.signature === 'completeAsync(Ljava/util/function/Supplier;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;' ||
+	        this.signature === 'completeOnTimeout(Ljava/lang/Object;JLjava/util/concurrent/TimeUnit;)Ljava/util/concurrent/CompletableFuture;' ||
+	        this.signature === 'exceptionallyAsync(Ljava/util/function/Function;)Ljava/util/concurrent/CompletableFuture;' ||
+	        this.signature === 'exceptionallyAsync(Ljava/util/function/Function;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;' ||
+	        this.signature === 'exceptionallyCompose(Ljava/util/function/Function;)Ljava/util/concurrent/CompletableFuture;' ||
+	        this.signature === 'exceptionallyComposeAsync(Ljava/util/function/Function;)Ljava/util/concurrent/CompletableFuture;' ||
+	        this.signature === 'exceptionallyComposeAsync(Ljava/util/function/Function;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;' ||
+	        this.signature === 'copy()Ljava/util/concurrent/CompletableFuture;' ||
+	        this.signature === 'defaultExecutor()Ljava/util/concurrent/Executor;' ||
+	        this.signature === 'minimalCompletionStage()Ljava/util/concurrent/CompletionStage;' ||
+	        this.signature === 'newIncompleteFuture()Ljava/util/concurrent/CompletableFuture;' ||
+	        this.signature === 'orTimeout(JLjava/util/concurrent/TimeUnit;)Ljava/util/concurrent/CompletableFuture;') &&
 	        typeof this.jsConstructor.prototype[this.fullSignature] !== 'function') {
 	      var syntheticCompletableFutureMethod = this.method;
 	      this.jsConstructor.prototype[this.fullSignature] = this.jsConstructor.prototype[this.signature] = function(thread: JVMThread, args: any[], cb?: (e?: JVMTypes.java_lang_Throwable, rv?: any) => void): void {

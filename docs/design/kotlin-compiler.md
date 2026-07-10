@@ -799,6 +799,12 @@ Current verified checks:
   `KT2!:5:l`. A local 2026-06-30 validation completed the focused
   CompletableFuture smoke in 74 seconds and the remaining full-classpath
   Kotlin compiler smoke in 404 seconds.
+- `CompletableFuture` subclass methodrefs now reach Doppio's Java 9/12 helper
+  methods, and selected subclass hooks use receiver `newIncompleteFuture()` and
+  `defaultExecutor()` for copy and exceptional async recovery paths. Coverage
+  lives in `classes/modern_test/Java12CompletableFutureSubclassHooks.java`,
+  protecting Kotlin and build-tool future interop that supplies custom
+  executors or subclasses.
 - A focused Kotlin contracts smoke now lives in `classes/kotlin_contract_smoke`
   and runs through `ci/kotlin_contract_smoke.sh`. It covers
   `ExperimentalContracts`, `returns` implications, `callsInPlace` with

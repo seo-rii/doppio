@@ -1,5 +1,7 @@
 package java.util.concurrent;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -17,7 +19,7 @@ final class CompletableFuture$DoppioFactories {
   public static <U> CompletableFuture<U> completeAsync(
       final CompletableFuture<U> source,
       final Supplier<? extends U> supplier) {
-    return completeAsync(source, supplier, ForkJoinPool.commonPool());
+    return completeAsync(source, supplier, source.defaultExecutor());
   }
 
   public static <U> CompletableFuture<U> completeAsync(
@@ -62,7 +64,7 @@ final class CompletableFuture$DoppioFactories {
   public static <U> CompletableFuture<U> exceptionallyAsync(
       CompletableFuture<U> source,
       final Function<Throwable, ? extends U> fn) {
-    return exceptionallyAsync(source, fn, ForkJoinPool.commonPool());
+    return exceptionallyAsync(source, fn, source.defaultExecutor());
   }
 
   public static <U> CompletableFuture<U> exceptionallyAsync(
@@ -75,11 +77,13 @@ final class CompletableFuture$DoppioFactories {
     if (executor == null) {
       throw new NullPointerException();
     }
-    return source.handleAsync(new BiFunction<U, Throwable, U>() {
+    CompletableFuture<U> result = newIncompleteFutureLike(source);
+    source.handleAsync(new BiFunction<U, Throwable, U>() {
       public U apply(U value, Throwable throwable) {
         return throwable == null ? value : fn.apply(throwable);
       }
-    }, executor);
+    }, executor).whenComplete(copyCompletion(result));
+    return result;
   }
 
   public static <U> CompletableFuture<U> exceptionallyCompose(
@@ -88,13 +92,16 @@ final class CompletableFuture$DoppioFactories {
     if (fn == null) {
       throw new NullPointerException();
     }
-    return source.handle(exceptionallyComposeHandler(fn)).thenCompose(identityStage());
+    final CompletableFuture<U> result = newIncompleteFutureLike(source);
+    source.handle(exceptionallyComposeHandler(fn))
+        .whenComplete(composeCompletion(result));
+    return result;
   }
 
   public static <U> CompletableFuture<U> exceptionallyComposeAsync(
       CompletableFuture<U> source,
       final Function<Throwable, ? extends CompletionStage<U>> fn) {
-    return exceptionallyComposeAsync(source, fn, ForkJoinPool.commonPool());
+    return exceptionallyComposeAsync(source, fn, source.defaultExecutor());
   }
 
   public static <U> CompletableFuture<U> exceptionallyComposeAsync(
@@ -107,11 +114,14 @@ final class CompletableFuture$DoppioFactories {
     if (executor == null) {
       throw new NullPointerException();
     }
-    return source.handleAsync(exceptionallyComposeHandler(fn), executor).thenCompose(identityStage());
+    final CompletableFuture<U> result = newIncompleteFutureLike(source);
+    source.handleAsync(exceptionallyComposeHandler(fn), executor)
+        .whenComplete(composeCompletion(result));
+    return result;
   }
 
   public static <U> CompletableFuture<U> copy(CompletableFuture<U> source) {
-    final CompletableFuture<U> copy = new CompletableFuture<U>();
+    final CompletableFuture<U> copy = newIncompleteFutureLike(source);
     source.whenComplete(new BiConsumer<U, Throwable>() {
       public void accept(U value, Throwable throwable) {
         if (throwable == null) {
@@ -212,12 +222,61 @@ final class CompletableFuture$DoppioFactories {
     };
   }
 
-  private static <U> Function<CompletionStage<U>, CompletionStage<U>> identityStage() {
-    return new Function<CompletionStage<U>, CompletionStage<U>>() {
-      public CompletionStage<U> apply(CompletionStage<U> stage) {
-        return stage;
+  private static <U> BiConsumer<U, Throwable> copyCompletion(final CompletableFuture<U> target) {
+    return new BiConsumer<U, Throwable>() {
+      public void accept(U value, Throwable throwable) {
+        if (throwable == null) {
+          target.complete(value);
+        } else {
+          target.completeExceptionally(completionCause(throwable));
+        }
       }
     };
+  }
+
+  private static <U> BiConsumer<CompletionStage<U>, Throwable> composeCompletion(
+      final CompletableFuture<U> target) {
+    return new BiConsumer<CompletionStage<U>, Throwable>() {
+      public void accept(CompletionStage<U> stage, Throwable throwable) {
+        if (throwable != null) {
+          target.completeExceptionally(completionCause(throwable));
+          return;
+        }
+        if (stage == null) {
+          target.completeExceptionally(new NullPointerException());
+          return;
+        }
+        stage.whenComplete(copyCompletion(target));
+      }
+    };
+  }
+
+  private static Throwable completionCause(Throwable throwable) {
+    if (throwable instanceof CompletionException && throwable.getCause() != null) {
+      return throwable.getCause();
+    }
+    return throwable;
+  }
+
+  private static <U> CompletableFuture<U> newIncompleteFutureLike(CompletableFuture<?> source) {
+    try {
+      Method method = source.getClass().getMethod("newIncompleteFuture");
+      method.setAccessible(true);
+      return (CompletableFuture<U>) method.invoke(source);
+    } catch (NoSuchMethodException e) {
+      return new CompletableFuture<U>();
+    } catch (InvocationTargetException e) {
+      Throwable cause = e.getCause();
+      if (cause instanceof RuntimeException) {
+        throw (RuntimeException) cause;
+      }
+      if (cause instanceof Error) {
+        throw (Error) cause;
+      }
+      throw new CompletionException(cause);
+    } catch (IllegalAccessException e) {
+      throw new CompletionException(e);
+    }
   }
 }
 

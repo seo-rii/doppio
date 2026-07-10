@@ -1216,7 +1216,10 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   stages, selected `MinimalStage` unsupported direct methods, and null
   validation.
   `defaultExecutor()` returns the tested common-pool executor and executes a
-  submitted task off the caller thread.
+  submitted task off the caller thread. Selected subclass hooks now cover
+  subclass methodrefs plus `newIncompleteFuture()` result construction and
+  `defaultExecutor()` scheduling for `copy()`, `completeAsync(...)`,
+  `exceptionallyAsync(...)`, and `exceptionallyComposeAsync(...)`.
   Java 12 `CompletableFuture` receiver methods `exceptionallyAsync`,
   `exceptionallyCompose`, and `exceptionallyComposeAsync` cover tested success
   propagation, failure recovery, compose flattening, common-pool/supplied

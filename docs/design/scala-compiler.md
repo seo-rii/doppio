@@ -335,6 +335,12 @@ reduced to a focused Java or Scala fixture.
   positional write native without advancing the channel's tracked file
   position. Coverage lives in
   `classes/modern_test/Java17FileChannelPositionalWrite.java`.
+- `CompletableFuture` subclass methodrefs now reach Doppio's Java 9/12 helper
+  methods, and selected subclass hooks use receiver `newIncompleteFuture()` and
+  `defaultExecutor()` for copy and exceptional async recovery paths. Coverage
+  lives in `classes/modern_test/Java12CompletableFutureSubclassHooks.java`,
+  protecting Scala and build-tool future interop that supplies custom
+  executors or subclasses.
 - Java NIO link helpers now cover `Files.createLink`, `createSymbolicLink`,
   `readSymbolicLink`, hard-link `isSameFile`, `NOFOLLOW_LINKS` symlink
   existence checks, and dangling symlink cleanup. Coverage lives in
