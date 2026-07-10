@@ -251,7 +251,8 @@ export default function (): any {
     }
 
     public static 'initIDs()V'(thread: JVMThread): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+      // Field ID caching is VM-internal metadata bookkeeping on HotSpot.
+      // Doppio resolves Java fields dynamically, so there is nothing to cache.
     }
 
     public static 'close0()V'(thread: JVMThread, javaThis: JVMTypes.java_io_FileInputStream): void {
@@ -362,7 +363,8 @@ export default function (): any {
     }
 
     public static 'initIDs()V'(thread: JVMThread): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+      // Field ID caching is VM-internal metadata bookkeeping on HotSpot.
+      // Doppio resolves Java fields dynamically, so there is nothing to cache.
     }
 
   }
@@ -869,7 +871,8 @@ export default function (): any {
     }
 
     public static 'initIDs()V'(thread: JVMThread): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+      // Field ID caching is VM-internal metadata bookkeeping on HotSpot.
+      // Doppio resolves Java fields dynamically, so there is nothing to cache.
     }
 
   }

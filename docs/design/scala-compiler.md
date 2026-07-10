@@ -361,6 +361,11 @@ reduced to a focused Java or Scala fixture.
   for files and directories, plus missing-path zero results. Coverage lives in
   `classes/modern_test/Java17FileSpace.java`, protecting compiler and build
   tool output/cache directory checks.
+- `java.io.FileInputStream`, `java.io.FileOutputStream`, and
+  `java.io.UnixFileSystem` `initIDs()` natives are implemented as VM metadata
+  no-ops. Coverage lives in
+  `classes/modern_test/Java17IoInitIDs.java`, protecting jar/classpath scans,
+  source reads, and incremental output writes.
 - Unsafe bulk and native-memory paths now cover
   `sun.misc.Unsafe.copyMemory(Object, long, Object, long, long)` for
   `byte[]` to `byte[]`, aligned same-type primitive arrays, overlapping

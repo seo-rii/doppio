@@ -66,7 +66,11 @@ including `createLink`, `createSymbolicLink`, `readSymbolicLink`,
 symlink cleanup. `java.io.File` disk-space queries now cover
 `getTotalSpace()`, `getFreeSpace()`, and `getUsableSpace()` for files and
 directories, plus missing-path zero results, backed by
-`classes/modern_test/Java17FileSpace.java`.
+`classes/modern_test/Java17FileSpace.java`. `java.io.FileInputStream`,
+`java.io.FileOutputStream`, and `java.io.UnixFileSystem` VM `initIDs()`
+initializers are treated as metadata no-ops; coverage lives in
+`classes/modern_test/Java17IoInitIDs.java`, which also protects basic
+read/write/append behavior and root listing.
 
 Java security/runtime note: `AccessController.doPrivileged(PrivilegedAction)`
 now dispatches covariant concrete `run()` methods instead of being pinned to
