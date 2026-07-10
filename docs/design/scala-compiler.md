@@ -61,7 +61,8 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
   emission;
 - a focused Scala language/type-system smoke covering path-dependent types,
   higher-kinded implicit typeclass lookup, self-types, by-name argument
-  evaluation, extractor matching, and `@switch` lowering;
+  evaluation, extractor matching, value-class extension methods, structural
+  refinement dispatch, and `@switch` lowering;
 - a focused Scala Java collection/Future interop smoke covering
   `scala.jdk.CollectionConverters`, mutable Java list/map wrappers, and a
   small `Future`/`Promise`/`Await` path running on a Java executor;
@@ -108,6 +109,8 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
 - a focused Scala duration smoke covering `scala.concurrent.duration` finite
   duration arithmetic, scanning, sorting, parsing, scaling, clamping, and
   infinite-duration metadata;
+- a focused Scala diagnostic smoke covering single-line and multiline
+  type-mismatch source positions plus missing-member diagnostics;
 - string interpolation and a plain `main` entry point.
 
 The smoke compares the generated program output on the host JVM and Doppio.
@@ -318,9 +321,11 @@ classpath stress while compiling only a minimal `Hello` program that prints
 `scala`.
 
 `ci/scala_diagnostic_smoke.sh` runs Doppio-hosted scalac on an intentionally
-invalid source pair and checks the nonzero exit status plus diagnostic source
-filenames, line numbers, type-mismatch found/required types, missing-member
-error kind, source lines, caret positions, and multi-error count.
+invalid source set and checks the nonzero exit status plus diagnostic source
+filenames, line numbers, single-line and multiline type-mismatch
+found/required types, missing-member error kind, source lines, caret positions,
+and multi-error count. A local 2026-07-10 validation completed the focused
+Scala diagnostic smoke using Scala 2.13.18.
 
 `ci/scala_record_smoke.sh` compiles a Java 17 record support class with the
 host JDK, then runs Doppio-hosted scalac on a focused Scala interop source that

@@ -61,6 +61,8 @@ mkdir -p "$out_dir"
 cat > "$source_file" <<'SCALA_DIAGNOSTIC_SOURCE'
 object DiagnosticSmoke {
   val number: Int = "not-an-int"
+  val pair: (String, Int) =
+    ("ok", "bad")
 }
 SCALA_DIAGNOSTIC_SOURCE
 cat > "$missing_member_source_file" <<'SCALA_MISSING_MEMBER_SOURCE'
@@ -101,10 +103,14 @@ grep -Fq 'found   : String("not-an-int")' "$log_file"
 grep -Fq 'required: Int' "$log_file"
 grep -Fq '  val number: Int = "not-an-int"' "$log_file"
 grep -Fq '                    ^' "$log_file"
+grep -Fq 'DiagnosticSmoke.scala:4: error: type mismatch;' "$log_file"
+grep -Fq 'found   : String("bad")' "$log_file"
+grep -Fq '    ("ok", "bad")' "$log_file"
+grep -Fq '           ^' "$log_file"
 grep -Fq 'MissingMemberSmoke.scala:2: error: value definitelyMissing is not a member of String' "$log_file"
 grep -Fq '  val text = "abc".definitelyMissing' "$log_file"
 grep -Fq '                   ^' "$log_file"
-grep -Fq '2 errors' "$log_file"
+grep -Fq '3 errors' "$log_file"
 
 if find "$out_dir" -type f -name '*.class' | grep -q .; then
   echo "Unexpected class files from failed diagnostic compile." >&2
