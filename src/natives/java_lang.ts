@@ -1650,9 +1650,21 @@ export default function (): any {
     }
 
     public static 'mapLibraryName(Ljava/lang/String;)Ljava/lang/String;'(thread: JVMThread, arg0: JVMTypes.java_lang_String): JVMTypes.java_lang_String {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+      if (arg0 === null) {
+        thread.throwNewException('Ljava/lang/NullPointerException;', '');
+        return null;
+      }
+
+      const name = arg0.toString();
+      let mappedName: string;
+      if (process.platform === 'win32') {
+        mappedName = `${name}.dll`;
+      } else if (process.platform === 'darwin') {
+        mappedName = `lib${name}.dylib`;
+      } else {
+        mappedName = `lib${name}.so`;
+      }
+      return util.initString(thread.getBsCl(), mappedName);
     }
 
   }

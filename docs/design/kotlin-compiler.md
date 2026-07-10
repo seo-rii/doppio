@@ -133,6 +133,10 @@ to `Hello.kt` backend codegen:
   no-ops, matching Doppio's dynamic field resolution model. Coverage lives in
   `classes/modern_test/Java17IoInitIDs.java`, protecting jar/classpath scan
   and incremental-output file I/O paths.
+- `System.mapLibraryName(String)` now maps optional native library base names
+  to host-style filenames and preserves null-argument failure behavior.
+  Coverage lives in `classes/modern_test/Java17SystemMapLibraryName.java`,
+  protecting compiler and build-tool native bridge probes.
 - `ClassLoader.defineClass(..., byte[], offset, length, ...)` now slices
   typed-array-backed Java byte arrays with both the view `byteOffset` and the
   Java offset/length. Coverage lives in `classes/test/DefineClassOffset.java`

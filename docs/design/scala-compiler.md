@@ -371,6 +371,10 @@ reduced to a focused Java or Scala fixture.
   no-ops. Coverage lives in
   `classes/modern_test/Java17IoInitIDs.java`, protecting jar/classpath scans,
   source reads, and incremental output writes.
+- `System.mapLibraryName(String)` now maps optional native library base names
+  to host-style filenames and preserves null-argument failure behavior.
+  Coverage lives in `classes/modern_test/Java17SystemMapLibraryName.java`,
+  protecting compiler and build-tool native bridge probes.
 - Unsafe bulk and native-memory paths now cover
   `sun.misc.Unsafe.copyMemory(Object, long, Object, long, long)` for
   `byte[]` to `byte[]`, aligned same-type primitive arrays, overlapping

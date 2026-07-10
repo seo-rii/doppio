@@ -1,0 +1,4 @@
+zip:libzip.so
+empty:lib.so
+hyphen:libkotlin-daemon.so
+null:java.lang.NullPointerException
