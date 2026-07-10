@@ -90,6 +90,9 @@ jobs:
       - name: Run Kotlin local interop smoke
         run: ./ci/kotlin_local_interop_smoke.sh
 
+      - name: Run Kotlin multifile facade smoke
+        run: ./ci/kotlin_multifile_facade_smoke.sh
+
       - name: Run Kotlin record smoke
         run: ./ci/kotlin_record_smoke.sh
 

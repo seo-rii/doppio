@@ -197,7 +197,8 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   object declaration, companion object, enum, collection pipeline, exception
   handling, nullable safe-call/Elvis flow, nested/inner/local classes, SAM
   conversions, an anonymous object expression, delegated local and custom
-  properties, an inline function, `Closeable.use` including close-failure
+  properties, an inline function, packaged `@JvmMultifileClass` facade
+  generation, `Closeable.use` including close-failure
   suppressed-exception preservation, destructuring, range loops, stepped
   `downTo` loops, `mapIndexed`, `synchronized`, and generated Kotlin
   `LineNumberTable` metadata flowing into Doppio stack-trace frames, plus

@@ -335,6 +335,14 @@ Current verified checks:
   completed in 288 seconds and the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 211 seconds. Both the host JVM and Doppio
   print `OK:FALLBACK:3:9:2:1:accbbb:4:4:7`.
+- A focused Kotlin package/multifile facade smoke now lives in
+  `classes/kotlin_multifile_facade_smoke` and runs through
+  `ci/kotlin_multifile_facade_smoke.sh`. It compiles packaged sources annotated
+  with `@file:JvmName` and `@file:JvmMultifileClass`, checks the generated
+  facade and part class names, and verifies cross-file top-level function,
+  default-argument, private-helper bridge, and Java reflection lookup behavior
+  on both the host JVM and Doppio. A local 2026-07-11 validation completed the
+  focused smoke in 112 seconds.
 - A focused Kotlin SAM smoke now lives in `classes/kotlin_sam_smoke` and runs
   through `ci/kotlin_sam_smoke.sh`. It compiles Kotlin `fun interface` adapters
   and Java SAM conversions for `Runnable`, `Comparator`, `Supplier`,
