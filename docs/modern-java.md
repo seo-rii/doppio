@@ -228,7 +228,8 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   references, and runtime-visible receiver-parameter annotations, plus tailrec
   lowering, labeled loops, local default-vararg helpers, spread-array calls,
   inline `Result` control flow, labeled `return@`, exception tables, and
-  `StackMapTable` metadata, plus `lateinit` property accessors,
+  `StackMapTable` metadata, `do`/`while` plus `when` branch lowering, and
+  finally-on-iteration cleanup, plus `lateinit` property accessors,
   `LazyThreadSafetyMode.NONE` lazy initialization, `notNull`/`observable`/
   `vetoable` delegates, delegated-property references, and companion/nested
   object initialization, plus `buildList`/`buildMap`/`buildSet`, grouping

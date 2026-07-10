@@ -629,11 +629,14 @@ Current verified checks:
   seconds and a follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 235 seconds. Both the host JVM and Doppio
   printed
-  `16|1:2:2,1:4:4,2:1:2,2:2:4,2:3:6,2:4:8,3:2:6#6|p357|q46|ok1:neg1:For input string: "x":ok7|2:ccc`.
+  `16|1:2:2,1:4:4,2:1:2,2:2:4,2:3:6,2:4:8,3:2:6#6|p357|q46|ok1:neg1:For input string: "x":ok7|2:ccc|zero,finally1,small2,finally2,catch:odd3,finally3,even4,finally4,neg-1,finally5`.
   `javap` verified tailrec/default bridges, labeled loop lowering, local
   default-vararg helpers, spread-array calls, inline
   `runCatching` / `fold`, labeled `return@` lowering, `Exception table`
-  entries, and `StackMapTable` metadata.
+  entries, and `StackMapTable` metadata. The smoke now also covers a
+  `do`/`while` loop around a `when` expression with range/multi-label branches,
+  an exceptional branch, and `finally` execution after every iteration.
+  A 2026-07-10 expanded validation completed the focused smoke in 130 seconds.
 - A focused Kotlin initialization/delegate smoke now lives in
   `classes/kotlin_initialization_delegate_smoke` and runs through
   `ci/kotlin_initialization_delegate_smoke.sh`. A focused local run completed

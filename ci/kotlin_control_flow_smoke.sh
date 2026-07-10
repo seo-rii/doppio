@@ -67,7 +67,7 @@ test -f "$out_dir/ControlFlowSmokeKt.class"
 test -f "$out_dir/META-INF/main.kotlin_module"
 
 runtime_cp="$out_dir:$stdlib_jar"
-expected_output="${KOTLIN_CONTROL_FLOW_SMOKE_EXPECTED_OUTPUT:-"16|1:2:2,1:4:4,2:1:2,2:2:4,2:3:6,2:4:8,3:2:6#6|p357|q46|ok1:neg1:For input string: \"x\":ok7|2:ccc"}"
+expected_output="${KOTLIN_CONTROL_FLOW_SMOKE_EXPECTED_OUTPUT:-"16|1:2:2,1:4:4,2:1:2,2:2:4,2:3:6,2:4:8,3:2:6#6|p357|q46|ok1:neg1:For input string: \"x\":ok7|2:ccc|zero,finally1,small2,finally2,catch:odd3,finally3,even4,finally4,neg-1,finally5"}"
 
 native_output="$(java -cp "$runtime_cp" KotlinControlFlowHelloKt)"
 if [ "$native_output" != "$expected_output" ]; then
