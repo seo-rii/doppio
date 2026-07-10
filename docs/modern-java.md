@@ -60,7 +60,10 @@ results, file contents, and source/target position updates, plus selected
 behavior covering writable, read-only, and empty mappings, plus selected Java
 13+ `MappedByteBuffer.force(int, int)` range forcing, zero-length range,
 read-only range no-op, empty-mapping validation order, and range validation
-behavior.
+behavior. Selected `Files` hard-link and symbolic-link APIs are also covered,
+including `createLink`, `createSymbolicLink`, `readSymbolicLink`,
+`NOFOLLOW_LINKS` existence checks, hard-link `isSameFile`, and dangling
+symlink cleanup.
 
 Java 17 compiler interop note: the Kotlin compiler smoke and focused Scala
 modern interop smoke now also exercise selected Java 17 class-library overlays
@@ -1244,7 +1247,7 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   selected `getAttribute`,
   string-based `readAttributes`, `setAttribute`, and extension-based
   `probeContentType`, input helper parent-target validation, timestamp get/set helpers,
-  `isSameFile`, and basic
+  `isSameFile`, selected hard-link and symbolic-link helpers, and basic
   `createFile`/`createDirectory`/`createDirectories` paths including
   single-level and recursive parent-file failure behavior. `writeString`
   covers null-charset validation before `CharSequence.toString()`. The tested copy
@@ -1267,7 +1270,7 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `DELETE_ON_CLOSE` without creation, and `WRITE`/`APPEND` rejection for input
   helpers.
 - Broader Java 11+ NIO file APIs, exact provider discovery edge cases,
-  attribute/view/link APIs, directory walking edge cases, remaining glob syntax edge cases, broader stream helpers, and new default method
+  remaining attribute/view/link APIs, directory walking edge cases, remaining glob syntax edge cases, broader stream helpers, and new default method
   behavior beyond the tested factories are not implemented.
 
 ## Known HTTP Client Gaps

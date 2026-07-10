@@ -646,6 +646,10 @@ Current verified checks:
   `walk`, `isDirectory`, `isRegularFile`, `size`, and `isSameFile`, explicit
   stream close paths in `finally` blocks, `LambdaMetafactory` bootstrap
   methods for Kotlin lambdas, `StackMapTable`, and `kotlin.Metadata`.
+- Repository-level NIO link coverage now lives in
+  `classes/modern_test/Java17FilesLinks.java`, covering `Files.createLink`,
+  `createSymbolicLink`, `readSymbolicLink`, hard-link `isSameFile`,
+  `NOFOLLOW_LINKS` symlink existence checks, and dangling symlink cleanup.
 - The focused I/O smoke includes `MappedByteBuffer` coverage; both runtimes
   print
   `aZcdYf:aZRSYf:ZRS:true:true:true:true:true:true:IndexOutOfBoundsException:0:true:true`.

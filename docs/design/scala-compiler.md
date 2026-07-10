@@ -95,7 +95,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
   interfaces, and member/local/anonymous flags;
 - a focused Scala NIO smoke covering reflection-backed Java NIO calls through
   `Path.of(String, String...)`, `Path.of(URI)`, `Files.mismatch`,
-  `Files.isSameFile`, and path cleanup through `Files.walk`;
+  `Files.isSameFile`, and path cleanup through `Files.walk`, with repository
+  fixture coverage for hard-link and symbolic-link APIs in
+  `classes/modern_test/Java17FilesLinks.java`;
 - a focused Scala modern Java interop smoke covering reflection-backed Java 17
   class-library interop for `HexFormat`, `InstantSource`,
   `RandomGeneratorFactory` `Random`/`SplittableRandom` provider output, and
@@ -329,6 +331,11 @@ reduced to a focused Java or Scala fixture.
   positional write native without advancing the channel's tracked file
   position. Coverage lives in
   `classes/modern_test/Java17FileChannelPositionalWrite.java`.
+- Java NIO link helpers now cover `Files.createLink`, `createSymbolicLink`,
+  `readSymbolicLink`, hard-link `isSameFile`, `NOFOLLOW_LINKS` symlink
+  existence checks, and dangling symlink cleanup. Coverage lives in
+  `classes/modern_test/Java17FilesLinks.java`, protecting compiler and build
+  tool paths that inspect linked source or classpath trees.
 - `scala-reflect` runtime universe forced the JIT non-virtual invoke fallback
   path. The generated JIT trace previously referenced an out-of-scope
   `methodReference` variable when falling back from the receiver object to the

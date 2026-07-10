@@ -47,6 +47,16 @@ import java.util.stream.Stream;
 public final class Files {
   private Files() {}
 
+  private static native void createHardLink0(String link, String existing) throws IOException;
+
+  private static native void createSymbolicLink0(String link, String target) throws IOException;
+
+  private static native String readSymbolicLink0(String link) throws IOException;
+
+  private static native void deletePath0(String path) throws IOException;
+
+  private static native boolean isSameFile0(String first, String second) throws IOException;
+
   public static InputStream newInputStream(Path path, OpenOption... options) throws IOException {
     Objects.requireNonNull(options);
     boolean deleteOnClose = false;
@@ -244,6 +254,21 @@ public final class Files {
     return path;
   }
 
+  public static Path createLink(Path link, Path existing) throws IOException {
+    File linkFile = toFile(link);
+    File existingFile = toFile(existing);
+    createHardLink0(linkFile.toString(), existingFile.toString());
+    return link;
+  }
+
+  public static Path createSymbolicLink(Path link, Path target, FileAttribute<?>... attrs) throws IOException {
+    requireFileAttributes(attrs);
+    File linkFile = toFile(link);
+    Path targetPath = Objects.requireNonNull(target);
+    createSymbolicLink0(linkFile.toString(), targetPath.toString());
+    return link;
+  }
+
   public static Path createDirectories(Path path, FileAttribute<?>... attrs) throws IOException {
     requireFileAttributes(attrs);
     File file = toFile(path);
@@ -268,7 +293,7 @@ public final class Files {
 
   public static void delete(Path path) throws IOException {
     File file = toFile(path);
-    if (!file.exists()) {
+    if (!file.exists() && !isSymbolicLink(path)) {
       throw new NoSuchFileException(file.toString());
     }
     deleteExisting(file);
@@ -276,7 +301,7 @@ public final class Files {
 
   public static boolean deleteIfExists(Path path) throws IOException {
     File file = toFile(path);
-    if (!file.exists()) {
+    if (!file.exists() && !isSymbolicLink(path)) {
       return false;
     }
     deleteExisting(file);
@@ -437,41 +462,43 @@ public final class Files {
   }
 
   public static boolean exists(Path path, LinkOption... options) {
-    requireLinkOptions(options);
-    return toFile(path).exists();
+    boolean followLinks = followLinks(options);
+    File file = toFile(path);
+    return file.exists() || (!followLinks && isSymbolicLink(path));
   }
 
   public static boolean notExists(Path path, LinkOption... options) {
-    requireLinkOptions(options);
-    return !toFile(path).exists();
+    return !exists(path, options);
   }
 
   public static boolean isDirectory(Path path, LinkOption... options) {
-    requireLinkOptions(options);
+    boolean followLinks = followLinks(options);
+    if (!followLinks && isSymbolicLink(path)) {
+      return false;
+    }
     return toFile(path).isDirectory();
   }
 
   public static boolean isRegularFile(Path path, LinkOption... options) {
-    requireLinkOptions(options);
+    boolean followLinks = followLinks(options);
+    if (!followLinks && isSymbolicLink(path)) {
+      return false;
+    }
     return toFile(path).isFile();
   }
 
   public static boolean isSymbolicLink(Path path) {
     File file = toFile(path);
-    if (!file.exists()) {
-      return false;
-    }
     try {
-      File absoluteFile = file.getAbsoluteFile();
-      File parentFile = absoluteFile.getParentFile();
-      File canonicalParent = parentFile == null ? null : parentFile.getCanonicalFile();
-      File fileInCanonicalParent = canonicalParent == null
-          ? absoluteFile
-          : new File(canonicalParent, absoluteFile.getName());
-      return !fileInCanonicalParent.getAbsolutePath().equals(fileInCanonicalParent.getCanonicalPath());
+      readSymbolicLink0(file.toString());
+      return true;
     } catch (IOException e) {
       return false;
     }
+  }
+
+  public static Path readSymbolicLink(Path link) throws IOException {
+    return Path.of(readSymbolicLink0(toFile(link).toString()));
   }
 
   public static long size(Path path) throws IOException {
@@ -1164,7 +1191,7 @@ public final class Files {
     if (!second.exists()) {
       throw new NoSuchFileException(second.toString());
     }
-    return false;
+    return isSameFile0(first.toString(), second.toString());
   }
 
   public static boolean isReadable(Path path) {
@@ -1342,6 +1369,16 @@ public final class Files {
     }
   }
 
+  private static boolean followLinks(LinkOption... options) {
+    requireLinkOptions(options);
+    for (LinkOption option : options) {
+      if (option == LinkOption.NOFOLLOW_LINKS) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   private static void requireFileAttributes(FileAttribute<?>... attrs) {
     Objects.requireNonNull(attrs);
     for (FileAttribute<?> attr : attrs) {
@@ -1421,6 +1458,10 @@ public final class Files {
   }
 
   private static void deleteExisting(File file) throws IOException {
+    if (isSymbolicLink(file.toPath())) {
+      deletePath0(file.toString());
+      return;
+    }
     if (file.isDirectory()) {
       File[] children = file.listFiles();
       if (children != null && children.length > 0) {
