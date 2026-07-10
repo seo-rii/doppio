@@ -5589,8 +5589,9 @@ export class DynamicConstant implements IConstantPoolItem {
         return;
       } else if (targetRef.getType() === ConstantPoolItemType.INTERFACE_METHODREF &&
           targetRefKind !== MethodHandleReferenceKind.INVOKEINTERFACE &&
-          targetRefKind !== MethodHandleReferenceKind.INVOKESTATIC) {
-        thread.throwNewException('Ljava/lang/BootstrapMethodError;', 'invoke CONSTANT_Dynamic interface target must use INVOKEINTERFACE or INVOKESTATIC');
+          targetRefKind !== MethodHandleReferenceKind.INVOKESTATIC &&
+          targetRefKind !== MethodHandleReferenceKind.INVOKESPECIAL) {
+        thread.throwNewException('Ljava/lang/BootstrapMethodError;', 'invoke CONSTANT_Dynamic interface target must use INVOKEINTERFACE, INVOKESTATIC, or INVOKESPECIAL');
         cb(false);
         return;
       }
@@ -5918,8 +5919,18 @@ export class DynamicConstant implements IConstantPoolItem {
           if (cdata === null) {
             cb(false);
           } else {
+            var receiverTarget = specialInvoke ? (<any> receiverArg)[targetMethod.fullSignature] : (<any> receiverArg)[targetMethod.signature];
+            if (specialInvoke && typeof receiverTarget !== 'function' && targetMethodRef.jsConstructor !== null) {
+              receiverTarget = targetMethodRef.jsConstructor.prototype[targetMethod.fullSignature];
+            }
+            if (typeof receiverTarget !== 'function') {
+              thread.throwNewException('Ljava/lang/BootstrapMethodError;',
+                `invoke CONSTANT_Dynamic special target ${targetMethod.fullSignature} is not invocable on receiver`);
+              cb(false);
+              return;
+            }
             thread.setStatus(ThreadStatus.ASYNC_WAITING);
-            (<any> receiverArg)[specialInvoke ? targetMethod.fullSignature : targetMethod.signature](thread, targetArgs, (e?: JVMTypes.java_lang_Throwable, rv?: any) => {
+            receiverTarget.call(receiverArg, thread, targetArgs, (e?: JVMTypes.java_lang_Throwable, rv?: any) => {
               if (e) {
                 thread.throwException(e);
                 cb(false);

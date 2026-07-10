@@ -210,7 +210,10 @@ handles, dynamic constants, and record object-method linkage:
   static arguments and returns a primitive `int`, a `GETFIELD` target whose
   receiver is supplied by another dynamic constant, a `REF_invokeSpecial`
   target whose receiver is supplied by another dynamic constant and whose
-  private instance method returns a reference dynamic constant, a `PUTSTATIC`
+  private instance method returns a reference dynamic constant, a
+  `REF_invokeSpecial` interface target whose receiver is supplied by another
+  dynamic constant and whose default method returns a reference dynamic
+  constant, a `PUTSTATIC`
   target that writes a `String` static argument and returns `null` into a
   reference dynamic constant, and a receiver-backed `PUTFIELD` target that
   writes a `String` static argument and returns `null` into a reference dynamic
@@ -307,7 +310,7 @@ handles, dynamic constants, and record object-method linkage:
   casts but not the full Java wrapper conversion matrix.
 - The `ConstantBootstraps.invoke` fast path does not yet cover broad dispatch
   adaptation beyond the targeted virtual/interface/special receiver cases and
-  tested interface static method target, remaining
+  tested interface static/special method targets, remaining
   field setter shapes beyond the tested reference `PUTSTATIC`, primitive
   `PUTSTATIC` `CONSTANT_Long` to `double`, receiver-backed reference
   `PUTFIELD`, and receiver-backed primitive `PUTFIELD` `CONSTANT_Double` to

@@ -4390,6 +4390,109 @@ function modernJava(grunt: IGrunt) {
 
     grunt.file.write(outPath, Buffer.from(bytes));
     grunt.log.ok('Generated ' + outPath);
+
+    outPath = 'classes/modern_test/Java11ConstantDynamicInvokeSpecial.class';
+    bytes = [];
+
+    u4(0xcafebabe);
+    u2(0);
+    u2(55);
+    u2(54);
+
+    cls(2);
+    utf8('classes/modern_test/Java11ConstantDynamicInvokeSpecial');
+    cls(4);
+    utf8('java/lang/Object');
+    utf8('<init>');
+    utf8('()V');
+    utf8('Code');
+    ref(10, 3, 9);
+    nameAndType(5, 6);
+    utf8('main');
+    utf8('([Ljava/lang/String;)V');
+    utf8('java/lang/System');
+    cls(12);
+    utf8('out');
+    utf8('Ljava/io/PrintStream;');
+    nameAndType(14, 15);
+    ref(9, 13, 16);
+    utf8('java/io/PrintStream');
+    cls(18);
+    utf8('println');
+    utf8('(Ljava/lang/String;)V');
+    nameAndType(20, 21);
+    ref(10, 19, 22);
+    utf8('BootstrapMethods');
+    utf8('java/lang/invoke/ConstantBootstraps');
+    cls(25);
+    utf8('invoke');
+    utf8('(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;Ljava/lang/invoke/MethodHandle;[Ljava/lang/Object;)Ljava/lang/Object;');
+    nameAndType(27, 28);
+    ref(10, 26, 29);
+    methodHandle(6, 30);
+    utf8('classes/modern_test/Java11ConstantDynamicInvokeSpecial');
+    cls(32);
+    nameAndType(5, 6);
+    ref(10, 33, 34);
+    methodHandle(8, 35);
+    utf8('specialReceiver');
+    utf8('Lclasses/modern_test/Java11ConstantDynamicInvokeSpecial$SpecialDefault;');
+    nameAndType(37, 38);
+    dynamic(0, 39);
+    utf8('classes/modern_test/Java11ConstantDynamicInvokeSpecial$SpecialDefault');
+    cls(41);
+    utf8('defaultValue');
+    utf8('(Ljava/lang/String;)Ljava/lang/String;');
+    nameAndType(43, 44);
+    ref(11, 42, 45);
+    methodHandle(7, 46);
+    utf8('condy');
+    string(48);
+    utf8('specialValue');
+    utf8('Ljava/lang/String;');
+    nameAndType(50, 51);
+    dynamic(1, 52);
+
+    u2(0x0021);
+    u2(1);
+    u2(3);
+    u2(1);
+    u2(42);
+    u2(0);
+    u2(2);
+
+    u2(0x0001);
+    u2(5);
+    u2(6);
+    u2(1);
+    codeAttr([0x2a, 0xb7, 0x00, 0x08, 0xb1], 1, 1);
+
+    u2(0x0009);
+    u2(10);
+    u2(11);
+    u2(1);
+    codeAttr([
+      0xb2, 0x00, 0x11,
+      0x13, 0x00, 0x35,
+      0xb6, 0x00, 0x17,
+      0xb1
+    ], 2, 1);
+
+    u2(1);
+    u2(24);
+    u4(18);
+    u2(2);
+    u2(31);
+    u2(1);
+    u2(36);
+    u2(31);
+    u2(3);
+    u2(47);
+    u2(40);
+    u2(49);
+
+    grunt.file.write(outPath, Buffer.from(bytes));
+    grunt.log.ok('Generated ' + outPath);
   });
 
   grunt.registerTask('javac_modern_classlib', 'Compile Java 9+ bootstrap class-library shims.', function() {
