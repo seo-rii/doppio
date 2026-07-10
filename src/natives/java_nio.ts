@@ -320,20 +320,10 @@ export default function (): any {
 
   }
 
-  class java_nio_charset_Charset$3 {
-
-    public static 'run()Ljava/lang/Object;'(thread: JVMThread, javaThis: JVMTypes.java_nio_charset_Charset$3): JVMTypes.java_lang_Object {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      return null;
-    }
-
-  }
-
   // Export line. This is what DoppioJVM sees.
   return {
     'java/nio/Bits': java_nio_Bits,
     'java/nio/file/Files': java_nio_file_Files,
-    'java/nio/MappedByteBuffer': java_nio_MappedByteBuffer,
-    'java/nio/charset/Charset$3': java_nio_charset_Charset$3
+    'java/nio/MappedByteBuffer': java_nio_MappedByteBuffer
   };
 };

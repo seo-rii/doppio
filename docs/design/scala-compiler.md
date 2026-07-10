@@ -352,6 +352,11 @@ reduced to a focused Java or Scala fixture.
   `DoubleBuffer` views. Coverage lives in
   `classes/modern_test/Java17DirectTypedBufferBulk.java`, protecting compiler
   and classfile libraries that stage primitive data through direct buffers.
+- `AccessController.doPrivileged(PrivilegedAction)` now handles covariant
+  concrete `run()` methods used by JDK privileged actions. Coverage lives in
+  `classes/modern_test/Java17CharsetAvailable.java`, protecting
+  `Charset.availableCharsets()` and charset-provider enumeration paths used
+  during source and classpath decoding.
 - Unsafe bulk and native-memory paths now cover
   `sun.misc.Unsafe.copyMemory(Object, long, Object, long, long)` for
   `byte[]` to `byte[]`, aligned same-type primitive arrays, overlapping

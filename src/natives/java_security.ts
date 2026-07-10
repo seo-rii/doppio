@@ -8,8 +8,17 @@ import util = Doppio.VM.Util;
 import ThreadStatus = Doppio.VM.Enums.ThreadStatus;
 
 function doPrivileged(thread: JVMThread, action: JVMTypes.java_security_PrivilegedAction, ctx?: JVMTypes.java_security_AccessControlContext): void {
+  const actionObj = <any> action;
+  let runSignature = 'run()Ljava/lang/Object;';
+  for (const key in actionObj) {
+    if (key !== runSignature && (key.indexOf('run()L') === 0 || key.indexOf('run()[') === 0) && typeof actionObj[key] === 'function') {
+      runSignature = key;
+      break;
+    }
+  }
+
   thread.setStatus(ThreadStatus.ASYNC_WAITING);
-  action['run()Ljava/lang/Object;'](thread, null, (e?: JVMTypes.java_lang_Throwable, rv?: JVMTypes.java_lang_Object): void => {
+  actionObj[runSignature](thread, null, (e?: JVMTypes.java_lang_Throwable, rv?: JVMTypes.java_lang_Object): void => {
     if (e) {
       // If e is an UNCHECKED exception, re-throw it.
       // https://docs.oracle.com/javase/tutorial/essential/exceptions/runtime.html

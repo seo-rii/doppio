@@ -65,6 +65,14 @@ including `createLink`, `createSymbolicLink`, `readSymbolicLink`,
 `NOFOLLOW_LINKS` existence checks, hard-link `isSameFile`, and dangling
 symlink cleanup.
 
+Java security/runtime note: `AccessController.doPrivileged(PrivilegedAction)`
+now dispatches covariant concrete `run()` methods instead of being pinned to
+the erased `run():Object` bridge when the action class exposes a more-specific
+reference return. Coverage lives in
+`classes/modern_test/Java17CharsetAvailable.java`, which protects
+`Charset.availableCharsets()` provider enumeration, case-insensitive charset
+lookup, and unmodifiable map behavior.
+
 Java 17 compiler interop note: the Kotlin compiler smoke and focused Scala
 modern interop smoke now also exercise selected Java 17 class-library overlays
 from generated Kotlin/Scala bytecode via reflection, covering `HexFormat`,

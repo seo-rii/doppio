@@ -112,6 +112,12 @@ to `Hello.kt` backend codegen:
   missing entries, and repeated `ZipFile.open` calls for the same path and
   modification timestamp reuse the parsed `ZipFS` index. Coverage lives in
   `classes/test/ZipFileHotPaths.java`.
+- `AccessController.doPrivileged(PrivilegedAction)` now dispatches covariant
+  concrete `run()` methods rather than the erased bridge when needed.
+  `classes/modern_test/Java17CharsetAvailable.java` covers
+  `Charset.availableCharsets()` provider enumeration and case-insensitive
+  UTF-8 lookup, protecting compiler paths that repeatedly resolve charset
+  metadata.
 - `ClassLoader.defineClass(..., byte[], offset, length, ...)` now slices
   typed-array-backed Java byte arrays with both the view `byteOffset` and the
   Java offset/length. Coverage lives in `classes/test/DefineClassOffset.java`
