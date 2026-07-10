@@ -13,6 +13,7 @@ import {JVMThread, BytecodeStackFrame} from './threading';
 import {ThreadStatus, OpCode, ConstantPoolItemType, Constants} from './enums';
 import assert from './assert';
 import {Method} from './methods';
+import {refreshMemberNameMethodTarget} from './method_handles';
 import * as JVMTypes from '../includes/JVMTypes';
 
 const emptyArgs: any[] = [];
@@ -1778,6 +1779,7 @@ export class Opcodes {
       opStack.dropFromTop(paramSize + 1);
       lmbdaForm = obj['java/lang/invoke/MethodHandle/form'];
       mn = lmbdaForm['java/lang/invoke/LambdaForm/vmentry'];
+      refreshMemberNameMethodTarget(thread, mn);
       assert(mn.vmtarget !== null && mn.vmtarget !== undefined, "vmtarget must be defined");
       mn.vmtarget(thread, methodReference.nameAndTypeInfo.descriptor, args);
       frame.returnToThreadLoop = true;
@@ -1803,6 +1805,7 @@ export class Opcodes {
     if (!isNull(thread, frame, memberName)) {
       opStack.dropFromTop(paramSize);
       assert(memberName.getClass().getInternalName() === "Ljava/lang/invoke/MemberName;");
+      refreshMemberNameMethodTarget(thread, memberName);
       // parameterTypes for function are the same as the method reference, but without the trailing MemberName.
       // TODO: Use parsed descriptor, avoid re-doing work here.
       memberName.vmtarget(thread, desc.replace("Ljava/lang/invoke/MemberName;)", ")"), args);

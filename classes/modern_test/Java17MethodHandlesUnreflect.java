@@ -39,6 +39,39 @@ public class Java17MethodHandlesUnreflect {
     return label + ":private:" + suffix;
   }
 
+  public static class SpecialParent {
+    public String dispatch(String suffix) {
+      return "parent:" + suffix;
+    }
+  }
+
+  public interface SpecialDefault {
+    default String defaultJoin(String suffix) {
+      return "default:" + suffix;
+    }
+  }
+
+  public static class SpecialChild extends SpecialParent implements SpecialDefault {
+    public String dispatch(String suffix) {
+      return "child:" + suffix;
+    }
+
+    public static void run() throws Throwable {
+      MethodHandles.Lookup lookup = MethodHandles.lookup();
+      SpecialChild receiver = new SpecialChild();
+
+      Method parentMethod = SpecialParent.class.getDeclaredMethod("dispatch", String.class);
+      MethodHandle parentSpecial = lookup.unreflectSpecial(parentMethod, SpecialChild.class);
+      System.out.println((String) parentSpecial.invokeExact(receiver, "reflect"));
+      System.out.println(parentSpecial.type().toMethodDescriptorString());
+
+      Method defaultMethod = SpecialDefault.class.getDeclaredMethod("defaultJoin", String.class);
+      MethodHandle defaultSpecial = lookup.unreflectSpecial(defaultMethod, SpecialChild.class);
+      System.out.println((String) defaultSpecial.invokeExact(receiver, "reflect"));
+      System.out.println(defaultSpecial.type().toMethodDescriptorString());
+    }
+  }
+
   public static void main(String[] args) throws Throwable {
     MethodHandles.Lookup lookup = MethodHandles.lookup();
     Method publicStaticMethod = Java17MethodHandlesUnreflect.class.getDeclaredMethod(
@@ -90,6 +123,7 @@ public class Java17MethodHandlesUnreflect {
     Field reflectedInstanceField = MethodHandles.reflectAs(Field.class, instanceSetter);
     System.out.println(reflectedInstanceField.getName() + ":" + reflectedInstanceField.getType().getName());
 
+    SpecialChild.run();
     Java17MethodHandlesUnreflectPeer.run();
     Nestmate.run();
   }

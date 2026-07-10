@@ -13,6 +13,10 @@ publicStaticField:java.lang.String
 instance:initial
 instance:updated
 publicInstanceField:java.lang.String
+parent:reflect
+(Lclasses/modern_test/Java17MethodHandlesUnreflect$SpecialChild;Ljava/lang/String;)Ljava/lang/String;
+default:reflect
+(Lclasses/modern_test/Java17MethodHandlesUnreflect$SpecialChild;Ljava/lang/String;)Ljava/lang/String;
 java.lang.IllegalAccessException
 java.lang.IllegalAccessException
 java.lang.IllegalAccessException

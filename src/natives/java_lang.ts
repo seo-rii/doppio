@@ -17,6 +17,7 @@ import attributes = Doppio.VM.ClassFile.Attributes;
 import ClassData = Doppio.VM.ClassFile.ClassData;
 import * as JVMTypes from '../../includes/JVMTypes';
 import {setImmediate} from 'browserfs';
+import {refreshMemberNameMethodTarget} from '../method_handles';
 
 export default function (): any {
   var debug = logging.debug;
@@ -1994,7 +1995,8 @@ export default function (): any {
       type = mn['java/lang/invoke/MemberName/type'],
       name = mn['java/lang/invoke/MemberName/name'],
       refKind: number,
-      existingRefKind = flags >>> MemberNameConstants.REFERENCE_KIND_SHIFT;
+      existingRefKind = flags >>> MemberNameConstants.REFERENCE_KIND_SHIFT,
+      targetRefKind: number;
 
     // Determine the reference type.
     if (ref instanceof Method) {
@@ -2009,12 +2011,15 @@ export default function (): any {
       } else {
         refKind = MethodHandleReferenceKind.INVOKEVIRTUAL;
       }
-      mn.vmtarget = ref.getVMTargetBridgeMethod(thread, existingRefKind ? existingRefKind : refKind);
-      if (refKind === MethodHandleReferenceKind.INVOKEINTERFACE ||
-        refKind === MethodHandleReferenceKind.INVOKEVIRTUAL) {
+      targetRefKind = existingRefKind ? existingRefKind : refKind;
+      mn.vmtarget = ref.getVMTargetBridgeMethod(thread, targetRefKind);
+      if (targetRefKind === MethodHandleReferenceKind.INVOKEINTERFACE ||
+        targetRefKind === MethodHandleReferenceKind.INVOKEVIRTUAL) {
         mn.vmindex = ref.cls.getVMIndexForMethod(ref);
+      } else {
+        mn.vmindex = -1;
       }
-      flags |= (refKind << MemberNameConstants.REFERENCE_KIND_SHIFT) | methodFlags(ref);
+      flags |= (targetRefKind << MemberNameConstants.REFERENCE_KIND_SHIFT) | methodFlags(ref);
     } else {
       flags = MemberNameConstants.IS_FIELD;
       // Assume a GET.
@@ -2399,13 +2404,17 @@ export default function (): any {
     public static 'init(Ljava/lang/invoke/MemberName;Ljava/lang/Object;)V'(thread: JVMThread, self: JVMTypes.java_lang_invoke_MemberName, ref: JVMTypes.java_lang_Object): void {
       var clazz: JVMTypes.java_lang_Class,
         clazzData: ReferenceClassData<JVMTypes.java_lang_Class>,
-        flags: number, m: Method, f: Field;
+        flags: number,
+        existingRefKind: number,
+        targetRefKind: number,
+        m: Method, f: Field;
       switch (ref.getClass().getInternalName()) {
         case "Ljava/lang/reflect/Method;":
           var methodObj = <JVMTypes.java_lang_reflect_Method> ref, refKind:  number;
           clazz = methodObj['java/lang/reflect/Method/clazz'];
           clazzData = (<ReferenceClassData<JVMTypes.java_lang_Class>> clazz.$cls);
           m = clazzData.getMethodFromSlot(methodObj['java/lang/reflect/Method/slot']);
+          existingRefKind = self['java/lang/invoke/MemberName/flags'] >>> MemberNameConstants.REFERENCE_KIND_SHIFT;
           flags = methodFlags(m) | MemberNameConstants.IS_METHOD;
           if (m.accessFlags.isStatic()) {
             refKind = MethodHandleReferenceKind.INVOKESTATIC;
@@ -2414,14 +2423,17 @@ export default function (): any {
           } else {
             refKind = MethodHandleReferenceKind.INVOKEVIRTUAL;
           }
-          flags |= refKind << MemberNameConstants.REFERENCE_KIND_SHIFT;
+          targetRefKind = existingRefKind ? existingRefKind : refKind;
+          flags |= targetRefKind << MemberNameConstants.REFERENCE_KIND_SHIFT;
 
           self['java/lang/invoke/MemberName/clazz'] = clazz;
           self['java/lang/invoke/MemberName/flags'] = flags;
-          self.vmtarget = m.getVMTargetBridgeMethod(thread, refKind);
+          self.vmtarget = m.getVMTargetBridgeMethod(thread, targetRefKind);
           // Only set vmindex for virtual dispatch.
-          if (refKind === MethodHandleReferenceKind.INVOKEVIRTUAL || refKind === MethodHandleReferenceKind.INVOKEINTERFACE) {
+          if (targetRefKind === MethodHandleReferenceKind.INVOKEVIRTUAL || targetRefKind === MethodHandleReferenceKind.INVOKEINTERFACE) {
             self.vmindex = clazzData.getVMIndexForMethod(m);
+          } else {
+            self.vmindex = -1;
           }
           break;
         case "Ljava/lang/reflect/Constructor;":
@@ -2429,7 +2441,8 @@ export default function (): any {
           clazz = consObj['java/lang/reflect/Constructor/clazz'];
           clazzData = (<ReferenceClassData<JVMTypes.java_lang_Class>> clazz.$cls);
           m = clazzData.getMethodFromSlot(consObj['java/lang/reflect/Constructor/slot']);
-          flags = methodFlags(m) | MemberNameConstants.IS_CONSTRUCTOR | (MethodHandleReferenceKind.INVOKESPECIAL << MemberNameConstants.REFERENCE_KIND_SHIFT);
+          refKind = MethodHandleReferenceKind.INVOKESPECIAL;
+          flags = methodFlags(m) | MemberNameConstants.IS_CONSTRUCTOR | (refKind << MemberNameConstants.REFERENCE_KIND_SHIFT);
           self['java/lang/invoke/MemberName/clazz'] = clazz;
           self['java/lang/invoke/MemberName/flags'] = flags;
           self.vmtarget = m.getVMTargetBridgeMethod(thread, refKind);
@@ -2474,8 +2487,7 @@ export default function (): any {
         clazz = <ReferenceClassData<JVMTypes.java_lang_Object>> memberName['java/lang/invoke/MemberName/clazz'].$cls,
         lookupCls = lookupClass !== null && lookupClass.$cls instanceof ReferenceClassData ?
           <ReferenceClassData<JVMTypes.java_lang_Object>> lookupClass.$cls : null,
-        flags = memberName['java/lang/invoke/MemberName/flags'],
-        refKind = flags >>> MemberNameConstants.REFERENCE_KIND_SHIFT;
+        flags = memberName['java/lang/invoke/MemberName/flags'];
 
       if (clazz == null || name == null || type == null) {
         thread.throwNewException("Ljava/lang/IllegalArgumentException;", "Invalid MemberName.");
@@ -2496,11 +2508,7 @@ export default function (): any {
               flags = (flags & ~(util.FlagMasks.PUBLIC | util.FlagMasks.PRIVATE | util.FlagMasks.PROTECTED)) | util.FlagMasks.PUBLIC;
             }
             memberName['java/lang/invoke/MemberName/flags'] = flags;
-            memberName.vmtarget = methodTarget.getVMTargetBridgeMethod(thread, flags >>> MemberNameConstants.REFERENCE_KIND_SHIFT);
-            // vmindex is only relevant for virtual dispatch.
-            if (refKind === MethodHandleReferenceKind.INVOKEINTERFACE || refKind === MethodHandleReferenceKind.INVOKEVIRTUAL) {
-              memberName.vmindex = clazz.getVMIndexForMethod(methodTarget);
-            }
+            refreshMemberNameMethodTarget(thread, memberName);
             return memberName;
           } else {
             thread.throwNewException('Ljava/lang/NoSuchMethodError;', `Invalid method ${name + (<JVMTypes.java_lang_invoke_MethodType> type).toString()} in class ${clazz.getExternalName()}.`);
@@ -2658,8 +2666,9 @@ export default function (): any {
     public static 'getMemberVMInfo(Ljava/lang/invoke/MemberName;)Ljava/lang/Object;'(thread: JVMThread, mname: JVMTypes.java_lang_invoke_MemberName): JVMTypes.java_lang_Object {
       var rv = util.newArray(thread, thread.getBsCl(), '[Ljava/lang/Object;', 2),
         flags = mname['java/lang/invoke/MemberName/flags'],
-        refKind = flags >>> MemberNameConstants.REFERENCE_KIND_SHIFT,
         longCls = (<PrimitiveClassData> thread.getBsCl().getInitializedClass(thread, 'J'));
+
+      refreshMemberNameMethodTarget(thread, mname);
 
       // VMIndex of the target.
       rv.array[0] = longCls.createWrapperObject(thread, Long.fromNumber(mname.vmindex));
@@ -2742,6 +2751,7 @@ export default function (): any {
         descriptor: string, paramTypes: string[];
 
       assert(mh.getClass().isCastable(thread.getBsCl().getInitializedClass(thread, 'Ljava/lang/invoke/MethodHandle;')), "First argument to invokeBasic must be a method handle.");
+      refreshMemberNameMethodTarget(thread, mn);
       assert(mn.vmtarget !== null && mn.vmtarget !== undefined, "vmtarget must be defined");
 
       assert(mn['java/lang/invoke/MemberName/type'].getClass().getInternalName() === 'Ljava/lang/invoke/MethodType;', "Expected a MethodType object.");
