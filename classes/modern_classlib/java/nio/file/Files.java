@@ -313,11 +313,14 @@ public final class Files {
   public static Path copy(Path source, Path target, CopyOption... options) throws IOException {
     Objects.requireNonNull(options);
     boolean replaceExisting = false;
+    boolean copyAttributes = false;
     for (CopyOption option : options) {
       Objects.requireNonNull(option);
       if (option == StandardCopyOption.REPLACE_EXISTING) {
         replaceExisting = true;
-      } else if (option != StandardCopyOption.COPY_ATTRIBUTES && option != LinkOption.NOFOLLOW_LINKS) {
+      } else if (option == StandardCopyOption.COPY_ATTRIBUTES) {
+        copyAttributes = true;
+      } else if (option != LinkOption.NOFOLLOW_LINKS) {
         throw new UnsupportedOperationException();
       }
     }
@@ -348,6 +351,9 @@ public final class Files {
       if (!targetFile.mkdir()) {
         throw new IOException("Unable to create directory");
       }
+      if (copyAttributes && !targetFile.setLastModified(sourceFile.lastModified())) {
+        throw new IOException("Unable to copy file attributes");
+      }
       return target;
     }
     InputStream input = new FileInputStream(sourceFile);
@@ -360,6 +366,9 @@ public final class Files {
       }
     } finally {
       input.close();
+    }
+    if (copyAttributes && !targetFile.setLastModified(sourceFile.lastModified())) {
+      throw new IOException("Unable to copy file attributes");
     }
     return target;
   }

@@ -382,6 +382,10 @@ reduced to a focused Java or Scala fixture.
   in `classes/modern_test/Java17FileSystemStores.java`, protecting compiler and
   build-tool probes that scan all mounted stores before selecting output/cache
   roots.
+- `Files.copy(..., COPY_ATTRIBUTES)` now preserves `lastModifiedTime` for
+  selected file and directory copies, including replacement. Coverage lives in
+  `classes/modern_test/Java11FilesCopyAttributes.java`, protecting compiler and
+  build-tool copy/cache paths that rely on timestamp-based freshness checks.
 - `java.io.FileInputStream`, `java.io.FileOutputStream`, and
   `java.io.UnixFileSystem` `initIDs()` natives are implemented as VM metadata
   no-ops. Coverage lives in

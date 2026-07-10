@@ -149,6 +149,11 @@ to `Hello.kt` backend codegen:
   in `classes/modern_test/Java17FileSystemStores.java`, protecting compiler and
   build-tool probes that scan all mounted stores before selecting cache/output
   roots.
+- `Files.copy(..., COPY_ATTRIBUTES)` now preserves `lastModifiedTime` for
+  selected file and directory copies, including replacement. Coverage lives in
+  `classes/modern_test/Java11FilesCopyAttributes.java`, protecting compiler
+  and build-cache paths that copy generated classes/resources while preserving
+  timestamp-based freshness checks.
 - `java.io.FileInputStream`, `java.io.FileOutputStream`, and
   `java.io.UnixFileSystem` `initIDs()` natives are implemented as VM metadata
   no-ops, matching Doppio's dynamic field resolution model. Coverage lives in

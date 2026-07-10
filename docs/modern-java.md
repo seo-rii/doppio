@@ -1308,7 +1308,8 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   path-copy missing-parent/parent-file target validation,
   stream-copy replacement of empty directory targets, stream-copy
   non-empty-directory/missing-parent/parent-file target validation,
-  path-copy `COPY_ATTRIBUTES`/`NOFOLLOW_LINKS` option acceptance,
+  path-copy `COPY_ATTRIBUTES` `lastModifiedTime` preservation for selected
+  file, replacement, and directory copies, `NOFOLLOW_LINKS` option acceptance,
   and unsupported stream-copy option rejection. The tested move
   surface covers plain-file and directory basic movement, target-parent
   validation, same-file no-op, existing target
