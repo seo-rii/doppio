@@ -1217,6 +1217,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `PrintWriter(OutputStream, boolean, Charset)`, `PrintWriter(File, Charset)`,
   and `PrintWriter(String, Charset)` while preserving the Java 8 print writer
   surface.
+- `java.io.ObjectInputStream` and `ObjectOutputStream` now expose tested
+  primitive `float[]`/`double[]` array serialization round-trips through their
+  bulk byte-conversion natives.
 - Other Java 9+ `java.io` helpers are not implemented yet.
 
 ## Known NIO File Gaps

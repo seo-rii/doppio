@@ -369,24 +369,52 @@ export default function (): any {
 
   class java_io_ObjectInputStream {
 
-    public static 'bytesToFloats([BI[FII)V'(thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number, arg2: JVMTypes.JVMArray<number>, arg3: number, arg4: number): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'bytesToFloats([BI[FII)V'(thread: JVMThread, bytes: JVMTypes.JVMArray<number>, srcPos: number, floats: JVMTypes.JVMArray<number>, dstPos: number, count: number): void {
+      const buf = Buffer.alloc(4);
+      for (let i = 0; i < count; i++) {
+        const byteOffset = srcPos + i * 4;
+        for (let j = 0; j < 4; j++) {
+          buf[j] = bytes.array[byteOffset + j] & 0xff;
+        }
+        floats.array[dstPos + i] = buf.readFloatBE(0);
+      }
     }
 
-    public static 'bytesToDoubles([BI[DII)V'(thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number, arg2: JVMTypes.JVMArray<number>, arg3: number, arg4: number): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'bytesToDoubles([BI[DII)V'(thread: JVMThread, bytes: JVMTypes.JVMArray<number>, srcPos: number, doubles: JVMTypes.JVMArray<number>, dstPos: number, count: number): void {
+      const buf = Buffer.alloc(8);
+      for (let i = 0; i < count; i++) {
+        const byteOffset = srcPos + i * 8;
+        for (let j = 0; j < 8; j++) {
+          buf[j] = bytes.array[byteOffset + j] & 0xff;
+        }
+        doubles.array[dstPos + i] = buf.readDoubleBE(0);
+      }
     }
 
   }
 
   class java_io_ObjectOutputStream {
 
-    public static 'floatsToBytes([FI[BII)V'(thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number, arg2: JVMTypes.JVMArray<number>, arg3: number, arg4: number): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'floatsToBytes([FI[BII)V'(thread: JVMThread, floats: JVMTypes.JVMArray<number>, srcPos: number, bytes: JVMTypes.JVMArray<number>, dstPos: number, count: number): void {
+      const buf = Buffer.alloc(4);
+      for (let i = 0; i < count; i++) {
+        buf.writeFloatBE(floats.array[srcPos + i], 0);
+        const byteOffset = dstPos + i * 4;
+        for (let j = 0; j < 4; j++) {
+          bytes.array[byteOffset + j] = buf.readInt8(j);
+        }
+      }
     }
 
-    public static 'doublesToBytes([DI[BII)V'(thread: JVMThread, arg0: JVMTypes.JVMArray<number>, arg1: number, arg2: JVMTypes.JVMArray<number>, arg3: number, arg4: number): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'doublesToBytes([DI[BII)V'(thread: JVMThread, doubles: JVMTypes.JVMArray<number>, srcPos: number, bytes: JVMTypes.JVMArray<number>, dstPos: number, count: number): void {
+      const buf = Buffer.alloc(8);
+      for (let i = 0; i < count; i++) {
+        buf.writeDoubleBE(doubles.array[srcPos + i], 0);
+        const byteOffset = dstPos + i * 8;
+        for (let j = 0; j < 8; j++) {
+          bytes.array[byteOffset + j] = buf.readInt8(j);
+        }
+      }
     }
 
   }
