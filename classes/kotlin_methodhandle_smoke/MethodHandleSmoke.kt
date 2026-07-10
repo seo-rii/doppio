@@ -145,6 +145,18 @@ class MethodHandleOwner(@JvmField var text: String) {
   }
 }
 
+open class MethodHandleSpecialParent {
+  open fun dispatch(suffix: String): String = "parent:$suffix"
+}
+
+interface MethodHandleSpecialDefault {
+  fun defaultJoin(suffix: String): String = "default:$suffix"
+}
+
+class MethodHandleSpecialChild : MethodHandleSpecialParent(), MethodHandleSpecialDefault {
+  override fun dispatch(suffix: String): String = "child:$suffix"
+}
+
 fun methodHandleSummary(): String {
   val lookup = MethodHandles.lookup()
   val ownerClass = MethodHandleOwner::class.java
@@ -180,6 +192,25 @@ fun methodHandleSummary(): String {
   val unreflectedAppend = lookup.unreflect(reflectedAppend)
   val unreflectedGetter = lookup.unreflectGetter(reflectedText)
   val unreflectedSetter = lookup.unreflectSetter(reflectedText)
+  val privateLookupMethod = MethodHandles::class.java.getMethod(
+    "privateLookupIn",
+    Class::class.java,
+    MethodHandles.Lookup::class.java
+  )
+  val specialReceiver = MethodHandleSpecialChild()
+  val specialLookup = privateLookupMethod.invoke(
+    null,
+    MethodHandleSpecialChild::class.java,
+    lookup
+  ) as MethodHandles.Lookup
+  val parentSpecial = specialLookup.unreflectSpecial(
+    MethodHandleSpecialParent::class.java.getDeclaredMethod("dispatch", stringClass),
+    MethodHandleSpecialChild::class.java
+  )
+  val defaultSpecial = specialLookup.unreflectSpecial(
+    MethodHandleSpecialDefault::class.java.getDeclaredMethod("defaultJoin", stringClass),
+    MethodHandleSpecialChild::class.java
+  )
 
   val owner = constructor.invokeWithArguments("mh") as MethodHandleOwner
   val before = getter.invokeWithArguments(owner).toString()
@@ -210,6 +241,8 @@ fun methodHandleSummary(): String {
   val unreflectValues = listOf(
     unreflectStatic,
     unreflectBefore + ">" + unreflectAfter,
+    parentSpecial.invokeWithArguments(specialReceiver, "ks").toString(),
+    defaultSpecial.invokeWithArguments(specialReceiver, "ks").toString(),
     unreflectPrivateFailure
   ).joinToString("/")
   val reflectAsMethod = MethodHandles::class.java.getMethod(
@@ -244,11 +277,6 @@ fun methodHandleSummary(): String {
     reflectedGetterMember.name + ":" + reflectedGetterMember.type.simpleName,
     reflectedSetterMember.name + ":" + reflectedSetterMember.type.simpleName
   ).joinToString("/")
-  val privateLookupMethod = MethodHandles::class.java.getMethod(
-    "privateLookupIn",
-    Class::class.java,
-    MethodHandles.Lookup::class.java
-  )
   val privateLookup = privateLookupMethod.invoke(null, ownerClass, lookup) as MethodHandles.Lookup
   val privateLookupSecret = privateLookup.findVirtual(
     ownerClass,

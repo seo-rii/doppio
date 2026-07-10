@@ -89,7 +89,7 @@ test -f "$out_dir/MethodHandleSmokeKt.class"
 runtime_cp="$out_dir:$stdlib_jar"
 native_output="$(java -cp "$runtime_cp" MethodHandleHelloKt)"
 case "$native_output" in
-  v5\|a3\|mh\>handle*cleanup:none,target:try:7,try*ts:zero0*MethodHandleOwner/true:true/secret:pl*)
+  v5\|a3\|mh\>handle*cleanup:none,target:try:7,try*ts:zero0*u7/ur\>reflect\?/parent:ks/default:ks/IllegalAccessException*MethodHandleOwner/true:true/secret:pl*)
     ;;
   *)
     echo "Unexpected native JVM MethodHandles smoke shape: $native_output" >&2

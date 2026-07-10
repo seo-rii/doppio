@@ -503,9 +503,10 @@ Current verified checks:
   This covers Kotlin-compiled calls to `findStatic`, `findConstructor`,
   `findVirtual`, `findGetter`, `findSetter`, `invokeWithArguments`,
   `MethodHandle.asType`, reference casts, primitive unboxing/widening, boxed
-  return adaptation, `Lookup.unreflect`, `unreflectConstructor`,
-  `unreflectGetter`, and `unreflectSetter` public success paths, private member
-  access-failure behavior, selected `MethodHandles.reflectAs` method,
+  return adaptation, `Lookup.unreflect`, `unreflectSpecial`,
+  `unreflectConstructor`, `unreflectGetter`, and `unreflectSetter` public
+  success paths, private-lookup-backed superclass and interface-default special
+  dispatch, private member access-failure behavior, selected `MethodHandles.reflectAs` method,
   constructor, getter, and setter round-trips, `MethodHandles.privateLookupIn`
   private method access plus public-lookup failure behavior, and
   `MethodType.toMethodDescriptorString()`.

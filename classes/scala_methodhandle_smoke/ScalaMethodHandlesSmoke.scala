@@ -5,6 +5,18 @@ final class ScalaMhBox(val label: String, private val base: Int) {
   def bump(delta: Int): String = s"$label${base + delta}"
 }
 
+class ScalaSpecialParent {
+  def dispatch(suffix: String): String = s"parent:$suffix"
+}
+
+trait ScalaSpecialDefault {
+  def defaultJoin(suffix: String): String = s"default:$suffix"
+}
+
+final class ScalaSpecialChild extends ScalaSpecialParent with ScalaSpecialDefault {
+  override def dispatch(suffix: String): String = s"child:$suffix"
+}
+
 object ScalaMethodHandlesSmoke {
   def exercise(): String = {
     val lookup = MethodHandles.lookup()
@@ -65,6 +77,25 @@ object ScalaMethodHandlesSmoke {
       stringClass
     )
     val guarded = MethodHandles.guardWithTest(isEmpty, emptyValue, filledValue)
+    val specialReceiver = new ScalaSpecialChild
+    val privateLookupMethod = classOf[MethodHandles].getMethod(
+      "privateLookupIn",
+      classOf[Class[_]],
+      classOf[MethodHandles.Lookup]
+    )
+    val specialLookup = privateLookupMethod.invoke(
+      null,
+      classOf[ScalaSpecialChild],
+      lookup
+    ).asInstanceOf[MethodHandles.Lookup]
+    val parentSpecial = specialLookup.unreflectSpecial(
+      classOf[ScalaSpecialParent].getDeclaredMethod("dispatch", stringClass),
+      classOf[ScalaSpecialChild]
+    )
+    val defaultSpecial = specialLookup.unreflectSpecial(
+      classOf[ScalaSpecialDefault].getDeclaredMethod("defaultJoin", stringClass),
+      classOf[ScalaSpecialChild]
+    )
 
     List(
       objectMax.invokeWithArguments(Integer.valueOf(5), Integer.valueOf(8)).toString,
@@ -73,7 +104,9 @@ object ScalaMethodHandlesSmoke {
       insertedSubstring.invokeWithArguments("scala", Integer.valueOf(5)).toString,
       droppedConstant.invokeWithArguments("ignored").toString,
       filteredReturn.invokeWithArguments("mh").toString,
-      guarded.invokeWithArguments("").toString + "/" + guarded.invokeWithArguments("word").toString
+      guarded.invokeWithArguments("").toString + "/" + guarded.invokeWithArguments("word").toString,
+      parentSpecial.invokeWithArguments(specialReceiver, "ss").toString,
+      defaultSpecial.invokeWithArguments(specialReceiver, "ss").toString
     ).mkString("mh:", ":", "")
   }
 }

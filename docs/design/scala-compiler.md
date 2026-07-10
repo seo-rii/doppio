@@ -158,7 +158,8 @@ Scala NIO smoke in 57 seconds using Scala 2.13.18.
 The direct Scala source-level `java.lang.invoke.MethodHandles` smoke now lives
 in `classes/scala_methodhandle_smoke` and runs through
 `ci/scala_methodhandle_smoke.sh`. It covers selected static, virtual,
-constructor, adaptation, and basic combinator flows that Kotlin already
+constructor, adaptation, basic combinator flows, and private-lookup-backed
+superclass/interface-default `unreflectSpecial` dispatch that Kotlin already
 stresses more broadly while keeping the main Scala compiler smoke output
 smaller and easier to isolate. The split local validation completed the
 focused MethodHandles smoke in 77 seconds and the remaining main Scala compiler

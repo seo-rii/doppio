@@ -275,8 +275,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `java.lang.invoke.MethodHandles` covering static, virtual, constructor, and
   field handle lookup, `invokeWithArguments`, `MethodHandle.asType`, primitive
   boxing/unboxing/widening, selected reflection-backed `Lookup.unreflect`,
-  `unreflectConstructor`, `unreflectGetter`, and `unreflectSetter` success
-  paths plus a private member access-failure path,
+  `unreflectSpecial`, `unreflectConstructor`, `unreflectGetter`, and
+  `unreflectSetter` success paths including private-lookup-backed superclass
+  and interface-default special dispatch plus a private member access-failure path,
   `MethodHandles.reflectAs` method, constructor, getter, and setter round-trips,
   and selected `MethodHandles.privateLookupIn` private method access plus public-lookup
   failure behavior, selected `MethodHandles` combinators (`identity`,
@@ -400,7 +401,8 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   synchronized Java maps,
   a focused Scala source-level `java.lang.invoke.MethodHandles`
   lookup/adaptation smoke for selected static, virtual, constructor, and
-  combinator flows,
+  combinator flows plus private-lookup-backed superclass and interface-default
+  `unreflectSpecial` dispatch,
   a focused Scala I/O smoke covering runtime JAR/ZIP/classpath resource reads
   through `JarOutputStream`, `JarFile`, `ZipInputStream`, and
   `URLClassLoader`, `ServiceLoader` provider discovery from generated
