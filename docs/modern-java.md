@@ -1201,9 +1201,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   direct-executor paths: constructor metadata and rounded capacity, subscriber
   snapshots, `isSubscribed`, cancellation removal, basic `submit`/`offer`
   delivery, bounded `offer` drop callbacks and negative drop result, invalid
-  request cancellation, `consume` future completion paths, normal/exceptional
-  close, late subscribers, callback exception handling, and selected
-  validation.
+  request cancellation, selected maximum-lag and minimum-demand estimates,
+  `consume` future completion paths, normal/exceptional close, late subscribers,
+  callback exception handling, and selected validation.
 - `CompletableFuture.failedFuture(Throwable)`, `completedStage(value)`,
   `failedStage(Throwable)`, `completeAsync(Supplier)`,
   `completeAsync(Supplier, Executor)`, `delayedExecutor(...)`, `orTimeout`,

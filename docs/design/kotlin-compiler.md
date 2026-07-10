@@ -748,9 +748,12 @@ Current verified checks:
   `kotlin.Metadata`.
 - `SubmissionPublisher` bounded `offer` now covers direct-executor drop
   callbacks, negative drop results, buffered delivery after demand, and invalid
-  request cancellation. Coverage lives in
-  `classes/modern_test/Java9SubmissionPublisherBackpressure.java`, hardening
-  Java Flow interop used by libraries around Kotlin compiler and build tests.
+  request cancellation. Demand estimate coverage lives in
+  `classes/modern_test/Java9SubmissionPublisherDemandEstimates.java`; drop and
+  request coverage lives in
+  `classes/modern_test/Java9SubmissionPublisherBackpressure.java`. Together
+  they harden Java Flow interop used by libraries around Kotlin compiler and
+  build tests.
 - The focused I/O smoke includes classpath resource lookup; both runtimes print
   `ffffff|4:cafebabe|1:1:true|true:true:true`. This covers Kotlin-generated
   class and module resource discovery while avoiding environment-specific

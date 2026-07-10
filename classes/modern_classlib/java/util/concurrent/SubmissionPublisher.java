@@ -195,7 +195,7 @@ public class SubmissionPublisher<T> implements Flow.Publisher<T>, AutoCloseable 
     long minDemand = Long.MAX_VALUE;
     for (BufferedSubscription subscription : subscriptions) {
       if (!subscription.isCanceled()) {
-        minDemand = Math.min(minDemand, Math.max(0L, subscription.demand - subscription.queue.size()));
+        minDemand = Math.min(minDemand, subscription.demand - subscription.queue.size());
       }
     }
     return minDemand == Long.MAX_VALUE ? 0L : minDemand;
@@ -308,8 +308,9 @@ public class SubmissionPublisher<T> implements Flow.Publisher<T>, AutoCloseable 
         }
       }
       queue.addLast(item);
+      int lag = queue.size();
       drain();
-      return queue.size();
+      return lag;
     }
 
     void signalTerminal(final Throwable throwable) {

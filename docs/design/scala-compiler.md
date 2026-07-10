@@ -133,9 +133,12 @@ A local 2026-06-29 validation completed the focused Scala concurrency smoke in
 Scala 2.13.18.
 `SubmissionPublisher` bounded `offer` now covers direct-executor drop
 callbacks, negative drop results, buffered delivery after demand, and invalid
-request cancellation in
-`classes/modern_test/Java9SubmissionPublisherBackpressure.java`, hardening Java
-Flow interop used by libraries around Scala compiler and build tests.
+request cancellation. Demand estimate coverage lives in
+`classes/modern_test/Java9SubmissionPublisherDemandEstimates.java`; drop and
+request coverage lives in
+`classes/modern_test/Java9SubmissionPublisherBackpressure.java`. Together they
+harden Java Flow interop used by libraries around Scala compiler and build
+tests.
 The smoke now also covers `scala.concurrent.duration` finite duration
 arithmetic, scan/sort paths, string parsing, scaling, clamping, and
 finite/infinite metadata. A local 2026-06-24 run with this duration slice
