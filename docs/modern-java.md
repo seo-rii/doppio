@@ -853,9 +853,12 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `leap`, `jumps`, and `leaps` behavior,
   bounded `long`/`double`/`float` output parity, full-range overflow-safe
   `nextInt(origin, bound)` and `nextLong(origin, bound)` behavior, finite
-  bound, NaN-bound, and finite-range validation for `nextFloat`, `nextDouble`, and bounded
-  `doubles` streams, zero-standard-deviation `nextGaussian(mean, stddev)`,
-  NaN and infinite standard-deviation `nextGaussian(mean, stddev)` behavior,
+  bound, NaN-bound, and finite-range validation for `nextFloat`,
+  `nextDouble`, and bounded `doubles` streams, zero-standard-deviation
+  `nextGaussian(mean, stddev)`,
+  native `+0.0` raw-bits parity for zero-valued default `nextGaussian()`
+  samples, NaN and infinite standard-deviation
+  `nextGaussian(mean, stddev)` behavior,
   non-negative `nextExponential()` invariant, bounded `ints`/`longs`/`doubles`
   stream behavior including full-range int/long stream bounds, one-bound
   invariants for unseeded and byte-array-seeded creation, plus custom
@@ -1744,7 +1747,8 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `nextDouble`, and `nextBytes`, plus eager invalid-range validation for
   bounded int/long/double stream factories, NaN and infinite floating-point
   bound behavior in the tested paths, native `+0.0` raw-bits parity for
-  zero-valued `nextExponential()` samples, null-byte-array rejection, and sized
+  zero-valued default `nextGaussian()` and `nextExponential()` samples,
+  null-byte-array rejection, and sized
   spliterator metadata for bounded and unbounded sized primitive stream
   factories.
 - `RandomGenerator.StreamableGenerator`, `SplittableGenerator`,

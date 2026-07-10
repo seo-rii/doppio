@@ -488,7 +488,10 @@ public interface RandomGenerator {
   }
 
   public default double nextGaussian() {
-    double u = nextDouble();
+    double u = (nextLong() >>> 11) * 0x1.0p-53;
+    if (u == 0.0d) {
+      return 0.0d;
+    }
     double v = nextDouble();
     return Math.sqrt(-2.0d * Math.log(u)) * Math.cos(2.0d * Math.PI * v);
   }

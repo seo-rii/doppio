@@ -180,6 +180,7 @@ public class Java17RandomGenerator {
     System.out.println(bounded.nextFloat(2.0f));
     System.out.println(bounded.nextFloat(2.0f, 4.0f));
     System.out.println(factory.create(456L).nextGaussian(10.0d, 0.0d));
+    System.out.println(Double.doubleToRawLongBits(new SequenceGenerator(0L).nextGaussian()));
     System.out.println(factory.create(456L).nextExponential() >= 0.0d);
     System.out.println(Double.doubleToRawLongBits(new SequenceGenerator(0L).nextExponential()));
     System.out.println(Double.doubleToRawLongBits(new SequenceGenerator(1L).nextExponential()));
