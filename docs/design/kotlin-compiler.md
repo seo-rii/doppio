@@ -136,6 +136,13 @@ to `Hello.kt` backend codegen:
   missing-path zero results. Coverage lives in
   `classes/modern_test/Java17FileSpace.java`, protecting compiler cache and
   output-directory checks that ask the host filesystem for available space.
+- NIO `FileStore` disk-space queries now populate total, usable, and
+  unallocated space in Doppio's `Files` shim, with the OpenJDK
+  `sun.nio.fs.UnixNativeDispatcher.statvfs0` bridge populated for native
+  class-library paths. Coverage lives in
+  `classes/modern_test/Java17FileStoreSpace.java`, protecting compiler cache
+  and output-directory checks that use `Files.getFileStore(...)` instead of
+  `java.io.File`.
 - `java.io.FileInputStream`, `java.io.FileOutputStream`, and
   `java.io.UnixFileSystem` `initIDs()` natives are implemented as VM metadata
   no-ops, matching Doppio's dynamic field resolution model. Coverage lives in

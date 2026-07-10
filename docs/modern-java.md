@@ -66,7 +66,13 @@ including `createLink`, `createSymbolicLink`, `readSymbolicLink`,
 symlink cleanup. `java.io.File` disk-space queries now cover
 `getTotalSpace()`, `getFreeSpace()`, and `getUsableSpace()` for files and
 directories, plus missing-path zero results, backed by
-`classes/modern_test/Java17FileSpace.java`. `java.io.FileInputStream`,
+`classes/modern_test/Java17FileSpace.java`. NIO `FileStore` space queries now
+populate `getTotalSpace()`, `getUsableSpace()`, and
+`getUnallocatedSpace()` in Doppio's `Files` shim, with the OpenJDK
+`sun.nio.fs.UnixNativeDispatcher.statvfs0` bridge populated for native
+class-library paths; coverage is in
+`classes/modern_test/Java17FileStoreSpace.java`.
+`java.io.FileInputStream`,
 `java.io.FileOutputStream`, and `java.io.UnixFileSystem` VM `initIDs()`
 initializers are treated as metadata no-ops; coverage lives in
 `classes/modern_test/Java17IoInitIDs.java`, which also protects basic
@@ -1272,7 +1278,8 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   paths, `delete`, `deleteIfExists`, including non-empty-directory
   failure behavior, basic
   existence/type/hidden/symlink/access queries, `size`, selected
-  `getFileStore` metadata/space/attribute-view behavior, selected
+  `getFileStore` metadata/space/attribute-view behavior, including
+  total/usable/unallocated space fields, selected
   `BasicFileAttributes` `readAttributes`, selected `BasicFileAttributeView`,
   selected owner lookup/setter behavior, selected `FileOwnerAttributeView`
   lookup/setter behavior, selected owner string-attribute lookup/setter

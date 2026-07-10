@@ -534,15 +534,15 @@ public final class Files {
       }
 
       public long getTotalSpace() throws IOException {
-        return 0L;
+        return storeFile.getTotalSpace();
       }
 
       public long getUsableSpace() throws IOException {
-        return 0L;
+        return storeFile.getUsableSpace();
       }
 
       public long getUnallocatedSpace() throws IOException {
-        return 0L;
+        return storeFile.getFreeSpace();
       }
 
       public boolean supportsFileAttributeView(Class<? extends FileAttributeView> type) {

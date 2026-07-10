@@ -1012,8 +1012,34 @@ export default function (): any {
       return 0;
     }
 
-    public static 'statvfs0(JLsun/nio/fs/UnixFileStoreAttributes;)V'(thread: JVMThread, arg0: Long, arg1: JVMTypes.sun_nio_fs_UnixFileStoreAttributes): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'statvfs0(JLsun/nio/fs/UnixFileStoreAttributes;)V'(thread: JVMThread, pathAddress: Long, attrs: JVMTypes.sun_nio_fs_UnixFileStoreAttributes): void {
+      const pathString = getStringFromHeap(thread, pathAddress),
+        statfs = (<any> fs).statfs;
+      if (typeof statfs !== 'function') {
+        attrs['sun/nio/fs/UnixFileStoreAttributes/f_frsize'] = Long.ZERO;
+        attrs['sun/nio/fs/UnixFileStoreAttributes/f_blocks'] = Long.ZERO;
+        attrs['sun/nio/fs/UnixFileStoreAttributes/f_bfree'] = Long.ZERO;
+        attrs['sun/nio/fs/UnixFileStoreAttributes/f_bavail'] = Long.ZERO;
+        return;
+      }
+
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      statfs(pathString, (err: NodeJS.ErrnoException, stats: any) => {
+        if (err) {
+          throwNodeError(thread, err);
+          return;
+        }
+
+        attrs['sun/nio/fs/UnixFileStoreAttributes/f_frsize'] =
+          Long.fromNumber(Math.max(0, Math.floor(stats != null && typeof stats.bsize === 'number' ? stats.bsize : 0)));
+        attrs['sun/nio/fs/UnixFileStoreAttributes/f_blocks'] =
+          Long.fromNumber(Math.max(0, Math.floor(stats != null && typeof stats.blocks === 'number' ? stats.blocks : 0)));
+        attrs['sun/nio/fs/UnixFileStoreAttributes/f_bfree'] =
+          Long.fromNumber(Math.max(0, Math.floor(stats != null && typeof stats.bfree === 'number' ? stats.bfree : 0)));
+        attrs['sun/nio/fs/UnixFileStoreAttributes/f_bavail'] =
+          Long.fromNumber(Math.max(0, Math.floor(stats != null && typeof stats.bavail === 'number' ? stats.bavail : 0)));
+        thread.asyncReturn();
+      });
     }
 
     public static 'pathconf0(JI)J'(thread: JVMThread, arg0: Long, arg1: number): Long {
