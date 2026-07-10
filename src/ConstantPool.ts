@@ -5826,13 +5826,13 @@ export class DynamicConstant implements IConstantPoolItem {
             case 'F':
               if (invokeCpType === ConstantPoolItemType.INTEGER) {
                 invokeArgValue = util.wrapFloat(invokeArgValue);
-              } else if (invokeCpType === ConstantPoolItemType.LONG) {
-                invokeArgValue = util.wrapFloat((<gLong> invokeArgValue).toNumber());
+              } else if (invokeArgValue instanceof gLong) {
+                invokeArgValue = util.wrapFloat(invokeArgValue.toNumber());
               }
               break;
             case 'D':
-              if (invokeCpType === ConstantPoolItemType.LONG) {
-                invokeArgValue = (<gLong> invokeArgValue).toNumber();
+              if (invokeArgValue instanceof gLong) {
+                invokeArgValue = invokeArgValue.toNumber();
               }
               break;
             default:
