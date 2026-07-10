@@ -318,6 +318,25 @@ export default function (): any {
       });
     }
 
+    public static 'fileStoreBlockSize0(Ljava/lang/String;)J'(thread: JVMThread, path: JVMTypes.java_lang_String): Long | void {
+      const filePath = path.toString(),
+        statfs = (<any> fs).statfs;
+      if (typeof statfs !== 'function') {
+        return Long.fromNumber(4096);
+      }
+
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      statfs(filePath, (err: NodeJS.ErrnoException, stats: any) => {
+        if (err) {
+          throwFileSystemError(thread, err, filePath);
+          return;
+        }
+
+        const blockSize = stats != null && typeof stats.bsize === 'number' ? stats.bsize : 4096;
+        thread.asyncReturn(Long.fromNumber(Math.max(1, Math.floor(blockSize))), null);
+      });
+    }
+
   }
 
   // Export line. This is what DoppioJVM sees.

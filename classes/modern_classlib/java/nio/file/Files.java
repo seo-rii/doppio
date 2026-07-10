@@ -57,6 +57,8 @@ public final class Files {
 
   private static native boolean isSameFile0(String first, String second) throws IOException;
 
+  private static native long fileStoreBlockSize0(String path) throws IOException;
+
   public static InputStream newInputStream(Path path, OpenOption... options) throws IOException {
     Objects.requireNonNull(options);
     boolean deleteOnClose = false;
@@ -546,7 +548,7 @@ public final class Files {
       }
 
       public long getBlockSize() throws IOException {
-        return 4096L;
+        return fileStoreBlockSize0(storeFile.toString());
       }
 
       public boolean supportsFileAttributeView(Class<? extends FileAttributeView> type) {

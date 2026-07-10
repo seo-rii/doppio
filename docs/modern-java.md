@@ -69,7 +69,8 @@ directories, plus missing-path zero results, backed by
 `classes/modern_test/Java17FileSpace.java`. NIO `FileStore` space queries now
 populate `getTotalSpace()`, `getUsableSpace()`, and
 `getUnallocatedSpace()`, plus the Java 10+ `getBlockSize()` surface, in
-Doppio's `Files` shim, with the OpenJDK
+Doppio's `Files` shim. `getBlockSize()` uses the host `statfs` block size when
+available, and the OpenJDK
 `sun.nio.fs.UnixNativeDispatcher.statvfs0` bridge populated for native
 class-library paths; coverage is in
 `classes/modern_test/Java17FileStoreSpace.java`.
