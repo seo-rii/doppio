@@ -104,6 +104,7 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
   class-library interop for `HexFormat`, `InstantSource`,
   `RandomGeneratorFactory` `Random`/`SplittableRandom` provider output, and
   `Map.Entry.copyOf`, plus reflection-backed Java 16 `Stream.toList()` calls,
+  plus Java 9/10 `List`/`Set`/`Map` factory and copy APIs,
   keeping the Scala 2.13 compile classpath on the Java 8 boot surface while
   checking modern runtime overlays;
 - a focused Scala duration smoke covering `scala.concurrent.duration` finite
@@ -220,11 +221,11 @@ The reflection-backed modern Java interop coverage now lives in
 `InstantSource`, seeded `RandomGeneratorFactory` `Random`/`SplittableRandom`
 provider output, and `Map.Entry.copyOf` snapshot behavior from
 Scala-compiled code, plus a reflection-backed Java 16 `Stream.toList()` call
-with an unmodifiable-result check while keeping the main Scala compiler smoke
-smaller.
-A local 2026-06-30 validation completed the focused Scala modern interop smoke
-in 73 seconds and the remaining main Scala compiler smoke in 337 seconds using
-Scala 2.13.18.
+with an unmodifiable-result check, plus reflection-backed Java 9 `List.of`,
+`Set.of`, and `Map.of` immutability/duplicate checks and Java 10
+`List.copyOf` while keeping the main Scala compiler smoke smaller.
+A local 2026-07-10 validation completed the focused Scala modern interop smoke
+in 190 seconds using Scala 2.13.18.
 The Scala duration coverage now lives in `classes/scala_duration_smoke` and
 runs through `ci/scala_duration_smoke.sh`. It covers finite duration
 arithmetic, scan/sort paths, string parsing, scaling, clamping, and

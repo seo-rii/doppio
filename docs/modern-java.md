@@ -118,8 +118,10 @@ classpath compatible with the Java 8-era Doppio surface. They also cover Java
 source and through the same reflection-backed runtime overlay path for Scala,
 verifying the returned list is unmodifiable. The same compiler interop slice
 covers Java 17 `Map.Entry.copyOf` snapshot and unmodifiable-result behavior,
-directly from Kotlin source and through reflection from Scala. The Java 17
-fixture set also covers
+directly from Kotlin source and through reflection from Scala. The Scala
+compiler interop smoke also covers Java 9 `List.of`, `Set.of`, and `Map.of`
+immutability/duplicate behavior plus Java 10 `List.copyOf` through the same
+reflection-backed path. The Java 17 fixture set also covers
 `ClassLoader.defineClass(String, ByteBuffer, ProtectionDomain)` for heap,
 direct, read-only direct, and sliced buffers without advancing buffer
 positions, which protects compiler and transformer class-loading paths that pass
@@ -430,7 +432,8 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `Files.walk` cleanup paths, a focused Scala modern Java interop smoke
   covering reflection-backed Scala use of Java 16 `Stream.toList()` and its
   unmodifiable result behavior plus reflection-backed Scala use of Java 17
-  `Map.Entry.copyOf` snapshot and unmodifiable-result behavior,
+  `Map.Entry.copyOf` snapshot and unmodifiable-result behavior plus Java 9/10
+  collection factory/copy APIs,
   a focused Scala duration smoke covering `scala.concurrent.duration`
   arithmetic/sorting/parsing/scaling checks,
   classfile assertions for `InvokeDynamic`/`LambdaMetafactory` emission in the

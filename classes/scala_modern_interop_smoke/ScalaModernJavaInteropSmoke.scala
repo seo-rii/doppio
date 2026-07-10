@@ -1,4 +1,5 @@
 import java.time.{Clock, Duration, Instant, ZoneId}
+import java.lang.reflect.InvocationTargetException
 import java.util.AbstractMap
 import java.util.stream.Stream
 
@@ -75,12 +76,48 @@ object ScalaModernJavaInteropSmoke {
       } catch {
         case _: UnsupportedOperationException => "uoe"
       }
+    val listClass = classOf[java.util.List[_]]
+    val listOf = listClass.getMethod("of", classOf[Object], classOf[Object])
+      .invoke(null, "j", "k")
+      .asInstanceOf[java.util.List[String]]
+    val listMutation =
+      try {
+        listOf.add("z")
+        "mut"
+      } catch {
+        case _: UnsupportedOperationException => "uoe"
+      }
+    val duplicateSet =
+      try {
+        classOf[java.util.Set[_]].getMethod("of", classOf[Object], classOf[Object])
+          .invoke(null, "dup", "dup")
+        "ok"
+      } catch {
+        case e: InvocationTargetException
+            if e.getCause != null && e.getCause.getClass.getName == "java.lang.IllegalArgumentException" =>
+          "iae"
+      }
+    val mapOf = classOf[java.util.Map[_, _]]
+      .getMethod("of", classOf[Object], classOf[Object], classOf[Object], classOf[Object])
+      .invoke(null, "a", Int.box(1), "b", Int.box(2))
+      .asInstanceOf[java.util.Map[String, Integer]]
+    val mapMutation =
+      try {
+        mapOf.put("c", Int.box(3))
+        "mut"
+      } catch {
+        case _: UnsupportedOperationException => "uoe"
+      }
+    val copiedList = listClass.getMethod("copyOf", classOf[java.util.Collection[_]])
+      .invoke(null, new java.util.ArrayList[String](listOf))
+      .asInstanceOf[java.util.List[String]]
 
     s"$formatted|$upperText|${parsed.length}:${hexClass.getMethod("formatHex", classOf[Array[Byte]]).invoke(hex, parsed)}:$digit|" +
       s"$fixedValue:$fixedMillis:$offsetValue:${classOf[Clock].isInstance(zoned)}|" +
       s"${randomFactoryClass.getMethod("name").invoke(randomFactory)}:$nextInt:$nextLong|" +
       s"${randomFactoryClass.getMethod("name").invoke(splitFactory)}:$splitIsSplittable:$splitInt:$splitLong|" +
       s"${java.lang.String.join("", streamToList)}:$streamListFailure|" +
-      s"${entryCopy.getKey}:${entryCopy.getValue}:$entryCopyMutation"
+      s"${entryCopy.getKey}:${entryCopy.getValue}:$entryCopyMutation|" +
+      s"${java.lang.String.join("", listOf)}:$listMutation:$duplicateSet:${mapOf.get("b")}:$mapMutation:${java.lang.String.join("", copiedList)}"
   }
 }
