@@ -24,6 +24,7 @@ public class Java17FileStoreSpace {
     long total = store.getTotalSpace();
     long usable = store.getUsableSpace();
     long unallocated = store.getUnallocatedSpace();
+    long blockSize = store.getBlockSize();
     System.out.println(label + "-name-present:" + (store.name() != null));
     System.out.println(label + "-type-present:" + (store.type() != null));
     System.out.println(label + "-total-positive:" + (total > 0));
@@ -31,5 +32,12 @@ public class Java17FileStoreSpace {
     System.out.println(label + "-unallocated-nonnegative:" + (unallocated >= 0));
     System.out.println(label + "-usable-within-total:" + (usable <= total));
     System.out.println(label + "-unallocated-within-total:" + (unallocated <= total));
+    System.out.println(label + "-block-size-positive:" + (blockSize > 0));
+    try {
+      store.getAttribute("blockSize");
+      System.out.println(label + "-block-size-attribute:ok");
+    } catch (Throwable t) {
+      System.out.println(label + "-block-size-attribute:" + t.getClass().getName());
+    }
   }
 }

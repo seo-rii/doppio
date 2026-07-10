@@ -137,7 +137,8 @@ to `Hello.kt` backend codegen:
   `classes/modern_test/Java17FileSpace.java`, protecting compiler cache and
   output-directory checks that ask the host filesystem for available space.
 - NIO `FileStore` disk-space queries now populate total, usable, and
-  unallocated space in Doppio's `Files` shim, with the OpenJDK
+  unallocated space and `getBlockSize()` in Doppio's `Files` shim, with the
+  OpenJDK
   `sun.nio.fs.UnixNativeDispatcher.statvfs0` bridge populated for native
   class-library paths. Coverage lives in
   `classes/modern_test/Java17FileStoreSpace.java`, protecting compiler cache

@@ -68,7 +68,8 @@ symlink cleanup. `java.io.File` disk-space queries now cover
 directories, plus missing-path zero results, backed by
 `classes/modern_test/Java17FileSpace.java`. NIO `FileStore` space queries now
 populate `getTotalSpace()`, `getUsableSpace()`, and
-`getUnallocatedSpace()` in Doppio's `Files` shim, with the OpenJDK
+`getUnallocatedSpace()`, plus the Java 10+ `getBlockSize()` surface, in
+Doppio's `Files` shim, with the OpenJDK
 `sun.nio.fs.UnixNativeDispatcher.statvfs0` bridge populated for native
 class-library paths; coverage is in
 `classes/modern_test/Java17FileStoreSpace.java`.
@@ -1279,7 +1280,7 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   failure behavior, basic
   existence/type/hidden/symlink/access queries, `size`, selected
   `getFileStore` metadata/space/attribute-view behavior, including
-  total/usable/unallocated space fields, selected
+  total/usable/unallocated space fields and `getBlockSize()`, selected
   `BasicFileAttributes` `readAttributes`, selected `BasicFileAttributeView`,
   selected owner lookup/setter behavior, selected `FileOwnerAttributeView`
   lookup/setter behavior, selected owner string-attribute lookup/setter

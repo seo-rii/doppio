@@ -5,6 +5,8 @@ cwd-usable-nonnegative:true
 cwd-unallocated-nonnegative:true
 cwd-usable-within-total:true
 cwd-unallocated-within-total:true
+cwd-block-size-positive:true
+cwd-block-size-attribute:java.lang.UnsupportedOperationException
 dir-name-present:true
 dir-type-present:true
 dir-total-positive:true
@@ -12,6 +14,8 @@ dir-usable-nonnegative:true
 dir-unallocated-nonnegative:true
 dir-usable-within-total:true
 dir-unallocated-within-total:true
+dir-block-size-positive:true
+dir-block-size-attribute:java.lang.UnsupportedOperationException
 file-name-present:true
 file-type-present:true
 file-total-positive:true
@@ -19,3 +23,5 @@ file-usable-nonnegative:true
 file-unallocated-nonnegative:true
 file-usable-within-total:true
 file-unallocated-within-total:true
+file-block-size-positive:true
+file-block-size-attribute:java.lang.UnsupportedOperationException

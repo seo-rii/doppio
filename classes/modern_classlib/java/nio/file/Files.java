@@ -545,6 +545,10 @@ public final class Files {
         return storeFile.getFreeSpace();
       }
 
+      public long getBlockSize() throws IOException {
+        return 4096L;
+      }
+
       public boolean supportsFileAttributeView(Class<? extends FileAttributeView> type) {
         Class<? extends FileAttributeView> viewType = Objects.requireNonNull(type);
         return viewType == BasicFileAttributeView.class
