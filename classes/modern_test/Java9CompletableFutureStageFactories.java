@@ -15,6 +15,13 @@ public class Java9CompletableFutureStageFactories {
     printFailure("completed-complete", () -> ((CompletableFuture<String>) completed).complete("changed"));
     printFailure("completed-cancel", () -> ((CompletableFuture<String>) completed).cancel(true));
     printFailure("completed-obtrude", () -> ((CompletableFuture<String>) completed).obtrudeValue("changed"));
+    printFailure("completed-complete-async", () -> ((CompletableFuture<String>) completed).completeAsync(() -> "changed"));
+    printFailure("completed-complete-async-executor", () -> ((CompletableFuture<String>) completed).completeAsync(
+        () -> "changed",
+        command -> command.run()));
+    printFailure("completed-or-timeout", () -> ((CompletableFuture<String>) completed).orTimeout(1, java.util.concurrent.TimeUnit.MILLISECONDS));
+    printFailure("completed-complete-on-timeout", () -> ((CompletableFuture<String>) completed).completeOnTimeout("changed", 1, java.util.concurrent.TimeUnit.MILLISECONDS));
+    printFailure("completed-dependents", () -> ((CompletableFuture<String>) completed).getNumberOfDependents());
     System.out.println(CompletableFuture.completedStage(null).toCompletableFuture().join() == null);
 
     CompletionStage<String> failed = CompletableFuture.failedStage(new IllegalArgumentException("bad"));

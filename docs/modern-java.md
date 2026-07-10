@@ -1221,7 +1221,8 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   timeout exceptional completion, timeout fallback completion, negative-delay
   immediate behavior, pending-source completion relay, `exceptionally` recovery,
   `get()`/`join()` failure wrapping, `toCompletableFuture()` copies for minimal
-  stages, selected `MinimalStage` unsupported direct methods, and null
+  stages, selected `MinimalStage` unsupported direct methods including
+  timeout/async-completion mutators and dependent-count queries, and null
   validation.
   `defaultExecutor()` returns the tested common-pool executor and executes a
   submitted task off the caller thread. Selected subclass hooks now cover

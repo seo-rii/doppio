@@ -357,6 +357,10 @@ final class CompletableFuture$DoppioMinimalStage<T> extends CompletableFuture<T>
     throw new UnsupportedOperationException();
   }
 
+  public int getNumberOfDependents() {
+    throw new UnsupportedOperationException();
+  }
+
   public T get() throws InterruptedException, ExecutionException {
     throw new UnsupportedOperationException();
   }
@@ -378,6 +382,22 @@ final class CompletableFuture$DoppioMinimalStage<T> extends CompletableFuture<T>
   }
 
   public void obtrudeException(Throwable ex) {
+    throw new UnsupportedOperationException();
+  }
+
+  public CompletableFuture<T> completeAsync(Supplier<? extends T> supplier) {
+    throw new UnsupportedOperationException();
+  }
+
+  public CompletableFuture<T> completeAsync(Supplier<? extends T> supplier, Executor executor) {
+    throw new UnsupportedOperationException();
+  }
+
+  public CompletableFuture<T> orTimeout(long timeout, TimeUnit unit) {
+    throw new UnsupportedOperationException();
+  }
+
+  public CompletableFuture<T> completeOnTimeout(T value, long timeout, TimeUnit unit) {
     throw new UnsupportedOperationException();
   }
 }
