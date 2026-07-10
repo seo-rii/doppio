@@ -1304,7 +1304,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `probeContentType`, input helper parent-target validation, timestamp get/set helpers,
   `isSameFile`, selected hard-link and symbolic-link helpers, and basic
   `createFile`/`createDirectory`/`createDirectories` paths including
-  single-level and recursive parent-file failure behavior. `writeString`
+  single-level and recursive parent-file failure behavior plus selected initial
+  `posix:permissions` `FileAttribute` handling for file, directory, temp, and
+  channel creation. `writeString`
   covers null-charset validation before `CharSequence.toString()`. The tested copy
   surface covers path-to-path file and directory sources, same-file no-op,
   input-to-path, and path-to-output streams, `REPLACE_EXISTING`,

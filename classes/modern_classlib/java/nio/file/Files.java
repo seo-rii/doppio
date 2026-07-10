@@ -147,6 +147,7 @@ public final class Files {
     boolean truncate = false;
     boolean sync = false;
     boolean dsync = false;
+    boolean created = false;
     for (OpenOption option : options) {
       Objects.requireNonNull(option);
       if (option == StandardOpenOption.READ) {
@@ -187,6 +188,7 @@ public final class Files {
       if (!file.createNewFile()) {
         throw new IOException("Unable to create file");
       }
+      created = true;
     }
     if (!file.exists()) {
       throw new NoSuchFileException(file.toString());
@@ -200,13 +202,29 @@ public final class Files {
       randomAccessFile.seek(randomAccessFile.length());
     }
     SeekableByteChannel channel = randomAccessFile.getChannel();
-    deleteAfterOpening(file, channel, deleteOnClose);
+    try {
+      if (created) {
+        applyFileAttributes(path, attrs);
+      }
+      deleteAfterOpening(file, channel, deleteOnClose);
+    } catch (IOException e) {
+      channel.close();
+      throw e;
+    } catch (RuntimeException e) {
+      try {
+        channel.close();
+      } catch (IOException ignored) {
+      }
+      throw e;
+    }
     return channel;
   }
 
   public static Path createTempFile(String prefix, String suffix, FileAttribute<?>... attrs) throws IOException {
     requireFileAttributes(attrs);
-    return createTemporaryFile(null, prefix, suffix).toPath();
+    Path path = createTemporaryFile(null, prefix, suffix).toPath();
+    applyFileAttributes(path, attrs);
+    return path;
   }
 
   public static Path createTempFile(
@@ -215,7 +233,9 @@ public final class Files {
       String suffix,
       FileAttribute<?>... attrs) throws IOException {
     requireFileAttributes(attrs);
-    return createTemporaryFile(toFile(dir), prefix, suffix).toPath();
+    Path path = createTemporaryFile(toFile(dir), prefix, suffix).toPath();
+    applyFileAttributes(path, attrs);
+    return path;
   }
 
   public static Path createTempDirectory(String prefix, FileAttribute<?>... attrs) throws IOException {
@@ -224,7 +244,9 @@ public final class Files {
     if (!file.delete() || !file.mkdir()) {
       throw new IOException("Unable to create temporary directory");
     }
-    return file.toPath();
+    Path path = file.toPath();
+    applyFileAttributes(path, attrs);
+    return path;
   }
 
   public static Path createTempDirectory(Path dir, String prefix, FileAttribute<?>... attrs) throws IOException {
@@ -233,7 +255,9 @@ public final class Files {
     if (!file.delete() || !file.mkdir()) {
       throw new IOException("Unable to create temporary directory");
     }
-    return file.toPath();
+    Path path = file.toPath();
+    applyFileAttributes(path, attrs);
+    return path;
   }
 
   public static Path createFile(Path path, FileAttribute<?>... attrs) throws IOException {
@@ -243,6 +267,7 @@ public final class Files {
     if (!file.createNewFile()) {
       throw new IOException("Unable to create file");
     }
+    applyFileAttributes(path, attrs);
     return path;
   }
 
@@ -253,6 +278,7 @@ public final class Files {
     if (!file.mkdir()) {
       throw new IOException("Unable to create directory");
     }
+    applyFileAttributes(path, attrs);
     return path;
   }
 
@@ -290,6 +316,7 @@ public final class Files {
     if (!file.mkdirs() && !file.isDirectory()) {
       throw new IOException("Unable to create directories");
     }
+    applyFileAttributes(path, attrs);
     return path;
   }
 
@@ -1413,6 +1440,17 @@ public final class Files {
     Objects.requireNonNull(attrs);
     for (FileAttribute<?> attr : attrs) {
       Objects.requireNonNull(attr);
+    }
+  }
+
+  private static void applyFileAttributes(Path path, FileAttribute<?>... attrs) throws IOException {
+    for (FileAttribute<?> attr : attrs) {
+      String name = attr.name();
+      if (name.equals("posix:permissions")) {
+        setPosixFilePermissions(path, (Set<PosixFilePermission>) attr.value());
+      } else {
+        throw new UnsupportedOperationException();
+      }
     }
   }
 

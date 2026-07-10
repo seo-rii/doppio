@@ -396,6 +396,11 @@ reduced to a focused Java or Scala fixture.
   `classes/modern_test/Java17FilesNoFollowLinkAttributes.java`, protecting
   compiler and build-tool scanners that avoid following linked source or
   dependency trees.
+- Initial `posix:permissions` `FileAttribute` values are now applied for
+  selected file, directory, temp-file, temp-directory, and `newByteChannel`
+  creation paths. Coverage lives in
+  `classes/modern_test/Java11FilesInitialPosixPermissions.java`, protecting
+  compiler and build-cache code that creates restricted temp/output files.
 - `java.io.FileInputStream`, `java.io.FileOutputStream`, and
   `java.io.UnixFileSystem` `initIDs()` natives are implemented as VM metadata
   no-ops. Coverage lives in
