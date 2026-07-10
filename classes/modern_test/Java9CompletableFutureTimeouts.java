@@ -48,6 +48,21 @@ public class Java9CompletableFutureTimeouts {
     });
     System.out.println(defaultDelayedDone.get(5, TimeUnit.SECONDS));
 
+    printFailure("delayed-null-command", new CheckedRunnable() {
+      public void run() {
+        CompletableFuture.delayedExecutor(1, TimeUnit.MILLISECONDS, direct).execute(null);
+      }
+    });
+    printFailure("delayed-throwing-command", new CheckedRunnable() {
+      public void run() {
+        CompletableFuture.delayedExecutor(1, TimeUnit.MILLISECONDS, direct).execute(new Runnable() {
+          public void run() {
+            throw new IllegalStateException("delayed");
+          }
+        });
+      }
+    });
+
     final AtomicInteger negativeDelayCalls = new AtomicInteger();
     CompletableFuture.delayedExecutor(-1, TimeUnit.MILLISECONDS, direct).execute(new Runnable() {
       public void run() {

@@ -1218,8 +1218,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   exceptional completion metadata, fresh incomplete future creation, supplied
   and common-pool async completion, already-completed no-op completion,
   supplier failure/rejected-executor behavior, delayed executor completion,
-  timeout exceptional completion, timeout fallback completion, negative-delay
-  immediate behavior, pending-source completion relay, `exceptionally` recovery,
+  delayed executor null/throwing command failure isolation, timeout exceptional
+  completion, timeout fallback completion, negative-delay immediate behavior,
+  pending-source completion relay, `exceptionally` recovery,
   `get()`/`join()` failure wrapping, `toCompletableFuture()` copies for minimal
   stages, selected `MinimalStage` unsupported direct methods including
   timeout/async-completion mutators and dependent-count queries, and null

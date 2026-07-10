@@ -302,7 +302,12 @@ final class CompletableFuture$DoppioDelayedExecutor implements Executor {
             Thread.currentThread().interrupt();
           }
         }
-        executor.execute(command);
+        try {
+          executor.execute(command);
+        } catch (Throwable t) {
+          // OpenJDK's delayed executor runs through a scheduled FutureTask,
+          // which records task failures without printing uncaught thread noise.
+        }
       }
     }, "Doppio CompletableFuture delayed executor");
     worker.setDaemon(true);
