@@ -675,6 +675,8 @@ Current verified checks:
   through `ci/kotlin_io_smoke.sh`, comparing the generated output on both the
   host JVM and Doppio. The split local validation completed the focused smoke
   in 229 seconds and the remaining full-classpath main smoke in 578 seconds.
+  A local 2026-07-10 validation with `FileStore` coverage completed the focused
+  smoke in 153 seconds.
 - The focused I/O smoke includes file I/O helpers; both runtimes print
   `0:5:a,1:4:b,2:5:g|aaa|input.txt:17,nested/out.txt:17|616c706861|txt/out/nested/out.txt|true/true`.
   `javap` verified `FilesKt.writeText`, `appendText`, `readLines`,
@@ -683,12 +685,15 @@ Current verified checks:
   `LambdaMetafactory` bootstrap methods for Kotlin lambdas, `StackMapTable`,
   and `kotlin.Metadata`.
 - The focused I/O smoke includes NIO path coverage; both runtimes print
-  `0:5:d,1:7:e,2:4:z|64656c74|-1/5/5/-1|input.txt:false,nested:true|input.txt:19,nested/moved.txt:19|input.txt/runtime-nio/nested/moved.txt|true/true/true/true/true`.
+  `0:5:d,1:7:e,2:4:z|64656c74|-1/5/5/-1|input.txt:false,nested:true|input.txt:19,nested/moved.txt:19|input.txt/runtime-nio/nested/moved.txt|true/true/true/true/true|true/true/true/true/true/true/UnsupportedOperationException`.
   `javap` verified `Paths.get`, `Files.exists`, `createDirectories`, `write`,
   `readAllLines`, `readAllBytes`, `copy`, `move`, `Files.mismatch`, `list`,
-  `walk`, `isDirectory`, `isRegularFile`, `size`, and `isSameFile`, explicit
-  stream close paths in `finally` blocks, `LambdaMetafactory` bootstrap
-  methods for Kotlin lambdas, `StackMapTable`, and `kotlin.Metadata`.
+  `walk`, `isDirectory`, `isRegularFile`, `size`, `isSameFile`,
+  `Files.getFileStore`, `FileStore` total/usable/unallocated space queries,
+  `FileStore.getBlockSize()`, and the unsupported `"blockSize"` attribute
+  path, explicit stream close paths in `finally` blocks, `LambdaMetafactory`
+  bootstrap methods for Kotlin lambdas, `StackMapTable`, and
+  `kotlin.Metadata`.
 - Repository-level NIO link coverage now lives in
   `classes/modern_test/Java17FilesLinks.java`, covering `Files.createLink`,
   `createSymbolicLink`, `readSymbolicLink`, hard-link `isSameFile`,

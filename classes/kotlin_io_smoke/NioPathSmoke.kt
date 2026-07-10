@@ -76,6 +76,26 @@ fun nioPathSummary(): String {
     Files.isSameFile(source, normalized) + "/" +
     Files.isSameFile(source, pathOfNormalized) + "/" +
     Files.isSameFile(source, uriPath)
+  val store = Files.getFileStore(source)
+  val totalSpace = store.totalSpace
+  val usableSpace = store.usableSpace
+  val unallocatedSpace = store.unallocatedSpace
+  val blockSize = store.getBlockSize()
+  val blockSizeAttribute = try {
+    store.getAttribute("blockSize")
+    "ok"
+  } catch (throwable: Throwable) {
+    throwable.javaClass.simpleName
+  }
+  val storeSummary = listOf(
+    totalSpace > 0L,
+    usableSpace >= 0L,
+    unallocatedSpace >= 0L,
+    usableSpace <= totalSpace,
+    unallocatedSpace <= totalSpace,
+    blockSize > 0L,
+    blockSizeAttribute
+  ).joinToString("/")
 
   return lineSummary + "|" +
     bytePrefix + "|" +
@@ -83,5 +103,6 @@ fun nioPathSummary(): String {
     listSummary + "|" +
     walkSummary + "|" +
     metadata + "|" +
-    state
+    state + "|" +
+    storeSummary
 }

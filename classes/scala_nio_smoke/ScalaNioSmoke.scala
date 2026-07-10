@@ -1,4 +1,5 @@
 import java.nio.charset.StandardCharsets
+import java.nio.file.FileStore
 import java.nio.file.Files
 import java.nio.file.Path
 import java.net.URI
@@ -10,6 +11,8 @@ object ScalaNioSmoke {
   private val pathOfUri = classOf[Path].getMethod("of", classOf[URI])
   private val filesMismatch =
     classOf[Files].getMethod("mismatch", classOf[Path], classOf[Path])
+  private val fileStoreGetBlockSize =
+    classOf[FileStore].getMethod("getBlockSize")
 
   private def pathOf(first: String, more: String*): Path = {
     pathOfString
@@ -62,8 +65,28 @@ object ScalaNioSmoke {
         mismatch(left, prefix),
         mismatch(left, left)
       ).mkString("/")
+      val store = Files.getFileStore(left)
+      val totalSpace = store.getTotalSpace
+      val usableSpace = store.getUsableSpace
+      val unallocatedSpace = store.getUnallocatedSpace
+      val blockSize = fileStoreGetBlockSize.invoke(store).asInstanceOf[java.lang.Long].longValue()
+      val blockSizeAttribute = try {
+        store.getAttribute("blockSize")
+        "ok"
+      } catch {
+        case throwable: Throwable => throwable.getClass.getSimpleName
+      }
+      val storeSummary = List(
+        totalSpace > 0L,
+        usableSpace >= 0L,
+        unallocatedSpace >= 0L,
+        usableSpace <= totalSpace,
+        unallocatedSpace <= totalSpace,
+        blockSize > 0L,
+        blockSizeAttribute
+      ).mkString("/")
 
-      s"$mismatches:${Files.isSameFile(left, pathOfNormalized)}:${Files.isSameFile(left, uriPath)}:${Files.size(left)}:${base.relativize(left)}"
+      s"$mismatches:${Files.isSameFile(left, pathOfNormalized)}:${Files.isSameFile(left, uriPath)}:${Files.size(left)}:${base.relativize(left)}:$storeSummary"
     } finally {
       deleteTree(base)
     }

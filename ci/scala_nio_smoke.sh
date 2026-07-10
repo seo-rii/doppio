@@ -76,7 +76,7 @@ compile_end="$(date +%s)"
 test -f "$out_dir/ScalaNioHello.class"
 test -f "$out_dir/ScalaNioSmoke.class"
 
-expected_output="-1/5/5/-1:true:true:10:nested/left.txt"
+expected_output="-1/5/5/-1:true:true:10:nested/left.txt:true/true/true/true/true/true/UnsupportedOperationException"
 
 native_output="$(java -cp "$runtime_cp" ScalaNioHello)"
 if [ "$native_output" != "$expected_output" ]; then

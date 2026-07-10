@@ -257,8 +257,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   nested `try`/`finally` cleanup, plus a focused queued suspend control-flow
   smoke covering `try`/`catch`/`finally`, `break`, `continue`, and
   `resumeWithException` unwinding, plus a focused Kotlin I/O smoke covering
-  file helpers, Java NIO `Path`/`Files`, `MappedByteBuffer`, classpath resource
-  lookup, `ServiceLoader`, and runtime jar/zip/classpath-style reads, plus
+  file helpers, Java NIO `Path`/`Files`, `FileStore` space/block-size queries,
+  `MappedByteBuffer`, classpath resource lookup, `ServiceLoader`, and runtime
+  jar/zip/classpath-style reads, plus
   Java dynamic-proxy
   interop covering a Kotlin interface proxy, `InvocationHandler` dispatch,
   reflective proxy-method invocation, runtime method and parameter
@@ -321,9 +322,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   while reducing main-smoke compile variance.
 - The workflow also runs `ci/kotlin_io_smoke.sh`, a focused Kotlin compiler
   smoke split out of the main full-classpath source set so file I/O, Java
-  NIO, mmap forcing, classpath resources, `ServiceLoader`, and jar/zip coverage
-  still compare host JVM and Doppio output while reducing main-smoke compile
-  variance.
+  NIO including `FileStore` space/block-size queries, mmap forcing, classpath
+  resources, `ServiceLoader`, and jar/zip coverage still compare host JVM and
+  Doppio output while reducing main-smoke compile variance.
 - The workflow also runs `ci/kotlin_record_smoke.sh`, a focused Kotlin
   `@JvmRecord` smoke compiled with `-jvm-target 17` to cover Kotlin-generated
   record classfiles, record reflection metadata, canonical constructors, and
@@ -410,7 +411,8 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   Java reflection over Scala-generated member, method-local, and anonymous
   class shape metadata,
   a focused Scala NIO smoke covering reflection-backed Scala use of Java NIO
-  `Path.of` factories, `Files.mismatch`, `Files.isSameFile`, and
+  `Path.of` factories, `Files.mismatch`, `Files.isSameFile`,
+  `Files.getFileStore` space queries, `FileStore.getBlockSize()`, and
   `Files.walk` cleanup paths, a focused Scala modern Java interop smoke
   covering reflection-backed Scala use of Java 16 `Stream.toList()` and its
   unmodifiable result behavior plus reflection-backed Scala use of Java 17
