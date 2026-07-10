@@ -1426,12 +1426,13 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   descriptors through raw descriptor parsing and `arrayType`; selected `MethodTypeDesc` method
   descriptor construction, transformations, and `MethodType` resolution;
   selected `MethodHandleDesc`/`DirectMethodHandleDesc` static method, virtual
-  method, constructor, getter, setter, static-getter, and static-setter
-  factories; selected `resolveConstantDesc` execution for public same-class
-  and selected JDK-class static/virtual methods, constructors, static/instance
-  fields, and `asType`; validation of owner class/interface descriptors, method versus
-  field lookup descriptors, constructor return descriptors, and void field
-  descriptors; `Kind.valueOf` field/interface/class ref-kind mappings;
+  method, special method, constructor, getter, setter, static-getter, and
+  static-setter factories; selected `resolveConstantDesc` execution for public
+  same-class and selected JDK-class static/virtual/special methods,
+  constructors, static/instance fields, and `asType`; validation of owner
+  class/interface descriptors, method versus field lookup descriptors,
+  constructor return descriptors, and void field descriptors; `Kind.valueOf`
+  field/interface/class ref-kind mappings;
   owner/name/lookup-descriptor metadata; invocation type descriptors; selected
   `asType` wrapper display/equality/hash behavior; and OpenJDK-style display;
   selected `ConstantDescs.CD_*` descriptor constants including
@@ -1455,7 +1456,7 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   constant/call-site bootstrap descriptor factory
   metadata plus selected owner and parameter validation.
 - Broad `MethodHandleDesc`/`DirectMethodHandleDesc` resolution beyond the
-  tested public same-class static/virtual/constructor/field and `asType`
+  tested public same-class static/virtual/special/constructor/field and `asType`
   descriptor cases, exhaustive `asType` semantics, exhaustive factory
   validation, unsupported handle kinds beyond the tested descriptor cases,
   broad `DynamicConstantDesc` bootstrap execution beyond the selected

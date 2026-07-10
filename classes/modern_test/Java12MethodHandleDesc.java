@@ -27,6 +27,10 @@ public class Java12MethodHandleDesc {
     }
   }
 
+  public String specialJoin(String suffix) {
+    return "special:" + suffix;
+  }
+
   public static void main(String[] args) throws Throwable {
     DirectMethodHandleDesc staticMethod = MethodHandleDesc.ofMethod(
       DirectMethodHandleDesc.Kind.STATIC,
@@ -82,6 +86,16 @@ public class Java12MethodHandleDesc {
     ResolveTarget receiver = new ResolveTarget("r");
     System.out.println((String) resolvedVirtual.invokeExact(receiver, "v"));
     System.out.println(resolvedVirtual.type());
+
+    ClassDesc sameClass = ClassDesc.of("classes.modern_test", "Java12MethodHandleDesc");
+    DirectMethodHandleDesc resolveSpecial = MethodHandleDesc.ofMethod(
+      DirectMethodHandleDesc.Kind.SPECIAL,
+      sameClass,
+      "specialJoin",
+      MethodTypeDesc.of(ConstantDescs.CD_String, ConstantDescs.CD_String));
+    MethodHandle resolvedSpecial = (MethodHandle) resolveSpecial.resolveConstantDesc(lookup);
+    System.out.println((String) resolvedSpecial.invokeExact(new Java12MethodHandleDesc(), "desc"));
+    System.out.println(resolvedSpecial.type());
 
     MethodHandle resolvedConstructor = (MethodHandle) MethodHandleDesc
       .ofConstructor(resolveOwner, ConstantDescs.CD_String)
