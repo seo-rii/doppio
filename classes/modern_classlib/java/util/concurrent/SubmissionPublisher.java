@@ -78,7 +78,23 @@ public class SubmissionPublisher<T> implements Flow.Publisher<T>, AutoCloseable 
   }
 
   public int offer(T item, BiPredicate<Flow.Subscriber<? super T>, ? super T> onDrop) {
-    return submit(item);
+    Objects.requireNonNull(item);
+    if (closed) {
+      throw new IllegalStateException("closed");
+    }
+    int maxLag = 0;
+    int drops = 0;
+    for (BufferedSubscription subscription : snapshotSubscriptions()) {
+      if (!subscription.canceled) {
+        int lag = subscription.offer(item, onDrop);
+        if (lag < 0) {
+          drops++;
+        } else {
+          maxLag = Math.max(maxLag, lag);
+        }
+      }
+    }
+    return drops == 0 ? maxLag : -drops;
   }
 
   public int offer(
@@ -87,7 +103,7 @@ public class SubmissionPublisher<T> implements Flow.Publisher<T>, AutoCloseable 
       TimeUnit unit,
       BiPredicate<Flow.Subscriber<? super T>, ? super T> onDrop) {
     Objects.requireNonNull(unit);
-    return submit(item);
+    return offer(item, onDrop);
   }
 
   public void close() {
@@ -276,6 +292,24 @@ public class SubmissionPublisher<T> implements Flow.Publisher<T>, AutoCloseable 
         queue.clear();
         removeSubscription(this);
       }
+    }
+
+    int offer(T item, BiPredicate<Flow.Subscriber<? super T>, ? super T> onDrop) {
+      if (canceled) {
+        return 0;
+      }
+      if (queue.size() >= maxBufferCapacity) {
+        if (!Objects.requireNonNull(onDrop).test(subscriber, item)) {
+          return -1;
+        }
+        drain();
+        if (queue.size() >= maxBufferCapacity) {
+          return -1;
+        }
+      }
+      queue.addLast(item);
+      drain();
+      return queue.size();
     }
 
     void signalTerminal(final Throwable throwable) {

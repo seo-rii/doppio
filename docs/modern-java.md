@@ -1200,8 +1200,10 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
 - `SubmissionPublisher` is a minimal Java 9 class-library shim for the tested
   direct-executor paths: constructor metadata and rounded capacity, subscriber
   snapshots, `isSubscribed`, cancellation removal, basic `submit`/`offer`
-  delivery, `consume` future completion paths, normal/exceptional close, late
-  subscribers, callback exception handling, and selected validation.
+  delivery, bounded `offer` drop callbacks and negative drop result, invalid
+  request cancellation, `consume` future completion paths, normal/exceptional
+  close, late subscribers, callback exception handling, and selected
+  validation.
 - `CompletableFuture.failedFuture(Throwable)`, `completedStage(value)`,
   `failedStage(Throwable)`, `completeAsync(Supplier)`,
   `completeAsync(Supplier, Executor)`, `delayedExecutor(...)`, `orTimeout`,

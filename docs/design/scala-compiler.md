@@ -131,6 +131,11 @@ maps while keeping the main Scala compiler smoke smaller.
 A local 2026-06-29 validation completed the focused Scala concurrency smoke in
 81 seconds and the remaining main Scala compiler smoke in 313 seconds using
 Scala 2.13.18.
+`SubmissionPublisher` bounded `offer` now covers direct-executor drop
+callbacks, negative drop results, buffered delivery after demand, and invalid
+request cancellation in
+`classes/modern_test/Java9SubmissionPublisherBackpressure.java`, hardening Java
+Flow interop used by libraries around Scala compiler and build tests.
 The smoke now also covers `scala.concurrent.duration` finite duration
 arithmetic, scan/sort paths, string parsing, scaling, clamping, and
 finite/infinite metadata. A local 2026-06-24 run with this duration slice
