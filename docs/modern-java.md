@@ -325,8 +325,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
 - The workflow also runs `ci/kotlin_suspend_control_smoke.sh`, a focused Kotlin
   compiler smoke split out of the main full-classpath source set so queued
   suspend control flow through `try`/`catch`/`finally`, `break`, `continue`,
-  and `resumeWithException` unwinding still compares host JVM and Doppio output
-  while reducing main-smoke compile variance.
+  `resumeWithException` unwinding, and nested `finally` return-state evaluation
+  still compares host JVM and Doppio output while reducing main-smoke compile
+  variance.
 - The workflow also runs `ci/kotlin_io_smoke.sh`, a focused Kotlin compiler
   smoke split out of the main full-classpath source set so file I/O, Java
   NIO including `FileStore` space/block-size queries, mmap forcing, classpath

@@ -9,6 +9,7 @@ import kotlin.coroutines.suspendCoroutine
 
 private var suspendControlContinuation: Continuation<Int>? = null
 private var suspendUnwindContinuation: Continuation<Int>? = null
+private var suspendFinallyContinuation: Continuation<String>? = null
 
 private class SuspendControlDispatcher :
     AbstractCoroutineContextElement(ContinuationInterceptor),
@@ -181,6 +182,74 @@ fun suspendExceptionUnwindSummary(): String {
     secondSteps++
   }
   states += "d$secondSteps:$outcome"
+
+  return states.joinToString("|") + "|" + events.joinToString(">")
+}
+
+private suspend fun suspendFinallyCheckpoint(label: String, events: MutableList<String>): String {
+  events += "wait:$label"
+  return suspendCoroutine { continuation ->
+    suspendFinallyContinuation = continuation
+  }
+}
+
+private suspend fun suspendFinallyMachine(events: MutableList<String>): String {
+  var state = "start"
+  try {
+    try {
+      val first = suspendFinallyCheckpoint("first", events)
+      events += "after-first:$first"
+      state += ":$first"
+      val second = suspendFinallyCheckpoint("second", events)
+      events += "after-second:$second"
+      return "$state:$second"
+    } finally {
+      events += "inner-finally:$state"
+      state += ":inner"
+    }
+  } finally {
+    events += "outer-finally:$state"
+  }
+}
+
+fun suspendFinallyReturnSummary(): String {
+  val events = mutableListOf<String>()
+  val dispatcher = SuspendControlDispatcher()
+  var outcome = "pending"
+  val states = mutableListOf<String>()
+  val block: suspend () -> String = { suspendFinallyMachine(events) }
+
+  fun drain(): Int {
+    var count = 0
+    while (dispatcher.queue.isNotEmpty()) {
+      dispatcher.queue.removeFirst().invoke()
+      count++
+    }
+    return count
+  }
+
+  block.startCoroutine(object : Continuation<String> {
+    override val context: CoroutineContext = dispatcher
+
+    override fun resumeWith(result: Result<String>) {
+      outcome = "done:" + result.getOrThrow()
+    }
+  })
+
+  states += outcome
+  states += "d${drain()}:$outcome"
+
+  val first = suspendFinallyContinuation ?: return "missing-finally-first"
+  suspendFinallyContinuation = null
+  first.resume("A")
+  states += "r1:$outcome"
+  states += "d${drain()}:$outcome"
+
+  val second = suspendFinallyContinuation ?: return "missing-finally-second"
+  suspendFinallyContinuation = null
+  second.resume("B")
+  states += "r2:$outcome"
+  states += "d${drain()}:$outcome"
 
   return states.joinToString("|") + "|" + events.joinToString(">")
 }

@@ -373,7 +373,12 @@ Current verified checks:
   that exception inside the generated state machine, and verifies nested
   `finally` unwinding after the catch return. The expected line is
   `pending|d1:pending|r1:pending|d1:pending|x2:pending|d1:done12|wait:first>after-first:2>wait:second>catch:bad>inner-finally:12>outer-finally:112`.
-  The split local validation completed the focused smoke in 150 seconds and
+  The smoke also covers a two-suspension nested `try`/`finally` return-state
+  path where the returned value is evaluated before the `finally` blocks mutate
+  local state; the expected line is
+  `pending|d1:pending|r1:pending|d1:pending|r2:pending|d1:done:start:A:B|wait:first>after-first:A>wait:second>after-second:B>inner-finally:start:A>outer-finally:start:A:inner`.
+  The split local validation completed the focused smoke in 150 seconds, a
+  2026-07-10 expanded validation completed it in 169 seconds, and
   the remaining full-classpath main smoke in 800 seconds, confirming coverage
   preservation while showing that full-classpath timing variance is still a
   tracking risk.

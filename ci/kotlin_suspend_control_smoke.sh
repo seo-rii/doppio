@@ -88,9 +88,12 @@ test -f "$out_dir/SuspendControlFlowSmokeKt.class"
 test -f "$out_dir/SuspendControlFlowSmokeKt\$suspendControlFlowSummary\$1.class"
 test -f "$out_dir/SuspendControlFlowSmokeKt\$suspendControlFlowSummary\$block\$1.class"
 test -f "$out_dir/SuspendControlFlowSmokeKt\$suspendControlMachine\$1.class"
+test -f "$out_dir/SuspendControlFlowSmokeKt\$suspendFinallyReturnSummary\$1.class"
+test -f "$out_dir/SuspendControlFlowSmokeKt\$suspendFinallyReturnSummary\$block\$1.class"
+test -f "$out_dir/SuspendControlFlowSmokeKt\$suspendFinallyMachine\$1.class"
 
 runtime_cp="$out_dir:$stdlib_jar"
-expected_output="$(printf 'pending|d1:pending|r1:pending|d1:pending|r2:pending|d1:pending|r3:pending|d1:done12|loop0>wait:v0>finally0:5>loop1>wait:v1>catch:neg1>finally1:12>loop2>wait:v2>finally2:12>outer:12\npending|d1:pending|r1:pending|d1:pending|x2:pending|d1:done12|wait:first>after-first:2>wait:second>catch:bad>inner-finally:12>outer-finally:112')"
+expected_output="$(printf 'pending|d1:pending|r1:pending|d1:pending|r2:pending|d1:pending|r3:pending|d1:done12|loop0>wait:v0>finally0:5>loop1>wait:v1>catch:neg1>finally1:12>loop2>wait:v2>finally2:12>outer:12\npending|d1:pending|r1:pending|d1:pending|x2:pending|d1:done12|wait:first>after-first:2>wait:second>catch:bad>inner-finally:12>outer-finally:112\npending|d1:pending|r1:pending|d1:pending|r2:pending|d1:done:start:A:B|wait:first>after-first:A>wait:second>after-second:B>inner-finally:start:A>outer-finally:start:A:inner')"
 
 native_output="$(java -cp "$runtime_cp" SuspendControlHelloKt)"
 if [ "$native_output" != "$expected_output" ]; then
