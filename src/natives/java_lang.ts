@@ -1218,7 +1218,9 @@ export default function (): any {
     }
 
     public static 'runFinalization0()V'(thread: JVMThread): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+      // Doppio does not maintain a separate finalizer queue to drain here.
+      // Treat this as the same best-effort no-op used by modern JVMs when
+      // there is no pending finalization work.
     }
 
     public static 'traceInstructions(Z)V'(thread: JVMThread, javaThis: JVMTypes.java_lang_Runtime, arg0: number): void {

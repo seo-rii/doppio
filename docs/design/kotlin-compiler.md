@@ -105,6 +105,10 @@ to `Hello.kt` backend codegen:
   `Thread.getAllStackTraces()` and non-current `Thread.getStackTrace()` calls.
   Coverage lives in `classes/modern_test/Java17ThreadDumpThreads.java`,
   protecting compiler diagnostics and build-tool thread dump paths.
+- `Runtime.runFinalization()` and `System.runFinalization()` now return as
+  best-effort no-ops when there is no finalizer queue work. Coverage lives in
+  `classes/modern_test/Java17RuntimeFinalization.java`, protecting cleanup hooks
+  that call finalization opportunistically.
 - Release-mode thread returns no longer build trace strings or validate return
   types on every `asyncReturn`; those checks are debug-only in release builds.
 - `Method.getFullSignature()` now returns the cached method signature instead

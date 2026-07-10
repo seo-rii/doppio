@@ -379,6 +379,10 @@ reduced to a focused Java or Scala fixture.
   `Thread.getAllStackTraces()` and non-current `Thread.getStackTrace()` calls.
   Coverage lives in `classes/modern_test/Java17ThreadDumpThreads.java`,
   protecting compiler diagnostics and build-tool thread dump paths.
+- `Runtime.runFinalization()` and `System.runFinalization()` now return as
+  best-effort no-ops when there is no finalizer queue work. Coverage lives in
+  `classes/modern_test/Java17RuntimeFinalization.java`, protecting cleanup hooks
+  that call finalization opportunistically.
 - Unsafe bulk and native-memory paths now cover
   `sun.misc.Unsafe.copyMemory(Object, long, Object, long, long)` for
   `byte[]` to `byte[]`, aligned same-type primitive arrays, overlapping

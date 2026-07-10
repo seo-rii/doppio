@@ -90,7 +90,10 @@ failure. Coverage lives in
 `classes/modern_test/Java17SystemMapLibraryName.java`. `Thread.dumpThreads`
 now materializes stack traces for `Thread.getAllStackTraces()` and
 non-current `Thread.getStackTrace()` calls. Coverage lives in
-`classes/modern_test/Java17ThreadDumpThreads.java`.
+`classes/modern_test/Java17ThreadDumpThreads.java`. `Runtime.runFinalization()`
+and `System.runFinalization()` now return as best-effort no-ops when Doppio has
+no finalizer queue work. Coverage lives in
+`classes/modern_test/Java17RuntimeFinalization.java`.
 
 Java 17 compiler interop note: the Kotlin compiler smoke and focused Scala
 modern interop smoke now also exercise selected Java 17 class-library overlays
