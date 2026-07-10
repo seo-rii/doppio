@@ -701,8 +701,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   static argument is collected and widened into a `long[]`, plus a
   `REF_invokeStatic` target backed by an interface static method returning
   `String`, and a static method target where a boxed `Long` dynamic constant
-  argument is unboxed and widened into a `double` parameter; Java 12
-  `CompactNumberFormat` basic
+  argument is unboxed and widened into a `double` parameter, plus a boxed
+  `Integer` dynamic constant unboxed, widened, and rounded into a `float`
+  parameter; Java 12 `CompactNumberFormat` basic
   constructor null validation, compact long formatting, negative formatting,
   and suffix parse position behavior, plus selected
   `NumberFormat.getCompactNumberInstance` default and US SHORT/LONG factory

@@ -219,9 +219,10 @@ handles, dynamic constants, and record object-method linkage:
   writes a `String` static argument and returns `null` into a reference dynamic
   constant, plus a `PUTSTATIC` double field setter fed by a `CONSTANT_Long`
   static argument and verified by double getter, boxed getter, and double
-  arithmetic paths. A focused primitive-adaptation fixture also feeds a boxed
-  `Long` dynamic constant into a `double` method parameter and verifies
-  unbox-then-widen argument conversion. Static
+  arithmetic paths. Focused primitive-adaptation fixtures also feed a boxed
+  `Long` dynamic constant into a `double` method parameter and a boxed
+  `Integer` dynamic constant into a `float` method parameter, verifying
+  unbox-then-widen argument conversion and float-width rounding. Static
   and virtual/interface method targets,
   `GETSTATIC`/`GETFIELD` field targets, and constructor targets also perform
   reference result cast checks for the tested non-exact return cases where a
@@ -320,7 +321,8 @@ handles, dynamic constants, and record object-method linkage:
   collection and `CONSTANT_Integer` to `long...` widening cases, full primitive boxing/unboxing parity beyond the tested
   `int` return, `CONSTANT_Integer` argument boxing, `Integer` argument
   unboxing, `Integer` to `long` argument widening, boxed `Long` to `double`
-  argument widening, `CONSTANT_Integer` to
+  argument widening, boxed `Integer` to `float` argument widening,
+  `CONSTANT_Integer` to
   `long` argument widening, method-target `int` to `long` return widening, and
   `GETSTATIC` field-target `int` to `long` return widening cases, or non-exact
   return adaptation beyond the targeted

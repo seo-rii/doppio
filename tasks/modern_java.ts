@@ -4600,6 +4600,113 @@ function modernJava(grunt: IGrunt) {
 
     grunt.file.write(outPath, Buffer.from(bytes));
     grunt.log.ok('Generated ' + outPath);
+
+    outPath = 'classes/modern_test/Java11ConstantDynamicInvokeFloatAdapt.class';
+    bytes = [];
+
+    u4(0xcafebabe);
+    u2(0);
+    u2(55);
+    u2(53);
+
+    cls(2);
+    utf8('classes/modern_test/Java11ConstantDynamicInvokeFloatAdapt');
+    cls(4);
+    utf8('java/lang/Object');
+    utf8('<init>');
+    utf8('()V');
+    utf8('Code');
+    ref(10, 3, 9);
+    nameAndType(5, 6);
+    utf8('main');
+    utf8('([Ljava/lang/String;)V');
+    utf8('java/lang/System');
+    cls(12);
+    utf8('out');
+    utf8('Ljava/io/PrintStream;');
+    nameAndType(14, 15);
+    ref(9, 13, 16);
+    utf8('java/io/PrintStream');
+    cls(18);
+    utf8('println');
+    utf8('(F)V');
+    nameAndType(20, 21);
+    ref(10, 19, 22);
+    utf8('BootstrapMethods');
+    utf8('java/lang/invoke/ConstantBootstraps');
+    cls(25);
+    utf8('invoke');
+    utf8('(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;Ljava/lang/invoke/MethodHandle;[Ljava/lang/Object;)Ljava/lang/Object;');
+    nameAndType(27, 28);
+    ref(10, 26, 29);
+    methodHandle(6, 30);
+    utf8('java/lang/Integer');
+    cls(32);
+    utf8('valueOf');
+    utf8('(I)Ljava/lang/Integer;');
+    nameAndType(34, 35);
+    ref(10, 33, 36);
+    methodHandle(6, 37);
+    int32(16777217);
+    utf8('boxedInteger');
+    utf8('Ljava/lang/Integer;');
+    nameAndType(40, 41);
+    dynamic(0, 42);
+    utf8('floatIdentity');
+    utf8('(F)F');
+    nameAndType(44, 45);
+    ref(10, 1, 46);
+    methodHandle(6, 47);
+    utf8('floatFromBoxedInteger');
+    utf8('F');
+    nameAndType(49, 50);
+    dynamic(1, 51);
+
+    u2(0x0021);
+    u2(1);
+    u2(3);
+    u2(0);
+    u2(0);
+    u2(3);
+
+    u2(0x0001);
+    u2(5);
+    u2(6);
+    u2(1);
+    codeAttr([0x2a, 0xb7, 0x00, 0x08, 0xb1], 1, 1);
+
+    u2(0x0009);
+    u2(10);
+    u2(11);
+    u2(1);
+    codeAttr([
+      0xb2, 0x00, 0x11,
+      0x12, 0x34,
+      0xb6, 0x00, 0x17,
+      0xb1
+    ], 2, 1);
+
+    u2(0x0009);
+    u2(44);
+    u2(45);
+    u2(1);
+    codeAttr([0x22, 0xae], 1, 1);
+
+    u2(1);
+    u2(24);
+    u4(18);
+    u2(2);
+    u2(31);
+    u2(2);
+    u2(38);
+    u2(39);
+    u2(31);
+    u2(2);
+    u2(48);
+    u2(43);
+
+    grunt.file.write(outPath, Buffer.from(bytes));
+    grunt.log.ok('Generated ' + outPath);
   });
 
   grunt.registerTask('javac_modern_classlib', 'Compile Java 9+ bootstrap class-library shims.', function() {
