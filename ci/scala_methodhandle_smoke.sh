@@ -77,7 +77,7 @@ test -f "$out_dir/ScalaMethodHandleHello.class"
 test -f "$out_dir/ScalaMethodHandlesSmoke.class"
 test -f "$out_dir/ScalaMhBox.class"
 
-expected_output="mh:8:b7:cal:ala:const:MH:empty/filled:parent:ss:default:ss"
+expected_output="mh:8:b7:cal:ala:const:MH:empty/filled:parent:ss:default:ss:0/true/true/3/2:true/matched/dropReturn/fold:n6:6:collect:a,b/collectAt:x,y/collectMid:m,n:tail/spread:d,e/spreadAt:g,h/spreadMid/o/p/tail/true/var:j,k/false/fixed:l,m"
 
 native_output="$(java -cp "$runtime_cp" ScalaMethodHandleHello)"
 if [ "$native_output" != "$expected_output" ]; then

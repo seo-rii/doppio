@@ -402,7 +402,8 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   a focused Scala source-level `java.lang.invoke.MethodHandles`
   lookup/adaptation smoke for selected static, virtual, constructor, and
   combinator flows plus private-lookup-backed superclass and interface-default
-  `unreflectSpecial` dispatch,
+  `unreflectSpecial` dispatch, reflection-discovered Java 17 overlay helpers,
+  and selected array collector/spreader adapter flows,
   a focused Scala I/O smoke covering runtime JAR/ZIP/classpath resource reads
   through `JarOutputStream`, `JarFile`, `ZipInputStream`, and
   `URLClassLoader`, `ServiceLoader` provider discovery from generated
