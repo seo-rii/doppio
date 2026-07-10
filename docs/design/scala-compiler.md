@@ -165,9 +165,10 @@ Java 17 `MethodHandles` overlay helpers, and selected array
 collector/spreader adapter flows that Kotlin already stresses more broadly
 while keeping the main Scala compiler smoke output smaller and easier to
 isolate. A local 2026-07-10 validation completed the focused MethodHandles
-smoke in 109 seconds using Scala 2.13.18. The previous split validation kept
-the remaining main Scala compiler smoke green in 454 seconds using Scala
-2.13.18.
+smoke in 109 seconds using Scala 2.13.18. A follow-up 2026-07-10
+release-runner validation completed the same focused MethodHandles smoke in
+208 seconds using Scala 2.13.18. The previous split validation kept the
+remaining main Scala compiler smoke green in 454 seconds using Scala 2.13.18.
 The Scala runtime JAR/ZIP, `ServiceLoader`, and classpath resource lookup
 coverage now lives in `classes/scala_io_smoke` and runs through
 `ci/scala_io_smoke.sh`. The focused smoke writes a manifest-bearing JAR, reads

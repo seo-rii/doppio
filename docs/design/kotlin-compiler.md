@@ -499,7 +499,9 @@ Current verified checks:
   host JVM and Doppio output comparison while reducing the main smoke's largest
   source file; the split local validation completed the focused MethodHandles
   smoke in 147 seconds and the remaining full-classpath main smoke in 591
-  seconds.
+  seconds. A follow-up 2026-07-10 release-runner validation completed the
+  focused MethodHandles smoke in 272 seconds using the minimal compiler
+  classpath.
   This covers Kotlin-compiled calls to `findStatic`, `findConstructor`,
   `findVirtual`, `findGetter`, `findSetter`, `invokeWithArguments`,
   `MethodHandle.asType`, reference casts, primitive unboxing/widening, boxed
