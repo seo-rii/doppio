@@ -69,11 +69,36 @@ fun modernJavaInteropSummary(): String {
   } catch (e: UnsupportedOperationException) {
     "uoe"
   }
+  val copyList = java.util.List.copyOf(listOf("m", "n"))
+  val copyListMutation = try {
+    copyList.add("z")
+    "mut"
+  } catch (e: UnsupportedOperationException) {
+    "uoe"
+  }
+  val copySet = java.util.Set.copyOf(listOf("s", "s", "t"))
+  val copyMap = java.util.Map.copyOf(linkedMapOf("x" to 4, "y" to 5))
+  val copyMapMutation = try {
+    copyMap.put("z", 9)
+    "mut"
+  } catch (e: UnsupportedOperationException) {
+    "uoe"
+  }
+  val optionalValue = java.util.Optional.of("opt").orElseThrow()
+  val optionalEmpty = java.util.Optional.empty<String>()
+  val optionalFailure = try {
+    optionalEmpty.orElseThrow()
+    "ok"
+  } catch (e: java.util.NoSuchElementException) {
+    "nse"
+  }
 
   return "$formatted|$upperText|${parsed.size}:${hexClass.getMethod("formatHex", ByteArray::class.java).invoke(hex, parsed)}:$digit|" +
       "$fixedValue:$fixedMillis:$offsetValue:${Clock::class.java.isInstance(zoned)}|" +
       "${randomFactoryClass.getMethod("name").invoke(randomFactory)}:$nextInt:$nextLong|" +
       "${randomFactoryClass.getMethod("name").invoke(splitFactory)}:$splitIsSplittable:$splitInt:$splitLong|" +
       "${streamList.joinToString("")}:$streamListFailure|" +
-      "${entryCopy.key}:${entryCopy.value}:$entryCopyMutation"
+      "${entryCopy.key}:${entryCopy.value}:$entryCopyMutation|" +
+      "${copyList.joinToString("")}:$copyListMutation:${copySet.size}:${copySet.contains("s")}:${copySet.contains("t")}:" +
+      "${copyMap["y"]}:$copyMapMutation:$optionalValue:${optionalEmpty.isEmpty}:$optionalFailure"
 }

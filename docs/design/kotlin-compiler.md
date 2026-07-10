@@ -285,9 +285,10 @@ Current verified checks:
   both the host JVM and Doppio, including seeded bounded output for the
   `Random` and `SplittableRandom` providers. It also directly calls Java 16
   `Stream.toList()` and Java 17 `Map.Entry.copyOf` from Kotlin source and
-  checks their unmodifiable-result behavior. A local validation completed the
-  focused smoke in 84 seconds and the remaining full-classpath
-  `ci/kotlin_smoke.sh` in 401 seconds.
+  checks their unmodifiable-result behavior, plus Java 10 `List.copyOf`,
+  `Set.copyOf`, and `Map.copyOf` and Java 11 `Optional.isEmpty()` /
+  `Optional.orElseThrow()` behavior. A local 2026-07-11 validation completed
+  the focused smoke in 262 seconds.
 - `ci/kotlin_diagnostic_smoke.sh` now covers a failing Kotlin compiler path:
   Doppio-hosted `K2JVMCompiler` compiles an intentionally invalid source file,
   exits with status 1, reports the expected initializer type-mismatch and
