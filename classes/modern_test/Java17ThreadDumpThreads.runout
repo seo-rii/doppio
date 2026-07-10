@@ -1,0 +1,10 @@
+contains-current:true
+current-stack-present:true
+current-stack-positive:true
+current-stack-has-main:true
+direct-stack-positive:true
+direct-stack-has-main:true
+worker-alive:true
+worker-stack-present:true
+worker-stack-positive:true
+worker-done:true

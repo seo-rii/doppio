@@ -87,7 +87,10 @@ with coverage in `classes/modern_test/Java17AccessControlContext.java` for
 Java system/runtime note: `System.mapLibraryName(String)` now maps library
 base names to host-style platform filenames and preserves Java's null-argument
 failure. Coverage lives in
-`classes/modern_test/Java17SystemMapLibraryName.java`.
+`classes/modern_test/Java17SystemMapLibraryName.java`. `Thread.dumpThreads`
+now materializes stack traces for `Thread.getAllStackTraces()` and
+non-current `Thread.getStackTrace()` calls. Coverage lives in
+`classes/modern_test/Java17ThreadDumpThreads.java`.
 
 Java 17 compiler interop note: the Kotlin compiler smoke and focused Scala
 modern interop smoke now also exercise selected Java 17 class-library overlays

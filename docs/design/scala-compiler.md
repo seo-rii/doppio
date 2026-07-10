@@ -375,6 +375,10 @@ reduced to a focused Java or Scala fixture.
   to host-style filenames and preserves null-argument failure behavior.
   Coverage lives in `classes/modern_test/Java17SystemMapLibraryName.java`,
   protecting compiler and build-tool native bridge probes.
+- `Thread.dumpThreads()` now materializes stack traces for
+  `Thread.getAllStackTraces()` and non-current `Thread.getStackTrace()` calls.
+  Coverage lives in `classes/modern_test/Java17ThreadDumpThreads.java`,
+  protecting compiler diagnostics and build-tool thread dump paths.
 - Unsafe bulk and native-memory paths now cover
   `sun.misc.Unsafe.copyMemory(Object, long, Object, long, long)` for
   `byte[]` to `byte[]`, aligned same-type primitive arrays, overlapping

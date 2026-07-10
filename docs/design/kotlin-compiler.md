@@ -101,6 +101,10 @@ to `Hello.kt` backend codegen:
   while `StackTraceElement` objects and strings are created when
   `getStackTrace()` materializes them. This keeps stack trace behavior intact
   but also does not make `EmptyMain.kt` finish within ten minutes.
+- `Thread.dumpThreads()` now materializes stack traces for
+  `Thread.getAllStackTraces()` and non-current `Thread.getStackTrace()` calls.
+  Coverage lives in `classes/modern_test/Java17ThreadDumpThreads.java`,
+  protecting compiler diagnostics and build-tool thread dump paths.
 - Release-mode thread returns no longer build trace strings or validate return
   types on every `asyncReturn`; those checks are debug-only in release builds.
 - `Method.getFullSignature()` now returns the cached method signature instead

@@ -1734,9 +1734,29 @@ export default function (): any {
     }
 
     public static 'dumpThreads([Ljava/lang/Thread;)[[Ljava/lang/StackTraceElement;'(thread: JVMThread, arg0: JVMTypes.JVMArray<JVMTypes.java_lang_Thread>): JVMTypes.JVMArray<JVMTypes.JVMArray<JVMTypes.java_lang_StackTraceElement>> {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+      var bsCl = thread.getBsCl(),
+        stackTraceElementCls = <ReferenceClassData<JVMTypes.java_lang_StackTraceElement>> bsCl.getInitializedClass(thread, 'Ljava/lang/StackTraceElement;'),
+        stacks: JVMTypes.JVMArray<JVMTypes.java_lang_StackTraceElement>[] = [];
+      for (var i = 0; i < arg0.array.length; i++) {
+        var javaThread = arg0.array[i],
+          frames: any[] = [],
+          elements: JVMTypes.java_lang_StackTraceElement[] = [];
+        if (javaThread === null || javaThread.$thread === null || javaThread.$thread.getStatus() === ThreadStatus.TERMINATED || javaThread.$thread.getStatus() === ThreadStatus.NEW) {
+          stacks.push(util.newArrayFromData<JVMTypes.java_lang_StackTraceElement>(thread, bsCl, '[Ljava/lang/StackTraceElement;', []));
+          continue;
+        }
+        frames = javaThread.$thread.getStackTrace();
+        for (var j = 0; j < frames.length; j++) {
+          if (frames[j].method.isHidden()) {
+            continue;
+          }
+          var element = util.newObjectFromClass<JVMTypes.java_lang_StackTraceElement>(thread, stackTraceElementCls);
+          writeStackTraceElement(thread, element, frames[j]);
+          elements.push(element);
+        }
+        stacks.push(util.newArrayFromData<JVMTypes.java_lang_StackTraceElement>(thread, bsCl, '[Ljava/lang/StackTraceElement;', elements));
+      }
+      return util.newArrayFromData<JVMTypes.JVMArray<JVMTypes.java_lang_StackTraceElement>>(thread, bsCl, '[[Ljava/lang/StackTraceElement;', stacks);
     }
 
     public static 'getThreads()[Ljava/lang/Thread;'(thread: JVMThread): JVMTypes.JVMArray<JVMTypes.java_lang_Thread> {
