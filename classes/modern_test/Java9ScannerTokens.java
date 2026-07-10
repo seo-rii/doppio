@@ -37,6 +37,11 @@ public class Java9ScannerTokens {
     System.out.println(spliterator.hasCharacteristics(Spliterator.ORDERED));
     System.out.println(spliterator.hasCharacteristics(Spliterator.NONNULL));
     System.out.println(spliterator.hasCharacteristics(Spliterator.SIZED));
+
+    Scanner closeSource = new Scanner("close me");
+    Stream<String> closeStream = closeSource.tokens();
+    closeStream.close();
+    printFailure("tokens-close", () -> closeSource.hasNext());
   }
 
   private static void printFailure(String label, Throwing action) {

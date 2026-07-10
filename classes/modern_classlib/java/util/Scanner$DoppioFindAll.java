@@ -51,6 +51,10 @@ final class Scanner$DoppioFindAll {
     return StreamSupport.stream(
       Spliterators.spliteratorUnknownSize(iterator, Spliterator.ORDERED | Spliterator.NONNULL),
       false
-    );
+    ).onClose(new Runnable() {
+      public void run() {
+        scanner.close();
+      }
+    });
   }
 }

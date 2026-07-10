@@ -1157,12 +1157,14 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
 - `java.util.Scanner` now exposes selected Java 9 `tokens()` behavior through a
   lazy token stream. Coverage includes default and custom delimiters, empty
   tokens with simple comma delimiters, continuation from the current scanner
-  position, empty input, iterator exhaustion, and spliterator metadata.
+  position, empty input, iterator exhaustion, spliterator metadata, and stream
+  close propagation to the backing scanner.
 - `java.util.Scanner` now exposes selected Java 9 `findAll(Pattern)` and
   `findAll(String)` behavior through lazy `MatchResult` streams. Coverage
   includes capture groups, string-pattern compilation, continuation from the
   current scanner position, empty result streams, null validation,
-  spliterator metadata, and iterator exhaustion.
+  spliterator metadata, iterator exhaustion, and stream close propagation to
+  the backing scanner.
 - `java.util.Scanner` now exposes selected Java 10 charset constructors for
   `InputStream`, `File`, `Path`, and `ReadableByteChannel` targets. Coverage
   includes decoded token output and null charset/source behavior.

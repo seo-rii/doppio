@@ -41,6 +41,11 @@ public class Java9ScannerFindAll {
     System.out.println(spliterator.hasCharacteristics(Spliterator.NONNULL));
     System.out.println(spliterator.hasCharacteristics(Spliterator.SIZED));
 
+    Scanner closeSource = new Scanner("a1 b2");
+    Stream<MatchResult> closeStream = closeSource.findAll("\\d+");
+    closeStream.close();
+    printFailure("findall-close", () -> closeSource.hasNext());
+
     printFailure("null-pattern", () -> new Scanner("x").findAll((Pattern) null));
     printFailure("null-string", () -> new Scanner("x").findAll((String) null));
   }
