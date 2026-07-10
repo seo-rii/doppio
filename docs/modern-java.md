@@ -350,9 +350,11 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `KClass.memberFunctions` invocation, runtime annotation lookup,
   companion-object dispatch, `KCallable.callBy` default constructor and method
   arguments, sealed subclass enumeration, and object-instance lookup.
-- Next blocker: broaden the Kotlin compiler smoke to more source constructs,
-  reduce remaining throughput variance, and compare full-classpath elapsed time.
-  Current notes live in `docs/design/kotlin-compiler.md`.
+- Next blocker: broaden the Kotlin compiler smoke to more source constructs and
+  reduce remaining throughput variance. A local 2026-07-10 validation completed
+  the metadata-guarded main smoke in 74 seconds with the minimal classpath and
+  85 seconds with the full `kotlinc/lib/*.jar` classpath. Current notes live in
+  `docs/design/kotlin-compiler.md`.
 
 ## Scala Compiler Bring-Up
 

@@ -251,7 +251,9 @@ Current verified checks:
   workflow caches `kotlin-compiler@2.4.0` outside the repository tree, checks
   the generated `HelloKt` class with `javap -v` for source metadata and
   `kotlin.Metadata`, and runs the generated class on both the host JVM and
-  Doppio.
+  Doppio. A local 2026-07-10 validation completed the main smoke in 74 seconds
+  with the minimal classpath and 85 seconds with the full `kotlinc/lib/*.jar`
+  classpath after the metadata guard was added.
 - A focused Kotlin modern-Java interop smoke now lives in
   `classes/kotlin_modern_java_interop_smoke` and runs through
   `ci/kotlin_modern_java_interop_smoke.sh`. It uses reflection-backed Kotlin
