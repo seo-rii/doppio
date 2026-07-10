@@ -82,6 +82,11 @@ compile_end="$(date +%s)"
 
 test -f "$out_dir/Hello.class"
 
+scala_bytecode_dump="$work_dir/scala-smoke-javap.txt"
+javap -classpath "$runtime_cp" -v Hello 'Hello$' > "$scala_bytecode_dump"
+grep -Fq 'SourceFile: "Hello.scala"' "$scala_bytecode_dump"
+grep -Fq 'scala.reflect.ScalaSignature(' "$scala_bytecode_dump"
+
 expected_output="${SCALA_SMOKE_EXPECTED_OUTPUT:-"scala"}"
 native_output="$(java -cp "$runtime_cp" Hello)"
 if [ "$native_output" != "$expected_output" ]; then

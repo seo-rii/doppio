@@ -248,8 +248,10 @@ Current verified checks:
   implementation.
 - The minimal `Hello.kt` compile-and-run smoke is now tracked by
   `ci/kotlin_smoke.sh` and the `Modern Java` GitHub Actions workflow. The
-  workflow caches `kotlin-compiler@2.4.0` outside the repository tree and runs
-  the generated class on both the host JVM and Doppio.
+  workflow caches `kotlin-compiler@2.4.0` outside the repository tree, checks
+  the generated `HelloKt` class with `javap -v` for source metadata and
+  `kotlin.Metadata`, and runs the generated class on both the host JVM and
+  Doppio.
 - A focused Kotlin modern-Java interop smoke now lives in
   `classes/kotlin_modern_java_interop_smoke` and runs through
   `ci/kotlin_modern_java_interop_smoke.sh`. It uses reflection-backed Kotlin

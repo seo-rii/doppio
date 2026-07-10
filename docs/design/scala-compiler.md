@@ -114,7 +114,8 @@ The smoke compares the generated program output on the host JVM and Doppio.
 ## Current Boundary: Initial Smoke Passes
 
 The initial Scala 2.13 compiler smoke now passes under Doppio. It compiles the
-source fixture, checks the emitted class files, and compares generated program
+source fixture, checks the emitted class files, verifies `SourceFile` and
+`ScalaSignature` metadata with `javap -v`, and compares generated program
 output on the host JVM and Doppio. The smoke now includes Java collection
 interop and a small asynchronous `Future` path. A local 2026-06-21 run of the
 expanded smoke completed in 303 seconds using Scala

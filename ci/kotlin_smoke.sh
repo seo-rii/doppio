@@ -84,6 +84,11 @@ compile_end="$(date +%s)"
 test -f "$out_dir/HelloKt.class"
 test -f "$out_dir/META-INF/main.kotlin_module"
 
+kotlin_bytecode_dump="$work_dir/kotlin-smoke-javap.txt"
+javap -classpath "$out_dir" -v HelloKt > "$kotlin_bytecode_dump"
+grep -Fq 'SourceFile: "Hello.kt"' "$kotlin_bytecode_dump"
+grep -Fq 'kotlin.Metadata(' "$kotlin_bytecode_dump"
+
 runtime_cp="$out_dir"
 runtime_cp="$runtime_cp:$stdlib_jar"
 default_expected_output="hi"
