@@ -73,7 +73,10 @@ Doppio's `Files` shim. `getBlockSize()` uses the host `statfs` block size when
 available, and the OpenJDK
 `sun.nio.fs.UnixNativeDispatcher.statvfs0` bridge populated for native
 class-library paths; coverage is in
-`classes/modern_test/Java17FileStoreSpace.java`.
+`classes/modern_test/Java17FileStoreSpace.java`. Default file-system
+`getFileStores()` enumeration now covers Linux mount-table dispatch enough to
+materialize usable `FileStore` instances; coverage is in
+`classes/modern_test/Java17FileSystemStores.java`.
 `java.io.FileInputStream`,
 `java.io.FileOutputStream`, and `java.io.UnixFileSystem` VM `initIDs()`
 initializers are treated as metadata no-ops; coverage lives in

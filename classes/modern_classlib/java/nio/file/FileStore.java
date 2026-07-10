@@ -20,6 +20,9 @@ public abstract class FileStore {
   public abstract long getUnallocatedSpace() throws IOException;
 
   public long getBlockSize() throws IOException {
+    if (getClass().getName().startsWith("sun.nio.fs.")) {
+      return 4096L;
+    }
     throw new UnsupportedOperationException();
   }
 

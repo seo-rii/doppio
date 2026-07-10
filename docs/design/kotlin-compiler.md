@@ -144,6 +144,11 @@ to `Hello.kt` backend codegen:
   `classes/modern_test/Java17FileStoreSpace.java`, protecting compiler cache
   and output-directory checks that use `Files.getFileStore(...)` instead of
   `java.io.File`.
+- Default file-system `getFileStores()` enumeration now covers Linux mount-table
+  dispatch enough to materialize usable `FileStore` instances. Coverage lives
+  in `classes/modern_test/Java17FileSystemStores.java`, protecting compiler and
+  build-tool probes that scan all mounted stores before selecting cache/output
+  roots.
 - `java.io.FileInputStream`, `java.io.FileOutputStream`, and
   `java.io.UnixFileSystem` `initIDs()` natives are implemented as VM metadata
   no-ops, matching Doppio's dynamic field resolution model. Coverage lives in

@@ -376,6 +376,11 @@ reduced to a focused Java or Scala fixture.
   class-library paths. Coverage lives in
   `classes/modern_test/Java17FileStoreSpace.java`, protecting compiler and
   build-tool output/cache directory checks that use `Files.getFileStore(...)`.
+- Default file-system `getFileStores()` enumeration now covers Linux mount-table
+  dispatch enough to materialize usable `FileStore` instances. Coverage lives
+  in `classes/modern_test/Java17FileSystemStores.java`, protecting compiler and
+  build-tool probes that scan all mounted stores before selecting output/cache
+  roots.
 - `java.io.FileInputStream`, `java.io.FileOutputStream`, and
   `java.io.UnixFileSystem` `initIDs()` natives are implemented as VM metadata
   no-ops. Coverage lives in

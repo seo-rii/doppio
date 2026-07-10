@@ -17,6 +17,19 @@ interface IOVec {
   len: number;
 }
 
+interface MountEntry {
+  name: string;
+  dir: string;
+  fstype: string;
+  opts: string;
+  dev: number;
+}
+
+interface MountTable {
+  entries: MountEntry[];
+  pos: number;
+}
+
 function readIOVecs(thread: JVMThread, address: Long, len: number): IOVec[] {
   const heap = thread.getJVM().getHeap(),
     base = address.toNumber(),
@@ -481,6 +494,7 @@ export default function (): any {
   }
 
   const dirMap = new FDMap<DirFd>();
+  const mountMap = new FDMap<MountTable>();
 
   function getStringFromHeap(thread: JVMThread, ptrLong: Long): string {
     var heap = thread.getJVM().getHeap(),
@@ -1063,11 +1077,116 @@ export default function (): any {
 
   }
 
+  class sun_nio_fs_LinuxNativeDispatcher {
+
+    private static readMountEntry(thread: JVMThread, handle: Long, entry: JVMTypes.sun_nio_fs_UnixMountEntry): number {
+      const table = mountMap.getEntry(thread, 'Lsun/nio/fs/UnixException;', handle.toNumber());
+      if (table === null || table.pos >= table.entries.length) {
+        return -1;
+      }
+
+      const mountEntry = table.entries[table.pos++];
+      entry['sun/nio/fs/UnixMountEntry/name'] = stringToByteArray(thread, mountEntry.name);
+      entry['sun/nio/fs/UnixMountEntry/dir'] = stringToByteArray(thread, mountEntry.dir);
+      entry['sun/nio/fs/UnixMountEntry/fstype'] = stringToByteArray(thread, mountEntry.fstype);
+      entry['sun/nio/fs/UnixMountEntry/opts'] = stringToByteArray(thread, mountEntry.opts);
+      entry['sun/nio/fs/UnixMountEntry/dev'] = Long.fromNumber(mountEntry.dev);
+      entry['sun/nio/fs/UnixMountEntry/fstypeAsString'] = null;
+      entry['sun/nio/fs/UnixMountEntry/optionsAsString'] = null;
+      return 0;
+    }
+
+    public static 'init()V'(thread: JVMThread): void {
+    }
+
+    public static 'setmntent0(JJ)J'(thread: JVMThread, pathAddress: Long, modeAddress: Long): Long {
+      const filePath = getStringFromHeap(thread, pathAddress);
+      let contents: string = null;
+      try {
+        contents = fs.readFileSync(filePath, 'utf8');
+      } catch (err) {
+        try {
+          contents = fs.readFileSync('/proc/mounts', 'utf8');
+        } catch (fallbackErr) {
+          contents = 'doppio / doppiofs rw 0 0\n';
+        }
+      }
+
+      const entries: MountEntry[] = [];
+      contents.split(/\r?\n/).forEach((line) => {
+        const trimmed = line.trim();
+        if (trimmed.length === 0 || trimmed.charAt(0) === '#') {
+          return;
+        }
+
+        const parts = trimmed.split(/\s+/);
+        if (parts.length < 4) {
+          return;
+        }
+
+        const dir = parts[1].replace(/\\040/g, ' '),
+          name = parts[0].replace(/\\040/g, ' '),
+          fstype = parts[2],
+          opts = parts[3];
+        let dev = 0;
+        try {
+          dev = fs.statSync(dir).dev;
+        } catch (statErr) {
+          dev = 0;
+        }
+        entries.push({ name: name, dir: dir, fstype: fstype, opts: opts, dev: dev });
+      });
+
+      if (entries.length === 0) {
+        let dev = 0;
+        try {
+          dev = fs.statSync('/').dev;
+        } catch (statErr) {
+          dev = 0;
+        }
+        entries.push({ name: 'doppio', dir: '/', fstype: 'doppiofs', opts: 'rw', dev: dev });
+      }
+
+      return Long.fromNumber(mountMap.newEntry({ entries: entries, pos: 0 }));
+    }
+
+    public static 'getlinelen(J)I'(thread: JVMThread, handle: Long): number {
+      const table = mountMap.getEntry(thread, 'Lsun/nio/fs/UnixException;', handle.toNumber());
+      if (table === null || table.pos >= table.entries.length) {
+        return -1;
+      }
+
+      const entry = table.entries[table.pos++];
+      return `${entry.name} ${entry.dir} ${entry.fstype} ${entry.opts}`.length;
+    }
+
+    public static 'rewind(J)V'(thread: JVMThread, handle: Long): void {
+      const table = mountMap.getEntry(thread, 'Lsun/nio/fs/UnixException;', handle.toNumber());
+      if (table !== null) {
+        table.pos = 0;
+      }
+    }
+
+    public static 'getmntent(JLsun/nio/fs/UnixMountEntry;)I'(thread: JVMThread, handle: Long, entry: JVMTypes.sun_nio_fs_UnixMountEntry): number {
+      return sun_nio_fs_LinuxNativeDispatcher.readMountEntry(thread, handle, entry);
+    }
+
+    public static 'getmntent0(JLsun/nio/fs/UnixMountEntry;JI)I'(thread: JVMThread, handle: Long, entry: JVMTypes.sun_nio_fs_UnixMountEntry, lineAddress: Long, lineLength: number): number {
+      return sun_nio_fs_LinuxNativeDispatcher.readMountEntry(thread, handle, entry);
+    }
+
+    public static 'endmntent(J)V'(thread: JVMThread, handle: Long): void {
+      mountMap.removeEntry(thread, handle.toNumber(), 'Lsun/nio/fs/UnixException;');
+    }
+
+  }
+
   return {
     'sun/nio/ch/FileChannelImpl': sun_nio_ch_FileChannelImpl,
     'sun/nio/ch/NativeThread': sun_nio_ch_NativeThread,
     'sun/nio/ch/IOUtil': sun_nio_ch_IOUtil,
     'sun/nio/ch/FileDispatcherImpl': sun_nio_ch_FileDispatcherImpl,
+    'sun/nio/fs/LinuxNativeDispatcher': sun_nio_fs_LinuxNativeDispatcher,
     'sun/nio/fs/UnixNativeDispatcher': sun_nio_fs_UnixNativeDispatcher
   };
 };
