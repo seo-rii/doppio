@@ -346,6 +346,12 @@ reduced to a focused Java or Scala fixture.
   `ClassLoader.defineClass(String, ByteBuffer, ProtectionDomain)` direct-buffer
   native without advancing the buffer position. Coverage lives in
   `classes/modern_test/Java17ClassLoaderDefineByteBuffer.java`.
+- Direct typed-buffer bulk paths now cover the `java.nio.Bits`
+  `copyFrom*Array` and `copyTo*Array` natives for swapped direct
+  `ShortBuffer`, `CharBuffer`, `IntBuffer`, `FloatBuffer`, `LongBuffer`, and
+  `DoubleBuffer` views. Coverage lives in
+  `classes/modern_test/Java17DirectTypedBufferBulk.java`, protecting compiler
+  and classfile libraries that stage primitive data through direct buffers.
 - Unsafe bulk and native-memory paths now cover
   `sun.misc.Unsafe.copyMemory(Object, long, Object, long, long)` for
   `byte[]` to `byte[]`, aligned same-type primitive arrays, overlapping

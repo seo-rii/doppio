@@ -90,30 +90,126 @@ export default function (): any {
     return false;
   }
 
+  interface TypedArrayCopy {
+    array: JVMTypes.JVMArray<any>;
+    component: string;
+    byteOffset: number;
+    byteLength: number;
+    index: number;
+    count: number;
+  }
+
+  function getTypedArrayCopy(thread: JVMThread, arrayObj: JVMTypes.java_lang_Object, byteOffsetArg: Long, byteLengthArg: Long, scale: number): TypedArrayCopy {
+    if (arrayObj === null) {
+      thread.throwNewException('Ljava/lang/NullPointerException;', '');
+      return null;
+    }
+
+    const byteOffset = byteOffsetArg.toNumber(),
+      byteLength = byteLengthArg.toNumber();
+
+    if (byteOffset < 0 || byteLength < 0 || byteOffset % scale !== 0 || byteLength % scale !== 0) {
+      thread.throwNewException('Ljava/lang/InternalError;', 'Unaligned java.nio.Bits primitive array copy.');
+      return null;
+    }
+
+    const array = <JVMTypes.JVMArray<any>> arrayObj,
+      index = byteOffset / scale,
+      count = byteLength / scale;
+    return {
+      array,
+      component: array.getClass().getInternalName()[1],
+      byteOffset,
+      byteLength,
+      index,
+      count
+    };
+  }
+
   class java_nio_Bits {
 
-    public static 'copyFromShortArray(Ljava/lang/Object;JJJ)V'(thread: JVMThread, arg0: JVMTypes.java_lang_Object, arg1: Long, arg2: Long, arg3: Long): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'copyFromShortArray(Ljava/lang/Object;JJJ)V'(thread: JVMThread, srcObj: JVMTypes.java_lang_Object, srcPos: Long, dstAddress: Long, byteLength: Long): void {
+      const copy = getTypedArrayCopy(thread, srcObj, srcPos, byteLength, 2);
+      if (copy === null) {
+        return;
+      }
+
+      const dst = thread.getJVM().getHeap().get_buffer(dstAddress.toNumber(), copy.byteLength);
+      for (let i = 0; i < copy.count; i++) {
+        dst.writeUInt16BE(copy.array.array[copy.index + i] & 0xffff, i * 2);
+      }
     }
 
-    public static 'copyToShortArray(JLjava/lang/Object;JJ)V'(thread: JVMThread, arg0: Long, arg1: JVMTypes.java_lang_Object, arg2: Long, arg3: Long): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'copyToShortArray(JLjava/lang/Object;JJ)V'(thread: JVMThread, srcAddress: Long, dstObj: JVMTypes.java_lang_Object, dstPos: Long, byteLength: Long): void {
+      const copy = getTypedArrayCopy(thread, dstObj, dstPos, byteLength, 2);
+      if (copy === null) {
+        return;
+      }
+
+      const src = thread.getJVM().getHeap().get_buffer(srcAddress.toNumber(), copy.byteLength);
+      for (let i = 0; i < copy.count; i++) {
+        copy.array.array[copy.index + i] = copy.component === 'C' ? src.readUInt16BE(i * 2) : src.readInt16BE(i * 2);
+      }
     }
 
-    public static 'copyFromIntArray(Ljava/lang/Object;JJJ)V'(thread: JVMThread, arg0: JVMTypes.java_lang_Object, arg1: Long, arg2: Long, arg3: Long): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'copyFromIntArray(Ljava/lang/Object;JJJ)V'(thread: JVMThread, srcObj: JVMTypes.java_lang_Object, srcPos: Long, dstAddress: Long, byteLength: Long): void {
+      const copy = getTypedArrayCopy(thread, srcObj, srcPos, byteLength, 4);
+      if (copy === null) {
+        return;
+      }
+
+      const dst = thread.getJVM().getHeap().get_buffer(dstAddress.toNumber(), copy.byteLength);
+      for (let i = 0; i < copy.count; i++) {
+        if (copy.component === 'F') {
+          dst.writeFloatBE(copy.array.array[copy.index + i], i * 4);
+        } else {
+          dst.writeInt32BE(copy.array.array[copy.index + i], i * 4);
+        }
+      }
     }
 
-    public static 'copyToIntArray(JLjava/lang/Object;JJ)V'(thread: JVMThread, arg0: Long, arg1: JVMTypes.java_lang_Object, arg2: Long, arg3: Long): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'copyToIntArray(JLjava/lang/Object;JJ)V'(thread: JVMThread, srcAddress: Long, dstObj: JVMTypes.java_lang_Object, dstPos: Long, byteLength: Long): void {
+      const copy = getTypedArrayCopy(thread, dstObj, dstPos, byteLength, 4);
+      if (copy === null) {
+        return;
+      }
+
+      const src = thread.getJVM().getHeap().get_buffer(srcAddress.toNumber(), copy.byteLength);
+      for (let i = 0; i < copy.count; i++) {
+        copy.array.array[copy.index + i] = copy.component === 'F' ? src.readFloatBE(i * 4) : src.readInt32BE(i * 4);
+      }
     }
 
-    public static 'copyFromLongArray(Ljava/lang/Object;JJJ)V'(thread: JVMThread, arg0: JVMTypes.java_lang_Object, arg1: Long, arg2: Long, arg3: Long): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'copyFromLongArray(Ljava/lang/Object;JJJ)V'(thread: JVMThread, srcObj: JVMTypes.java_lang_Object, srcPos: Long, dstAddress: Long, byteLength: Long): void {
+      const copy = getTypedArrayCopy(thread, srcObj, srcPos, byteLength, 8);
+      if (copy === null) {
+        return;
+      }
+
+      const dst = thread.getJVM().getHeap().get_buffer(dstAddress.toNumber(), copy.byteLength);
+      for (let i = 0; i < copy.count; i++) {
+        if (copy.component === 'D') {
+          dst.writeDoubleBE(copy.array.array[copy.index + i], i * 8);
+        } else {
+          const value = <Long> copy.array.array[copy.index + i];
+          dst.writeInt32BE(value.getHighBits(), i * 8);
+          dst.writeInt32BE(value.getLowBits(), (i * 8) + 4);
+        }
+      }
     }
 
-    public static 'copyToLongArray(JLjava/lang/Object;JJ)V'(thread: JVMThread, arg0: Long, arg1: JVMTypes.java_lang_Object, arg2: Long, arg3: Long): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'copyToLongArray(JLjava/lang/Object;JJ)V'(thread: JVMThread, srcAddress: Long, dstObj: JVMTypes.java_lang_Object, dstPos: Long, byteLength: Long): void {
+      const copy = getTypedArrayCopy(thread, dstObj, dstPos, byteLength, 8);
+      if (copy === null) {
+        return;
+      }
+
+      const src = thread.getJVM().getHeap().get_buffer(srcAddress.toNumber(), copy.byteLength);
+      for (let i = 0; i < copy.count; i++) {
+        copy.array.array[copy.index + i] = copy.component === 'D' ?
+          src.readDoubleBE(i * 8) :
+          Long.fromBits(src.readInt32BE((i * 8) + 4), src.readInt32BE(i * 8));
+      }
     }
 
   }

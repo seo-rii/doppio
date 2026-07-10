@@ -90,10 +90,12 @@ to `Hello.kt` backend codegen:
   `FirElement.transform(...)`.
 - Java 9 buffer covariant fluent-return bridges such as
   `ByteBuffer.position(int): ByteBuffer`, plus direct `DirectByteBuffer`
-  relative bulk `get(byte[], int, int)` / `put(byte[], int, int)` traps. These
-  avoid Java 9 `NoSuchMethodError` in modern fixtures and reduce one JAR
-  scanning hot path, but they do not make `EmptyMain.kt` finish within ten
-  minutes.
+  relative bulk `get(byte[], int, int)` / `put(byte[], int, int)` traps.
+  Direct typed-buffer bulk `get`/`put` now covers the `java.nio.Bits`
+  short/char/int/float/long/double native copy paths used by swapped direct
+  views. These avoid Java 9 `NoSuchMethodError` and `UnsatisfiedLinkError`
+  failures in modern fixtures and reduce JAR/class-buffer shuffling traps, but
+  they do not make `EmptyMain.kt` finish within ten minutes.
 - Lazy `Throwable` stack trace materialization matching the JDK's backtrace
   shape more closely: exception construction stores lightweight frame metadata,
   while `StackTraceElement` objects and strings are created when

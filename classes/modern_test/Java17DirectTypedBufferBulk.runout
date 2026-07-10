@@ -1,0 +1,36 @@
+true
+4
+true
+[0, 4660, -21555, -2, 0]
+5
+true
+4
+true
+[0, 65, 4660, 65535, 0]
+5
+true
+5
+true
+[0, 16909060, -7, 2147483647, 0]
+6
+true
+4
+true
+[0.0, 1.25, -0.0, NaN, 0.0]
+5
+true
+4
+true
+[0, 72623859790382856, -9, 9223372036854775807, 0]
+5
+true
+4
+true
+[0.0, -1.5, Infinity, -0.0, 0.0]
+5
+short-underflow:java.nio.BufferUnderflowException
+char-underflow:java.nio.BufferUnderflowException
+int-overflow:java.nio.BufferOverflowException
+float-overflow:java.nio.BufferOverflowException
+long-bounds:java.lang.IndexOutOfBoundsException
+double-bounds:java.lang.IndexOutOfBoundsException
