@@ -118,6 +118,11 @@ to `Hello.kt` backend codegen:
   `Charset.availableCharsets()` provider enumeration and case-insensitive
   UTF-8 lookup, protecting compiler paths that repeatedly resolve charset
   metadata.
+- `java.io.File` disk-space queries now cover `getTotalSpace()`,
+  `getFreeSpace()`, and `getUsableSpace()` for files and directories, plus
+  missing-path zero results. Coverage lives in
+  `classes/modern_test/Java17FileSpace.java`, protecting compiler cache and
+  output-directory checks that ask the host filesystem for available space.
 - `ClassLoader.defineClass(..., byte[], offset, length, ...)` now slices
   typed-array-backed Java byte arrays with both the view `byteOffset` and the
   Java offset/length. Coverage lives in `classes/test/DefineClassOffset.java`

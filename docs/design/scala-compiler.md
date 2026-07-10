@@ -357,6 +357,10 @@ reduced to a focused Java or Scala fixture.
   `classes/modern_test/Java17CharsetAvailable.java`, protecting
   `Charset.availableCharsets()` and charset-provider enumeration paths used
   during source and classpath decoding.
+- `java.io.File` disk-space queries now cover total, free, and usable space
+  for files and directories, plus missing-path zero results. Coverage lives in
+  `classes/modern_test/Java17FileSpace.java`, protecting compiler and build
+  tool output/cache directory checks.
 - Unsafe bulk and native-memory paths now cover
   `sun.misc.Unsafe.copyMemory(Object, long, Object, long, long)` for
   `byte[]` to `byte[]`, aligned same-type primitive arrays, overlapping

@@ -835,10 +835,37 @@ export default function (): any {
       });
     }
 
-    public static 'getSpace(Ljava/io/File;I)J'(thread: JVMThread, javaThis: JVMTypes.java_io_UnixFileSystem, file: JVMTypes.java_io_File, arg1: number): Long {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+    public static 'getSpace(Ljava/io/File;I)J'(thread: JVMThread, javaThis: JVMTypes.java_io_UnixFileSystem, file: JVMTypes.java_io_File, spaceType: number): Long | void {
+      const filepath = file['java/io/File/path'].toString(),
+        statfs = (<any> fs).statfs;
+      if (typeof statfs !== 'function') {
+        return Long.ZERO;
+      }
+
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      statfs(filepath, (err: NodeJS.ErrnoException, stats: any) => {
+        if (err || stats == null) {
+          thread.asyncReturn(Long.ZERO, null);
+          return;
+        }
+
+        const blockSize = typeof stats.bsize === 'number' ? stats.bsize : 0;
+        let blocks = 0;
+        switch (spaceType) {
+          case 0:
+            blocks = stats.blocks;
+            break;
+          case 1:
+            blocks = stats.bfree;
+            break;
+          case 2:
+            blocks = stats.bavail;
+            break;
+          default:
+            blocks = 0;
+        }
+        thread.asyncReturn(Long.fromNumber(Math.max(0, Math.floor(blockSize * (typeof blocks === 'number' ? blocks : 0)))), null);
+      });
     }
 
     public static 'initIDs()V'(thread: JVMThread): void {

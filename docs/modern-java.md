@@ -63,7 +63,10 @@ read-only range no-op, empty-mapping validation order, and range validation
 behavior. Selected `Files` hard-link and symbolic-link APIs are also covered,
 including `createLink`, `createSymbolicLink`, `readSymbolicLink`,
 `NOFOLLOW_LINKS` existence checks, hard-link `isSameFile`, and dangling
-symlink cleanup.
+symlink cleanup. `java.io.File` disk-space queries now cover
+`getTotalSpace()`, `getFreeSpace()`, and `getUsableSpace()` for files and
+directories, plus missing-path zero results, backed by
+`classes/modern_test/Java17FileSpace.java`.
 
 Java security/runtime note: `AccessController.doPrivileged(PrivilegedAction)`
 now dispatches covariant concrete `run()` methods instead of being pinned to
