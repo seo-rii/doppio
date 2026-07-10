@@ -357,6 +357,11 @@ reduced to a focused Java or Scala fixture.
   `classes/modern_test/Java17CharsetAvailable.java`, protecting
   `Charset.availableCharsets()` and charset-provider enumeration paths used
   during source and classpath decoding.
+- `AccessController.getInheritedAccessControlContext()` now exposes the
+  current Java thread's inherited access-control context. Coverage lives in
+  `classes/modern_test/Java17AccessControlContext.java`, protecting
+  privileged compiler/bootstrap actions and `doPrivilegedWithCombiner`
+  fallback paths.
 - `java.io.File` disk-space queries now cover total, free, and usable space
   for files and directories, plus missing-path zero results. Coverage lives in
   `classes/modern_test/Java17FileSpace.java`, protecting compiler and build

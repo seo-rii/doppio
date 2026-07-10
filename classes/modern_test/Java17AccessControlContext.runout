@@ -1,0 +1,6 @@
+main-context:true
+inherited-native-accessible:true
+do-privileged:privileged
+do-privileged-combiner:combiner
+child-context:true
+child-inherited-context:true

@@ -78,7 +78,11 @@ the erased `run():Object` bridge when the action class exposes a more-specific
 reference return. Coverage lives in
 `classes/modern_test/Java17CharsetAvailable.java`, which protects
 `Charset.availableCharsets()` provider enumeration, case-insensitive charset
-lookup, and unmodifiable map behavior.
+lookup, and unmodifiable map behavior. `AccessController` now also exposes the
+current Java thread's inherited `AccessControlContext` through its native entry,
+with coverage in `classes/modern_test/Java17AccessControlContext.java` for
+`getContext()`, reflected inherited-context lookup, `doPrivileged`, and
+`doPrivilegedWithCombiner` fallback behavior.
 
 Java 17 compiler interop note: the Kotlin compiler smoke and focused Scala
 modern interop smoke now also exercise selected Java 17 class-library overlays

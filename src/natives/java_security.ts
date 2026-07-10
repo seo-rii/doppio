@@ -63,9 +63,8 @@ export default function (): any {
     }
 
     public static 'getInheritedAccessControlContext()Ljava/security/AccessControlContext;'(thread: JVMThread): JVMTypes.java_security_AccessControlContext {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      // Satisfy TypeScript return type.
-      return null;
+      const threadObj = thread.getJVMObject();
+      return threadObj['java/lang/Thread/inheritedAccessControlContext'] || null;
     }
 
   }

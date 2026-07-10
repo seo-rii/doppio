@@ -118,6 +118,11 @@ to `Hello.kt` backend codegen:
   `Charset.availableCharsets()` provider enumeration and case-insensitive
   UTF-8 lookup, protecting compiler paths that repeatedly resolve charset
   metadata.
+- `AccessController.getInheritedAccessControlContext()` now returns the
+  current Java thread's inherited access-control context instead of throwing.
+  Coverage lives in `classes/modern_test/Java17AccessControlContext.java`,
+  protecting privileged compiler initialization and `doPrivilegedWithCombiner`
+  fallback paths.
 - `java.io.File` disk-space queries now cover `getTotalSpace()`,
   `getFreeSpace()`, and `getUsableSpace()` for files and directories, plus
   missing-path zero results. Coverage lives in
