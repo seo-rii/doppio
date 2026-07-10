@@ -27,6 +27,27 @@ public class Java12MethodHandleDesc {
     }
   }
 
+  public interface SpecialInterface {
+    default String interfaceJoin(String suffix) {
+      return "interface:" + suffix;
+    }
+  }
+
+  public static class SpecialCaller implements SpecialInterface {
+    public static void run() throws Throwable {
+      MethodHandles.Lookup lookup = MethodHandles.lookup();
+      ClassDesc interfaceClass = ClassDesc.of("classes.modern_test", "Java12MethodHandleDesc").nested("SpecialInterface");
+      DirectMethodHandleDesc resolveInterfaceSpecial = MethodHandleDesc.ofMethod(
+        DirectMethodHandleDesc.Kind.INTERFACE_SPECIAL,
+        interfaceClass,
+        "interfaceJoin",
+        MethodTypeDesc.of(ConstantDescs.CD_String, ConstantDescs.CD_String));
+      MethodHandle resolvedInterfaceSpecial = (MethodHandle) resolveInterfaceSpecial.resolveConstantDesc(lookup);
+      System.out.println((String) resolvedInterfaceSpecial.invokeExact(new SpecialCaller(), "desc"));
+      System.out.println(resolvedInterfaceSpecial.type());
+    }
+  }
+
   public String specialJoin(String suffix) {
     return "special:" + suffix;
   }
@@ -96,6 +117,7 @@ public class Java12MethodHandleDesc {
     MethodHandle resolvedSpecial = (MethodHandle) resolveSpecial.resolveConstantDesc(lookup);
     System.out.println((String) resolvedSpecial.invokeExact(new Java12MethodHandleDesc(), "desc"));
     System.out.println(resolvedSpecial.type());
+    SpecialCaller.run();
 
     MethodHandle resolvedConstructor = (MethodHandle) MethodHandleDesc
       .ofConstructor(resolveOwner, ConstantDescs.CD_String)

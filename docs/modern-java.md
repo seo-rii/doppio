@@ -1423,13 +1423,15 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `ClassDesc.ofDescriptor` and `ClassDesc.arrayType`; rejecting selected
   malformed internal-name class descriptors with leading, doubled, or trailing
   slashes; accepting rank-255 array descriptors and rejecting selected rank-256
-  descriptors through raw descriptor parsing and `arrayType`; selected `MethodTypeDesc` method
-  descriptor construction, transformations, and `MethodType` resolution;
+  descriptors through raw descriptor parsing and `arrayType`; selected
+  `MethodTypeDesc` method descriptor construction, transformations, and
+  `MethodType` resolution;
   selected `MethodHandleDesc`/`DirectMethodHandleDesc` static method, virtual
-  method, special method, constructor, getter, setter, static-getter, and
-  static-setter factories; selected `resolveConstantDesc` execution for public
-  same-class and selected JDK-class static/virtual/special methods,
-  constructors, static/instance fields, and `asType`; validation of owner
+  method, special/interface-special method, constructor, getter, setter,
+  static-getter, and static-setter factories; selected `resolveConstantDesc`
+  execution for public same-class and selected JDK-class
+  static/virtual/special/interface-special methods, constructors,
+  static/instance fields, and `asType`; validation of owner
   class/interface descriptors, method versus field lookup descriptors,
   constructor return descriptors, and void field descriptors; `Kind.valueOf`
   field/interface/class ref-kind mappings;
@@ -1456,8 +1458,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   constant/call-site bootstrap descriptor factory
   metadata plus selected owner and parameter validation.
 - Broad `MethodHandleDesc`/`DirectMethodHandleDesc` resolution beyond the
-  tested public same-class static/virtual/special/constructor/field and `asType`
-  descriptor cases, exhaustive `asType` semantics, exhaustive factory
+  tested public same-class static, virtual, special, interface-special,
+  constructor, field, and `asType` descriptor cases, exhaustive `asType`
+  semantics, exhaustive factory
   validation, unsupported handle kinds beyond the tested descriptor cases,
   broad `DynamicConstantDesc` bootstrap execution beyond the selected
   descriptor-level `ConstantBootstraps.invoke` public-static method-handle
