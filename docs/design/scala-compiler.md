@@ -265,11 +265,10 @@ The Scala language/type-system coverage now lives in
 `classes/scala_language_smoke` and runs through
 `ci/scala_language_smoke.sh`. It checks path-dependent types, higher-kinded
 implicit typeclass lookup, self-types, by-name argument evaluation, extractor
-matching, and `@switch` lowering while keeping the main Scala compiler smoke
-smaller.
-A local 2026-06-30 validation completed the focused Scala language smoke in 70
-seconds and the remaining main Scala compiler smoke in 237 seconds using Scala
-2.13.18.
+matching, value-class extension methods, structural refinement dispatch, and
+`@switch` lowering while keeping the main Scala compiler smoke smaller.
+A local 2026-07-10 validation completed the focused Scala language smoke in
+220 seconds using Scala 2.13.18.
 The Scala library/lowering coverage now lives in
 `classes/scala_library_smoke` and runs through `ci/scala_library_smoke.sh`. It
 checks `groupMapReduce`, implicit value classes, default arguments, case-class

@@ -29,6 +29,12 @@ object ScalaLanguageSmoke {
 
   private final class NamedOp(val label: String) extends Labeled with LabelMath
 
+  private final class RichInt(private val value: Int) extends AnyVal {
+    def tagged(prefix: String): String = s"$prefix${value * 3}"
+  }
+
+  private implicit def richInt(value: Int): RichInt = new RichInt(value)
+
   private object Digits {
     def unapply(text: String): Option[Int] =
       if (text.nonEmpty && text.forall(_.isDigit)) Some(text.toInt) else None
@@ -66,6 +72,9 @@ object ScalaLanguageSmoke {
     s"${twice { counter += 1; counter * 4 }}:$counter"
   }
 
+  private def refinementToken(item: { def name: String; def value: Int }): String =
+    s"${item.name.reverse}:${item.value.tagged("r")}"
+
   def exercise(): String = {
     val left = new Registry("L")
     val right = new Registry("R")
@@ -76,6 +85,7 @@ object ScalaLanguageSmoke {
     val folded = foldWith(Vector("a", "bb", "ccc"))(text => s"${text.head}${text.length}")
     val marked = new NamedOp("op").mark(5)
     val byName = byNameToken()
+    val refined = refinementToken(new { val name = "ref"; val value = 4 })
     val switched = List("12", "x", "7").map {
       case Digits(value) =>
         (value: @switch) match {
@@ -86,6 +96,6 @@ object ScalaLanguageSmoke {
       case other => s"s$other"
     }.mkString("/")
 
-    s"$dependent:$encoded:$folded:$marked:$byName:$switched"
+    s"$dependent:$encoded:$folded:$marked:$byName:$refined:$switched"
   }
 }

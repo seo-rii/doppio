@@ -80,7 +80,7 @@ test -f "$out_dir/ScalaLanguageSmoke\$.class"
 test -f "$out_dir/SmokeCodec.class"
 test -f "$out_dir/SmokeFolder.class"
 
-expected_output="L:a7:R:b3:some(i2)|none|some(i4):a1,b2,c3:op7:12:2:dozen/sx/seven"
+expected_output="L:a7:R:b3:some(i2)|none|some(i4):a1,b2,c3:op7:12:2:fer:r12:dozen/sx/seven"
 
 native_output="$(java -cp "$runtime_cp" ScalaLanguageHello)"
 if [ "$native_output" != "$expected_output" ]; then

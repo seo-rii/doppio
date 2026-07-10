@@ -18,6 +18,10 @@ import * as JVMTypes from '../includes/JVMTypes';
 
 const emptyArgs: any[] = [];
 
+function getInvokeDynamicCallSiteKey(method: Method, pc: number): string {
+  return `${method.fullSignature}#${pc}`;
+}
+
 /**
  * Interface for individual opcode implementations.
  */
@@ -1533,11 +1537,12 @@ export class Opcodes {
 
   public static invokedynamic(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
-    var callSiteSpecifier = <InvokeDynamic> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1));
+    var callSiteSpecifier = <InvokeDynamic> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1)),
+      callSiteKey = getInvokeDynamicCallSiteKey(frame.method, pc);
     thread.setStatus(ThreadStatus.ASYNC_WAITING);
-    callSiteSpecifier.constructCallSiteObject(thread, frame.getLoader(), frame.method.cls, pc, (status: boolean) => {
+    callSiteSpecifier.constructCallSiteObject(thread, frame.getLoader(), frame.method.cls, callSiteKey, (status: boolean) => {
       if (status) {
-        assert(typeof(callSiteSpecifier.getCallSiteObject(pc)[0].vmtarget) === 'function', "MethodName should be resolved...");
+        assert(typeof(callSiteSpecifier.getCallSiteObject(callSiteKey)[0].vmtarget) === 'function', "MethodName should be resolved...");
         code[pc] = OpCode.INVOKEDYNAMIC_FAST;
         // Resume and rerun fast opcode.
         thread.setStatus(ThreadStatus.RUNNABLE);
@@ -1697,7 +1702,7 @@ export class Opcodes {
   public static invokedynamic_fast(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
     var callSiteSpecifier = <InvokeDynamic> frame.method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1)),
-      cso = callSiteSpecifier.getCallSiteObject(pc),
+      cso = callSiteSpecifier.getCallSiteObject(getInvokeDynamicCallSiteKey(frame.method, pc)),
       appendix = cso[1],
       fcn = cso[0].vmtarget,
       opStack = frame.opStack, paramSize = callSiteSpecifier.paramWordSize,

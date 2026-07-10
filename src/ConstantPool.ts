@@ -6132,7 +6132,7 @@ export class InvokeDynamic implements IConstantPoolItem {
    * We store the CallSite objects here for future retrieval, along with an
    * optional 'appendix' argument.
    */
-  private callSiteObjects: { [pc: number]: [JVMTypes.java_lang_invoke_MemberName, JVMTypes.java_lang_Object] } = {};
+  private callSiteObjects: { [siteKey: string]: [JVMTypes.java_lang_invoke_MemberName, JVMTypes.java_lang_Object] } = {};
   private stringConcatRecipe: string = null;
   private stringConcatConstants: string[] = [];
   private objectMethodsMethodName: string = null;
@@ -6166,8 +6166,8 @@ export class InvokeDynamic implements IConstantPoolItem {
     });
   }
 
-  public getCallSiteObject(pc: number): [JVMTypes.java_lang_invoke_MemberName, JVMTypes.java_lang_Object] {
-    var cso = this.callSiteObjects[pc]
+  public getCallSiteObject(siteKey: string): [JVMTypes.java_lang_invoke_MemberName, JVMTypes.java_lang_Object] {
+    var cso = this.callSiteObjects[siteKey]
     if (cso) {
       return cso;
     } else {
@@ -6641,7 +6641,7 @@ export class InvokeDynamic implements IConstantPoolItem {
     return constants;
   }
 
-  private constructStringConcatCallSiteObject(thread: JVMThread, cl: ClassLoader, clazz: ReferenceClassData<JVMTypes.java_lang_Object>, pc: number, bootstrapMethod: [MethodHandle, IConstantPoolItem[]], cb: (status: boolean) => void): boolean {
+  private constructStringConcatCallSiteObject(thread: JVMThread, cl: ClassLoader, clazz: ReferenceClassData<JVMTypes.java_lang_Object>, siteKey: string, bootstrapMethod: [MethodHandle, IConstantPoolItem[]], cb: (status: boolean) => void): boolean {
     var recipe = this.getStringConcatRecipe(bootstrapMethod);
     if (recipe === null) {
       return false;
@@ -6656,7 +6656,7 @@ export class InvokeDynamic implements IConstantPoolItem {
         if (err) {
           cb(false);
         } else {
-          this.constructStringConcatCallSiteObject(thread, cl, clazz, pc, bootstrapMethod, cb);
+          this.constructStringConcatCallSiteObject(thread, cl, clazz, siteKey, bootstrapMethod, cb);
         }
       });
       return true;
@@ -6670,14 +6670,14 @@ export class InvokeDynamic implements IConstantPoolItem {
         this.methodType = rv;
         this.stringConcatRecipe = recipe;
         this.stringConcatConstants = this.getStringConcatConstants(bootstrapMethod);
-        this.setResolved(pc, [memberName, null]);
+        this.setResolved(siteKey, [memberName, null]);
         cb(true);
       }
     });
     return true;
   }
 
-  private constructObjectMethodsCallSiteObject(thread: JVMThread, cl: ClassLoader, pc: number, bootstrapMethod: [MethodHandle, IConstantPoolItem[]], cb: (status: boolean) => void): boolean {
+  private constructObjectMethodsCallSiteObject(thread: JVMThread, cl: ClassLoader, siteKey: string, bootstrapMethod: [MethodHandle, IConstantPoolItem[]], cb: (status: boolean) => void): boolean {
     var bootstrapRef = bootstrapMethod[0].getReference();
     if (bootstrapRef.classInfo.name !== 'Ljava/lang/runtime/ObjectMethods;' || bootstrapRef.nameAndTypeInfo.name !== 'bootstrap') {
       return false;
@@ -6745,14 +6745,14 @@ export class InvokeDynamic implements IConstantPoolItem {
         this.objectMethodsMethodName = this.nameAndTypeInfo.name;
         this.objectMethodsRecordName = simpleRecordName;
         this.objectMethodsComponents = components;
-        this.setResolved(pc, [memberName, null]);
+        this.setResolved(siteKey, [memberName, null]);
         cb(true);
       }
     });
     return true;
   }
 
-  public constructCallSiteObject(thread: JVMThread, cl: ClassLoader, clazz: ReferenceClassData<JVMTypes.java_lang_Object>, pc: number, cb: (status: boolean) => void, explicit: boolean = true): void {
+  public constructCallSiteObject(thread: JVMThread, cl: ClassLoader, clazz: ReferenceClassData<JVMTypes.java_lang_Object>, siteKey: string, cb: (status: boolean) => void, explicit: boolean = true): void {
     /**
      * A call site specifier gives a symbolic reference to a method handle which
      * is to serve as the bootstrap method for a dynamic call site (§4.7.23).
@@ -6762,11 +6762,11 @@ export class InvokeDynamic implements IConstantPoolItem {
     var bootstrapMethod = clazz.getBootstrapMethod(this.bootstrapMethodAttrIndex),
       unresolvedItems: IConstantPoolItem[] = bootstrapMethod[1].concat(bootstrapMethod[0], this).filter((item: IConstantPoolItem) => !item.isResolved());
 
-    if (this.constructStringConcatCallSiteObject(thread, cl, clazz, pc, bootstrapMethod, cb)) {
+    if (this.constructStringConcatCallSiteObject(thread, cl, clazz, siteKey, bootstrapMethod, cb)) {
       return;
     }
 
-    if (this.constructObjectMethodsCallSiteObject(thread, cl, pc, bootstrapMethod, cb)) {
+    if (this.constructObjectMethodsCallSiteObject(thread, cl, siteKey, bootstrapMethod, cb)) {
       return;
     }
 
@@ -6785,7 +6785,7 @@ export class InvokeDynamic implements IConstantPoolItem {
           cb(false);
         } else {
           // Rerun. This time, all items are resolved.
-          this.constructCallSiteObject(thread, cl, clazz, pc, cb, explicit);
+          this.constructCallSiteObject(thread, cl, clazz, siteKey, cb, explicit);
         }
       });
     }
@@ -6884,17 +6884,17 @@ export class InvokeDynamic implements IConstantPoolItem {
         thread.throwException(e);
         cb(false);
       } else {
-        this.setResolved(pc, [rv, appendixArr.array[0]]);
+        this.setResolved(siteKey, [rv, appendixArr.array[0]]);
         cb(true);
       }
     });
   }
 
-  private setResolved(pc: number, cso: [JVMTypes.java_lang_invoke_MemberName, JVMTypes.java_lang_Object]) {
+  private setResolved(siteKey: string, cso: [JVMTypes.java_lang_invoke_MemberName, JVMTypes.java_lang_Object]) {
     // Prevent resolution races. It's OK to create multiple CSOs, but only one
     // should ever be used!
-    if (this.callSiteObjects[pc] === undefined) {
-      this.callSiteObjects[pc] = cso;
+    if (this.callSiteObjects[siteKey] === undefined) {
+      this.callSiteObjects[siteKey] = cso;
     }
   }
 

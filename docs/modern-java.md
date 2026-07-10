@@ -389,8 +389,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   extractor `unapply`, `Regex`, `TreeMap`, `ArraySeq`, `groupMap`, map views,
   and right-biased `Either`, a focused Scala language/type-system smoke
   covering path-dependent types, higher-kinded implicit typeclass lookup,
-  self-types, by-name argument evaluation, extractor matching, and `@switch`
-  lowering, a focused Scala functional/library smoke covering `Function.chain`,
+  self-types, by-name argument evaluation, extractor matching, value-class
+  extension methods, structural refinement dispatch, and `@switch` lowering,
+  a focused Scala functional/library smoke covering `Function.chain`,
   composed function adapters, `Option.when`/`Option.unless`, `Using.resource`,
   close-failure suppressed-exception preservation, `Try` recovery,
   `Either.cond`, `partitionMap`, and lambda-heavy classfile emission,
@@ -437,8 +438,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   generic `Signature` metadata, Scala `SourceFile`/`LineNumberTable`,
   `ScalaSignature`, `ScalaInlineInfo`, and `ScalaSig` classfile attributes,
   path-dependent types, higher-kinded implicit typeclass lookup, self-types,
-  by-name argument evaluation, extractor matching, and `@switch` lowering,
-  and a diagnostic smoke covering type-mismatch
+  by-name argument evaluation, extractor matching, value-class extension
+  methods, structural refinement dispatch, and `@switch` lowering, and a
+  diagnostic smoke covering type-mismatch
   and missing-member source filename, line number, found/required types,
   source lines, carets, and multi-error count,
   plus a focused two-phase Scala 2 blackbox macro expansion smoke, plus string

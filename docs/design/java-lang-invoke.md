@@ -73,6 +73,7 @@ The fixture matrix tracks the covered smoke tests and the next fixtures to add:
 | VarHandle descriptors | Covered | `ConstantDescs.CD_VarHandle`, nested `CD_VarHandleDesc`, plus VarHandle bootstrap descriptor constants | Descriptor metadata only, no execution claim | class-library shim |
 | Nominal dynamic-constant descriptors | Partial | `DynamicConstantDesc.resolveConstantDesc` for selected `ConstantBootstraps` descriptors | `nullConstant`, `primitiveClass`, `enumConstant`, `getStaticFinal`, reference `explicitCast`, selected primitive-target `explicitCast` numeric conversion, and selected descriptor-level `invoke` public-static method-handle targets resolve to native-compatible values, including tested primitive return widening; selected bad primitive name, missing enum, bad explicit-cast, and bad invoke result-cast failures use native-style `BootstrapMethodError` wrapping; selected `getStaticFinal` field lookup failures use `NoSuchFieldError` | class-library shim |
 | Dynamic constant bootstrap dispatch | Later | One unsupported `ConstantBootstraps.invoke` shape per fixture | `BootstrapMethodError` or native-equivalent success | `ConstantPool.ts` |
+| `invokedynamic` call-site identity | Covered | Scala structural-refinement helper methods share one `CONSTANT_InvokeDynamic` entry at the same bytecode offset in different methods | Each lexical `invokedynamic` instruction links independently, so reflective structural calls for different member names do not reuse the wrong `CallSite` | `ConstantPool.ts` call-site cache plus `opcodes.ts` site-key selection |
 | `StringConcatFactory` object conversion | Covered | User object whose `toString()` has observable output, null reference concat, direct `StringBuilder`/enum/`Class` references, and primitive/object array prefix checks | Native-compatible `String.valueOf(Object)` dispatch and JVM-style array display prefixes for the tested reference shapes | invokedynamic concat fast path |
 | `ObjectMethods.bootstrap` fallback | Later | Record-like component handle that is not a plain field getter | Native-compatible failure or general helper path | record `invokedynamic` fast path |
 
@@ -175,6 +176,12 @@ handles, dynamic constants, and record object-method linkage:
   enum, bad explicit-cast, and bad invoke result-cast failures, exact field lookup failure behavior beyond the tested
   `getStaticFinal` missing-field and wrong-type cases, or `ldc` interoperation
   beyond the existing runtime fast paths.
+- Generic `invokedynamic` call-site caching is keyed by the caller method
+  signature and bytecode offset, matching lexical instruction identity rather
+  than only the shared constant-pool entry and offset. The Scala language smoke
+  covers the regression with structural-refinement dispatch where two helper
+  methods link different reflective member names from the same
+  `CONSTANT_InvokeDynamic` entry.
 - Java 9 `StringConcatFactory` call sites have a targeted fast path for basic
   `makeConcat` and `makeConcatWithConstants` recipes, including tested static
   recipe constants for `String`, primitive numeric values, and `Class`
