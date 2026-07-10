@@ -132,11 +132,12 @@ public interface ProcessHandle extends Comparable<ProcessHandle> {
     }
 
     public int compareTo(ProcessHandle other) {
-      return Long.compare(pid(), other.pid());
+      CurrentProcessHandle handle = (CurrentProcessHandle) other;
+      return Long.compare(pid(), handle.pid());
     }
 
     public boolean equals(Object other) {
-      return other instanceof ProcessHandle && ((ProcessHandle) other).pid() == pid();
+      return other instanceof CurrentProcessHandle && ((CurrentProcessHandle) other).pid() == pid();
     }
 
     public int hashCode() {

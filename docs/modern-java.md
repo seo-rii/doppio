@@ -1571,9 +1571,11 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `isAlive() == true` for the tested current-process case, and
   `Optional.empty()` for unrecognized pids. `of(current.pid())` and
   `of(current.parent().pid())` return separate handles that compare equal by
-  pid, `compareTo` is implemented as pid ordering for those stable handles, and
-  `allProcesses()` exposes the current handle plus the host parent handle when
-  the parent pid is available.
+  pid, equality remains limited to the shim handle implementation rather than
+  arbitrary same-pid `ProcessHandle` implementations, `compareTo` is
+  implemented as pid ordering for those stable handles with native-style
+  rejection of unrelated implementations, and `allProcesses()` exposes the
+  current handle plus the host parent handle when the parent pid is available.
 - `parent()` returns the Doppio host parent pid for the current handle when the
   host exposes one. When a handle represents that host parent pid,
   `children()` and `descendants()` expose the current handle; current-handle

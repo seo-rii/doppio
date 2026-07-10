@@ -1,6 +1,8 @@
 package classes.modern_test;
 
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Stream;
 
 public class Java9ProcessHandle {
   public static void main(String[] args) {
@@ -18,6 +20,10 @@ public class Java9ProcessHandle {
     System.out.println(same.get() != current);
     System.out.println(missing.isPresent());
     System.out.println(current.compareTo(current) == 0);
+    ProcessHandle fakeSamePid = new FakeHandle(current.pid());
+    System.out.println(current.equals(fakeSamePid));
+    System.out.println(same.get().equals(fakeSamePid));
+    printFailure("compare-fake", () -> current.compareTo(fakeSamePid));
     System.out.println(ProcessHandle.allProcesses().anyMatch(handle -> handle.pid() == current.pid()));
     System.out.println(current.parent() != null);
     System.out.println(parent.isPresent());
@@ -91,5 +97,70 @@ public class Java9ProcessHandle {
     System.out.println(infoString.contains("startTime: "));
     System.out.println(infoString.contains("totalTime: "));
     System.out.println(infoString.endsWith("]"));
+  }
+
+  private static void printFailure(String label, Throwing action) {
+    try {
+      action.run();
+      System.out.println(label + ":ok");
+    } catch (Throwable t) {
+      System.out.println(label + ":" + t.getClass().getName());
+    }
+  }
+
+  private interface Throwing {
+    void run();
+  }
+
+  private static final class FakeHandle implements ProcessHandle {
+    private final long pid;
+
+    FakeHandle(long pid) {
+      this.pid = pid;
+    }
+
+    public Optional<ProcessHandle> parent() {
+      return Optional.empty();
+    }
+
+    public Stream<ProcessHandle> children() {
+      return Stream.empty();
+    }
+
+    public Stream<ProcessHandle> descendants() {
+      return Stream.empty();
+    }
+
+    public long pid() {
+      return pid;
+    }
+
+    public boolean isAlive() {
+      return true;
+    }
+
+    public Info info() {
+      return ProcessHandle.current().info();
+    }
+
+    public CompletableFuture<ProcessHandle> onExit() {
+      return new CompletableFuture<ProcessHandle>();
+    }
+
+    public boolean supportsNormalTermination() {
+      return true;
+    }
+
+    public boolean destroy() {
+      return false;
+    }
+
+    public boolean destroyForcibly() {
+      return false;
+    }
+
+    public int compareTo(ProcessHandle other) {
+      return Long.compare(pid(), other.pid());
+    }
   }
 }
