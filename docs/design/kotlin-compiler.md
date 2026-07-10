@@ -158,6 +158,12 @@ to `Hello.kt` backend codegen:
   of dereferencing them, including dangling links. Coverage lives in
   `classes/modern_test/Java17FilesCopyNoFollowLinks.java`, protecting
   classpath and source-tree copy paths that preserve linked dependency layouts.
+- `Files.readAttributes(..., NOFOLLOW_LINKS)` now reports symlink object
+  attributes instead of followed-target attributes, including dangling links,
+  for class-based, string-based, and basic-view reads. Coverage lives in
+  `classes/modern_test/Java17FilesNoFollowLinkAttributes.java`, protecting
+  compiler and build-tool scanners that avoid following linked source or
+  dependency trees.
 - `java.io.FileInputStream`, `java.io.FileOutputStream`, and
   `java.io.UnixFileSystem` `initIDs()` natives are implemented as VM metadata
   no-ops, matching Doppio's dynamic field resolution model. Coverage lives in

@@ -615,13 +615,14 @@ public final class Files {
       throw new UnsupportedOperationException();
     }
     File file = toFile(path);
-    if (!file.exists()) {
+    boolean symbolicLink = !followLinks(options) && isSymbolicLink(path);
+    if (!file.exists() && !symbolicLink) {
       throw new NoSuchFileException(file.toString());
     }
     if (attributeType == BasicFileAttributes.class) {
-      return attributeType.cast(readBasicFileAttributes(file));
+      return attributeType.cast(readBasicFileAttributes(file, symbolicLink));
     }
-    return attributeType.cast(readPosixFileAttributes(file));
+    return attributeType.cast(readPosixFileAttributes(file, symbolicLink));
   }
 
   public static <V extends FileAttributeView> V getFileAttributeView(
@@ -629,6 +630,7 @@ public final class Files {
       Class<V> type,
       LinkOption... options) {
     requireLinkOptions(options);
+    final LinkOption[] linkOptions = options.clone();
     final Class<V> viewType = Objects.requireNonNull(type);
     toFile(path);
     if (viewType != BasicFileAttributeView.class) {
@@ -656,7 +658,7 @@ public final class Files {
         }
 
         public PosixFileAttributes readAttributes() throws IOException {
-          return Files.readAttributes(path, PosixFileAttributes.class);
+          return Files.readAttributes(path, PosixFileAttributes.class, linkOptions);
         }
 
         public void setPermissions(Set<PosixFilePermission> perms) throws IOException {
@@ -693,7 +695,7 @@ public final class Files {
       }
 
       public BasicFileAttributes readAttributes() throws IOException {
-        return Files.readAttributes(path, BasicFileAttributes.class);
+        return Files.readAttributes(path, BasicFileAttributes.class, linkOptions);
       }
 
       public void setTimes(FileTime lastModifiedTime, FileTime lastAccessTime, FileTime createTime)
@@ -720,12 +722,13 @@ public final class Files {
     String viewName = attributeViewName(attributeString);
     String attributeNames = attributeNames(attributeString);
     File file = toFile(path);
-    if (!file.exists()) {
+    boolean symbolicLink = !followLinks(options) && isSymbolicLink(path);
+    if (!file.exists() && !symbolicLink) {
       throw new NoSuchFileException(file.toString());
     }
-    BasicFileAttributes basicAttributes = readBasicFileAttributes(file);
+    BasicFileAttributes basicAttributes = readBasicFileAttributes(file, symbolicLink);
     PosixFileAttributes posixAttributes =
-        viewName.equals("posix") ? readPosixFileAttributes(file) : null;
+        viewName.equals("posix") ? readPosixFileAttributes(file, symbolicLink) : null;
     UserPrincipal ownerAttribute = viewName.equals("owner") ? currentUserPrincipal() : null;
     HashMap<String, Object> values = new HashMap<String, Object>();
     if (attributeNames.equals("*")) {
@@ -1675,8 +1678,8 @@ public final class Files {
     return propertyName == null || propertyName.length() == 0 ? "user" : propertyName;
   }
 
-  private static PosixFileAttributes readPosixFileAttributes(final File file) {
-    final BasicFileAttributes basicAttributes = readBasicFileAttributes(file);
+  private static PosixFileAttributes readPosixFileAttributes(final File file, boolean symbolicLink) {
+    final BasicFileAttributes basicAttributes = readBasicFileAttributes(file, symbolicLink);
     final UserPrincipal owner = currentUserPrincipal();
     final GroupPrincipal group = currentGroupPrincipal();
     final Set<PosixFilePermission> permissions = readPosixFilePermissions(file);
@@ -1732,11 +1735,22 @@ public final class Files {
   }
 
   private static BasicFileAttributes readBasicFileAttributes(final File file) {
+    return readBasicFileAttributes(file, false);
+  }
+
+  private static BasicFileAttributes readBasicFileAttributes(final File file, boolean symbolicLink) {
     final FileTime lastModifiedTime = FileTime.fromMillis(file.lastModified());
-    final long size = file.length();
-    final boolean regularFile = file.isFile();
-    final boolean directory = file.isDirectory();
-    final boolean symbolicLink = isSymbolicLink(file.toPath());
+    long fileSize = file.length();
+    if (symbolicLink) {
+      try {
+        fileSize = readSymbolicLink(file.toPath()).toString().getBytes(StandardCharsets.UTF_8).length;
+      } catch (IOException e) {
+        fileSize = 0L;
+      }
+    }
+    final long size = fileSize;
+    final boolean regularFile = !symbolicLink && file.isFile();
+    final boolean directory = !symbolicLink && file.isDirectory();
     return new BasicFileAttributes() {
       public FileTime lastModifiedTime() {
         return lastModifiedTime;

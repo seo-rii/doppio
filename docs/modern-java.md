@@ -63,8 +63,9 @@ read-only range no-op, empty-mapping validation order, and range validation
 behavior. Selected `Files` hard-link and symbolic-link APIs are also covered,
 including `createLink`, `createSymbolicLink`, `readSymbolicLink`,
 `NOFOLLOW_LINKS` existence checks, hard-link `isSameFile`, `Files.copy`
-symlink-object preservation with `NOFOLLOW_LINKS`, and dangling symlink
-cleanup. `java.io.File` disk-space queries now cover
+symlink-object preservation with `NOFOLLOW_LINKS`, selected symlink
+`readAttributes(..., NOFOLLOW_LINKS)` behavior including dangling links, and
+dangling symlink cleanup. `java.io.File` disk-space queries now cover
 `getTotalSpace()`, `getFreeSpace()`, and `getUsableSpace()` for files and
 directories, plus missing-path zero results, backed by
 `classes/modern_test/Java17FileSpace.java`. NIO `FileStore` space queries now
@@ -1291,6 +1292,7 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `getFileStore` metadata/space/attribute-view behavior, including
   total/usable/unallocated space fields and `getBlockSize()`, selected
   `BasicFileAttributes` `readAttributes`, selected `BasicFileAttributeView`,
+  `NOFOLLOW_LINKS` symlink attribute queries including dangling links,
   selected owner lookup/setter behavior, selected `FileOwnerAttributeView`
   lookup/setter behavior, selected owner string-attribute lookup/setter
   behavior, selected owner POSIX permission get/set behavior, selected

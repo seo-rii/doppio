@@ -390,6 +390,12 @@ reduced to a focused Java or Scala fixture.
   of dereferencing them, including dangling links. Coverage lives in
   `classes/modern_test/Java17FilesCopyNoFollowLinks.java`, protecting compiler
   and build-tool copy paths that preserve linked source or classpath trees.
+- `Files.readAttributes(..., NOFOLLOW_LINKS)` now reports symlink object
+  attributes instead of followed-target attributes, including dangling links,
+  for class-based, string-based, and basic-view reads. Coverage lives in
+  `classes/modern_test/Java17FilesNoFollowLinkAttributes.java`, protecting
+  compiler and build-tool scanners that avoid following linked source or
+  dependency trees.
 - `java.io.FileInputStream`, `java.io.FileOutputStream`, and
   `java.io.UnixFileSystem` `initIDs()` natives are implemented as VM metadata
   no-ops. Coverage lives in
