@@ -264,13 +264,15 @@ public final class DoppioMethodHandles {
     }
 
     MethodHandle init = clause[0];
-    MethodHandle step = Objects.requireNonNull(clause[1]);
+    MethodHandle step = clause[1];
     MethodHandle pred = Objects.requireNonNull(clause[2]);
     MethodHandle fini = clause.length == 4 ? clause[3] : null;
-    MethodType stepType = step.type();
+    MethodType stepType;
     Class<?> stateType;
     List<Class<?>> externalTypes;
     if (init == null) {
+      step = Objects.requireNonNull(step);
+      stepType = step.type();
       stateType = stepType.returnType();
       if (stateType == void.class ||
           stepType.parameterCount() == 0 ||
@@ -285,7 +287,10 @@ public final class DoppioMethodHandles {
         throw new IllegalArgumentException("init must return the loop state type");
       }
       externalTypes = initType.parameterList();
-      checkLoopClauseHandle(stepType, stateType, externalTypes, stateType, "step");
+      if (step != null) {
+        stepType = step.type();
+        checkLoopClauseHandle(stepType, stateType, externalTypes, stateType, "step");
+      }
     }
     checkLoopClauseHandle(pred.type(), stateType, externalTypes, boolean.class, "pred");
     Class<?> returnType = void.class;
@@ -714,7 +719,9 @@ public final class DoppioMethodHandles {
     System.arraycopy(args, 0, loopArgs, 1, args.length);
     do {
       loopArgs[0] = state;
-      state = step.invokeWithArguments(loopArgs);
+      if (step != null) {
+        state = step.invokeWithArguments(loopArgs);
+      }
       loopArgs[0] = state;
     } while (((Boolean) pred.invokeWithArguments(loopArgs)).booleanValue());
     return fini == null ? null : fini.invokeWithArguments(loopArgs);

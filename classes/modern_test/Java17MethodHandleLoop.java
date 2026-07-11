@@ -17,6 +17,10 @@ public class Java17MethodHandleLoop {
     return state < limit;
   }
 
+  public static boolean never(int state, int limit) {
+    return false;
+  }
+
   public static String fini(int state, int limit) {
     return "done:" + state + ":" + limit;
   }
@@ -31,6 +35,10 @@ public class Java17MethodHandleLoop {
 
   public static boolean textPred(String state, String prefix, int limit) {
     return state.length() < prefix.length() + limit;
+  }
+
+  public static boolean textNever(String state, String prefix, int limit) {
+    return false;
   }
 
   public static String textFini(String state, String prefix, int limit) {
@@ -55,6 +63,10 @@ public class Java17MethodHandleLoop {
         Java17MethodHandleLoop.class,
         "pred",
         MethodType.methodType(boolean.class, int.class, int.class));
+    MethodHandle never = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "never",
+        MethodType.methodType(boolean.class, int.class, int.class));
     MethodHandle fini = lookup.findStatic(
         Java17MethodHandleLoop.class,
         "fini",
@@ -70,6 +82,10 @@ public class Java17MethodHandleLoop {
     System.out.println((String) defaultCounted.invokeExact(3));
     System.out.println((String) defaultCounted.invokeExact(0));
 
+    MethodHandle noStep = MethodHandles.loop(new MethodHandle[] { init, null, never, fini });
+    System.out.println(noStep.type().toMethodDescriptorString());
+    System.out.println((String) noStep.invokeExact(7));
+
     MethodHandle textInit = lookup.findStatic(
         Java17MethodHandleLoop.class,
         "textInit",
@@ -81,6 +97,10 @@ public class Java17MethodHandleLoop {
     MethodHandle textPred = lookup.findStatic(
         Java17MethodHandleLoop.class,
         "textPred",
+        MethodType.methodType(boolean.class, String.class, String.class, int.class));
+    MethodHandle textNever = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "textNever",
         MethodType.methodType(boolean.class, String.class, String.class, int.class));
     MethodHandle textFini = lookup.findStatic(
         Java17MethodHandleLoop.class,
@@ -96,10 +116,19 @@ public class Java17MethodHandleLoop {
     System.out.println((String) defaultTextLoop.invokeExact("x", 3));
     System.out.println((String) defaultTextLoop.invokeExact("x", 0));
 
+    MethodHandle noStepText = MethodHandles.loop(new MethodHandle[] { textInit, null, textNever, textFini });
+    System.out.println(noStepText.type().toMethodDescriptorString());
+    System.out.println((String) noStepText.invokeExact("x", 7));
+
     MethodHandle voidLoop = MethodHandles.loop(new MethodHandle[] { init, step, pred, null });
     System.out.println(voidLoop.type().toMethodDescriptorString());
     voidLoop.invokeExact(2);
     System.out.println("void-loop");
+
+    MethodHandle voidNoStep = MethodHandles.loop(new MethodHandle[] { init, null, never });
+    System.out.println(voidNoStep.type().toMethodDescriptorString());
+    voidNoStep.invokeExact(7);
+    System.out.println("void-no-step-loop");
 
     MethodHandle shortVoidLoop = MethodHandles.loop(new MethodHandle[] { init, step, pred });
     System.out.println(shortVoidLoop.type().toMethodDescriptorString());

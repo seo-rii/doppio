@@ -43,6 +43,9 @@ class MethodHandleOwner(@JvmField var text: String) {
     fun loopBelow(value: Int, limit: Int): Boolean = value < limit
 
     @JvmStatic
+    fun loopNever(value: Int, limit: Int): Boolean = false
+
+    @JvmStatic
     fun loopIncrement(value: Int, limit: Int): Int = value + 1
 
     @JvmStatic
@@ -586,6 +589,11 @@ fun methodHandleSummary(): String {
     "loopBelow",
     MethodType.methodType(java.lang.Boolean.TYPE, intClass, intClass)
   )
+  val loopNever = lookup.findStatic(
+    ownerClass,
+    "loopNever",
+    MethodType.methodType(java.lang.Boolean.TYPE, intClass, intClass)
+  )
   val loopIncrement = lookup.findStatic(
     ownerClass,
     "loopIncrement",
@@ -599,6 +607,10 @@ fun methodHandleSummary(): String {
   val genericLoop = loopMethod.invoke(
     null,
     arrayOf(arrayOf<MethodHandle?>(null, loopIncrement, loopBelow, loopFinish))
+  ) as MethodHandle
+  val genericLoopNoStep = loopMethod.invoke(
+    null,
+    arrayOf(arrayOf<MethodHandle?>(loopZero, null, loopNever, loopFinish))
   ) as MethodHandle
   val whileInt = whileLoopMethod.invoke(null, loopZero, loopBelow, loopIncrement) as MethodHandle
   val whileDefaultInt = whileLoopMethod.invoke(null, null, loopBelow, loopIncrement) as MethodHandle
@@ -778,6 +790,7 @@ fun methodHandleSummary(): String {
     spreadVarargs,
     genericLoop.invokeWithArguments(3).toString(),
     genericLoop.invokeWithArguments(0).toString(),
+    genericLoopNoStep.invokeWithArguments(7).toString(),
     whileLoops,
     doWhileLoops,
     countedLoops,
@@ -817,6 +830,7 @@ fun methodHandleSummary(): String {
     spreadArrayMiddle,
     spreadInvoker,
     genericLoop,
+    genericLoopNoStep,
     whileInt,
     whileDefaultInt,
     whileText,

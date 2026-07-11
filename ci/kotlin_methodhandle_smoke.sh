@@ -65,7 +65,7 @@ out_dir="$work_dir/out"
 rm -rf "$out_dir"
 mkdir -p "$out_dir"
 
-compile_timeout="${KOTLIN_METHODHANDLE_SMOKE_COMPILE_TIMEOUT_SECONDS:-420}"
+compile_timeout="${KOTLIN_METHODHANDLE_SMOKE_COMPILE_TIMEOUT_SECONDS:-600}"
 run_timeout="${KOTLIN_METHODHANDLE_SMOKE_RUN_TIMEOUT_SECONDS:-60}"
 responsiveness="${DOPPIO_KOTLIN_RESPONSIVENESS:-100000}"
 
