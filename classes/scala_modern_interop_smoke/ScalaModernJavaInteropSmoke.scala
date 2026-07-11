@@ -125,6 +125,14 @@ object ScalaModernJavaInteropSmoke {
             if e.getCause != null && e.getCause.getClass.getName == "java.util.NoSuchElementException" =>
           "nse"
       }
+    val processHandleClass = Class.forName("java.lang.ProcessHandle")
+    val currentProcess = processHandleClass.getMethod("current").invoke(null)
+    val currentPid = processHandleClass.getMethod("pid").invoke(currentProcess).asInstanceOf[Long]
+    val currentProcessAlive = processHandleClass.getMethod("isAlive").invoke(currentProcess).asInstanceOf[Boolean]
+    val currentProcessByPid = processHandleClass
+      .getMethod("of", java.lang.Long.TYPE)
+      .invoke(null, Long.box(currentPid))
+      .asInstanceOf[java.util.Optional[_]]
 
     s"$formatted|$upperText|${parsed.length}:${hexClass.getMethod("formatHex", classOf[Array[Byte]]).invoke(hex, parsed)}:$digit|" +
       s"$fixedValue:$fixedMillis:$offsetValue:${classOf[Clock].isInstance(zoned)}|" +
@@ -133,6 +141,6 @@ object ScalaModernJavaInteropSmoke {
       s"${java.lang.String.join("", streamToList)}:$streamListFailure|" +
       s"${entryCopy.getKey}:${entryCopy.getValue}:$entryCopyMutation|" +
       s"${java.lang.String.join("", listOf)}:$listMutation:$duplicateSet:${mapOf.get("b")}:$mapMutation:${java.lang.String.join("", copiedList)}:" +
-      s"$optionalText:$optionalIsEmpty:$optionalFailure"
+      s"$optionalText:$optionalIsEmpty:$optionalFailure:${currentPid > 0}:$currentProcessAlive:${currentProcessByPid.isPresent}"
   }
 }

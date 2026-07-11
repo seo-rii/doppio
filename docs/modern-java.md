@@ -122,11 +122,12 @@ directly from Kotlin source and through reflection from Scala. The Scala
 compiler interop smoke also covers Java 9 `List.of`, `Set.of`, and `Map.of`
 immutability/duplicate behavior plus Java 10 `List.copyOf` through the same
 reflection-backed path and Java 11 `Optional.isEmpty()` / no-arg
-`Optional.orElseThrow()`, while the Kotlin compiler interop smoke directly
-covers Java 10 `List.copyOf`/`Set.copyOf`/`Map.copyOf` and the same Java 11
-Optional additions, plus Java 9 `StackWalker.walk(...)` frame discovery and
-`ProcessHandle.current()` / `ProcessHandle.of(pid)` metadata through
-reflection. The Java 17 fixture set also
+`Optional.orElseThrow()` and Java 9 `ProcessHandle.current()` /
+`ProcessHandle.of(pid)` metadata through reflection, while the Kotlin compiler
+interop smoke directly covers Java 10 `List.copyOf`/`Set.copyOf`/`Map.copyOf`
+and the same Java 11 Optional additions, plus Java 9 `StackWalker.walk(...)`
+frame discovery and `ProcessHandle.current()` / `ProcessHandle.of(pid)`
+metadata through reflection. The Java 17 fixture set also
 covers
 `ClassLoader.defineClass(String, ByteBuffer, ProtectionDomain)` for heap,
 direct, read-only direct, and sliced buffers without advancing buffer
@@ -448,7 +449,8 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   covering reflection-backed Scala use of Java 16 `Stream.toList()` and its
   unmodifiable result behavior plus reflection-backed Scala use of Java 17
   `Map.Entry.copyOf` snapshot and unmodifiable-result behavior plus Java 9/10
-  collection factory/copy APIs and Java 11 Optional additions,
+  collection factory/copy APIs, Java 11 Optional additions, and Java 9
+  `ProcessHandle` metadata,
   a focused Scala duration smoke covering `scala.concurrent.duration`
   arithmetic/sorting/parsing/scaling checks,
   classfile assertions for `InvokeDynamic`/`LambdaMetafactory` emission in the
