@@ -250,6 +250,52 @@ public final class DoppioMethodHandles {
     return MethodHandles.permuteArguments(spreadMoved, desiredType, restoreReorder);
   }
 
+  public static MethodHandle loop(MethodHandle[]... clauses)
+      throws NoSuchMethodException, IllegalAccessException {
+    if (clauses == null) {
+      throw new IllegalArgumentException("null clauses");
+    }
+    if (clauses.length != 1) {
+      throw new IllegalArgumentException("only one loop clause is supported");
+    }
+    MethodHandle[] clause = Objects.requireNonNull(clauses[0]);
+    if (clause.length != 3 && clause.length != 4) {
+      throw new IllegalArgumentException("loop clause must contain init, step, pred, and optional fini handles");
+    }
+
+    MethodHandle init = Objects.requireNonNull(clause[0]);
+    MethodHandle step = Objects.requireNonNull(clause[1]);
+    MethodHandle pred = Objects.requireNonNull(clause[2]);
+    MethodHandle fini = clause.length == 4 ? clause[3] : null;
+    MethodType initType = init.type();
+    Class<?> stateType = initType.returnType();
+    if (stateType == void.class) {
+      throw new IllegalArgumentException("init must return the loop state type");
+    }
+    List<Class<?>> externalTypes = initType.parameterList();
+    checkLoopClauseHandle(step.type(), stateType, externalTypes, stateType, "step");
+    checkLoopClauseHandle(pred.type(), stateType, externalTypes, boolean.class, "pred");
+    Class<?> returnType = void.class;
+    if (fini != null) {
+      checkLoopClauseHandle(fini.type(), stateType, externalTypes, fini.type().returnType(), "fini");
+      returnType = fini.type().returnType();
+    }
+
+    MethodHandle adapter = MethodHandles.publicLookup().findStatic(
+        DoppioMethodHandles.class,
+        "loopTarget",
+        MethodType.methodType(
+            Object.class,
+            MethodHandle.class,
+            MethodHandle.class,
+            MethodHandle.class,
+            MethodHandle.class,
+            Object[].class));
+    return MethodHandles.insertArguments(adapter, 0, init, step, pred, fini)
+        .asCollector(Object[].class, externalTypes.size())
+        .asType(MethodType.methodType(returnType, externalTypes));
+  }
+
   public static MethodHandle whileLoop(MethodHandle init, MethodHandle pred, MethodHandle body)
       throws NoSuchMethodException, IllegalAccessException {
     return stateLoop(init, pred, body, false);
@@ -642,6 +688,23 @@ public final class DoppioMethodHandles {
     return target.invokeWithArguments(args);
   }
 
+  public static Object loopTarget(
+      MethodHandle init,
+      MethodHandle step,
+      MethodHandle pred,
+      MethodHandle fini,
+      Object[] args) throws Throwable {
+    Object state = init.invokeWithArguments(args);
+    Object[] loopArgs = new Object[1 + args.length];
+    System.arraycopy(args, 0, loopArgs, 1, args.length);
+    do {
+      loopArgs[0] = state;
+      state = step.invokeWithArguments(loopArgs);
+      loopArgs[0] = state;
+    } while (((Boolean) pred.invokeWithArguments(loopArgs)).booleanValue());
+    return fini == null ? null : fini.invokeWithArguments(loopArgs);
+  }
+
   public static Object iteratedLoopTarget(
       MethodHandle iterator,
       MethodHandle init,
@@ -861,6 +924,28 @@ public final class DoppioMethodHandles {
       }
     }
     return type.parameterCount();
+  }
+
+  private static void checkLoopClauseHandle(
+      MethodType type,
+      Class<?> stateType,
+      List<Class<?>> externalTypes,
+      Class<?> returnType,
+      String role) {
+    if (type.returnType() != returnType) {
+      throw new IllegalArgumentException(role + " return type does not match");
+    }
+    if (type.parameterCount() != externalTypes.size() + 1) {
+      throw new IllegalArgumentException(role + " parameter count does not match");
+    }
+    if (type.parameterType(0) != stateType) {
+      throw new IllegalArgumentException(role + " state parameter type does not match");
+    }
+    for (int i = 0; i < externalTypes.size(); i++) {
+      if (type.parameterType(i + 1) != externalTypes.get(i)) {
+        throw new IllegalArgumentException(role + " external parameter types do not match");
+      }
+    }
   }
 
   private static Object defaultValue(Class<?> type) {

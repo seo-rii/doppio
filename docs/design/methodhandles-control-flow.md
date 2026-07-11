@@ -31,9 +31,10 @@ The control-flow family is split into small implementation slices:
   `(T, A...)void`. The iterator is either `null` and supplied by the leading
   `Iterable` runtime argument, or a handle returning `Iterator`, and `init` is
   either `null` or accepts a prefix of `(A...)`.
-- `loop(MethodHandle[]...)`: later slice. This is the general form behind the
-  convenience combinators and should wait until more simple slices have parity
-  tests.
+- `loop(MethodHandle[]...)`: selected fifth slice. It supports one clause with
+  an explicit `init`, `step`, `pred`, and optional `fini` handle over one
+  non-`void` loop state variable. The `fini` handle may be `null` or omitted
+  from the selected clause. The general multi-clause form remains a later slice.
 - `tableSwitch(fallback, targets...)`: selected slice. It is control flow, but
   not a loop; the current coverage lives in the broader `java.lang.invoke`
   design notes.
@@ -212,6 +213,12 @@ handle returns `void`.
   explicit/default iterator loops, descriptor strings, and selected validation
   failures for null body, non-`Iterator` iterator return, mismatched
   initializer return, and invalid null-iterator external arguments.
+- Java fixture coverage in
+  `classes/modern_test/Java17MethodHandleLoop.java`: selected single-clause
+  `loop(MethodHandle[]...)` state flows, including `init -> step -> pred`
+  ordering, primitive and reference state, explicit `fini` return adaptation,
+  `null` and omitted `fini` void return adaptation, descriptor strings, and
+  selected validation failures.
 - Kotlin smoke coverage in `classes/kotlin_smoke/MethodHandleSmoke.kt`:
   reflective discovery of `MethodHandles.whileLoop` and
   `MethodHandles.doWhileLoop` plus both `MethodHandles.countedLoop` overloads,
@@ -224,6 +231,10 @@ handle returns `void`.
 - Predicate and initializer validation is prefix-based but not a complete
   implementation of the generic `loop` effectively-identical parameter-list
   rules.
+- The selected `loop` slice covers only one clause with one explicit
+  non-`void` state variable. Multi-clause loops, absent `init`/`step`/`pred`
+  handles beyond the tested optional `fini`, no-state clauses, and exact
+  validation ordering remain open.
 - The selected `void` loop slices cover simple side-effect loops only; broad
   no-state/state mixes, exact generic `loop` effectively-identical
   parameter-list inference, and full validation ordering are not claimed.

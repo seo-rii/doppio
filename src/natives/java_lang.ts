@@ -2196,6 +2196,17 @@ export default function (): any {
       );
     }
 
+    public static 'loop([[Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;'(
+      thread: JVMThread,
+      clauses: JVMTypes.JVMArray<JVMTypes.JVMArray<JVMTypes.java_lang_invoke_MethodHandle>>
+    ): void {
+      java_lang_invoke_MethodHandles.callDoppioHelper(
+        thread,
+        'java/lang/invoke/DoppioMethodHandles/loop([[Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;',
+        [clauses]
+      );
+    }
+
     public static 'whileLoop(Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;'(
       thread: JVMThread,
       init: JVMTypes.java_lang_invoke_MethodHandle,
