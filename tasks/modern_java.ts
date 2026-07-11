@@ -4858,9 +4858,12 @@ function modernJava(grunt: IGrunt) {
       }
       tasks.push(function(cb: (err?: any) => void) {
         var className = file.src[0].slice(0, -5).replace(/[\\\/]/g, '.'),
-          javaOptions = className === 'classes.modern_test.Java17AccessControlContext'
-            ? ' --add-opens java.base/java.security=ALL-UNNAMED'
-            : '';
+          javaOptions = '';
+        if (className === 'classes.modern_test.Java17AccessControlContext') {
+          javaOptions = ' --add-opens java.base/java.security=ALL-UNNAMED';
+        } else if (className === 'classes.modern_test.Java17IoInitIDs') {
+          javaOptions = ' --add-opens java.base/java.io=ALL-UNNAMED';
+        }
         child_process.exec(shellEscape(grunt.config('build.java')) + javaOptions + ' -Dfile.encoding=UTF8 -ea -cp . ' + className,
           function(err?: any, stdout?: Buffer, stderr?: Buffer) {
             fs.writeFileSync(file.dest, stdout.toString() + stderr.toString());
