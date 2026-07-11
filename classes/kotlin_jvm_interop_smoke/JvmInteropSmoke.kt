@@ -30,6 +30,9 @@ class JvmInteropOwner private constructor(val label: String) {
     marker += delta
     return marker
   }
+
+  @JvmSynthetic
+  fun syntheticLabel(prefix: String): String = "$prefix$label"
 }
 
 object JvmInteropSingleton {
@@ -57,6 +60,7 @@ fun jvmInteropSummary(): String {
   val singletonClass = JvmInteropSingleton::class.java
   val objectCall = singletonClass.getDeclaredMethod("objectCall", java.lang.Integer.TYPE)
   val objectField = singletonClass.getDeclaredField("objectField")
+  val syntheticLabel = ownerClass.getDeclaredMethod("syntheticLabel", String::class.java)
 
   val created = staticCreate.invoke(null, "java") as JvmInteropOwner
   val checked = staticChecked.invoke(null, 7).toString()
@@ -71,7 +75,8 @@ fun jvmInteropSummary(): String {
     Modifier.isSynchronized(bump.modifiers),
     Modifier.isStatic(renamedTop.modifiers),
     Modifier.isStatic(objectCall.modifiers),
-    Modifier.isStatic(objectField.modifiers)
+    Modifier.isStatic(objectField.modifiers),
+    syntheticLabel.isSynthetic
   ).joinToString("") { flag ->
     if (flag) "1" else "0"
   }
@@ -84,5 +89,6 @@ fun jvmInteropSummary(): String {
       renamedTop.invoke(null, "abc") + ":" +
       objectCall.invoke(null, 4) + objectField.get(null) + ":" +
       owner.bump(4) + ":" +
+      syntheticLabel.invoke(owner, "syn-") + ":" +
       flags
 }

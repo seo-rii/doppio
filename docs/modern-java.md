@@ -218,13 +218,14 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `$WhenMappings`, string `when` hash switching, and subjectless `when`
   branches, plus inline `try/finally`, non-local returns, `crossinline`, and
   `noinline` function-object retention, plus `@file:JvmName`, `@JvmName`,
-  `@JvmStatic`, `@JvmField`, `const val`, `@Throws`, `@Volatile`, and
-  `@Synchronized` JVM interop lowering, plus mutable delegated properties with
-  `provideDelegate`, `getValue`, `setValue`, and generated delegated-property
-  references, plus captured local classes, anonymous object lowering,
-  inner-class `this$0`, nested companion construction, and synthetic accessor
-  generation, plus Java reflection over Kotlin nested, inner, companion,
-  method-local, companion-local, and anonymous class shape metadata, plus
+  `@JvmStatic`, `@JvmField`, `const val`, `@Throws`, `@Volatile`,
+  `@Synchronized`, and `@JvmSynthetic` JVM interop lowering, plus mutable
+  delegated properties with `provideDelegate`, `getValue`, `setValue`, and
+  generated delegated-property references, plus captured local classes,
+  anonymous object lowering, inner-class `this$0`, nested companion
+  construction, and synthetic accessor generation, plus Java reflection over
+  Kotlin nested, inner, companion, method-local, companion-local, and anonymous
+  class shape metadata, plus
   interface delegation, delegated `DefaultImpls` forwarding,
   and generic bridge methods verified through Java reflection, plus extension
   receiver functions/properties, typealias metadata, use-site variance, star
