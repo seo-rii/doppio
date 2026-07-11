@@ -579,6 +579,29 @@ public final class Files {
         throw new UnsupportedOperationException();
       }
     }
+    if (source.getFileSystem() != FileSystems.getDefault()
+        || target.getFileSystem() != FileSystems.getDefault()) {
+      if (source.getFileSystem() == target.getFileSystem()) {
+        try {
+          if (isSameFile(source, target)) {
+            return target;
+          }
+        } catch (NoSuchFileException e) {
+        }
+        source.getFileSystem().provider().move(source, target, options);
+        return target;
+      }
+      if (atomicMove) {
+        throw new IOException("Unable to move file atomically");
+      }
+      if (replaceExisting) {
+        copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+      } else {
+        copy(source, target);
+      }
+      delete(source);
+      return target;
+    }
     File sourceFile = toFile(source);
     File targetFile = toFile(target);
     if (!sourceFile.exists()) {

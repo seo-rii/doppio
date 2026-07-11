@@ -147,6 +147,37 @@ public class Java13FileSystems {
     Path lineFile = createdNested.resolve("lines.txt");
     System.out.println("write-lines:" + Files.write(lineFile, Arrays.asList("a", "b")).equals(lineFile) +
         ":" + Files.readAllLines(lineFile));
+    Path moveSource = fs.getPath(label + "-move-source.txt");
+    Path moveTarget = fs.getPath(label + "-move-target.txt");
+    Files.writeString(moveSource, "mz");
+    Files.move(moveSource, moveTarget);
+    System.out.println("move-zip:" + Files.readString(moveTarget) + ":" + Files.exists(moveSource));
+    Path moveExistingSource = fs.getPath(label + "-move-existing-source.txt");
+    Files.writeString(moveExistingSource, "mr");
+    printFailure(label + "-move-existing", () -> Files.move(moveExistingSource, moveTarget));
+    Files.move(moveExistingSource, moveTarget, StandardCopyOption.REPLACE_EXISTING);
+    System.out.println("move-replace:" + Files.readString(moveTarget) + ":" + Files.exists(moveExistingSource));
+    Path defaultMoveSource = Files.createTempFile("doppio-java13-fs-move-source", ".txt");
+    try {
+      Files.writeString(defaultMoveSource, "dm");
+      Path movedFromDefault = fs.getPath(label + "-default-move.txt");
+      Files.move(defaultMoveSource, movedFromDefault);
+      System.out.println("move-from-default:" + Files.exists(defaultMoveSource) + ":" +
+          Files.readString(movedFromDefault));
+    } finally {
+      Files.deleteIfExists(defaultMoveSource);
+    }
+    Path zipMoveSource = fs.getPath(label + "-zip-move-source.txt");
+    Files.writeString(zipMoveSource, "zd");
+    Path defaultMoveTarget = Files.createTempFile("doppio-java13-fs-move-target", ".txt");
+    Files.deleteIfExists(defaultMoveTarget);
+    try {
+      Files.move(zipMoveSource, defaultMoveTarget);
+      System.out.println("move-to-default:" + Files.exists(zipMoveSource) + ":" +
+          Files.readString(defaultMoveTarget));
+    } finally {
+      Files.deleteIfExists(defaultMoveTarget);
+    }
     try (SeekableByteChannel channel = Files.newByteChannel(hello)) {
       System.out.println("channel:" + channel.size());
     }
