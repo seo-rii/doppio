@@ -124,7 +124,9 @@ immutability/duplicate behavior plus Java 10 `List.copyOf` through the same
 reflection-backed path and Java 11 `Optional.isEmpty()` / no-arg
 `Optional.orElseThrow()`, while the Kotlin compiler interop smoke directly
 covers Java 10 `List.copyOf`/`Set.copyOf`/`Map.copyOf` and the same Java 11
-Optional additions. The Java 17 fixture set also
+Optional additions, plus Java 9 `StackWalker.walk(...)` frame discovery and
+`ProcessHandle.current()` / `ProcessHandle.of(pid)` metadata through
+reflection. The Java 17 fixture set also
 covers
 `ClassLoader.defineClass(String, ByteBuffer, ProtectionDomain)` for heap,
 direct, read-only direct, and sliced buffers without advancing buffer
@@ -261,8 +263,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   behavior, plus Kotlin source-level use of Java 17 `Map.Entry.copyOf`
   snapshot and unmodifiable-result behavior, plus Kotlin source-level use of
   Java 10 collection `copyOf` APIs and Java 11 `Optional` additions, plus Kotlin
-  source-level use of concurrent cache
-  primitives covering `ConcurrentHashMap` compute/merge paths, atomics,
+  source-level reflection over Java 9 `StackWalker` and `ProcessHandle`, plus
+  concurrent cache primitives covering `ConcurrentHashMap` compute/merge paths,
+  atomics,
   `CopyOnWriteArrayList`, `ThreadLocal`, `ReentrantLock.withLock`,
   synchronized maps, and one-shot thread-local isolation, plus Kotlin contracts
   covering `returns` implications, `callsInPlace` invocation-kind metadata,

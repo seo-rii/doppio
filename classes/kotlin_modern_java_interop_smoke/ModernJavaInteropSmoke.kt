@@ -3,6 +3,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.util.AbstractMap
+import java.util.function.Function
 import java.util.stream.Stream
 
 fun modernJavaInteropSummary(): String {
@@ -92,6 +93,26 @@ fun modernJavaInteropSummary(): String {
   } catch (e: java.util.NoSuchElementException) {
     "nse"
   }
+  val stackWalkerClass = Class.forName("java.lang.StackWalker")
+  val stackFrameClass = Class.forName("java.lang.StackWalker\$StackFrame")
+  val stackWalker = stackWalkerClass.getMethod("getInstance").invoke(null)
+  val stackHasSmokeFrame = stackWalkerClass
+    .getMethod("walk", Function::class.java)
+    .invoke(stackWalker, Function<Any, Boolean> { framesObj ->
+      @Suppress("UNCHECKED_CAST")
+      val frames = framesObj as Stream<Any>
+      frames.anyMatch { frame ->
+        stackFrameClass.getMethod("getClassName").invoke(frame) == "ModernJavaInteropSmokeKt" &&
+            stackFrameClass.getMethod("getMethodName").invoke(frame) == "modernJavaInteropSummary"
+      }
+    }) as Boolean
+  val processHandleClass = Class.forName("java.lang.ProcessHandle")
+  val currentHandle = processHandleClass.getMethod("current").invoke(null)
+  val currentPid = processHandleClass.getMethod("pid").invoke(currentHandle) as Long
+  val currentProcessAlive = processHandleClass.getMethod("isAlive").invoke(currentHandle) as Boolean
+  val currentProcessByPid = processHandleClass
+    .getMethod("of", Long::class.javaPrimitiveType)
+    .invoke(null, currentPid) as java.util.Optional<*>
 
   return "$formatted|$upperText|${parsed.size}:${hexClass.getMethod("formatHex", ByteArray::class.java).invoke(hex, parsed)}:$digit|" +
       "$fixedValue:$fixedMillis:$offsetValue:${Clock::class.java.isInstance(zoned)}|" +
@@ -100,5 +121,6 @@ fun modernJavaInteropSummary(): String {
       "${streamList.joinToString("")}:$streamListFailure|" +
       "${entryCopy.key}:${entryCopy.value}:$entryCopyMutation|" +
       "${copyList.joinToString("")}:$copyListMutation:${copySet.size}:${copySet.contains("s")}:${copySet.contains("t")}:" +
-      "${copyMap["y"]}:$copyMapMutation:$optionalValue:${optionalEmpty.isEmpty}:$optionalFailure"
+      "${copyMap["y"]}:$copyMapMutation:$optionalValue:${optionalEmpty.isEmpty}:$optionalFailure:" +
+      "$stackHasSmokeFrame:${currentPid > 0}:$currentProcessAlive:${currentProcessByPid.isPresent}"
 }
