@@ -98,46 +98,55 @@ function downloadJDK(downloadUrl: string, destPath: string, cb: (err?: Error) =>
 }
 
 function writeJdkJson(): void {
-  let globSearch = `${path.resolve(JDK_PATH, JDK_FOLDER).replace(/\\/g, '/')}/lib/*.jar`;
-  glob(globSearch, (e: Error, classpath: string[]) => {
-    if (e) {
-      console.error(`Failed to locate JDK JAR items: ${e}`);
+  let jdkHome = path.resolve(JDK_PATH, JDK_FOLDER),
+    libGlob = `${jdkHome.replace(/\\/g, '/')}/lib/*.jar`,
+    extGlob = `${jdkHome.replace(/\\/g, '/')}/lib/ext/*.jar`;
+  glob(libGlob, (libErr: Error, libClasspath: string[]) => {
+    if (libErr) {
+      console.error(`Failed to locate JDK lib JAR items: ${libErr}`);
       process.exit(1);
     }
-    let rtIndex: number = -1;
-    classpath = classpath.map((item, i) =>  {
-      switch (path.basename(item)) {
-        case "rt.jar":
-          rtIndex = i;
-          break;
+    glob(extGlob, (extErr: Error, extClasspath: string[]) => {
+      if (extErr) {
+        console.error(`Failed to locate JDK ext JAR items: ${extErr}`);
+        process.exit(1);
       }
-      return path.relative(path.resolve(JDK_PATH, JDK_FOLDER), item);
-    });
-    let rt = classpath[rtIndex];
-    classpath.splice(rtIndex, 1);
-    classpath.unshift(rt);
+      let classpath = libClasspath.concat(extClasspath.sort()),
+        rtIndex: number = -1;
+      classpath = classpath.map((item, i) =>  {
+        switch (path.basename(item)) {
+          case "rt.jar":
+            rtIndex = i;
+            break;
+        }
+        return path.relative(jdkHome, item);
+      });
+      let rt = classpath[rtIndex];
+      classpath.splice(rtIndex, 1);
+      classpath.unshift(rt);
 
-    let jdkJson = {
-      url: JDK_URL,
-      // Convert Windows-style paths to Unix-style paths
-      classpath: classpath.map((cpItem) => cpItem.replace(/\\/g, '/'))
-    };
-    // Ensure our generated doppio.jar is added.
-    if (jdkJson.classpath.filter((cpItem) => path.basename(cpItem) === 'doppio.jar').length === 0) {
-      jdkJson.classpath.push('lib/doppio.jar');
-    }
+      let jdkJson = {
+        url: JDK_URL,
+        // Convert Windows-style paths to Unix-style paths
+        classpath: classpath.map((cpItem) => cpItem.replace(/\\/g, '/'))
+      };
+      // Ensure our generated doppio.jar is added.
+      if (jdkJson.classpath.filter((cpItem) => path.basename(cpItem) === 'doppio.jar').length === 0) {
+        jdkJson.classpath.push('lib/doppio.jar');
+      }
 
-    fs.writeFileSync(path.resolve(JDK_PATH, JDK_FOLDER, "jdk.json"),
-      new Buffer(JSON.stringify(jdkJson), "utf8"));
-    // TypeScript typings, so it can be used as a module. :)
-    fs.writeFileSync(path.resolve(JDK_PATH, JDK_FOLDER, "jdk.json.d.ts"),
-      new Buffer(
+      fs.writeFileSync(path.resolve(JDK_PATH, JDK_FOLDER, "jdk.json"),
+        new Buffer(JSON.stringify(jdkJson), "utf8"));
+      // TypeScript typings, so it can be used as a module. :)
+      fs.writeFileSync(path.resolve(JDK_PATH, JDK_FOLDER, "jdk.json.d.ts"),
+        new Buffer(
 `declare let JDKInfo: {
   url: string;
   classpath: string[];
 };
 export = JDKInfo;
 `, "utf8"));
+    });
   });
 }
 
