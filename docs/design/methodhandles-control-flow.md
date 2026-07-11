@@ -36,8 +36,10 @@ The control-flow family is split into small implementation slices:
   handle over one non-`void` loop state variable. A `null` `init` starts from
   the Java default value for the state type inferred from `step`; a `null`
   `step` is supported when `init` is explicit and preserves the current state.
-  The `fini` handle may be `null` or omitted from the selected clause. The
-  general multi-clause form remains a later slice.
+  When both `init` and `step` are `null`, the selected slice supports a first
+  external argument as the loop state for false-predicate exit paths. The
+  `fini` handle may be `null` or omitted from the selected clause. The general
+  multi-clause form remains a later slice.
 - `tableSwitch(fallback, targets...)`: selected slice. It is control flow, but
   not a loop; the current coverage lives in the broader `java.lang.invoke`
   design notes.
@@ -221,16 +223,17 @@ handle returns `void`.
   `loop(MethodHandle[]...)` state flows, including `init -> step -> pred`
   ordering, primitive and reference state, `null init` default-state behavior
   for primitive and reference state, explicit-init `null step` identity-state
-  behavior, explicit `fini` return adaptation, `null` and omitted `fini` void
-  return adaptation, descriptor strings, and selected validation failures.
+  behavior, null-init/null-step external-state false-predicate exits, explicit
+  `fini` return adaptation, `null` and omitted `fini` void return adaptation,
+  descriptor strings, and selected validation failures.
 - Kotlin smoke coverage in
   `classes/kotlin_methodhandle_smoke/MethodHandleSmoke.kt`:
   reflective discovery of `MethodHandles.whileLoop` and
   `MethodHandles.doWhileLoop` plus both `MethodHandles.countedLoop` overloads,
   integer and reference state invocation, null initializer invocation,
   body-first `doWhileLoop` behavior, explicit counted ranges, selected
-  `MethodHandles.loop` null-init and null-step invocation, and descriptor
-  checks.
+  `MethodHandles.loop` null-init, null-step, and external-state invocation,
+  and descriptor checks.
 
 ## Remaining Gaps
 
@@ -238,9 +241,9 @@ handle returns `void`.
   implementation of the generic `loop` effectively-identical parameter-list
   rules.
 - The selected `loop` slice covers only one clause with one non-`void` state
-  variable. Multi-clause loops, absent `pred` handles, null-init plus null-step
-  no-state inference, no-state clauses, and exact validation ordering remain
-  open.
+  variable. Multi-clause loops, absent `pred` handles, broad null-init plus
+  null-step inference beyond the tested external-state shape, no-state clauses,
+  and exact validation ordering remain open.
 - The selected `void` loop slices cover simple side-effect loops only; broad
   no-state/state mixes, exact generic `loop` effectively-identical
   parameter-list inference, and full validation ordering are not claimed.

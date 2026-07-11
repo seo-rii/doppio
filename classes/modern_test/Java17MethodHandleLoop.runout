@@ -6,6 +6,8 @@ done:3:3
 done:1:0
 (I)Ljava/lang/String;
 done:0:7
+(II)Ljava/lang/String;
+done:5:9
 (Ljava/lang/String;I)Ljava/lang/String;
 x...:3
 x.:0
@@ -14,10 +16,14 @@ x...:3
 x:0
 (Ljava/lang/String;I)Ljava/lang/String;
 x:7
+(Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/String;
+x:7
 (I)V
 void-loop
 (I)V
 void-no-step-loop
+(II)V
+void-external-state-loop
 (I)V
 short-void-loop
 null-clauses:java.lang.IllegalArgumentException

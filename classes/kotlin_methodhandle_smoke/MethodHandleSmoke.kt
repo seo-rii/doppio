@@ -612,6 +612,10 @@ fun methodHandleSummary(): String {
     null,
     arrayOf(arrayOf<MethodHandle?>(loopZero, null, loopNever, loopFinish))
   ) as MethodHandle
+  val genericLoopExternalState = loopMethod.invoke(
+    null,
+    arrayOf(arrayOf<MethodHandle?>(null, null, loopNever, loopFinish))
+  ) as MethodHandle
   val whileInt = whileLoopMethod.invoke(null, loopZero, loopBelow, loopIncrement) as MethodHandle
   val whileDefaultInt = whileLoopMethod.invoke(null, null, loopBelow, loopIncrement) as MethodHandle
   val loopSeed = lookup.findStatic(
@@ -791,6 +795,7 @@ fun methodHandleSummary(): String {
     genericLoop.invokeWithArguments(3).toString(),
     genericLoop.invokeWithArguments(0).toString(),
     genericLoopNoStep.invokeWithArguments(7).toString(),
+    genericLoopExternalState.invokeWithArguments(5, 9).toString(),
     whileLoops,
     doWhileLoops,
     countedLoops,
@@ -831,6 +836,7 @@ fun methodHandleSummary(): String {
     spreadInvoker,
     genericLoop,
     genericLoopNoStep,
+    genericLoopExternalState,
     whileInt,
     whileDefaultInt,
     whileText,

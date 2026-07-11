@@ -86,6 +86,10 @@ public class Java17MethodHandleLoop {
     System.out.println(noStep.type().toMethodDescriptorString());
     System.out.println((String) noStep.invokeExact(7));
 
+    MethodHandle externalState = MethodHandles.loop(new MethodHandle[] { null, null, never, fini });
+    System.out.println(externalState.type().toMethodDescriptorString());
+    System.out.println((String) externalState.invokeExact(5, 9));
+
     MethodHandle textInit = lookup.findStatic(
         Java17MethodHandleLoop.class,
         "textInit",
@@ -120,6 +124,10 @@ public class Java17MethodHandleLoop {
     System.out.println(noStepText.type().toMethodDescriptorString());
     System.out.println((String) noStepText.invokeExact("x", 7));
 
+    MethodHandle externalTextState = MethodHandles.loop(new MethodHandle[] { null, null, textNever, textFini });
+    System.out.println(externalTextState.type().toMethodDescriptorString());
+    System.out.println((String) externalTextState.invokeExact("x", "ignored", 7));
+
     MethodHandle voidLoop = MethodHandles.loop(new MethodHandle[] { init, step, pred, null });
     System.out.println(voidLoop.type().toMethodDescriptorString());
     voidLoop.invokeExact(2);
@@ -129,6 +137,11 @@ public class Java17MethodHandleLoop {
     System.out.println(voidNoStep.type().toMethodDescriptorString());
     voidNoStep.invokeExact(7);
     System.out.println("void-no-step-loop");
+
+    MethodHandle voidExternalState = MethodHandles.loop(new MethodHandle[] { null, null, never });
+    System.out.println(voidExternalState.type().toMethodDescriptorString());
+    voidExternalState.invokeExact(5, 9);
+    System.out.println("void-external-state-loop");
 
     MethodHandle shortVoidLoop = MethodHandles.loop(new MethodHandle[] { init, step, pred });
     System.out.println(shortVoidLoop.type().toMethodDescriptorString());
