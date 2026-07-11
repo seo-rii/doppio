@@ -42,7 +42,8 @@ side-effect targets, selected `MethodHandles.iteratedLoop` `Iterable`/`Iterator`
 support including no-arg explicit iterator handles, plus selected
 `MethodHandles.whileLoop`/`MethodHandles.doWhileLoop`/`MethodHandles.countedLoop`
 non-`void` state-loop and selected `void` side-effect slices through public
-overlays, plus selected single-clause `MethodHandles.loop` state-loop flows, covering normal,
+overlays, plus selected single-clause `MethodHandles.loop` state-loop flows
+with explicit or `null` `init` and optional `fini`, covering normal,
 exceptional, and `void` `tryFinally` target flows, same-typed `tableSwitch`
 target/fallback dispatch, selected iterated `Iterable`/`Iterator` flows, plus
 stateful loop flows in the Java fixtures and Kotlin smoke. Full control-flow

@@ -271,7 +271,8 @@ handles, dynamic constants, and record object-method linkage:
   `iteratedLoop` `Iterable`/`Iterator` flows including no-arg explicit iterator
   handles, and selected `whileLoop`, `doWhileLoop`, and both `countedLoop`
   overloads for non-`void` state loops plus selected `void` side-effect loops,
-  and selected single-clause `loop` state flows with optional `fini`.
+  and selected single-clause `loop` state flows with explicit or `null` `init`
+  plus optional `fini`.
   The `tryFinally` slice is tracked separately in
   `docs/design/methodhandles-try-finally.md`; the control-flow family and
   selected state-loop slices are tracked in
@@ -306,12 +307,11 @@ handles, dynamic constants, and record object-method linkage:
   `Iterable` dispatch, explicit iterator handles including no-arg iterator
   handles, reference and primitive state, selected `void` side-effect
   iteration, empty iteration, and selected validation errors. The selected
-  `loop` slice covers one explicit `init`/`step`/`pred` clause with optional
-  `fini`. Broad state-loop parity and the remaining multi-clause Java 9+
-  `loop` combinator still need
-  separate fixtures and implementation slices because they need control-flow,
-  exception, and argument-flow parity beyond the simple public overlay helper
-  shape.
+  `loop` slice covers one `init`/`step`/`pred` clause with explicit or `null`
+  `init` and optional `fini`. Broad state-loop parity and the remaining
+  multi-clause Java 9+ `loop` combinator still need separate fixtures and
+  implementation slices because they need control-flow, exception, and
+  argument-flow parity beyond the simple public overlay helper shape.
 - `MethodHandleNatives.resolve` currently bridges Java 11 nestmate private
   `find*` lookup through `MemberName` access-flag adjustment, and the modern
   `sun.invoke.util.VerifyAccess` shim bridges `unreflect*` lookup access

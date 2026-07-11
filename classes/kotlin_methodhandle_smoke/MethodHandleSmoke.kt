@@ -46,6 +46,9 @@ class MethodHandleOwner(@JvmField var text: String) {
     fun loopIncrement(value: Int, limit: Int): Int = value + 1
 
     @JvmStatic
+    fun loopFinish(value: Int, limit: Int): String = "loop:$value:$limit"
+
+    @JvmStatic
     fun loopCount(limit: Int): Int = limit
 
     @JvmStatic
@@ -464,6 +467,10 @@ fun methodHandleSummary(): String {
     MethodHandle::class.java,
     MethodHandle::class.java
   )
+  val loopMethod = MethodHandles::class.java.getMethod(
+    "loop",
+    Array<Array<MethodHandle>>::class.java
+  )
   val zeroInt = zeroMethod.invoke(null, intClass) as MethodHandle
   val zeroString = zeroMethod.invoke(null, stringClass) as MethodHandle
   val emptyString = emptyMethod.invoke(
@@ -584,6 +591,15 @@ fun methodHandleSummary(): String {
     "loopIncrement",
     MethodType.methodType(intClass, intClass, intClass)
   )
+  val loopFinish = lookup.findStatic(
+    ownerClass,
+    "loopFinish",
+    MethodType.methodType(stringClass, intClass, intClass)
+  )
+  val genericLoop = loopMethod.invoke(
+    null,
+    arrayOf(arrayOf<MethodHandle?>(null, loopIncrement, loopBelow, loopFinish))
+  ) as MethodHandle
   val whileInt = whileLoopMethod.invoke(null, loopZero, loopBelow, loopIncrement) as MethodHandle
   val whileDefaultInt = whileLoopMethod.invoke(null, null, loopBelow, loopIncrement) as MethodHandle
   val loopSeed = lookup.findStatic(
@@ -760,6 +776,8 @@ fun methodHandleSummary(): String {
     matchedDrop.invokeWithArguments(2, "matched").toString(),
     foldedAtOne.invokeWithArguments("fold", 6).toString(),
     spreadVarargs,
+    genericLoop.invokeWithArguments(3).toString(),
+    genericLoop.invokeWithArguments(0).toString(),
     whileLoops,
     doWhileLoops,
     countedLoops,
@@ -798,6 +816,7 @@ fun methodHandleSummary(): String {
     spreadArrayAt,
     spreadArrayMiddle,
     spreadInvoker,
+    genericLoop,
     whileInt,
     whileDefaultInt,
     whileText,

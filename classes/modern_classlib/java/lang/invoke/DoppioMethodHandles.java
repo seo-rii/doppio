@@ -263,17 +263,30 @@ public final class DoppioMethodHandles {
       throw new IllegalArgumentException("loop clause must contain init, step, pred, and optional fini handles");
     }
 
-    MethodHandle init = Objects.requireNonNull(clause[0]);
+    MethodHandle init = clause[0];
     MethodHandle step = Objects.requireNonNull(clause[1]);
     MethodHandle pred = Objects.requireNonNull(clause[2]);
     MethodHandle fini = clause.length == 4 ? clause[3] : null;
-    MethodType initType = init.type();
-    Class<?> stateType = initType.returnType();
-    if (stateType == void.class) {
-      throw new IllegalArgumentException("init must return the loop state type");
+    MethodType stepType = step.type();
+    Class<?> stateType;
+    List<Class<?>> externalTypes;
+    if (init == null) {
+      stateType = stepType.returnType();
+      if (stateType == void.class ||
+          stepType.parameterCount() == 0 ||
+          stepType.parameterType(0) != stateType) {
+        throw new IllegalArgumentException("step must accept and return the loop state type");
+      }
+      externalTypes = stepType.parameterList().subList(1, stepType.parameterCount());
+    } else {
+      MethodType initType = init.type();
+      stateType = initType.returnType();
+      if (stateType == void.class) {
+        throw new IllegalArgumentException("init must return the loop state type");
+      }
+      externalTypes = initType.parameterList();
+      checkLoopClauseHandle(stepType, stateType, externalTypes, stateType, "step");
     }
-    List<Class<?>> externalTypes = initType.parameterList();
-    checkLoopClauseHandle(step.type(), stateType, externalTypes, stateType, "step");
     checkLoopClauseHandle(pred.type(), stateType, externalTypes, boolean.class, "pred");
     Class<?> returnType = void.class;
     if (fini != null) {
@@ -290,8 +303,9 @@ public final class DoppioMethodHandles {
             MethodHandle.class,
             MethodHandle.class,
             MethodHandle.class,
+            Class.class,
             Object[].class));
-    return MethodHandles.insertArguments(adapter, 0, init, step, pred, fini)
+    return MethodHandles.insertArguments(adapter, 0, init, step, pred, fini, stateType)
         .asCollector(Object[].class, externalTypes.size())
         .asType(MethodType.methodType(returnType, externalTypes));
   }
@@ -693,8 +707,9 @@ public final class DoppioMethodHandles {
       MethodHandle step,
       MethodHandle pred,
       MethodHandle fini,
+      Class<?> stateType,
       Object[] args) throws Throwable {
-    Object state = init.invokeWithArguments(args);
+    Object state = init == null ? defaultValue(stateType) : init.invokeWithArguments(args);
     Object[] loopArgs = new Object[1 + args.length];
     System.arraycopy(args, 0, loopArgs, 1, args.length);
     do {

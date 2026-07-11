@@ -26,7 +26,7 @@ public class Java17MethodHandleLoop {
   }
 
   public static String textStep(String state, String prefix, int limit) {
-    return state + ".";
+    return state == null ? prefix : state + ".";
   }
 
   public static boolean textPred(String state, String prefix, int limit) {
@@ -65,6 +65,11 @@ public class Java17MethodHandleLoop {
     System.out.println((String) counted.invokeExact(3));
     System.out.println((String) counted.invokeExact(0));
 
+    MethodHandle defaultCounted = MethodHandles.loop(new MethodHandle[] { null, step, pred, fini });
+    System.out.println(defaultCounted.type().toMethodDescriptorString());
+    System.out.println((String) defaultCounted.invokeExact(3));
+    System.out.println((String) defaultCounted.invokeExact(0));
+
     MethodHandle textInit = lookup.findStatic(
         Java17MethodHandleLoop.class,
         "textInit",
@@ -85,6 +90,11 @@ public class Java17MethodHandleLoop {
     System.out.println(textLoop.type().toMethodDescriptorString());
     System.out.println((String) textLoop.invokeExact("x", 3));
     System.out.println((String) textLoop.invokeExact("x", 0));
+
+    MethodHandle defaultTextLoop = MethodHandles.loop(new MethodHandle[] { null, textStep, textPred, textFini });
+    System.out.println(defaultTextLoop.type().toMethodDescriptorString());
+    System.out.println((String) defaultTextLoop.invokeExact("x", 3));
+    System.out.println((String) defaultTextLoop.invokeExact("x", 0));
 
     MethodHandle voidLoop = MethodHandles.loop(new MethodHandle[] { init, step, pred, null });
     System.out.println(voidLoop.type().toMethodDescriptorString());

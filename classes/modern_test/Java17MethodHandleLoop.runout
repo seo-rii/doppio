@@ -1,9 +1,15 @@
 (I)Ljava/lang/String;
 done:3:3
 done:1:0
+(I)Ljava/lang/String;
+done:3:3
+done:1:0
 (Ljava/lang/String;I)Ljava/lang/String;
 x...:3
 x.:0
+(Ljava/lang/String;I)Ljava/lang/String;
+x...:3
+x:0
 (I)V
 void-loop
 (I)V
