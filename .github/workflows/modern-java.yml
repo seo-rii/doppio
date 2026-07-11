@@ -50,6 +50,8 @@ jobs:
         run: |
           yarn ci:check-modern-java-workflow:test
           yarn ci:check-modern-java-workflow
+          yarn ci:check-kotlin-modern-source-guards:test
+          yarn ci:check-kotlin-modern-source-guards
 
       - name: Build release CLI runner
         timeout-minutes: 20

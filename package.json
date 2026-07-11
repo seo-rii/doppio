@@ -92,6 +92,8 @@
     "ci:check-pages-workflow:test": "node ci/check_pages_workflow_test.mjs",
     "ci:check-modern-java-workflow": "node ci/check_modern_java_workflow.mjs",
     "ci:check-modern-java-workflow:test": "node ci/check_modern_java_workflow_test.mjs",
+    "ci:check-kotlin-modern-source-guards": "node ci/check_kotlin_modern_source_guards.mjs",
+    "ci:check-kotlin-modern-source-guards:test": "node ci/check_kotlin_modern_source_guards_test.mjs",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "typecheck:bootstrap": "tsc --noEmit --ignoreConfig --noImplicitAny --noImplicitThis false --strict false --strictNullChecks false --strictPropertyInitialization false --useUnknownInCatchVariables false --module commonjs --target ES2015 --skipLibCheck types/legacy-globals.d.ts tasks/*.ts Grunttasks.ts",
     "typecheck:typescript-7-rc": "npx -y -p typescript@7.0.1-rc tsc --project tsconfig.json --noEmit",

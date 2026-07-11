@@ -88,6 +88,19 @@ if (!/node\s+build\/release-cli\/console\/test_runner\.js\s+classes\/test\/Array
   fail('Modern Java workflow must run the ArrayOps makefile smoke with the release CLI runner.');
 }
 
+const compilerCoverageStep = workflow.match(
+  /- name:\s*Check compiler smoke workflow coverage\n(?<body>(?:\s{8}[^\n]*\n)*)/
+);
+const compilerCoverageBody = compilerCoverageStep?.groups?.body || '';
+if (compilerCoverageStep) {
+  if (!/yarn\s+ci:check-kotlin-modern-source-guards:test\b/.test(compilerCoverageBody)) {
+    fail('Modern Java workflow must test the Kotlin modern source guard before compiler smokes.');
+  }
+  if (!/yarn\s+ci:check-kotlin-modern-source-guards\b/.test(compilerCoverageBody)) {
+    fail('Modern Java workflow must run the Kotlin modern source guard before compiler smokes.');
+  }
+}
+
 const releaseRunnerIndex = requireWorkflowIndex('the Build release CLI runner step', workflow.indexOf('- name: Build release CLI runner'));
 const modernJavaRuntimeIndex = requireWorkflowIndex(
   'the Run modern Java compatibility tests step',

@@ -170,6 +170,39 @@ jobs:
     );
   }
 
+  const missingKotlinSourceGuard = writeFixture(root, `
+jobs:
+  test:
+    steps:
+      - name: Check compiler smoke workflow coverage
+        run: |
+          yarn ci:check-modern-java-workflow:test
+          yarn ci:check-modern-java-workflow
+      - name: Build release CLI runner
+        timeout-minutes: 20
+        run: ./node_modules/.bin/grunt --stack modern-ci-release-cli --grunt-ignore-compile-errors
+      - name: Run modern Java compatibility tests
+        run: ./node_modules/.bin/grunt --stack test-modern-java-runtime --grunt-ignore-compile-errors
+      - name: Run core array compatibility smoke
+        run: |
+          ./node_modules/.bin/grunt --stack modern-ci-array-runout --grunt-ignore-compile-errors
+          node build/release-cli/console/test_runner.js classes/test/ArrayOps --makefile
+      - run: ./ci/kotlin_alpha_smoke.sh
+      - run: ./ci/scala_beta_smoke.sh
+`);
+  const missingKotlinSourceGuardResult = runChecker(
+    missingKotlinSourceGuard.ciDir,
+    missingKotlinSourceGuard.workflowPath
+  );
+  if (
+    missingKotlinSourceGuardResult.status === 0 ||
+    !missingKotlinSourceGuardResult.stderr.includes('Kotlin modern source guard')
+  ) {
+    throw new Error(
+      `expected missing Kotlin source guard to fail:\n${missingKotlinSourceGuardResult.stdout}\n${missingKotlinSourceGuardResult.stderr}`
+    );
+  }
+
   const compilerSmokeBeforeBuild = writeFixture(root, `
 jobs:
   test:

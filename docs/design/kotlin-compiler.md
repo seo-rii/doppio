@@ -294,6 +294,12 @@ Current verified checks:
   `ProcessHandle.of(pid)` metadata, plus selected `ProcessHandle.Info`
   optional metadata and display shape. A local 2026-07-11 validation completed
   the focused smoke with retained StackWalker traversal in 294 seconds.
+- `ci/check_kotlin_modern_source_guards.mjs` blocks Kotlin smoke sources from
+  adding direct calls that have already exhausted local Doppio-hosted compiler
+  budgets, including `Runtime.version`, selected `Optional` Java 9 methods,
+  selected modern `Objects` helpers, and `COPY_ATTRIBUTES`. These probes should
+  stay in Java fixtures or reflection-backed Kotlin smokes until compiler
+  startup and class-library resolution have enough headroom.
 - `ci/kotlin_diagnostic_smoke.sh` now covers a failing Kotlin compiler path:
   Doppio-hosted `K2JVMCompiler` compiles an intentionally invalid source file,
   exits with status 1, reports the expected initializer type-mismatch and
@@ -1065,10 +1071,13 @@ and full-classpath modes.
 3. Keep broadening the Kotlin smoke in small increments that distinguish
    event-loop asynchronous resumption, more complex control-flow bytecode, and
    broader JVM bytecode emission.
-4. If a smoke is slow because of repeated Java exceptions, reduce the specific
+4. Keep the Kotlin modern source guard green before broadening compiler smokes;
+   direct modern API calls that have already hit timeout budgets need a
+   separate design or Java fixture first.
+5. If a smoke is slow because of repeated Java exceptions, reduce the specific
    exception pattern to a Java fixture before optimizing Doppio. The generic
    lazy `Throwable` stack trace path is already covered.
-5. If a smoke diverges semantically, reduce the primitive to a Java fixture
+6. If a smoke diverges semantically, reduce the primitive to a Java fixture
    where possible. If it is Kotlin-compiler-internal behavior, keep a small
    `/tmp` Kotlin smoke and document the exact class/method path before changing
    VM semantics.
