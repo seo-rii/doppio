@@ -103,6 +103,21 @@ public class Java13FileSystems {
     }
     Collections.sort(listedNames);
     System.out.println("list:" + listedNames);
+    ArrayList<String> walkedNames = new ArrayList<String>();
+    try (java.util.stream.Stream<Path> stream = Files.walk(nested)) {
+      stream.forEach(path -> {
+        Path fileName = path.getFileName();
+        walkedNames.add(fileName == null ? "." : fileName.toString());
+      });
+    }
+    Collections.sort(walkedNames);
+    System.out.println("walk:" + walkedNames);
+    ArrayList<String> foundNames = new ArrayList<String>();
+    try (java.util.stream.Stream<Path> stream = Files.find(nested, 1, (path, attributes) -> attributes.isRegularFile())) {
+      stream.forEach(path -> foundNames.add(path.getFileName().toString()));
+    }
+    Collections.sort(foundNames);
+    System.out.println("find:" + foundNames);
   }
 
   private static void printFailure(String label, Throwing action) {

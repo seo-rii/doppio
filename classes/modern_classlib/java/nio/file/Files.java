@@ -1177,6 +1177,36 @@ public final class Files {
     if (maxDepth < 0) {
       throw new IllegalArgumentException();
     }
+    if (start.getFileSystem() != FileSystems.getDefault()) {
+      ArrayList<Path> paths = new ArrayList<Path>();
+      ArrayList<Path> pending = new ArrayList<Path>();
+      ArrayList<Integer> depths = new ArrayList<Integer>();
+      pending.add(start);
+      depths.add(Integer.valueOf(0));
+      while (!pending.isEmpty()) {
+        int index = pending.size() - 1;
+        Path path = pending.remove(index);
+        int depth = depths.remove(index).intValue();
+        BasicFileAttributes attributes = readAttributes(path, BasicFileAttributes.class);
+        paths.add(path);
+        if (depth < maxDepth && attributes.isDirectory()) {
+          ArrayList<Path> children = new ArrayList<Path>();
+          DirectoryStream<Path> stream = newDirectoryStream(path);
+          try {
+            for (Path child : stream) {
+              children.add(child);
+            }
+          } finally {
+            stream.close();
+          }
+          for (int i = children.size() - 1; i >= 0; i--) {
+            pending.add(children.get(i));
+            depths.add(Integer.valueOf(depth + 1));
+          }
+        }
+      }
+      return paths.stream();
+    }
     File root = toFile(start);
     if (!root.exists()) {
       throw new NoSuchFileException(root.toString());
@@ -1212,11 +1242,11 @@ public final class Files {
       FileVisitOption... options) throws IOException {
     return walk(start, maxDepth, options).filter(new Predicate<Path>() {
       public boolean test(final Path path) {
-        final File file = toFile(path);
-        if (!file.exists()) {
-          throw new UncheckedIOException(new NoSuchFileException(file.toString()));
+        try {
+          return matcher.test(path, Files.readAttributes(path, BasicFileAttributes.class));
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
         }
-        return matcher.test(path, readBasicFileAttributes(file));
       }
     });
   }
