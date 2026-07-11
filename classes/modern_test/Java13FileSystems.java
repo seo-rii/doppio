@@ -1,12 +1,16 @@
 package classes.modern_test;
 
 import java.io.OutputStream;
+import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.DirectoryStream;
+import java.nio.file.FileVisitOption;
+import java.nio.file.FileVisitResult;
 import java.nio.file.FileSystems;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -118,6 +122,37 @@ public class Java13FileSystems {
     }
     Collections.sort(foundNames);
     System.out.println("find:" + foundNames);
+    ArrayList<String> treeEvents = new ArrayList<String>();
+    Path returned = Files.walkFileTree(nested, new SimpleFileVisitor<Path>() {
+      @Override
+      public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attributes) {
+        treeEvents.add("pre:" + dir.getFileName().toString() + ":" + attributes.isDirectory());
+        return FileVisitResult.CONTINUE;
+      }
+
+      @Override
+      public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+        treeEvents.add("file:" + file.getFileName().toString() + ":" + attributes.isRegularFile());
+        return FileVisitResult.CONTINUE;
+      }
+
+      @Override
+      public FileVisitResult postVisitDirectory(Path dir, IOException error) {
+        treeEvents.add("post:" + dir.getFileName().toString() + ":" + (error == null));
+        return FileVisitResult.CONTINUE;
+      }
+    });
+    Collections.sort(treeEvents);
+    System.out.println("tree:" + returned.equals(nested) + ":" + treeEvents);
+    treeEvents.clear();
+    Files.walkFileTree(nested, Collections.<FileVisitOption>emptySet(), 0, new SimpleFileVisitor<Path>() {
+      @Override
+      public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+        treeEvents.add("depth0:" + file.equals(nested) + ":" + attributes.isDirectory());
+        return FileVisitResult.CONTINUE;
+      }
+    });
+    System.out.println("tree-depth0:" + treeEvents);
   }
 
   private static void printFailure(String label, Throwing action) {
