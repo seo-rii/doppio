@@ -220,8 +220,10 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `noinline` function-object retention, plus `@file:JvmName`, `@JvmName`,
   `@JvmStatic`, `@JvmField`, `const val`, `@Throws`, `@Volatile`,
   `@Synchronized`, and `@JvmSynthetic` JVM interop lowering, plus mutable
-  delegated properties with `provideDelegate`, `getValue`, `setValue`, and
-  generated delegated-property references, plus captured local classes,
+  `MethodParameters` name/presence metadata including synthetic-method fallback
+  behavior, plus mutable delegated properties with `provideDelegate`,
+  `getValue`, `setValue`, and generated
+  delegated-property references, plus captured local classes,
   anonymous object lowering, inner-class `this$0`, nested companion
   construction, and synthetic accessor generation, plus Java reflection over
   Kotlin nested, inner, companion, method-local, companion-local, and anonymous

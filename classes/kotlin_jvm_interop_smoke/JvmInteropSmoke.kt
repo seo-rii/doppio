@@ -67,6 +67,15 @@ fun jvmInteropSummary(): String {
   val exceptionTypes = staticChecked.exceptionTypes.joinToString("|") { type ->
     type.simpleName
   }
+  val parameterShape = listOf(
+    staticCreate.parameters.single(),
+    staticChecked.parameters.single(),
+    bump.parameters.single(),
+    renamedTop.parameters.single(),
+    syntheticLabel.parameters.single()
+  ).joinToString(",") { parameter ->
+    parameter.name + "/" + parameter.isNamePresent
+  }
   val flags = listOf(
     Modifier.isStatic(staticCreate.modifiers),
     Modifier.isStatic(fieldTag.modifiers),
@@ -90,5 +99,6 @@ fun jvmInteropSummary(): String {
       objectCall.invoke(null, 4) + objectField.get(null) + ":" +
       owner.bump(4) + ":" +
       syntheticLabel.invoke(owner, "syn-") + ":" +
-      flags
+      flags + ":" +
+      parameterShape
 }

@@ -491,13 +491,14 @@ Current verified checks:
 - A minimal JVM interop annotation smoke was expanded on 2026-07-11 and a
   focused local run completed in 177 seconds. Both the host JVM and Doppio
   printed
-  `kt:java:ok7:IllegalArgumentException:fieldconst:top-3:o5obj:5:syn-kt:111111111`.
+  `kt:java:ok7:IllegalArgumentException:fieldconst:top-3:o5obj:5:syn-kt:111111111:label/true,value/true,delta/true,value/true,arg0/false`.
   The repo smoke now includes the same path and completed in 240 seconds with
   the full classpath. Java reflection and `javap` verified `@file:JvmName`,
   `@JvmName`, `@JvmStatic`, `@JvmField`, `const val`, `@Throws`, `@Volatile`,
   `@Synchronized`, and `@JvmSynthetic` lowering into static members,
   exception metadata, volatile fields, synchronized methods, and synthetic
-  method flags.
+  method flags, plus `MethodParameters` names and `isNamePresent` metadata,
+  including the synthetic method's unnamed fallback parameter.
 - A dynamic-proxy/reflection smoke is now split into
   `classes/kotlin_proxy_smoke` and run through `ci/kotlin_proxy_smoke.sh`. A
   focused local run completed in 73 seconds and a follow-up run through the
@@ -564,11 +565,12 @@ Current verified checks:
   seconds and a follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 240 seconds. Both the host JVM and Doppio
   printed
-  `kt:java:ok7:IllegalArgumentException:fieldconst:top-3:o5obj:5:syn-kt:111111111`.
+  `kt:java:ok7:IllegalArgumentException:fieldconst:top-3:o5obj:5:syn-kt:111111111:label/true,value/true,delta/true,value/true,arg0/false`.
   Runtime reflection verifies `@JvmStatic`, `@JvmField`, `const val`,
   `@Volatile`, `@Synchronized`, top-level `@JvmName`, object static access,
   declared exception metadata, `@JvmSynthetic` method flags, and Java
-  parameter metadata.
+  `MethodParameters` names and `isNamePresent` metadata, including the
+  synthetic method's unnamed fallback parameter.
 - A focused Kotlin callable-reference/sequence smoke now lives in
   `classes/kotlin_reference_sequence_smoke` and runs through
   `ci/kotlin_reference_sequence_smoke.sh`. A focused local run completed in

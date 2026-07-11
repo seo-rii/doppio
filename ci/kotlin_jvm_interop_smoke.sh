@@ -71,7 +71,7 @@ test -f "$out_dir/JvmInteropSmokeFile.class"
 test -f "$out_dir/META-INF/main.kotlin_module"
 
 runtime_cp="$out_dir:$stdlib_jar"
-expected_output="${KOTLIN_JVM_INTEROP_SMOKE_EXPECTED_OUTPUT:-"kt:java:ok7:IllegalArgumentException:fieldconst:top-3:o5obj:5:syn-kt:111111111"}"
+expected_output="${KOTLIN_JVM_INTEROP_SMOKE_EXPECTED_OUTPUT:-"kt:java:ok7:IllegalArgumentException:fieldconst:top-3:o5obj:5:syn-kt:111111111:label/true,value/true,delta/true,value/true,arg0/false"}"
 
 native_output="$(java -cp "$runtime_cp" KotlinJvmInteropHelloKt)"
 if [ "$native_output" != "$expected_output" ]; then
