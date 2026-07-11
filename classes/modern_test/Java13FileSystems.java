@@ -90,6 +90,13 @@ public class Java13FileSystems {
     BasicFileAttributes attrs = Files.readAttributes(hello, BasicFileAttributes.class);
     System.out.println(attrs.size() + ":" + attrs.isRegularFile() + ":" +
         Files.readAttributes(hello, "basic:size,isRegularFile").get("size"));
+    System.out.println("time:" + (Files.getLastModifiedTime(hello).toMillis() >= 0));
+    System.out.println("access:" + Files.isReadable(hello) + ":" +
+        Files.isWritable(hello) + ":" + Files.isExecutable(hello));
+    System.out.println("hidden-symbolic:" + Files.isHidden(hello) + ":" + Files.isSymbolicLink(hello));
+    System.out.println("same-mismatch:" + Files.isSameFile(hello, fs.getPath("hello.txt")) + ":" +
+        Files.mismatch(hello, nestedValue));
+    System.out.println("store:" + Files.getFileStore(hello).supportsFileAttributeView("basic"));
     try (SeekableByteChannel channel = Files.newByteChannel(hello)) {
       System.out.println("channel:" + channel.size());
     }

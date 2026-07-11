@@ -566,6 +566,13 @@ public final class Files {
   }
 
   public static boolean isSymbolicLink(Path path) {
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      try {
+        return readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS).isSymbolicLink();
+      } catch (IOException e) {
+        return false;
+      }
+    }
     File file = toFile(path);
     try {
       readSymbolicLink0(file.toString());
@@ -576,6 +583,9 @@ public final class Files {
   }
 
   public static Path readSymbolicLink(Path link) throws IOException {
+    if (link.getFileSystem() != FileSystems.getDefault()) {
+      return link.getFileSystem().provider().readSymbolicLink(link);
+    }
     return Path.of(readSymbolicLink0(toFile(link).toString()));
   }
 
@@ -591,6 +601,9 @@ public final class Files {
   }
 
   public static FileStore getFileStore(Path path) throws IOException {
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      return path.getFileSystem().provider().getFileStore(path);
+    }
     File file = toFile(path);
     if (!file.exists()) {
       throw new NoSuchFileException(file.toString());
@@ -875,6 +888,9 @@ public final class Files {
 
   public static FileTime getLastModifiedTime(Path path, LinkOption... options) throws IOException {
     requireLinkOptions(options);
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      return readAttributes(path, BasicFileAttributes.class, options).lastModifiedTime();
+    }
     File file = toFile(path);
     if (!file.exists()) {
       throw new NoSuchFileException(file.toString());
@@ -884,6 +900,10 @@ public final class Files {
 
   public static Path setLastModifiedTime(Path path, FileTime time) throws IOException {
     FileTime fileTime = Objects.requireNonNull(time);
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      path.getFileSystem().provider().setAttribute(path, "basic:lastModifiedTime", fileTime);
+      return path;
+    }
     File file = toFile(path);
     if (!file.exists()) {
       throw new NoSuchFileException(file.toString());
@@ -1308,6 +1328,21 @@ public final class Files {
   public static long mismatch(Path path, Path path2) throws IOException {
     Objects.requireNonNull(path);
     Objects.requireNonNull(path2);
+    if (path.getFileSystem() != FileSystems.getDefault()
+        || path2.getFileSystem() != FileSystems.getDefault()) {
+      if (isSameFile(path, path2)) {
+        return -1L;
+      }
+      byte[] first = readAllBytes(path);
+      byte[] second = readAllBytes(path2);
+      int length = Math.min(first.length, second.length);
+      for (int i = 0; i < length; i++) {
+        if (first[i] != second[i]) {
+          return i;
+        }
+      }
+      return first.length == second.length ? -1L : length;
+    }
     File firstFile = path.toFile();
     File secondFile = path2.toFile();
     if (firstFile.getCanonicalPath().equals(secondFile.getCanonicalPath())) {
@@ -1325,6 +1360,15 @@ public final class Files {
   }
 
   public static boolean isSameFile(Path path, Path path2) throws IOException {
+    Objects.requireNonNull(path);
+    Objects.requireNonNull(path2);
+    if (path.equals(path2)) {
+      return true;
+    }
+    if (path.getFileSystem() != FileSystems.getDefault()
+        || path2.getFileSystem() != FileSystems.getDefault()) {
+      return path.getFileSystem().provider().isSameFile(path, path2);
+    }
     File first = toFile(path);
     File second = toFile(path2);
     String firstCanonical = first.getCanonicalPath();
@@ -1342,18 +1386,30 @@ public final class Files {
   }
 
   public static boolean isReadable(Path path) {
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      return hasAccess(path, AccessMode.READ);
+    }
     return toFile(path).canRead();
   }
 
   public static boolean isWritable(Path path) {
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      return hasAccess(path, AccessMode.WRITE);
+    }
     return toFile(path).canWrite();
   }
 
   public static boolean isExecutable(Path path) {
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      return hasAccess(path, AccessMode.EXECUTE);
+    }
     return toFile(path).canExecute();
   }
 
   public static boolean isHidden(Path path) throws IOException {
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      return path.getFileSystem().provider().isHidden(path);
+    }
     return toFile(path).isHidden();
   }
 
@@ -1628,6 +1684,15 @@ public final class Files {
     }
     if (!file.delete()) {
       throw new IOException("Unable to delete file");
+    }
+  }
+
+  private static boolean hasAccess(Path path, AccessMode mode) {
+    try {
+      path.getFileSystem().provider().checkAccess(path, mode);
+      return true;
+    } catch (IOException e) {
+      return false;
     }
   }
 
