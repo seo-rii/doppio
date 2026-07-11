@@ -107,7 +107,8 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
   `Map.Entry.copyOf`, plus reflection-backed Java 16 `Stream.toList()` calls,
   plus Java 9/10 `List`/`Set`/`Map` factory and copy APIs and Java 11
   `Optional.isEmpty()` / no-arg `Optional.orElseThrow()`, plus Java 9
-  `ProcessHandle.current()` / `ProcessHandle.of(pid)` metadata,
+  `ProcessHandle.current()` / `ProcessHandle.of(pid)` metadata and selected
+  `ProcessHandle.Info` optional metadata,
   keeping the Scala 2.13 compile classpath on the Java 8 boot surface while
   checking modern runtime overlays;
 - a focused Scala duration smoke covering `scala.concurrent.duration` finite
@@ -228,10 +229,10 @@ with an unmodifiable-result check, plus reflection-backed Java 9 `List.of`,
 `Set.of`, and `Map.of` immutability/duplicate checks and Java 10
 `List.copyOf`, plus Java 11 `Optional.isEmpty()` and no-arg
 `Optional.orElseThrow()`, plus Java 9 `ProcessHandle.current()` and
-`ProcessHandle.of(pid)` metadata, while keeping the main Scala compiler smoke
-smaller.
+`ProcessHandle.of(pid)` metadata plus selected `ProcessHandle.Info` optionals
+and display shape, while keeping the main Scala compiler smoke smaller.
 A local 2026-07-11 validation completed the focused Scala modern interop smoke
-in 112 seconds using Scala 2.13.18.
+in 184 seconds using Scala 2.13.18.
 The Scala duration coverage now lives in `classes/scala_duration_smoke` and
 runs through `ci/scala_duration_smoke.sh`. It covers finite duration
 arithmetic, scan/sort paths, string parsing, scaling, clamping, and

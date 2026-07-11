@@ -133,6 +133,15 @@ object ScalaModernJavaInteropSmoke {
       .getMethod("of", java.lang.Long.TYPE)
       .invoke(null, Long.box(currentPid))
       .asInstanceOf[java.util.Optional[_]]
+    val processInfoClass = Class.forName("java.lang.ProcessHandle$Info")
+    val currentInfo = processHandleClass.getMethod("info").invoke(currentProcess)
+    val commandPresent = processInfoClass.getMethod("command").invoke(currentInfo).asInstanceOf[java.util.Optional[_]].isPresent
+    val commandLinePresent = processInfoClass.getMethod("commandLine").invoke(currentInfo).asInstanceOf[java.util.Optional[_]].isPresent
+    val argumentsPresent = processInfoClass.getMethod("arguments").invoke(currentInfo).asInstanceOf[java.util.Optional[_]].isPresent
+    val startInstantPresent = processInfoClass.getMethod("startInstant").invoke(currentInfo).asInstanceOf[java.util.Optional[_]].isPresent
+    val cpuDurationPresent = processInfoClass.getMethod("totalCpuDuration").invoke(currentInfo).asInstanceOf[java.util.Optional[_]].isPresent
+    val infoString = currentInfo.toString
+    val infoStringShape = infoString.startsWith("[") && infoString.contains("cmd: ") && infoString.endsWith("]")
 
     s"$formatted|$upperText|${parsed.length}:${hexClass.getMethod("formatHex", classOf[Array[Byte]]).invoke(hex, parsed)}:$digit|" +
       s"$fixedValue:$fixedMillis:$offsetValue:${classOf[Clock].isInstance(zoned)}|" +
@@ -141,6 +150,7 @@ object ScalaModernJavaInteropSmoke {
       s"${java.lang.String.join("", streamToList)}:$streamListFailure|" +
       s"${entryCopy.getKey}:${entryCopy.getValue}:$entryCopyMutation|" +
       s"${java.lang.String.join("", listOf)}:$listMutation:$duplicateSet:${mapOf.get("b")}:$mapMutation:${java.lang.String.join("", copiedList)}:" +
-      s"$optionalText:$optionalIsEmpty:$optionalFailure:${currentPid > 0}:$currentProcessAlive:${currentProcessByPid.isPresent}"
+      s"$optionalText:$optionalIsEmpty:$optionalFailure:${currentPid > 0}:$currentProcessAlive:${currentProcessByPid.isPresent}:" +
+      s"$commandPresent:$commandLinePresent:$argumentsPresent:$startInstantPresent:$cpuDurationPresent:$infoStringShape"
   }
 }
