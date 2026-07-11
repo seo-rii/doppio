@@ -113,6 +113,15 @@ fun modernJavaInteropSummary(): String {
   val currentProcessByPid = processHandleClass
     .getMethod("of", Long::class.javaPrimitiveType)
     .invoke(null, currentPid) as java.util.Optional<*>
+  val processInfoClass = Class.forName("java.lang.ProcessHandle\$Info")
+  val currentInfo = processHandleClass.getMethod("info").invoke(currentHandle)
+  val commandPresent = (processInfoClass.getMethod("command").invoke(currentInfo) as java.util.Optional<*>).isPresent
+  val commandLinePresent = (processInfoClass.getMethod("commandLine").invoke(currentInfo) as java.util.Optional<*>).isPresent
+  val argumentsPresent = (processInfoClass.getMethod("arguments").invoke(currentInfo) as java.util.Optional<*>).isPresent
+  val startInstantPresent = (processInfoClass.getMethod("startInstant").invoke(currentInfo) as java.util.Optional<*>).isPresent
+  val cpuDurationPresent = (processInfoClass.getMethod("totalCpuDuration").invoke(currentInfo) as java.util.Optional<*>).isPresent
+  val infoString = currentInfo.toString()
+  val infoStringShape = infoString.startsWith("[") && infoString.contains("cmd: ") && infoString.endsWith("]")
 
   return "$formatted|$upperText|${parsed.size}:${hexClass.getMethod("formatHex", ByteArray::class.java).invoke(hex, parsed)}:$digit|" +
       "$fixedValue:$fixedMillis:$offsetValue:${Clock::class.java.isInstance(zoned)}|" +
@@ -122,5 +131,6 @@ fun modernJavaInteropSummary(): String {
       "${entryCopy.key}:${entryCopy.value}:$entryCopyMutation|" +
       "${copyList.joinToString("")}:$copyListMutation:${copySet.size}:${copySet.contains("s")}:${copySet.contains("t")}:" +
       "${copyMap["y"]}:$copyMapMutation:$optionalValue:${optionalEmpty.isEmpty}:$optionalFailure:" +
-      "$stackHasSmokeFrame:${currentPid > 0}:$currentProcessAlive:${currentProcessByPid.isPresent}"
+      "$stackHasSmokeFrame:${currentPid > 0}:$currentProcessAlive:${currentProcessByPid.isPresent}:" +
+      "$commandPresent:$commandLinePresent:$argumentsPresent:$startInstantPresent:$cpuDurationPresent:$infoStringShape"
 }

@@ -127,7 +127,8 @@ reflection-backed path and Java 11 `Optional.isEmpty()` / no-arg
 interop smoke directly covers Java 10 `List.copyOf`/`Set.copyOf`/`Map.copyOf`
 and the same Java 11 Optional additions, plus Java 9 `StackWalker.walk(...)`
 frame discovery and `ProcessHandle.current()` / `ProcessHandle.of(pid)`
-metadata through reflection. The Java 17 fixture set also
+metadata plus selected `ProcessHandle.Info` optionals through reflection. The
+Java 17 fixture set also
 covers
 `ClassLoader.defineClass(String, ByteBuffer, ProtectionDomain)` for heap,
 direct, read-only direct, and sliced buffers without advancing buffer
@@ -264,7 +265,8 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   behavior, plus Kotlin source-level use of Java 17 `Map.Entry.copyOf`
   snapshot and unmodifiable-result behavior, plus Kotlin source-level use of
   Java 10 collection `copyOf` APIs and Java 11 `Optional` additions, plus Kotlin
-  source-level reflection over Java 9 `StackWalker` and `ProcessHandle`, plus
+  source-level reflection over Java 9 `StackWalker`, `ProcessHandle`, and
+  selected `ProcessHandle.Info` metadata, plus
   concurrent cache primitives covering `ConcurrentHashMap` compute/merge paths,
   atomics,
   `CopyOnWriteArrayList`, `ThreadLocal`, `ReentrantLock.withLock`,

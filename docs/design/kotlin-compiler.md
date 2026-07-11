@@ -289,8 +289,9 @@ Current verified checks:
   `Set.copyOf`, and `Map.copyOf` and Java 11 `Optional.isEmpty()` /
   `Optional.orElseThrow()` behavior, plus reflection-backed Java 9
   `StackWalker.walk(...)` frame discovery and `ProcessHandle.current()` /
-  `ProcessHandle.of(pid)` metadata. A local 2026-07-11 validation completed
-  the focused smoke in 169 seconds.
+  `ProcessHandle.of(pid)` metadata, plus selected `ProcessHandle.Info`
+  optional metadata and display shape. A local 2026-07-11 validation completed
+  the focused smoke in 174 seconds.
 - `ci/kotlin_diagnostic_smoke.sh` now covers a failing Kotlin compiler path:
   Doppio-hosted `K2JVMCompiler` compiles an intentionally invalid source file,
   exits with status 1, reports the expected initializer type-mismatch and
