@@ -67,7 +67,7 @@ test -f "$out_dir/ModernJavaInteropSmokeKt.class"
 test -f "$out_dir/META-INF/main.kotlin_module"
 
 runtime_cp="$out_dir:$stdlib_jar"
-expected_output="${KOTLIN_MODERN_JAVA_INTEROP_SMOKE_EXPECTED_OUTPUT:-"0f10ff|0A0B|2:cafe:15|2020-01-02T03:04:05Z:1577934245000:2020-01-02T03:04:07Z:true|Random:82:376|SplittableRandom:true:88:574|QRS:uoe|entry:value:uoe|mn:uoe:2:true:true:5:uoe:opt:true:nse:true:true:true:true:true:true:true:true:true:true"}"
+expected_output="${KOTLIN_MODERN_JAVA_INTEROP_SMOKE_EXPECTED_OUTPUT:-"0f10ff|0A0B|2:cafe:15|2020-01-02T03:04:05Z:1577934245000:2020-01-02T03:04:07Z:true|Random:82:376|SplittableRandom:true:88:574|QRS:uoe|entry:value:uoe|mn:uoe:2:true:true:5:uoe:opt:true:nse:true:true:true:true:true:true:true:true:true:true:true:true:true"}"
 
 native_output="$(java -cp "$runtime_cp" KotlinModernJavaInteropHelloKt)"
 if [ "$native_output" != "$expected_output" ]; then

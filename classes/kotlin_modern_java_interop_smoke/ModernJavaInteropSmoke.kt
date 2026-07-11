@@ -3,6 +3,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.util.AbstractMap
+import java.util.function.Consumer
 import java.util.function.Function
 import java.util.stream.Stream
 
@@ -96,16 +97,40 @@ fun modernJavaInteropSummary(): String {
   val stackWalkerClass = Class.forName("java.lang.StackWalker")
   val stackFrameClass = Class.forName("java.lang.StackWalker\$StackFrame")
   val stackWalker = stackWalkerClass.getMethod("getInstance").invoke(null)
+  val stackFrameGetClassName = stackFrameClass.getMethod("getClassName")
+  val stackFrameGetMethodName = stackFrameClass.getMethod("getMethodName")
   val stackHasSmokeFrame = stackWalkerClass
     .getMethod("walk", Function::class.java)
     .invoke(stackWalker, Function<Any, Boolean> { framesObj ->
       @Suppress("UNCHECKED_CAST")
       val frames = framesObj as Stream<Any>
       frames.anyMatch { frame ->
-        stackFrameClass.getMethod("getClassName").invoke(frame) == "ModernJavaInteropSmokeKt" &&
-            stackFrameClass.getMethod("getMethodName").invoke(frame) == "modernJavaInteropSummary"
+        stackFrameGetClassName.invoke(frame) == "ModernJavaInteropSmokeKt" &&
+            stackFrameGetMethodName.invoke(frame) == "modernJavaInteropSummary"
       }
     }) as Boolean
+  val stackWalkerOptionClass = Class.forName("java.lang.StackWalker\$Option")
+  val retainClassReference = stackWalkerOptionClass.enumConstants
+    .first { (it as Enum<*>).name == "RETAIN_CLASS_REFERENCE" }
+  val retainedStackWalker = stackWalkerClass
+    .getMethod("getInstance", stackWalkerOptionClass)
+    .invoke(null, retainClassReference)
+  val callerClass = stackWalkerClass.getMethod("getCallerClass").invoke(retainedStackWalker) as Class<*>
+  var forEachSawSummary = false
+  var forEachSawHelloMain = false
+  stackWalkerClass
+    .getMethod("forEach", Consumer::class.java)
+    .invoke(retainedStackWalker, Consumer<Any> { frame ->
+      val className = stackFrameGetClassName.invoke(frame)
+      val methodName = stackFrameGetMethodName.invoke(frame)
+      if (className == "ModernJavaInteropSmokeKt" && methodName == "modernJavaInteropSummary") {
+        forEachSawSummary = true
+      }
+      if (className == "KotlinModernJavaInteropHelloKt" && methodName == "main") {
+        forEachSawHelloMain = true
+      }
+    })
+  val callerClassMatches = callerClass.name == "KotlinModernJavaInteropHelloKt"
   val processHandleClass = Class.forName("java.lang.ProcessHandle")
   val currentHandle = processHandleClass.getMethod("current").invoke(null)
   val currentPid = processHandleClass.getMethod("pid").invoke(currentHandle) as Long
@@ -131,6 +156,7 @@ fun modernJavaInteropSummary(): String {
       "${entryCopy.key}:${entryCopy.value}:$entryCopyMutation|" +
       "${copyList.joinToString("")}:$copyListMutation:${copySet.size}:${copySet.contains("s")}:${copySet.contains("t")}:" +
       "${copyMap["y"]}:$copyMapMutation:$optionalValue:${optionalEmpty.isEmpty}:$optionalFailure:" +
-      "$stackHasSmokeFrame:${currentPid > 0}:$currentProcessAlive:${currentProcessByPid.isPresent}:" +
+      "$stackHasSmokeFrame:$callerClassMatches:$forEachSawSummary:$forEachSawHelloMain:" +
+      "${currentPid > 0}:$currentProcessAlive:${currentProcessByPid.isPresent}:" +
       "$commandPresent:$commandLinePresent:$argumentsPresent:$startInstantPresent:$cpuDurationPresent:$infoStringShape"
 }
