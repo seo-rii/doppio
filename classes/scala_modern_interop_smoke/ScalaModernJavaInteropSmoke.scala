@@ -111,6 +111,20 @@ object ScalaModernJavaInteropSmoke {
     val copiedList = listClass.getMethod("copyOf", classOf[java.util.Collection[_]])
       .invoke(null, new java.util.ArrayList[String](listOf))
       .asInstanceOf[java.util.List[String]]
+    val optionalClass = classOf[java.util.Optional[_]]
+    val optionalValue = java.util.Optional.of("opt")
+    val optionalEmpty = java.util.Optional.empty[String]()
+    val optionalText = optionalClass.getMethod("orElseThrow").invoke(optionalValue)
+    val optionalIsEmpty = optionalClass.getMethod("isEmpty").invoke(optionalEmpty)
+    val optionalFailure =
+      try {
+        optionalClass.getMethod("orElseThrow").invoke(optionalEmpty)
+        "ok"
+      } catch {
+        case e: InvocationTargetException
+            if e.getCause != null && e.getCause.getClass.getName == "java.util.NoSuchElementException" =>
+          "nse"
+      }
 
     s"$formatted|$upperText|${parsed.length}:${hexClass.getMethod("formatHex", classOf[Array[Byte]]).invoke(hex, parsed)}:$digit|" +
       s"$fixedValue:$fixedMillis:$offsetValue:${classOf[Clock].isInstance(zoned)}|" +
@@ -118,6 +132,7 @@ object ScalaModernJavaInteropSmoke {
       s"${randomFactoryClass.getMethod("name").invoke(splitFactory)}:$splitIsSplittable:$splitInt:$splitLong|" +
       s"${java.lang.String.join("", streamToList)}:$streamListFailure|" +
       s"${entryCopy.getKey}:${entryCopy.getValue}:$entryCopyMutation|" +
-      s"${java.lang.String.join("", listOf)}:$listMutation:$duplicateSet:${mapOf.get("b")}:$mapMutation:${java.lang.String.join("", copiedList)}"
+      s"${java.lang.String.join("", listOf)}:$listMutation:$duplicateSet:${mapOf.get("b")}:$mapMutation:${java.lang.String.join("", copiedList)}:" +
+      s"$optionalText:$optionalIsEmpty:$optionalFailure"
   }
 }
