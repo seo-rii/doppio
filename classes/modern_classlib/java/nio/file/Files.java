@@ -441,6 +441,8 @@ public final class Files {
           }
         } catch (NoSuchFileException e) {
         }
+        source.getFileSystem().provider().copy(source, target, options);
+        return target;
       }
       if (exists(target)) {
         if (!replaceExisting) {

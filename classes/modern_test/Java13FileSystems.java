@@ -129,10 +129,18 @@ public class Java13FileSystems {
     Path pathCopied = fs.getPath(label + "-path-copy.txt");
     System.out.println("path-copy:" + Files.copy(hello, pathCopied).equals(pathCopied) +
         ":" + Files.readString(pathCopied));
+    System.out.println("path-copy-same:" + Files.copy(hello, hello).equals(hello));
+    System.out.println("path-copy-same-replace:" +
+        Files.copy(hello, hello, StandardCopyOption.REPLACE_EXISTING).equals(hello));
     printFailure(label + "-path-copy-existing", () -> Files.copy(hello, pathCopied));
     System.out.println("path-copy-replace:" +
         Files.copy(nestedValue, pathCopied, StandardCopyOption.REPLACE_EXISTING).equals(pathCopied) +
         ":" + Files.readString(pathCopied));
+    Path pathCopiedWithAttributes = fs.getPath(label + "-path-copy-attrs.txt");
+    System.out.println("path-copy-attrs:" +
+        Files.copy(hello, pathCopiedWithAttributes, StandardCopyOption.COPY_ATTRIBUTES).equals(pathCopiedWithAttributes) +
+        ":" + Files.readString(pathCopiedWithAttributes) +
+        ":" + (Files.getLastModifiedTime(pathCopiedWithAttributes).toMillis() >= 0));
     Path copiedDirectory = fs.getPath(label + "-dir-copy");
     System.out.println("dir-copy:" + Files.copy(nested, copiedDirectory).equals(copiedDirectory) +
         ":" + Files.isDirectory(copiedDirectory));
