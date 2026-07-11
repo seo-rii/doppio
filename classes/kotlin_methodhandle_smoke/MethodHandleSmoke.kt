@@ -49,7 +49,16 @@ class MethodHandleOwner(@JvmField var text: String) {
     fun loopIncrement(value: Int, limit: Int): Int = value + 1
 
     @JvmStatic
+    fun loopIncrementState(value: Int): Int = value + 2
+
+    @JvmStatic
     fun loopFinish(value: Int, limit: Int): String = "loop:$value:$limit"
+
+    @JvmStatic
+    fun loopFinishState(value: Int): String = "loop-state:$value"
+
+    @JvmStatic
+    fun loopBelowFive(value: Int): Boolean = value < 5
 
     @JvmStatic
     fun loopCount(limit: Int): Int = limit
@@ -599,10 +608,25 @@ fun methodHandleSummary(): String {
     "loopIncrement",
     MethodType.methodType(intClass, intClass, intClass)
   )
+  val loopIncrementState = lookup.findStatic(
+    ownerClass,
+    "loopIncrementState",
+    MethodType.methodType(intClass, intClass)
+  )
   val loopFinish = lookup.findStatic(
     ownerClass,
     "loopFinish",
     MethodType.methodType(stringClass, intClass, intClass)
+  )
+  val loopFinishState = lookup.findStatic(
+    ownerClass,
+    "loopFinishState",
+    MethodType.methodType(stringClass, intClass)
+  )
+  val loopBelowFive = lookup.findStatic(
+    ownerClass,
+    "loopBelowFive",
+    MethodType.methodType(java.lang.Boolean.TYPE, intClass)
   )
   val genericLoop = loopMethod.invoke(
     null,
@@ -615,6 +639,10 @@ fun methodHandleSummary(): String {
   val genericLoopExternalState = loopMethod.invoke(
     null,
     arrayOf(arrayOf<MethodHandle?>(null, null, loopNever, loopFinish))
+  ) as MethodHandle
+  val genericLoopPrefix = loopMethod.invoke(
+    null,
+    arrayOf(arrayOf<MethodHandle?>(loopZero, loopIncrementState, loopBelowFive, loopFinishState))
   ) as MethodHandle
   val whileInt = whileLoopMethod.invoke(null, loopZero, loopBelow, loopIncrement) as MethodHandle
   val whileDefaultInt = whileLoopMethod.invoke(null, null, loopBelow, loopIncrement) as MethodHandle
@@ -796,6 +824,7 @@ fun methodHandleSummary(): String {
     genericLoop.invokeWithArguments(0).toString(),
     genericLoopNoStep.invokeWithArguments(7).toString(),
     genericLoopExternalState.invokeWithArguments(5, 9).toString(),
+    genericLoopPrefix.invokeWithArguments(5).toString(),
     whileLoops,
     doWhileLoops,
     countedLoops,
@@ -837,6 +866,7 @@ fun methodHandleSummary(): String {
     genericLoop,
     genericLoopNoStep,
     genericLoopExternalState,
+    genericLoopPrefix,
     whileInt,
     whileDefaultInt,
     whileText,

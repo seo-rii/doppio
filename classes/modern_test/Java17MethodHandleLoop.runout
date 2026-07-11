@@ -6,6 +6,12 @@ done:3:3
 done:1:0
 (I)Ljava/lang/String;
 done:0:7
+(I)Ljava/lang/String;
+done:6:5
+(I)Ljava/lang/String;
+state:6
+(I)Ljava/lang/String;
+none
 (II)Ljava/lang/String;
 done:5:9
 (Ljava/lang/String;I)Ljava/lang/String;

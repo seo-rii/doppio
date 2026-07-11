@@ -13,8 +13,20 @@ public class Java17MethodHandleLoop {
     return state + 1;
   }
 
+  public static int stepStateOnly(int state) {
+    return state + 2;
+  }
+
   public static boolean pred(int state, int limit) {
     return state < limit;
+  }
+
+  public static boolean predStateOnly(int state) {
+    return state < 5;
+  }
+
+  public static boolean neverNoArgs() {
+    return false;
   }
 
   public static boolean never(int state, int limit) {
@@ -23,6 +35,14 @@ public class Java17MethodHandleLoop {
 
   public static String fini(int state, int limit) {
     return "done:" + state + ":" + limit;
+  }
+
+  public static String finiStateOnly(int state) {
+    return "state:" + state;
+  }
+
+  public static String finiNoArgs() {
+    return "none";
   }
 
   public static String textInit(String prefix, int limit) {
@@ -59,10 +79,22 @@ public class Java17MethodHandleLoop {
         Java17MethodHandleLoop.class,
         "step",
         MethodType.methodType(int.class, int.class, int.class));
+    MethodHandle stepStateOnly = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "stepStateOnly",
+        MethodType.methodType(int.class, int.class));
     MethodHandle pred = lookup.findStatic(
         Java17MethodHandleLoop.class,
         "pred",
         MethodType.methodType(boolean.class, int.class, int.class));
+    MethodHandle predStateOnly = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "predStateOnly",
+        MethodType.methodType(boolean.class, int.class));
+    MethodHandle neverNoArgs = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "neverNoArgs",
+        MethodType.methodType(boolean.class));
     MethodHandle never = lookup.findStatic(
         Java17MethodHandleLoop.class,
         "never",
@@ -71,6 +103,14 @@ public class Java17MethodHandleLoop {
         Java17MethodHandleLoop.class,
         "fini",
         MethodType.methodType(String.class, int.class, int.class));
+    MethodHandle finiStateOnly = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "finiStateOnly",
+        MethodType.methodType(String.class, int.class));
+    MethodHandle finiNoArgs = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "finiNoArgs",
+        MethodType.methodType(String.class));
 
     MethodHandle counted = MethodHandles.loop(new MethodHandle[] { init, step, pred, fini });
     System.out.println(counted.type().toMethodDescriptorString());
@@ -85,6 +125,18 @@ public class Java17MethodHandleLoop {
     MethodHandle noStep = MethodHandles.loop(new MethodHandle[] { init, null, never, fini });
     System.out.println(noStep.type().toMethodDescriptorString());
     System.out.println((String) noStep.invokeExact(7));
+
+    MethodHandle prefixPredicate = MethodHandles.loop(new MethodHandle[] { init, stepStateOnly, predStateOnly, fini });
+    System.out.println(prefixPredicate.type().toMethodDescriptorString());
+    System.out.println((String) prefixPredicate.invokeExact(5));
+
+    MethodHandle prefixFini = MethodHandles.loop(new MethodHandle[] { init, stepStateOnly, predStateOnly, finiStateOnly });
+    System.out.println(prefixFini.type().toMethodDescriptorString());
+    System.out.println((String) prefixFini.invokeExact(5));
+
+    MethodHandle noArgPrefix = MethodHandles.loop(new MethodHandle[] { init, stepStateOnly, neverNoArgs, finiNoArgs });
+    System.out.println(noArgPrefix.type().toMethodDescriptorString());
+    System.out.println((String) noArgPrefix.invokeExact(5));
 
     MethodHandle externalState = MethodHandles.loop(new MethodHandle[] { null, null, never, fini });
     System.out.println(externalState.type().toMethodDescriptorString());

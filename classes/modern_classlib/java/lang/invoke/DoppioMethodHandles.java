@@ -271,6 +271,7 @@ public final class DoppioMethodHandles {
     Class<?> stateType;
     List<Class<?>> externalTypes;
     boolean externalState = false;
+    int stepArgumentCount = 0;
     if (init == null) {
       if (step == null) {
         MethodType predType = pred.type();
@@ -288,6 +289,7 @@ public final class DoppioMethodHandles {
             stepType.parameterType(0) != stateType) {
           throw new IllegalArgumentException("step must accept and return the loop state type");
         }
+        stepArgumentCount = stepType.parameterCount();
         externalTypes = stepType.parameterList().subList(1, stepType.parameterCount());
       }
     } else {
@@ -299,20 +301,24 @@ public final class DoppioMethodHandles {
       externalTypes = initType.parameterList();
       if (step != null) {
         stepType = step.type();
-        checkLoopClauseHandle(stepType, stateType, externalTypes, stateType, "step");
+        stepArgumentCount = checkLoopClauseHandle(stepType, stateType, externalTypes, stateType, "step");
       }
     }
+    int predArgumentCount;
     if (externalState) {
       checkExternalStateLoopHandle(pred.type(), externalTypes, boolean.class, "pred");
+      predArgumentCount = pred.type().parameterCount();
     } else {
-      checkLoopClauseHandle(pred.type(), stateType, externalTypes, boolean.class, "pred");
+      predArgumentCount = checkLoopClauseHandle(pred.type(), stateType, externalTypes, boolean.class, "pred");
     }
     Class<?> returnType = void.class;
+    int finiArgumentCount = 0;
     if (fini != null) {
       if (externalState) {
         checkExternalStateLoopHandle(fini.type(), externalTypes, fini.type().returnType(), "fini");
+        finiArgumentCount = fini.type().parameterCount();
       } else {
-        checkLoopClauseHandle(fini.type(), stateType, externalTypes, fini.type().returnType(), "fini");
+        finiArgumentCount = checkLoopClauseHandle(fini.type(), stateType, externalTypes, fini.type().returnType(), "fini");
       }
       returnType = fini.type().returnType();
     }
@@ -327,10 +333,23 @@ public final class DoppioMethodHandles {
             MethodHandle.class,
             MethodHandle.class,
             Class.class,
+            int.class,
+            int.class,
+            int.class,
             boolean.class,
             Object[].class));
     return MethodHandles.insertArguments(
-            adapter, 0, init, step, pred, fini, stateType, Boolean.valueOf(externalState))
+            adapter,
+            0,
+            init,
+            step,
+            pred,
+            fini,
+            stateType,
+            Integer.valueOf(stepArgumentCount),
+            Integer.valueOf(predArgumentCount),
+            Integer.valueOf(finiArgumentCount),
+            Boolean.valueOf(externalState))
         .asCollector(Object[].class, externalTypes.size())
         .asType(MethodType.methodType(returnType, externalTypes));
   }
@@ -733,6 +752,9 @@ public final class DoppioMethodHandles {
       MethodHandle pred,
       MethodHandle fini,
       Class<?> stateType,
+      int stepArgumentCount,
+      int predArgumentCount,
+      int finiArgumentCount,
       boolean externalState,
       Object[] args) throws Throwable {
     Object state = externalState ? args[0] : (init == null ? defaultValue(stateType) : init.invokeWithArguments(args));
@@ -740,18 +762,27 @@ public final class DoppioMethodHandles {
     if (!externalState) {
       System.arraycopy(args, 0, loopArgs, 1, args.length);
     }
+    Object[] stepArgs = step == null ? null : new Object[stepArgumentCount];
+    Object[] predArgs = new Object[predArgumentCount];
     do {
       if (!externalState) {
         loopArgs[0] = state;
       }
       if (step != null) {
-        state = step.invokeWithArguments(loopArgs);
+        System.arraycopy(loopArgs, 0, stepArgs, 0, stepArgumentCount);
+        state = step.invokeWithArguments(stepArgs);
       }
       if (!externalState) {
         loopArgs[0] = state;
       }
-    } while (((Boolean) pred.invokeWithArguments(loopArgs)).booleanValue());
-    return fini == null ? null : fini.invokeWithArguments(loopArgs);
+      System.arraycopy(loopArgs, 0, predArgs, 0, predArgumentCount);
+    } while (((Boolean) pred.invokeWithArguments(predArgs)).booleanValue());
+    if (fini == null) {
+      return null;
+    }
+    Object[] finiArgs = new Object[finiArgumentCount];
+    System.arraycopy(loopArgs, 0, finiArgs, 0, finiArgumentCount);
+    return fini.invokeWithArguments(finiArgs);
   }
 
   public static Object iteratedLoopTarget(
@@ -975,7 +1006,7 @@ public final class DoppioMethodHandles {
     return type.parameterCount();
   }
 
-  private static void checkLoopClauseHandle(
+  private static int checkLoopClauseHandle(
       MethodType type,
       Class<?> stateType,
       List<Class<?>> externalTypes,
@@ -984,17 +1015,16 @@ public final class DoppioMethodHandles {
     if (type.returnType() != returnType) {
       throw new IllegalArgumentException(role + " return type does not match");
     }
-    if (type.parameterCount() != externalTypes.size() + 1) {
+    if (type.parameterCount() > externalTypes.size() + 1) {
       throw new IllegalArgumentException(role + " parameter count does not match");
     }
-    if (type.parameterType(0) != stateType) {
-      throw new IllegalArgumentException(role + " state parameter type does not match");
-    }
-    for (int i = 0; i < externalTypes.size(); i++) {
-      if (type.parameterType(i + 1) != externalTypes.get(i)) {
+    for (int i = 0; i < type.parameterCount(); i++) {
+      Class<?> expectedType = i == 0 ? stateType : externalTypes.get(i - 1);
+      if (type.parameterType(i) != expectedType) {
         throw new IllegalArgumentException(role + " external parameter types do not match");
       }
     }
+    return type.parameterCount();
   }
 
   private static void checkExternalStateLoopHandle(
