@@ -316,6 +316,9 @@ public final class Files {
       link.getFileSystem().provider().createLink(link, existing);
       return link;
     }
+    if (existing.getFileSystem() != FileSystems.getDefault()) {
+      throw new ProviderMismatchException();
+    }
     File linkFile = toFile(link);
     File existingFile = toFile(existing);
     createHardLink0(linkFile.toString(), existingFile.toString());
@@ -327,6 +330,9 @@ public final class Files {
     if (link.getFileSystem() != FileSystems.getDefault()) {
       link.getFileSystem().provider().createSymbolicLink(link, target, attrs);
       return link;
+    }
+    if (target.getFileSystem() != FileSystems.getDefault()) {
+      throw new ProviderMismatchException();
     }
     File linkFile = toFile(link);
     Path targetPath = Objects.requireNonNull(target);

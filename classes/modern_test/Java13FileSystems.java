@@ -184,6 +184,16 @@ public class Java13FileSystems {
     printFailure(label + "-symlink-create",
         () -> Files.createSymbolicLink(fs.getPath(label + "-symbolic-link.txt"), hello));
     printFailure(label + "-symlink-read", () -> Files.readSymbolicLink(hello));
+    Path defaultLink = Files.createTempFile("doppio-java13-fs-link", ".tmp");
+    Files.deleteIfExists(defaultLink);
+    try {
+      printFailure(label + "-default-link-zip-target",
+          () -> Files.createLink(defaultLink, hello));
+      printFailure(label + "-default-symlink-zip-target",
+          () -> Files.createSymbolicLink(defaultLink, hello));
+    } finally {
+      Files.deleteIfExists(defaultLink);
+    }
     Path moveSource = fs.getPath(label + "-move-source.txt");
     Path moveTarget = fs.getPath(label + "-move-target.txt");
     Files.writeString(moveSource, "mz");
