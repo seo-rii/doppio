@@ -1,10 +1,14 @@
 package classes.modern_test;
 
 import java.io.OutputStream;
+import java.nio.channels.SeekableByteChannel;
+import java.nio.file.DirectoryStream;
 import java.nio.file.FileSystems;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
 import java.util.zip.ZipEntry;
@@ -72,9 +76,33 @@ public class Java13FileSystems {
   }
 
   private static void printZipFileSystem(String label, FileSystem fs) throws Exception {
+    Path hello = fs.getPath("hello.txt");
+    Path nested = fs.getPath("nested");
+    Path nestedValue = fs.getPath("nested", "value.txt");
     System.out.println(label + ":" + fs.provider().getScheme());
-    System.out.println(Files.readString(fs.getPath("hello.txt")));
-    System.out.println(Files.exists(fs.getPath("nested", "value.txt")));
+    System.out.println(Files.readString(hello));
+    System.out.println(Files.exists(nestedValue));
+    System.out.println(Files.isRegularFile(hello) + ":" + Files.isDirectory(nested) + ":" + Files.size(hello));
+    BasicFileAttributes attrs = Files.readAttributes(hello, BasicFileAttributes.class);
+    System.out.println(attrs.size() + ":" + attrs.isRegularFile() + ":" +
+        Files.readAttributes(hello, "basic:size,isRegularFile").get("size"));
+    try (SeekableByteChannel channel = Files.newByteChannel(hello)) {
+      System.out.println("channel:" + channel.size());
+    }
+    ArrayList<String> directoryNames = new ArrayList<String>();
+    try (DirectoryStream<Path> stream = Files.newDirectoryStream(nested)) {
+      for (Path path : stream) {
+        directoryNames.add(path.getFileName().toString());
+      }
+    }
+    Collections.sort(directoryNames);
+    System.out.println("dir:" + directoryNames);
+    ArrayList<String> listedNames = new ArrayList<String>();
+    try (java.util.stream.Stream<Path> stream = Files.list(nested)) {
+      stream.forEach(path -> listedNames.add(path.getFileName().toString()));
+    }
+    Collections.sort(listedNames);
+    System.out.println("list:" + listedNames);
   }
 
   private static void printFailure(String label, Throwing action) {

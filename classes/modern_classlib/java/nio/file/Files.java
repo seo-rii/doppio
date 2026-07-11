@@ -185,6 +185,9 @@ public final class Files {
     if (append && truncate) {
       throw new IllegalArgumentException();
     }
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      return path.getFileSystem().provider().newByteChannel(path, options, attrs);
+    }
     File file = toFile(path);
     validateOutputTarget(file, create, createNew);
     if (write && !file.exists() && (create || createNew)) {
@@ -534,6 +537,13 @@ public final class Files {
 
   public static boolean isDirectory(Path path, LinkOption... options) {
     boolean followLinks = followLinks(options);
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      try {
+        return readAttributes(path, BasicFileAttributes.class, options).isDirectory();
+      } catch (IOException e) {
+        return false;
+      }
+    }
     if (!followLinks && isSymbolicLink(path)) {
       return false;
     }
@@ -542,6 +552,13 @@ public final class Files {
 
   public static boolean isRegularFile(Path path, LinkOption... options) {
     boolean followLinks = followLinks(options);
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      try {
+        return readAttributes(path, BasicFileAttributes.class, options).isRegularFile();
+      } catch (IOException e) {
+        return false;
+      }
+    }
     if (!followLinks && isSymbolicLink(path)) {
       return false;
     }
@@ -563,6 +580,9 @@ public final class Files {
   }
 
   public static long size(Path path) throws IOException {
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      return readAttributes(path, BasicFileAttributes.class).size();
+    }
     File file = toFile(path);
     if (!file.exists()) {
       throw new NoSuchFileException(file.toString());
@@ -651,6 +671,9 @@ public final class Files {
     Class<A> attributeType = Objects.requireNonNull(type);
     if (attributeType != BasicFileAttributes.class && attributeType != PosixFileAttributes.class) {
       throw new UnsupportedOperationException();
+    }
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      return path.getFileSystem().provider().readAttributes(path, attributeType, options);
     }
     File file = toFile(path);
     boolean symbolicLink = !followLinks(options) && isSymbolicLink(path);
@@ -757,6 +780,9 @@ public final class Files {
       throws IOException {
     requireLinkOptions(options);
     String attributeString = Objects.requireNonNull(attributes);
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      return path.getFileSystem().provider().readAttributes(path, attributeString, options);
+    }
     String viewName = attributeViewName(attributeString);
     String attributeNames = attributeNames(attributeString);
     File file = toFile(path);
@@ -934,6 +960,18 @@ public final class Files {
   }
 
   public static Stream<Path> list(Path dir) throws IOException {
+    if (dir.getFileSystem() != FileSystems.getDefault()) {
+      ArrayList<Path> paths = new ArrayList<Path>();
+      DirectoryStream<Path> stream = newDirectoryStream(dir);
+      try {
+        for (Path path : stream) {
+          paths.add(path);
+        }
+      } finally {
+        stream.close();
+      }
+      return paths.stream();
+    }
     File directory = toFile(dir);
     if (!directory.exists()) {
       throw new NoSuchFileException(directory.toString());
@@ -1051,6 +1089,9 @@ public final class Files {
       Path dir,
       DirectoryStream.Filter<? super Path> filter) throws IOException {
     final DirectoryStream.Filter<? super Path> directoryFilter = Objects.requireNonNull(filter);
+    if (dir.getFileSystem() != FileSystems.getDefault()) {
+      return dir.getFileSystem().provider().newDirectoryStream(dir, directoryFilter);
+    }
     File directory = toFile(dir);
     if (!directory.exists()) {
       throw new NoSuchFileException(directory.toString());
