@@ -51,9 +51,9 @@ if [ -z "$jline_jar" ]; then
 fi
 
 compiler_cp="$compiler_jar:$library_jar:$reflect_jar:$diff_utils_jar:$jline_jar"
-source_cp="$library_jar"
 out_dir="$work_dir/out"
 resource_dir="$work_dir/resources"
+source_cp="$out_dir:$library_jar"
 runtime_cp="$out_dir:$resource_dir:$library_jar"
 
 rm -rf "$out_dir" "$resource_dir"
@@ -64,6 +64,7 @@ run_timeout="${SCALA_IO_SMOKE_RUN_TIMEOUT_SECONDS:-60}"
 responsiveness="${DOPPIO_SCALA_RESPONSIVENESS:-100000}"
 
 compile_start="$(date +%s)"
+javac -Xlint:-options -source 8 -target 8 -d "$out_dir" "$source_dir"/ZipFileSystemProbe.java
 timeout -s INT "${compile_timeout}s" \
   node --max-old-space-size=4096 --no-deprecation "$runner" \
   "-Xresponsiveness:$responsiveness" \
@@ -75,6 +76,7 @@ timeout -s INT "${compile_timeout}s" \
 compile_end="$(date +%s)"
 
 test -f "$out_dir/ScalaIoHello.class"
+test -f "$out_dir/ZipFileSystemProbe.class"
 test -f "$out_dir/ScalaJarZipSmoke.class"
 test -f "$out_dir/ScalaResourceLookupSmoke.class"
 test -f "$out_dir/ScalaServiceLoaderSmoke.class"
@@ -95,7 +97,7 @@ printf 'scala-root\n' > "$out_dir/scala-root-resource.txt"
 printf 'out\n' > "$out_dir/scalasmoke/resources/duplicate.txt"
 printf 'macro\n' > "$resource_dir/scalasmoke/resources/duplicate.txt"
 
-expected_output="$(printf 'jarzip:false:META-INF/MANIFEST.MF,META-INF/services/example.Service,META-INF/versions/17/pkg/data.txt,pkg/data.txt:scala/jar:scala.Provider:10:true:true|META-INF/MANIFEST.MF=META-INF,META-INF/services/example.Service=META-INF,META-INF/versions/17/pkg/data.txt=META-INF,pkg/data.txt=scala|jar:jar:scala/jar:scala.Provider:true\nsvc:alpha=7,beta=11:2:alpha=7,beta=11:AlphaScalaServiceLookupPlugin>BetaScalaServiceLookupPlugin:true\nres:scala-resource/lookup:scala-root:out>macro:out>macro:2/2:true:true:true:true:true:true')"
+expected_output="$(printf 'jarzip:false:META-INF/MANIFEST.MF,META-INF/services/example.Service,META-INF/versions/17/pkg/data.txt,pkg/data.txt:scala/jar:scala.Provider:10:true:true|META-INF/MANIFEST.MF=META-INF,META-INF/services/example.Service=META-INF,META-INF/versions/17/pkg/data.txt=META-INF,pkg/data.txt=scala|jar:jar:scala/jar:scala.Provider:true|one:jar:scala/jar:true;map:jar:scala/jar:true\nsvc:alpha=7,beta=11:2:alpha=7,beta=11:AlphaScalaServiceLookupPlugin>BetaScalaServiceLookupPlugin:true\nres:scala-resource/lookup:scala-root:out>macro:out>macro:2/2:true:true:true:true:true:true')"
 
 native_output="$(java -cp "$runtime_cp" ScalaIoHello)"
 if [ "$native_output" != "$expected_output" ]; then

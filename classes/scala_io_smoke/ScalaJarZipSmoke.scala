@@ -133,7 +133,9 @@ object ScalaJarZipSmoke {
         loader.close()
       }
 
-      jarSummary + "|" + zipSummary + "|" + urlSummary
+      val zipFileSystemSummary = ZipFileSystemProbe.summary(jarPath)
+
+      jarSummary + "|" + zipSummary + "|" + urlSummary + "|" + zipFileSystemSummary
     } finally {
       val stream = Files.walk(base)
       try {
