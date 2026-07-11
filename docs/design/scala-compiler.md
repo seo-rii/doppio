@@ -233,6 +233,13 @@ with an unmodifiable-result check, plus reflection-backed Java 9 `List.of`,
 and display shape, while keeping the main Scala compiler smoke smaller.
 A local 2026-07-11 validation completed the focused Scala modern interop smoke
 in 184 seconds using Scala 2.13.18.
+`ci/check_scala_modern_source_guards.mjs` blocks Scala smoke sources from
+adding direct calls that have already exhausted or nearly exhausted local
+Doppio-hosted compiler budgets, including `Runtime.version`,
+`Runtime.Version.parse`, `scala.jdk.DurationConverters`, and
+`COPY_ATTRIBUTES`. These probes should stay in Java fixtures or
+reflection-backed Scala smokes until compiler startup and class-library
+resolution have enough headroom.
 The Scala duration coverage now lives in `classes/scala_duration_smoke` and
 runs through `ci/scala_duration_smoke.sh`. It covers finite duration
 arithmetic, scan/sort paths, string parsing, scaling, clamping, and

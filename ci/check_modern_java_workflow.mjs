@@ -99,6 +99,12 @@ if (compilerCoverageStep) {
   if (!/yarn\s+ci:check-kotlin-modern-source-guards\b/.test(compilerCoverageBody)) {
     fail('Modern Java workflow must run the Kotlin modern source guard before compiler smokes.');
   }
+  if (!/yarn\s+ci:check-scala-modern-source-guards:test\b/.test(compilerCoverageBody)) {
+    fail('Modern Java workflow must test the Scala modern source guard before compiler smokes.');
+  }
+  if (!/yarn\s+ci:check-scala-modern-source-guards\b/.test(compilerCoverageBody)) {
+    fail('Modern Java workflow must run the Scala modern source guard before compiler smokes.');
+  }
 }
 
 const releaseRunnerIndex = requireWorkflowIndex('the Build release CLI runner step', workflow.indexOf('- name: Build release CLI runner'));
