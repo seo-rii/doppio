@@ -77,7 +77,7 @@ compile_end="$(date +%s)"
 test -f "$out_dir/ScalaStackWalkerHello.class"
 test -f "$out_dir/ScalaStackWalkerSmoke.class"
 
-expected_output="5:leaf:(I)Ljava/lang/String;:(I)Ljava/lang/String;:ScalaStackWalkerSmoke$|outer:(Ljava/lang/String;)Ljava/lang/String;:(Ljava/lang/String;)Ljava/lang/String;:ScalaStackWalkerSmoke$|exercise:()Ljava/lang/String;:()Ljava/lang/String;:ScalaStackWalkerSmoke$:(I)Ljava/lang/String;:UnsupportedOperationException"
+expected_output="5:leaf:(I)Ljava/lang/String;:(I)Ljava/lang/String;:ScalaStackWalkerSmoke$|outer:(Ljava/lang/String;)Ljava/lang/String;:(Ljava/lang/String;)Ljava/lang/String;:ScalaStackWalkerSmoke$|exercise:()Ljava/lang/String;:()Ljava/lang/String;:ScalaStackWalkerSmoke$:(I)Ljava/lang/String;:UnsupportedOperationException:true:leaf|outer"
 
 native_output="$(java -cp "$runtime_cp" ScalaStackWalkerHello)"
 if [ "$native_output" != "$expected_output" ]; then

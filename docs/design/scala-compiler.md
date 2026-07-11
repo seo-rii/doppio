@@ -47,7 +47,8 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
   first under Doppio and then used by a second Doppio-hosted scalac invocation;
 - a focused Scala StackWalker smoke covering source-level Java `StackWalker`
   retained-class-reference frame descriptor and `MethodType` metadata plus the
-  no-retain `getMethodType` guard;
+  no-retain `getMethodType` guard, `getCallerClass()`, and `forEach` frame
+  traversal;
 - a focused `scala-reflect` runtime universe smoke covering runtime mirror
   creation, `typeOf`, constructor/member symbol lookup, case-accessor
   discovery, and static class lookup;
@@ -238,9 +239,10 @@ seconds and the remaining main Scala compiler smoke in 353 seconds using Scala
 The Scala StackWalker coverage now lives in `classes/scala_stackwalker_smoke`
 and runs through `ci/scala_stackwalker_smoke.sh`. It checks retained
 class-reference frame descriptor and `MethodType` metadata plus the no-retain
-`getMethodType` guard while keeping the main Scala compiler smoke smaller.
-A local 2026-06-30 validation completed the focused Scala StackWalker smoke in
-58 seconds and the remaining main Scala compiler smoke in 310 seconds using
+`getMethodType` guard, retained `getCallerClass()`, and `forEach` frame
+traversal while keeping the main Scala compiler smoke smaller.
+A local 2026-07-11 validation completed the focused Scala StackWalker smoke in
+125 seconds and the remaining main Scala compiler smoke in 310 seconds using
 Scala 2.13.18.
 The `scala-reflect` runtime universe coverage now lives in
 `classes/scala_reflect_smoke` and runs through `ci/scala_reflect_smoke.sh`. It

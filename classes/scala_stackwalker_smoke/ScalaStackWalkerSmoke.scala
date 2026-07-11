@@ -22,6 +22,13 @@ object ScalaStackWalkerSmoke {
       }
       joinParts(parts)
     }
+    val callerClassMatches = retain.getCallerClass.getSimpleName == "ScalaStackWalkerSmoke$"
+    val forEachParts = new java.util.ArrayList[String]()
+    retain.forEach { frame =>
+      if (frame.getClassName.contains("ScalaStackWalkerSmoke") && forEachParts.size() < 2) {
+        forEachParts.add(frame.getMethodName)
+      }
+    }
 
     val noRetain = StackWalker.getInstance().walk[StackWalker.StackFrame] { stream =>
       val iterator = stream.iterator()
@@ -43,7 +50,8 @@ object ScalaStackWalkerSmoke {
         case e: UnsupportedOperationException => e.getClass.getSimpleName
       }
 
-    value + ":" + frames + ":" + noRetain.getDescriptor + ":" + methodTypeGuard
+    value + ":" + frames + ":" + noRetain.getDescriptor + ":" + methodTypeGuard + ":" +
+      callerClassMatches + ":" + joinParts(forEachParts)
   }
 
   private def joinParts(parts: java.util.ArrayList[String]): String = {

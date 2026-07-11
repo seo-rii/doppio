@@ -398,7 +398,8 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `@BeanProperty`, Java reflection over Scala-generated members, specialized
   class generation, and specialized generic `Signature` metadata, a focused Scala
   StackWalker smoke covering Java `StackWalker` frame descriptor/`MethodType`
-  metadata with retained-class-reference guards, a focused `scala-reflect`
+  metadata with retained-class-reference guards, `getCallerClass()`, and
+  `forEach` traversal, a focused `scala-reflect`
   runtime universe smoke covering runtime mirror creation, `typeOf`,
   constructor/member symbol lookup, case-accessor discovery, and static class
   lookup, a focused Scala collection-library smoke covering `LazyList`,
