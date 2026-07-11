@@ -179,6 +179,11 @@ public class Java13FileSystems {
         () -> Files.setAttribute(hello, "owner:owner", zipOwner));
     printFailure(label + "-attr-posix-set",
         () -> Files.setAttribute(hello, "posix:permissions", EnumSet.of(PosixFilePermission.OWNER_READ)));
+    printFailure(label + "-link-create",
+        () -> Files.createLink(fs.getPath(label + "-hard-link.txt"), hello));
+    printFailure(label + "-symlink-create",
+        () -> Files.createSymbolicLink(fs.getPath(label + "-symbolic-link.txt"), hello));
+    printFailure(label + "-symlink-read", () -> Files.readSymbolicLink(hello));
     Path moveSource = fs.getPath(label + "-move-source.txt");
     Path moveTarget = fs.getPath(label + "-move-target.txt");
     Files.writeString(moveSource, "mz");

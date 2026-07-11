@@ -312,6 +312,10 @@ public final class Files {
   }
 
   public static Path createLink(Path link, Path existing) throws IOException {
+    if (link.getFileSystem() != FileSystems.getDefault()) {
+      link.getFileSystem().provider().createLink(link, existing);
+      return link;
+    }
     File linkFile = toFile(link);
     File existingFile = toFile(existing);
     createHardLink0(linkFile.toString(), existingFile.toString());
@@ -320,6 +324,10 @@ public final class Files {
 
   public static Path createSymbolicLink(Path link, Path target, FileAttribute<?>... attrs) throws IOException {
     requireFileAttributes(attrs);
+    if (link.getFileSystem() != FileSystems.getDefault()) {
+      link.getFileSystem().provider().createSymbolicLink(link, target, attrs);
+      return link;
+    }
     File linkFile = toFile(link);
     Path targetPath = Objects.requireNonNull(target);
     createSymbolicLink0(linkFile.toString(), targetPath.toString());
