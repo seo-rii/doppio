@@ -70,6 +70,9 @@ public final class Files {
         deleteOnClose = true;
       }
     }
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      return path.getFileSystem().provider().newInputStream(path, options);
+    }
     File file = toFile(path);
     validateInputTarget(file);
     InputStream input = new FileInputStream(file);
@@ -513,6 +516,14 @@ public final class Files {
 
   public static boolean exists(Path path, LinkOption... options) {
     boolean followLinks = followLinks(options);
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      try {
+        path.getFileSystem().provider().checkAccess(path);
+        return true;
+      } catch (IOException e) {
+        return false;
+      }
+    }
     File file = toFile(path);
     return file.exists() || (!followLinks && isSymbolicLink(path));
   }

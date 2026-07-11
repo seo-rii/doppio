@@ -2441,7 +2441,55 @@ export class MethodReference implements IConstantPoolItem {
 		                  if (!fs.existsSync(filepath)) {
 		                    thread.throwNewException('Ljava/nio/file/NoSuchFileException;', filepath);
 		                  } else {
-		                    thread.throwNewException('Ljava/nio/file/ProviderNotFoundException;', 'Provider not found');
+		                    var stats = fs.statSync(filepath),
+		                      isZipFile = false;
+		                    if (stats.isFile()) {
+		                      var fd = fs.openSync(filepath, 'r');
+		                      try {
+		                        var header = Buffer.alloc(2);
+		                        isZipFile = fs.readSync(fd, header, 0, 2, 0) === 2 && header.toString() === 'PK';
+		                      } finally {
+		                        fs.closeSync(fd);
+		                      }
+		                    }
+		                    if (!isZipFile) {
+		                      thread.throwNewException('Ljava/nio/file/ProviderNotFoundException;', 'Provider not found');
+		                      return;
+		                    }
+		                    thread.getBsCl().initializeClass(thread, 'Ljava/util/Collections;', (collectionsCls: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+		                      if (collectionsCls === null) {
+		                        return;
+		                      }
+		                      var collectionsCons: any = collectionsCls.getConstructor(thread);
+		                      collectionsCons['java/util/Collections/emptyMap()Ljava/util/Map;'](thread, [], (emptyMapErr?: JVMTypes.java_lang_Throwable, emptyMap?: JVMTypes.java_lang_Object) => {
+		                        if (emptyMapErr) {
+		                          thread.throwException(emptyMapErr);
+		                          return;
+		                        }
+		                        thread.getBsCl().initializeClass(thread, 'Lcom/sun/nio/zipfs/ZipFileSystemProvider;', (providerCls: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+		                          if (providerCls === null) {
+		                            return;
+		                          }
+		                          var provider = util.newObjectFromClass<JVMTypes.java_lang_Object>(thread, providerCls);
+		                          (<any> provider)['<init>()V'](thread, [], (providerInitErr?: JVMTypes.java_lang_Throwable) => {
+		                            if (providerInitErr) {
+		                              thread.throwException(providerInitErr);
+		                              return;
+		                            }
+		                            (<any> provider)['newFileSystem(Ljava/nio/file/Path;Ljava/util/Map;)Ljava/nio/file/FileSystem;'](
+		                              thread,
+		                              [path, hasEnv ? env : emptyMap],
+		                              (zipErr?: JVMTypes.java_lang_Throwable, zipFileSystem?: JVMTypes.java_lang_Object) => {
+		                                if (zipErr) {
+		                                  thread.throwException(zipErr);
+		                                } else {
+		                                  thread.asyncReturn(zipFileSystem);
+		                                }
+		                              });
+		                          });
+		                        });
+		                      });
+		                    });
 		                  }
 		                });
 		                return null;

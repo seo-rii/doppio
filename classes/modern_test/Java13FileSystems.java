@@ -1,10 +1,14 @@
 package classes.modern_test;
 
+import java.io.OutputStream;
 import java.nio.file.FileSystems;
+import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 public class Java13FileSystems {
   public static void main(String[] args) throws Exception {
@@ -34,6 +38,37 @@ public class Java13FileSystems {
     } finally {
       Files.deleteIfExists(temp);
     }
+
+    Path zip = Files.createTempFile("doppio-java13-fs", ".zip");
+    try {
+      writeZip(zip);
+      try (FileSystem fs = FileSystems.newFileSystem(zip)) {
+        printZipFileSystem("zip-one", fs);
+      }
+      try (FileSystem fs = FileSystems.newFileSystem(zip, Collections.emptyMap())) {
+        printZipFileSystem("zip-map", fs);
+      }
+    } finally {
+      Files.deleteIfExists(zip);
+    }
+  }
+
+  private static void writeZip(Path path) throws Exception {
+    try (OutputStream out = Files.newOutputStream(path);
+         ZipOutputStream zip = new ZipOutputStream(out)) {
+      zip.putNextEntry(new ZipEntry("hello.txt"));
+      zip.write(new byte[] { 'h', 'i' });
+      zip.closeEntry();
+      zip.putNextEntry(new ZipEntry("nested/value.txt"));
+      zip.write(new byte[] { 'z' });
+      zip.closeEntry();
+    }
+  }
+
+  private static void printZipFileSystem(String label, FileSystem fs) throws Exception {
+    System.out.println(label + ":" + fs.provider().getScheme());
+    System.out.println(Files.readString(fs.getPath("hello.txt")));
+    System.out.println(Files.exists(fs.getPath("nested", "value.txt")));
   }
 
   private static void printFailure(String label, Throwing action) {

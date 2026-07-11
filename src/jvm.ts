@@ -331,10 +331,14 @@ class JVM {
 
   public static getDefaultOptions(doppioHome: string): JVMOptions {
     let javaHome = path.join(doppioHome, 'vendor', 'java_home');
+    let bootstrapClasspath = JDKInfo.classpath.slice(0);
+    if (bootstrapClasspath.indexOf('lib/ext/zipfs.jar') === -1) {
+      bootstrapClasspath.push('lib/ext/zipfs.jar');
+    }
     return {
       doppioHomePath: doppioHome,
       classpath: ['.'],
-      bootstrapClasspath: JDKInfo.classpath.map((item) => path.join(javaHome, item)),
+      bootstrapClasspath: bootstrapClasspath.map((item) => path.join(javaHome, item)),
       javaHomePath: javaHome,
       nativeClasspath: [],
       enableSystemAssertions: false,
