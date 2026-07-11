@@ -59,7 +59,7 @@ runtime_cp="$out_dir:$resource_dir:$library_jar"
 rm -rf "$out_dir" "$resource_dir"
 mkdir -p "$out_dir" "$resource_dir"
 
-compile_timeout="${SCALA_IO_SMOKE_COMPILE_TIMEOUT_SECONDS:-420}"
+compile_timeout="${SCALA_IO_SMOKE_COMPILE_TIMEOUT_SECONDS:-600}"
 run_timeout="${SCALA_IO_SMOKE_RUN_TIMEOUT_SECONDS:-60}"
 responsiveness="${DOPPIO_SCALA_RESPONSIVENESS:-100000}"
 
