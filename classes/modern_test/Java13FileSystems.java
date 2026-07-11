@@ -14,7 +14,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributeView;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileAttributeView;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -23,6 +25,9 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 public class Java13FileSystems {
+  private interface MissingFileAttributeView extends FileAttributeView {
+  }
+
   public static void main(String[] args) throws Exception {
     ClassLoader loader = Java13FileSystems.class.getClassLoader();
     printFailure("null-one", () -> FileSystems.newFileSystem((Path) null));
@@ -103,6 +108,10 @@ public class Java13FileSystems {
     System.out.println("same-mismatch:" + Files.isSameFile(hello, fs.getPath("hello.txt")) + ":" +
         Files.mismatch(hello, nestedValue));
     System.out.println("store:" + Files.getFileStore(hello).supportsFileAttributeView("basic"));
+    BasicFileAttributeView basicView = Files.getFileAttributeView(hello, BasicFileAttributeView.class);
+    BasicFileAttributes viewAttrs = basicView.readAttributes();
+    System.out.println("view:" + basicView.name() + ":" + viewAttrs.size() + ":" + viewAttrs.isRegularFile());
+    System.out.println("missing-view:" + (Files.getFileAttributeView(hello, MissingFileAttributeView.class) == null));
     ByteArrayOutputStream copiedOut = new ByteArrayOutputStream();
     System.out.println("copy-out:" + Files.copy(hello, copiedOut) + ":" + copiedOut.toString("UTF-8"));
     Path copied = fs.getPath(label + "-copy.txt");

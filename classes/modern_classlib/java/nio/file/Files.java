@@ -825,6 +825,9 @@ public final class Files {
     requireLinkOptions(options);
     final LinkOption[] linkOptions = options.clone();
     final Class<V> viewType = Objects.requireNonNull(type);
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      return path.getFileSystem().provider().getFileAttributeView(path, viewType, options);
+    }
     toFile(path);
     if (viewType != BasicFileAttributeView.class) {
       if (viewType == FileOwnerAttributeView.class) {
