@@ -1156,6 +1156,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
 	  propagation. Selected Java 12 `String`, `Integer`, `Long`, `Float`, and
 	  `Double` `describeConstable` and `resolveConstantDesc` behavior is covered
 	  for present optionals and self-returning constants.
+- Selected Java 15 `CharSequence.isEmpty()` behavior is covered for `String`,
+  `StringBuilder`, and custom `CharSequence` implementations while preserving
+  default `chars()` and `codePoints()` behavior.
 - Selected Java 15 `String.formatted` behavior is covered by delegating to the
   existing `String.format(String, Object...)` implementation for varargs,
   literal percent, null argument, explicit object-array, and missing-argument
