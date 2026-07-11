@@ -45,6 +45,8 @@ import java.util.regex.PatternSyntaxException;
 import java.util.stream.Stream;
 
 public final class Files {
+  private static int temporaryProviderCounter;
+
   private Files() {}
 
   private static native void createHardLink0(String link, String existing) throws IOException;
@@ -242,6 +244,9 @@ public final class Files {
       String suffix,
       FileAttribute<?>... attrs) throws IOException {
     requireFileAttributes(attrs);
+    if (dir.getFileSystem() != FileSystems.getDefault()) {
+      return createTemporaryProviderPath(dir, prefix, suffix, false, attrs);
+    }
     Path path = createTemporaryFile(toFile(dir), prefix, suffix).toPath();
     applyFileAttributes(path, attrs);
     return path;
@@ -260,6 +265,9 @@ public final class Files {
 
   public static Path createTempDirectory(Path dir, String prefix, FileAttribute<?>... attrs) throws IOException {
     requireFileAttributes(attrs);
+    if (dir.getFileSystem() != FileSystems.getDefault()) {
+      return createTemporaryProviderPath(dir, prefix, "", true, attrs);
+    }
     File file = createTemporaryFile(toFile(dir), prefix, "");
     if (!file.delete() || !file.mkdir()) {
       throw new IOException("Unable to create temporary directory");
@@ -971,6 +979,10 @@ public final class Files {
       throws IOException {
     requireLinkOptions(options);
     String attributeString = Objects.requireNonNull(attribute);
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      path.getFileSystem().provider().setAttribute(path, attributeString, value, options);
+      return path;
+    }
     String viewName = attributeViewName(attributeString);
     String attributeName = attributeNames(attributeString);
     if (viewName.equals("owner")) {
@@ -1038,6 +1050,13 @@ public final class Files {
 
   public static UserPrincipal getOwner(Path path, LinkOption... options) throws IOException {
     requireLinkOptions(options);
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      FileOwnerAttributeView view = getFileAttributeView(path, FileOwnerAttributeView.class, options);
+      if (view == null) {
+        throw new UnsupportedOperationException();
+      }
+      return view.getOwner();
+    }
     File file = toFile(path);
     if (!file.exists()) {
       throw new NoSuchFileException(file.toString());
@@ -1046,7 +1065,15 @@ public final class Files {
   }
 
   public static Path setOwner(Path path, UserPrincipal owner) throws IOException {
-    Objects.requireNonNull(owner);
+    UserPrincipal user = Objects.requireNonNull(owner);
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      FileOwnerAttributeView view = getFileAttributeView(path, FileOwnerAttributeView.class);
+      if (view == null) {
+        throw new UnsupportedOperationException();
+      }
+      view.setOwner(user);
+      return path;
+    }
     File file = toFile(path);
     if (!file.exists()) {
       throw new NoSuchFileException(file.toString());
@@ -1057,6 +1084,13 @@ public final class Files {
   public static Set<PosixFilePermission> getPosixFilePermissions(Path path, LinkOption... options)
       throws IOException {
     requireLinkOptions(options);
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      PosixFileAttributeView view = getFileAttributeView(path, PosixFileAttributeView.class, options);
+      if (view == null) {
+        throw new UnsupportedOperationException();
+      }
+      return view.readAttributes().permissions();
+    }
     File file = toFile(path);
     if (!file.exists()) {
       throw new NoSuchFileException(file.toString());
@@ -1069,6 +1103,14 @@ public final class Files {
     Set<PosixFilePermission> permissions = Objects.requireNonNull(perms);
     for (PosixFilePermission permission : permissions) {
       Objects.requireNonNull(permission);
+    }
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      PosixFileAttributeView view = getFileAttributeView(path, PosixFileAttributeView.class);
+      if (view == null) {
+        throw new UnsupportedOperationException();
+      }
+      view.setPermissions(permissions);
+      return path;
     }
     File file = toFile(path);
     if (!file.exists()) {
@@ -1764,6 +1806,41 @@ public final class Files {
       }
     }
     return File.createTempFile(temporaryPrefix(prefix), suffix, directory);
+  }
+
+  private static Path createTemporaryProviderPath(
+      Path dir,
+      String prefix,
+      String suffix,
+      boolean directory,
+      FileAttribute<?>... attrs) throws IOException {
+    Path parent = Objects.requireNonNull(dir);
+    if (!exists(parent)) {
+      throw new NoSuchFileException(parent.toString());
+    }
+    if (!isDirectory(parent)) {
+      throw new FileSystemException(parent.toString());
+    }
+    String namePrefix = temporaryPrefix(prefix);
+    String nameSuffix = suffix == null ? ".tmp" : suffix;
+    IOException failure = null;
+    for (int i = 0; i < 10000; i++) {
+      String name = namePrefix + Integer.toString(temporaryProviderCounter++, 16) + "-" + i + nameSuffix;
+      Path candidate = parent.resolve(name);
+      try {
+        if (directory) {
+          return createDirectory(candidate, attrs);
+        }
+        return createFile(candidate, attrs);
+      } catch (FileAlreadyExistsException e) {
+        failure = e;
+      }
+    }
+    IOException e = new IOException("Unable to create temporary " + (directory ? "directory" : "file"));
+    if (failure != null) {
+      e.initCause(failure);
+    }
+    throw e;
   }
 
   private static String temporaryPrefix(String prefix) {

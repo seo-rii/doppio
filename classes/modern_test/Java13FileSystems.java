@@ -17,9 +17,12 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributeView;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileAttributeView;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -156,6 +159,26 @@ public class Java13FileSystems {
     Path lineFile = createdNested.resolve("lines.txt");
     System.out.println("write-lines:" + Files.write(lineFile, Arrays.asList("a", "b")).equals(lineFile) +
         ":" + Files.readAllLines(lineFile));
+    Path tempFile = Files.createTempFile(createdNested, label + "-tmp", ".dat");
+    System.out.println("temp-file:" + tempFile.getParent().equals(createdNested) +
+        ":" + Files.isRegularFile(tempFile) + ":" + tempFile.getFileName().toString().endsWith(".dat"));
+    Path tempDirectory = Files.createTempDirectory(createdNested, label + "-td");
+    System.out.println("temp-dir:" + tempDirectory.getParent().equals(createdNested) +
+        ":" + Files.isDirectory(tempDirectory));
+    final UserPrincipal zipOwner = new UserPrincipal() {
+      public String getName() {
+        return "zip-owner";
+      }
+    };
+    printFailure(label + "-owner-get", () -> Files.getOwner(hello));
+    printFailure(label + "-owner-set", () -> Files.setOwner(hello, zipOwner));
+    printFailure(label + "-posix-get", () -> Files.getPosixFilePermissions(hello));
+    printFailure(label + "-posix-set",
+        () -> Files.setPosixFilePermissions(hello, EnumSet.of(PosixFilePermission.OWNER_READ)));
+    printFailure(label + "-attr-owner-set",
+        () -> Files.setAttribute(hello, "owner:owner", zipOwner));
+    printFailure(label + "-attr-posix-set",
+        () -> Files.setAttribute(hello, "posix:permissions", EnumSet.of(PosixFilePermission.OWNER_READ)));
     Path moveSource = fs.getPath(label + "-move-source.txt");
     Path moveTarget = fs.getPath(label + "-move-target.txt");
     Files.writeString(moveSource, "mz");
