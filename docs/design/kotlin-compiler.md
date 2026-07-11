@@ -1072,7 +1072,12 @@ and full-classpath modes.
    where possible. If it is Kotlin-compiler-internal behavior, keep a small
    `/tmp` Kotlin smoke and document the exact class/method path before changing
    VM semantics.
-6. Keep the full `kotlinc/lib/*.jar` classpath stress path in CI and compare
+6. Treat reflection-visible Java 9+ runtime overlays as a separate risk class.
+   Direct-call support such as `Runtime.version()` is not enough evidence that
+   `Class.getMethod` or `getDeclaredMethods` exposure is safe for Kotlin
+   compiler startup; use `docs/design/runtime-reflection-overlays.md` before
+   enabling those methods in public reflection enumeration.
+7. Keep the full `kotlinc/lib/*.jar` classpath stress path in CI and compare
    elapsed time after each throughput change.
 
 ## Done Criteria For The First Goal

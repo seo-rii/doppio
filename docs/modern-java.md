@@ -167,9 +167,11 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
    broaden `invokedynamic` linkage.
 6. Design and implement hard runtime surfaces separately: `java.lang.invoke`,
    reflection metadata, records, modules, and virtual-thread-facing APIs. Start
-   `java.lang.invoke` work from `docs/design/java-lang-invoke.md`, track the
-   Kotlin compiler bring-up in `docs/design/kotlin-compiler.md`, and track the
-   Scala compiler bring-up in `docs/design/scala-compiler.md`.
+   `java.lang.invoke` work from `docs/design/java-lang-invoke.md`, track
+   synthetic modern-method reflection overlays in
+   `docs/design/runtime-reflection-overlays.md`, track the Kotlin compiler
+   bring-up in `docs/design/kotlin-compiler.md`, and track the Scala compiler
+   bring-up in `docs/design/scala-compiler.md`.
 
 ## Test Strategy
 
@@ -1074,7 +1076,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   and `tanh`. The shim delegates to host JavaScript `Math` functions for these
   paths, so exhaustive fdlibm bit-for-bit parity across all inputs is not
   claimed.
-- `Runtime.version()` returns a cached baseline `Runtime.Version` object,
+- Direct bytecode calls to `Runtime.version()` return a cached baseline
+  `Runtime.Version` object. Reflection-visible synthetic modern methods need
+  the separate overlay design in `docs/design/runtime-reflection-overlays.md`.
   `Thread.onSpinWait()` is implemented as the tested no-op spin hint, and
   `Reference.reachabilityFence(Object)` is implemented as the tested no-op
   reachability barrier shim for object and null references.
