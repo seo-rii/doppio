@@ -85,6 +85,7 @@ test -f "$out_dir/ReflectSmokeBox.class"
 test -f "$out_dir/ReflectSmokeBox\$Companion.class"
 test -f "$out_dir/ReflectTag.class"
 test -f "$out_dir/ReflectDefaults.class"
+test -f "$out_dir/ReflectGenericHolder.class"
 test -f "$out_dir/ReflectNode.class"
 test -f "$out_dir/ReflectEmptyNode.class"
 test -f "$out_dir/ReflectValueNode.class"
@@ -92,7 +93,7 @@ test -f "$out_dir/ReflectSmokeKt.class"
 test -f "$out_dir/META-INF/main.kotlin_module"
 
 runtime_cp="$out_dir:$stdlib_jar:$reflect_jar"
-expected_output="ReflectSmokeBox|count,name|5|r:box:5|box:render:prefix|s:seed:1|d:x:8/d:x:12|ReflectEmptyNode,ReflectValueNode:empty"
+expected_output="ReflectSmokeBox|count,name|5|r:box:5|box:render:prefix|s:seed:1|d:x:8/d:x:12|ReflectEmptyNode,ReflectValueNode:empty|String[]:false|item:T[]:false,maybeItems:List[T?]:false"
 
 native_output="$(java -cp "$runtime_cp" ReflectSmokeKt)"
 if [ "$native_output" != "$expected_output" ]; then

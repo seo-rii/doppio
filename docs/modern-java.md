@@ -361,7 +361,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   mutable property set/get through `KMutableProperty1`,
   `KClass.memberFunctions` invocation, runtime annotation lookup,
   companion-object dispatch, `KCallable.callBy` default constructor and method
-  arguments, sealed subclass enumeration, and object-instance lookup.
+  arguments, sealed subclass enumeration, object-instance lookup, and selected
+  `KType` classifier, generic argument, type-parameter, return-type, and
+  nullability metadata.
 - Next blocker: broaden the Kotlin compiler smoke to more source constructs and
   reduce remaining throughput variance. A local 2026-07-10 validation completed
   the metadata-guarded main smoke in 74 seconds with the minimal classpath and

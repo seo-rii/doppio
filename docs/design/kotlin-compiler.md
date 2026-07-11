@@ -427,17 +427,19 @@ Current verified checks:
   `AnnotationDefault` metadata.
 - A standalone `kotlin-reflect.jar` smoke now lives in
   `ci/kotlin_reflect_smoke.sh`, separate from the large `ci/kotlin_smoke.sh`
-  suite so reflection regressions are isolated. Doppio compiled the source in
-  78 seconds with explicit `kotlin-stdlib.jar` and `kotlin-reflect.jar` source
-  classpath; both the host JVM and Doppio printed
-  `ReflectSmokeBox|count,name|5|r:box:5|box:render:prefix|s:seed:1|d:x:8/d:x:12|ReflectEmptyNode,ReflectValueNode:empty`.
+  suite so reflection regressions are isolated. A local 2026-07-11 validation
+  completed the focused smoke in 273 seconds with explicit `kotlin-stdlib.jar`
+  and `kotlin-reflect.jar` source classpath; both the host JVM and Doppio
+  printed
+  `ReflectSmokeBox|count,name|5|r:box:5|box:render:prefix|s:seed:1|d:x:8/d:x:12|ReflectEmptyNode,ReflectValueNode:empty|String[]:false|item:T[]:false,maybeItems:List[T?]:false`.
   This covers
   `KClass.primaryConstructor`, `KClass.memberProperties`, mutable property
   set/get through `KMutableProperty1`, `KClass.memberFunctions` invocation,
   runtime annotation lookup, companion-object instance dispatch,
   `KCallable.callBy` default constructor and method arguments, sealed subclass
-  enumeration, and object-instance lookup through the real `kotlin-reflect.jar`
-  runtime.
+  enumeration, object-instance lookup, and selected `KType` classifier,
+  generic argument, type-parameter, return-type, and nullability metadata
+  through the real `kotlin-reflect.jar` runtime.
 - A focused Kotlin modern-construct smoke now lives in
   `classes/kotlin_modern_construct_smoke` and runs through
   `ci/kotlin_modern_construct_smoke.sh`. A focused local run completed in 185

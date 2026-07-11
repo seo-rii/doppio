@@ -1,4 +1,6 @@
 import kotlin.reflect.KMutableProperty1
+import kotlin.reflect.KClass
+import kotlin.reflect.KType
 import kotlin.reflect.full.companionObjectInstance
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.memberFunctions
@@ -34,6 +36,23 @@ data object ReflectEmptyNode : ReflectNode {
 
 data class ReflectValueNode(override val label: String, val weight: Int) : ReflectNode
 
+data class ReflectGenericHolder<T : Any>(val item: T, val maybeItems: List<T?>)
+
+fun describeType(type: KType): String {
+  fun classifierName(value: KType): String =
+    when (val classifier = value.classifier) {
+      is KClass<*> -> classifier.simpleName ?: "?"
+      null -> "?"
+      else -> classifier.toString()
+    }
+
+  val args = type.arguments.joinToString(",") { projection ->
+    val argType = projection.type ?: return@joinToString "*"
+    classifierName(argType) + if (argType.isMarkedNullable) "?" else ""
+  }
+  return "${classifierName(type)}[$args]:${type.isMarkedNullable}"
+}
+
 fun main() {
   val kClass = ReflectSmokeBox::class
   val ctor = kClass.primaryConstructor!!
@@ -51,6 +70,11 @@ fun main() {
   val receiver = join.parameters.first()
   val scale = join.valueParameters.single { it.name == "scale" }
   val sealedNames = ReflectNode::class.sealedSubclasses.map { it.simpleName ?: "?" }.sorted().joinToString(",")
+  val genericCtor = ReflectGenericHolder::class.primaryConstructor!!
+  val genericTypes = genericCtor.valueParameters.joinToString(",") { parameter ->
+    "${parameter.name}:${describeType(parameter.type)}"
+  }
+  val renderType = describeType(render.returnType)
   println(
     kClass.simpleName + "|" +
       names + "|" +
@@ -62,6 +86,8 @@ fun main() {
       seeded.render("s") + "|" +
       join.callBy(mapOf(receiver to defaults)) + "/" +
       join.callBy(mapOf(receiver to defaults, scale to 3)) + "|" +
-      sealedNames + ":" + ReflectEmptyNode::class.objectInstance!!.label
+      sealedNames + ":" + ReflectEmptyNode::class.objectInstance!!.label + "|" +
+      renderType + "|" +
+      genericTypes
   )
 }
