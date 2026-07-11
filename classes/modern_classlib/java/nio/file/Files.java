@@ -111,6 +111,9 @@ public final class Files {
     if (append && truncate) {
       throw new IllegalArgumentException();
     }
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      return path.getFileSystem().provider().newOutputStream(path, options);
+    }
     File file = toFile(path);
     validateOutputTarget(file, create, createNew);
     if (append || truncate) {
@@ -327,6 +330,10 @@ public final class Files {
   }
 
   public static void delete(Path path) throws IOException {
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      path.getFileSystem().provider().delete(path);
+      return;
+    }
     File file = toFile(path);
     if (!file.exists() && !isSymbolicLink(path)) {
       throw new NoSuchFileException(file.toString());
@@ -335,6 +342,14 @@ public final class Files {
   }
 
   public static boolean deleteIfExists(Path path) throws IOException {
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      try {
+        path.getFileSystem().provider().delete(path);
+        return true;
+      } catch (NoSuchFileException e) {
+        return false;
+      }
+    }
     File file = toFile(path);
     if (!file.exists() && !isSymbolicLink(path)) {
       return false;
@@ -430,6 +445,20 @@ public final class Files {
         throw new UnsupportedOperationException();
       }
     }
+    if (target.getFileSystem() != FileSystems.getDefault()) {
+      if (exists(target)) {
+        if (!replaceExisting) {
+          throw new FileAlreadyExistsException(target.toString());
+        }
+        delete(target);
+      }
+      OutputStream output = newOutputStream(target);
+      try {
+        return copyStream(in, output);
+      } finally {
+        output.close();
+      }
+    }
     File targetFile = toFile(target);
     if (targetFile.exists()) {
       if (!replaceExisting) {
@@ -457,11 +486,7 @@ public final class Files {
 
   public static long copy(Path source, OutputStream out) throws IOException {
     Objects.requireNonNull(out);
-    File sourceFile = toFile(source);
-    if (!sourceFile.exists()) {
-      throw new NoSuchFileException(sourceFile.toString());
-    }
-    InputStream input = new FileInputStream(sourceFile);
+    InputStream input = newInputStream(source);
     try {
       return copyStream(input, out);
     } finally {

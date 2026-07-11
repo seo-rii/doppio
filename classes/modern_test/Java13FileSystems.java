@@ -1,5 +1,7 @@
 package classes.modern_test;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
@@ -11,6 +13,7 @@ import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -97,6 +100,17 @@ public class Java13FileSystems {
     System.out.println("same-mismatch:" + Files.isSameFile(hello, fs.getPath("hello.txt")) + ":" +
         Files.mismatch(hello, nestedValue));
     System.out.println("store:" + Files.getFileStore(hello).supportsFileAttributeView("basic"));
+    ByteArrayOutputStream copiedOut = new ByteArrayOutputStream();
+    System.out.println("copy-out:" + Files.copy(hello, copiedOut) + ":" + copiedOut.toString("UTF-8"));
+    Path copied = fs.getPath(label + "-copy.txt");
+    System.out.println("copy-in:" + Files.copy(new ByteArrayInputStream(new byte[] { 'o', 'k' }), copied) +
+        ":" + Files.readString(copied));
+    printFailure(label + "-copy-existing",
+        () -> Long.valueOf(Files.copy(new ByteArrayInputStream(new byte[] { 'x' }), copied)));
+    System.out.println("copy-replace:" +
+        Files.copy(new ByteArrayInputStream(new byte[] { 'n' }), copied, StandardCopyOption.REPLACE_EXISTING) +
+        ":" + Files.readString(copied));
+    System.out.println("delete:" + Files.deleteIfExists(copied) + ":" + Files.exists(copied));
     try (SeekableByteChannel channel = Files.newByteChannel(hello)) {
       System.out.println("channel:" + channel.size());
     }
