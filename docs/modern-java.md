@@ -686,7 +686,7 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   append and create-new option paths, read-all-bytes length checks, temp-file
   cleanup, and null validation,
   `CharSequence.compare` lexicographic, equal, length-difference, same-object,
-  and null input paths,
+  custom implementation, and null input paths,
   `Collection.toArray(IntFunction)` generator-size, returned-array, empty
   collection, oversized-array reuse, null-generator/null-array, and
   incompatible-array behavior, `Predicate.not` negation,
