@@ -5,6 +5,8 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 
 public class Java17MethodHandleTableSwitch {
+  private static String switchLog = "";
+
   public static String fallback(int index, String prefix) {
     return prefix + ":fallback" + index;
   }
@@ -31,6 +33,18 @@ public class Java17MethodHandleTableSwitch {
 
   public static int intTarget1(int index, int base) {
     return base + index + 20;
+  }
+
+  public static void voidFallback(int index, String prefix) {
+    switchLog += prefix + ":fallback" + index + "|";
+  }
+
+  public static void voidTarget0(int index, String prefix) {
+    switchLog += prefix + ":zero" + index + "|";
+  }
+
+  public static void voidTarget1(int index, String prefix) {
+    switchLog += prefix + ":one" + index + "|";
   }
 
   public static void main(String[] args) throws Throwable {
@@ -77,6 +91,27 @@ public class Java17MethodHandleTableSwitch {
     System.out.println((int) intSwitch.invokeExact(0, 5));
     System.out.println((int) intSwitch.invokeExact(1, 5));
     System.out.println((int) intSwitch.invokeExact(7, 5));
+
+    MethodHandle voidFallback = lookup.findStatic(
+        Java17MethodHandleTableSwitch.class,
+        "voidFallback",
+        MethodType.methodType(void.class, int.class, String.class));
+    MethodHandle voidTarget0 = lookup.findStatic(
+        Java17MethodHandleTableSwitch.class,
+        "voidTarget0",
+        MethodType.methodType(void.class, int.class, String.class));
+    MethodHandle voidTarget1 = lookup.findStatic(
+        Java17MethodHandleTableSwitch.class,
+        "voidTarget1",
+        MethodType.methodType(void.class, int.class, String.class));
+    MethodHandle voidSwitch = MethodHandles.tableSwitch(voidFallback, voidTarget0, voidTarget1);
+    System.out.println(voidSwitch.type().toMethodDescriptorString());
+    switchLog = "";
+    voidSwitch.invokeExact(0, "v");
+    voidSwitch.invokeExact(1, "v");
+    voidSwitch.invokeExact(2, "v");
+    voidSwitch.invokeExact(-1, "v");
+    System.out.println(switchLog);
 
     try {
       MethodHandles.tableSwitch(null, target0);

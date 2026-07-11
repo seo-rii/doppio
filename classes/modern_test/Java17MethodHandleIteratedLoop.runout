@@ -4,6 +4,8 @@ abc
 a2b2
 (Ljava/lang/String;)Ljava/lang/String;
 p:papbpc
+()Ljava/lang/String;
+xy
 (Ljava/lang/Iterable;)I
 10
 0

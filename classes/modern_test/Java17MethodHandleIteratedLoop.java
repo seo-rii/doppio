@@ -35,6 +35,10 @@ public class Java17MethodHandleIteratedLoop {
     return Arrays.asList("a", "b", "c").iterator();
   }
 
+  public static Iterator<String> noArgIterator() {
+    return Arrays.asList("x", "y").iterator();
+  }
+
   public static void resetPrefix(String prefix) {
     sideEffect = 0;
   }
@@ -85,6 +89,10 @@ public class Java17MethodHandleIteratedLoop {
         Java17MethodHandleIteratedLoop.class,
         "prefixIterator",
         MethodType.methodType(Iterator.class, String.class));
+    MethodHandle noArgIterator = lookup.findStatic(
+        Java17MethodHandleIteratedLoop.class,
+        "noArgIterator",
+        MethodType.methodType(Iterator.class));
     MethodHandle resetPrefix = lookup.findStatic(
         Java17MethodHandleIteratedLoop.class,
         "resetPrefix",
@@ -109,6 +117,10 @@ public class Java17MethodHandleIteratedLoop {
     MethodHandle explicitIterator = MethodHandles.iteratedLoop(prefixIterator, prefixSeed, joinWithPrefix);
     System.out.println(explicitIterator.type().toMethodDescriptorString());
     System.out.println((String) explicitIterator.invokeExact("p"));
+
+    MethodHandle explicitNoArgIterator = MethodHandles.iteratedLoop(noArgIterator, seed, join);
+    System.out.println(explicitNoArgIterator.type().toMethodDescriptorString());
+    System.out.println((String) explicitNoArgIterator.invokeExact());
 
     MethodHandle sum = lookup.findStatic(
         Java17MethodHandleIteratedLoop.class,

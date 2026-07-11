@@ -37,8 +37,9 @@ run.
 
 Java 17 `java.lang.invoke` note: the compatibility row above now also includes
 selected `MethodHandles.tryFinally` support, selected
-`MethodHandles.tableSwitch` selector/fallback support, selected
-`MethodHandles.iteratedLoop` `Iterable`/`Iterator` support, plus selected
+`MethodHandles.tableSwitch` selector/fallback support including `void`
+side-effect targets, selected `MethodHandles.iteratedLoop` `Iterable`/`Iterator`
+support including no-arg explicit iterator handles, plus selected
 `MethodHandles.whileLoop`/`MethodHandles.doWhileLoop`/`MethodHandles.countedLoop`
 non-`void` state-loop and selected `void` side-effect slices through public overlays, covering normal,
 exceptional, and `void` `tryFinally` target flows, same-typed `tableSwitch`
