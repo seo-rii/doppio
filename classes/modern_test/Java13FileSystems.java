@@ -48,6 +48,12 @@ public class Java13FileSystems {
       try (FileSystem fs = FileSystems.newFileSystem(zip, Collections.emptyMap())) {
         printZipFileSystem("zip-map", fs);
       }
+      try (FileSystem fs = FileSystems.newFileSystem(zip, loader)) {
+        printZipFileSystem("zip-loader", fs);
+      }
+      try (FileSystem fs = FileSystems.newFileSystem(zip, Collections.emptyMap(), loader)) {
+        printZipFileSystem("zip-map-loader", fs);
+      }
     } finally {
       Files.deleteIfExists(zip);
     }
