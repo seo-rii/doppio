@@ -271,6 +271,14 @@ public final class Files {
 
   public static Path createFile(Path path, FileAttribute<?>... attrs) throws IOException {
     requireFileAttributes(attrs);
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      HashSet<OpenOption> options = new HashSet<OpenOption>();
+      options.add(StandardOpenOption.CREATE_NEW);
+      options.add(StandardOpenOption.WRITE);
+      SeekableByteChannel channel = path.getFileSystem().provider().newByteChannel(path, options, attrs);
+      channel.close();
+      return path;
+    }
     File file = toFile(path);
     validateOutputTarget(file, true, true);
     if (!file.createNewFile()) {
@@ -282,6 +290,10 @@ public final class Files {
 
   public static Path createDirectory(Path path, FileAttribute<?>... attrs) throws IOException {
     requireFileAttributes(attrs);
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      path.getFileSystem().provider().createDirectory(path, attrs);
+      return path;
+    }
     File file = toFile(path);
     validateOutputTarget(file, true, true);
     if (!file.mkdir()) {
@@ -308,6 +320,26 @@ public final class Files {
 
   public static Path createDirectories(Path path, FileAttribute<?>... attrs) throws IOException {
     requireFileAttributes(attrs);
+    if (path.getFileSystem() != FileSystems.getDefault()) {
+      if (exists(path)) {
+        if (!isDirectory(path)) {
+          throw new FileAlreadyExistsException(path.toString());
+        }
+        return path;
+      }
+      Path parent = path.getParent();
+      if (parent != null) {
+        createDirectories(parent);
+      }
+      try {
+        createDirectory(path, attrs);
+      } catch (FileAlreadyExistsException e) {
+        if (!isDirectory(path)) {
+          throw e;
+        }
+      }
+      return path;
+    }
     File file = toFile(path);
     if (file.exists()) {
       if (!file.isDirectory()) {
@@ -374,6 +406,45 @@ public final class Files {
       } else {
         throw new UnsupportedOperationException();
       }
+    }
+    if (source.getFileSystem() != FileSystems.getDefault()
+        || target.getFileSystem() != FileSystems.getDefault()) {
+      BasicFileAttributes sourceAttributes = followLinks
+          ? readAttributes(source, BasicFileAttributes.class)
+          : readAttributes(source, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+      if (source.getFileSystem() == target.getFileSystem()) {
+        try {
+          if (isSameFile(source, target)) {
+            return target;
+          }
+        } catch (NoSuchFileException e) {
+        }
+      }
+      if (exists(target)) {
+        if (!replaceExisting) {
+          throw new FileAlreadyExistsException(target.toString());
+        }
+        delete(target);
+      }
+      if (sourceAttributes.isDirectory()) {
+        createDirectory(target);
+      } else {
+        InputStream input = followLinks ? newInputStream(source) : newInputStream(source, LinkOption.NOFOLLOW_LINKS);
+        try {
+          OutputStream output = newOutputStream(target);
+          try {
+            copyStream(input, output);
+          } finally {
+            output.close();
+          }
+        } finally {
+          input.close();
+        }
+      }
+      if (copyAttributes) {
+        setLastModifiedTime(target, sourceAttributes.lastModifiedTime());
+      }
+      return target;
     }
     File sourceFile = toFile(source);
     File targetFile = toFile(target);
@@ -1557,7 +1628,9 @@ public final class Files {
     if (append && truncate) {
       throw new IllegalArgumentException();
     }
-    validateOutputTarget(toFile(path), create, createNew);
+    if (path.getFileSystem() == FileSystems.getDefault()) {
+      validateOutputTarget(toFile(path), create, createNew);
+    }
     StringBuilder builder = new StringBuilder();
     String separator = System.lineSeparator();
     for (CharSequence line : lines) {

@@ -16,6 +16,7 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.zip.ZipEntry;
@@ -76,6 +77,8 @@ public class Java13FileSystems {
       zip.putNextEntry(new ZipEntry("hello.txt"));
       zip.write(new byte[] { 'h', 'i' });
       zip.closeEntry();
+      zip.putNextEntry(new ZipEntry("nested/"));
+      zip.closeEntry();
       zip.putNextEntry(new ZipEntry("nested/value.txt"));
       zip.write(new byte[] { 'z' });
       zip.closeEntry();
@@ -111,6 +114,39 @@ public class Java13FileSystems {
         Files.copy(new ByteArrayInputStream(new byte[] { 'n' }), copied, StandardCopyOption.REPLACE_EXISTING) +
         ":" + Files.readString(copied));
     System.out.println("delete:" + Files.deleteIfExists(copied) + ":" + Files.exists(copied));
+    Path pathCopied = fs.getPath(label + "-path-copy.txt");
+    System.out.println("path-copy:" + Files.copy(hello, pathCopied).equals(pathCopied) +
+        ":" + Files.readString(pathCopied));
+    printFailure(label + "-path-copy-existing", () -> Files.copy(hello, pathCopied));
+    System.out.println("path-copy-replace:" +
+        Files.copy(nestedValue, pathCopied, StandardCopyOption.REPLACE_EXISTING).equals(pathCopied) +
+        ":" + Files.readString(pathCopied));
+    Path copiedDirectory = fs.getPath(label + "-dir-copy");
+    System.out.println("dir-copy:" + Files.copy(nested, copiedDirectory).equals(copiedDirectory) +
+        ":" + Files.isDirectory(copiedDirectory));
+    Path defaultTarget = Files.createTempFile("doppio-java13-fs-copy-target", ".txt");
+    Files.deleteIfExists(defaultTarget);
+    try {
+      System.out.println("copy-to-default:" + Files.copy(hello, defaultTarget).equals(defaultTarget) +
+          ":" + Files.readString(defaultTarget));
+    } finally {
+      Files.deleteIfExists(defaultTarget);
+    }
+    Path defaultSource = Files.createTempFile("doppio-java13-fs-copy-source", ".txt");
+    try {
+      Files.writeString(defaultSource, "df");
+      Path copiedFromDefault = fs.getPath(label + "-default-copy.txt");
+      System.out.println("copy-from-default:" + Files.copy(defaultSource, copiedFromDefault).equals(copiedFromDefault) +
+          ":" + Files.readString(copiedFromDefault));
+    } finally {
+      Files.deleteIfExists(defaultSource);
+    }
+    Path createdNested = fs.getPath(label + "-created", "nested");
+    Files.createDirectories(createdNested);
+    System.out.println("createdirs:" + Files.isDirectory(createdNested));
+    Path lineFile = createdNested.resolve("lines.txt");
+    System.out.println("write-lines:" + Files.write(lineFile, Arrays.asList("a", "b")).equals(lineFile) +
+        ":" + Files.readAllLines(lineFile));
     try (SeekableByteChannel channel = Files.newByteChannel(hello)) {
       System.out.println("channel:" + channel.size());
     }
