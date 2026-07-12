@@ -286,7 +286,8 @@ handles, dynamic constants, and record object-method linkage:
   predicates, selected `null` finalizers, distinct state/external parameter
   domains, non-init-only external argument inference, executing void/state
   mixed clauses, fixed-arity normalization with tested single- and multi-clause
-  varargs finalizers, and selected single- and multi-clause null, length,
+  varargs initializers, steps, predicates, and finalizers including mixed and
+  no-state `void` clauses, and selected single- and multi-clause null, length,
   init/step-return, predicate-before-parameter, finalizer, and parameter
   validation precedence.
   The `tryFinally` slice is tracked separately in
@@ -318,7 +319,8 @@ handles, dynamic constants, and record object-method linkage:
   `void` side-effect loops. Both `countedLoop` overloads cover null initializer
   default state, including the four-handle explicit-range overload. Tested
   varargs component handles for all four convenience-loop APIs are normalized
-  to fixed arity before adapter execution.
+  to fixed arity before adapter execution, including mixed fixed/varargs,
+  `void` state, and default-iterator paths.
   The selected `tableSwitch` slice covers
   same-typed fallback/target handles with a leading `int` selector, in-range
   dispatch, fallback dispatch, `void` side-effect target dispatch, and selected
@@ -345,7 +347,8 @@ handles, dynamic constants, and record object-method linkage:
   finalizer/predicate-before-parameter validation ordering, non-init-only
   external argument inference, executing void/state mixed clauses, and
   fixed-arity normalization with tested single- and multi-clause varargs
-  finalizers.
+  initializers, steps, predicates, and finalizers, including mixed and no-state
+  `void` clauses.
   Broad state-loop parity and the
   remaining broad Java 9+ `loop` combinator still need separate fixtures and
   implementation slices because they need control-flow, exception, and

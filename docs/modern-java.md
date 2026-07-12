@@ -45,7 +45,8 @@ non-`void` state-loop and selected `void` side-effect slices through public
 overlays, including primitive and reference default state from a null
 initializer in four-handle `countedLoop`, and fixed-arity normalization of
 varargs component handles across `whileLoop`, `doWhileLoop`, both
-`countedLoop` overloads, and explicit-iterator `iteratedLoop`, plus selected
+`countedLoop` overloads, and explicit/default-iterator `iteratedLoop`, including
+mixed fixed/varargs and `void` state paths, plus selected
 single-clause `MethodHandles.loop` state-loop flows
 with explicit or `null` `init`, null-init state inference from zero-argument
 non-`void` steps, selected `null step`, null-init/null-step no-state exits with
@@ -57,7 +58,8 @@ selected `null` steps, selected `void` clauses, selected `null` helper
 predicates, selected `null` finalizers, distinct state/external parameter
 domains, non-init-only external argument inference, executing void/state mixed
 clauses, fixed-arity normalization with tested single- and multi-clause varargs
-finalizers, single- and multi-clause null rejection, and selected validation
+initializers, steps, predicates, and finalizers including mixed and no-state
+`void` clauses, single- and multi-clause null rejection, and selected validation
 precedence including single-clause init/step-return-before-predicate and
 predicate-before-parameter ordering, plus optional `fini`, covering
 normal, exceptional, and `void`

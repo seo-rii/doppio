@@ -240,7 +240,9 @@ handle returns `void`.
   `classes/modern_test/Java17MethodHandleConvenienceVarargs.java`: varargs
   component handles normalized to fixed arity for `whileLoop`, `doWhileLoop`,
   both `countedLoop` overloads, and explicit-iterator `iteratedLoop`, including
-  initializer, predicate, body, start/end, and iterator argument flow.
+  initializer, predicate, body, start/end, and iterator argument flow. The
+  same fixture also covers mixed fixed/varargs `whileLoop`, varargs `void`
+  `whileLoop`/`doWhileLoop`, and default-iterator varargs argument flow.
 - Java fixture coverage in
   `classes/modern_test/Java17MethodHandleIteratedLoop.java`: null-iterator
   `Iterable` dispatch, null-iterator body argument flow, explicit iterator
@@ -274,6 +276,11 @@ handle returns `void`.
   single-clause init/step-return-before-predicate and
   predicate-before-parameter ordering, plus multi-clause
   finalizer/predicate-before-parameter ordering.
+- Java fixture coverage in
+  `classes/modern_test/Java17MethodHandleLoopVarargs.java`: fixed-arity
+  normalization for varargs `init`, `step`, `pred`, and `fini` handles in
+  single- and multi-clause adapters, a mixed fixed/varargs clause, and a
+  no-state `void` clause with varargs external arguments.
 - Kotlin smoke coverage in
   `classes/kotlin_methodhandle_smoke/MethodHandleSmoke.kt`:
   reflective discovery of `MethodHandles.whileLoop` and
@@ -303,14 +310,14 @@ handle returns `void`.
   beyond the tested single- and multi-clause null, length, init/step-return,
   predicate-before-parameter, finalizer, and parameter precedence remain open.
 - All non-null generic `loop` clause handles are normalized with
-  `asFixedArity()` after validation. Execution coverage currently exercises
-  varargs finalizers in the single- and multi-clause adapter paths; broader
-  varargs initializer, step, and predicate combinations remain untested.
+  `asFixedArity()` after validation. Execution coverage exercises varargs
+  initializers, steps, predicates, and finalizers in the single- and
+  multi-clause adapter paths, including mixed fixed/varargs components and a
+  no-state `void` clause.
 - All non-null convenience-loop component handles are also normalized with
   `asFixedArity()` after validation. The selected fixture covers varargs
-  components across the four convenience APIs, but mixed fixed/varargs
-  component combinations and default-iterator varargs argument flow remain
-  untested.
+  components across the four convenience APIs, mixed fixed/varargs components,
+  `void` state loops, and default-iterator varargs argument flow.
 - The selected `void` loop slices cover simple side-effect loops only; broad
   no-state/state mixes, exact generic `loop` effectively-identical
   parameter-list inference, and full validation ordering are not claimed.

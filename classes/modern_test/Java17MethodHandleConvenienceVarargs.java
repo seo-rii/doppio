@@ -7,6 +7,8 @@ import java.util.Arrays;
 import java.util.Iterator;
 
 public class Java17MethodHandleConvenienceVarargs {
+  private static int sideEffect;
+
   public static int init(String... values) {
     return values.length;
   }
@@ -41,6 +43,27 @@ public class Java17MethodHandleConvenienceVarargs {
 
   public static String append(String state, String element, String... values) {
     return state + ":" + element + values.length;
+  }
+
+  public static String defaultTextInit(Iterable<String> values, String... suffixes) {
+    return Integer.toString(suffixes.length);
+  }
+
+  public static String defaultAppend(
+      String state, String element, Iterable<String> values, String... suffixes) {
+    return state + ":" + element + suffixes.length;
+  }
+
+  public static void reset(String... values) {
+    sideEffect = values.length;
+  }
+
+  public static boolean sideEffectBelowTwiceLength(String... values) {
+    return sideEffect < values.length * 2;
+  }
+
+  public static void incrementSideEffect(String... values) {
+    sideEffect++;
   }
 
   public static void main(String[] args) throws Throwable {
@@ -81,6 +104,27 @@ public class Java17MethodHandleConvenienceVarargs {
         Java17MethodHandleConvenienceVarargs.class,
         "append",
         MethodType.methodType(String.class, String.class, String.class, String[].class));
+    MethodHandle defaultTextInit = lookup.findStatic(
+        Java17MethodHandleConvenienceVarargs.class,
+        "defaultTextInit",
+        MethodType.methodType(String.class, Iterable.class, String[].class));
+    MethodHandle defaultAppend = lookup.findStatic(
+        Java17MethodHandleConvenienceVarargs.class,
+        "defaultAppend",
+        MethodType.methodType(
+            String.class, String.class, String.class, Iterable.class, String[].class));
+    MethodHandle reset = lookup.findStatic(
+        Java17MethodHandleConvenienceVarargs.class,
+        "reset",
+        MethodType.methodType(void.class, String[].class));
+    MethodHandle sideEffectPred = lookup.findStatic(
+        Java17MethodHandleConvenienceVarargs.class,
+        "sideEffectBelowTwiceLength",
+        MethodType.methodType(boolean.class, String[].class));
+    MethodHandle sideEffectBody = lookup.findStatic(
+        Java17MethodHandleConvenienceVarargs.class,
+        "incrementSideEffect",
+        MethodType.methodType(void.class, String[].class));
 
     System.out.println(init.isVarargsCollector());
     String[] values = new String[] { "a", "b" };
@@ -104,5 +148,29 @@ public class Java17MethodHandleConvenienceVarargs {
     MethodHandle iteratedLoop = MethodHandles.iteratedLoop(iterator, textInit, append);
     System.out.println(iteratedLoop.isVarargsCollector());
     System.out.println((String) iteratedLoop.invokeExact(values));
+
+    Iterable<String> iterable = Arrays.asList("x", "y");
+    String[] suffixes = new String[] { "!", "?" };
+    MethodHandle defaultIteratedLoop = MethodHandles.iteratedLoop(
+        null, defaultTextInit, defaultAppend);
+    System.out.println(defaultIteratedLoop.isVarargsCollector());
+    System.out.println((String) defaultIteratedLoop.invokeExact(iterable, suffixes));
+
+    MethodHandle mixedWhileLoop = MethodHandles.whileLoop(
+        init.asFixedArity(), pred, increment.asFixedArity());
+    System.out.println(mixedWhileLoop.isVarargsCollector());
+    System.out.println((int) mixedWhileLoop.invokeExact(values));
+
+    MethodHandle voidWhileLoop = MethodHandles.whileLoop(reset, sideEffectPred, sideEffectBody);
+    System.out.println(voidWhileLoop.isVarargsCollector());
+    sideEffect = -1;
+    voidWhileLoop.invokeExact(values);
+    System.out.println(sideEffect);
+
+    MethodHandle voidDoWhileLoop = MethodHandles.doWhileLoop(reset, sideEffectBody, sideEffectPred);
+    System.out.println(voidDoWhileLoop.isVarargsCollector());
+    sideEffect = -1;
+    voidDoWhileLoop.invokeExact(values);
+    System.out.println(sideEffect);
   }
 }
