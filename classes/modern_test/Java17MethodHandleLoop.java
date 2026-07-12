@@ -23,6 +23,10 @@ public class Java17MethodHandleLoop {
     return state + 2;
   }
 
+  public static int stepNoArgs() {
+    return 7;
+  }
+
   public static boolean pred(int state, int limit) {
     return state < limit;
   }
@@ -184,6 +188,10 @@ public class Java17MethodHandleLoop {
         Java17MethodHandleLoop.class,
         "stepStateOnly",
         MethodType.methodType(int.class, int.class));
+    MethodHandle stepNoArgs = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "stepNoArgs",
+        MethodType.methodType(int.class));
     MethodHandle pred = lookup.findStatic(
         Java17MethodHandleLoop.class,
         "pred",
@@ -314,6 +322,16 @@ public class Java17MethodHandleLoop {
     System.out.println(defaultCounted.type().toMethodDescriptorString());
     System.out.println((String) defaultCounted.invokeExact(3));
     System.out.println((String) defaultCounted.invokeExact(0));
+
+    MethodHandle defaultConstantStep = MethodHandles.loop(
+        new MethodHandle[] { null, stepNoArgs, predStateOnly, finiStateOnly });
+    System.out.println(defaultConstantStep.type().toMethodDescriptorString());
+    System.out.println((String) defaultConstantStep.invokeExact());
+
+    MethodHandle defaultConstantStepWithExternal = MethodHandles.loop(
+        new MethodHandle[] { null, stepNoArgs, never, fini });
+    System.out.println(defaultConstantStepWithExternal.type().toMethodDescriptorString());
+    System.out.println((String) defaultConstantStepWithExternal.invokeExact(9));
 
     MethodHandle noStep = MethodHandles.loop(new MethodHandle[] { init, null, never, fini });
     System.out.println(noStep.type().toMethodDescriptorString());

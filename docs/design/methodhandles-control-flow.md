@@ -34,8 +34,10 @@ The control-flow family is split into small implementation slices:
 - `loop(MethodHandle[]...)`: selected fifth slice. It supports one clause with
   an explicit or `null` `init`, optional `step`, `pred`, and optional `fini`
   handle over one non-`void` loop state variable. A `null` `init` starts from
-  the Java default value for the state type inferred from `step`; a `null`
-  `step` is supported when `init` is explicit and preserves the current state.
+  the Java default value for the state type inferred from `step`. The inferred
+  non-`void` `step` may have no parameters, in which case it ignores the
+  current state and replaces it with its return value. A `null` `step` is
+  supported when `init` is explicit and preserves the current state.
   When both `init` and `step` are `null`, the selected slice treats the clause
   as a no-state `void` clause whose `pred` and `fini` handles consume matching
   prefixes of the external argument list. For explicit-init state loops,
@@ -241,10 +243,12 @@ handle returns `void`.
   `classes/modern_test/Java17MethodHandleLoop.java`: selected single-clause
   `loop(MethodHandle[]...)` state flows, including `init -> step -> pred`
   ordering, primitive and reference state, `null init` default-state behavior
-  for primitive and reference state, explicit-init `null step` identity-state
-  behavior, null-init/null-step no-state false-predicate exits with and without
-  external prefix arguments, explicit prefix-parameter `step`/`pred`/`fini`
-  flows, explicit-init external argument inference from longer
+  for primitive and reference state, null-init state inference from a
+  zero-argument non-`void` step with and without external arguments,
+  explicit-init `null step` identity-state behavior, null-init/null-step
+  no-state false-predicate exits with and without external prefix arguments,
+  explicit prefix-parameter `step`/`pred`/`fini` flows, explicit-init external
+  argument inference from longer
   prefix-compatible clause handles, explicit `fini` return adaptation, `null`
   and omitted `fini` void return adaptation, selected no-state loops with
   `void` `init`/`step` handles and with or without external arguments, selected

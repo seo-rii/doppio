@@ -4,6 +4,10 @@ done:1:0
 (I)Ljava/lang/String;
 done:3:3
 done:1:0
+()Ljava/lang/String;
+state:7
+(I)Ljava/lang/String;
+done:7:9
 (I)Ljava/lang/String;
 done:0:7
 (I)Ljava/lang/String;

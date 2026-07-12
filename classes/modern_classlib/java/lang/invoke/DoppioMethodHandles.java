@@ -290,12 +290,14 @@ public final class DoppioMethodHandles {
         if (stateType == void.class) {
           voidState = true;
           externalTypes = new ArrayList<Class<?>>(stepType.parameterList());
-        } else if (stepType.parameterCount() == 0 ||
+        } else if (stepType.parameterCount() > 0 &&
             stepType.parameterType(0) != stateType) {
           throw new IllegalArgumentException("step must accept and return the loop state type");
         } else {
-          externalTypes = new ArrayList<Class<?>>(
-              stepType.parameterList().subList(1, stepType.parameterCount()));
+          externalTypes = stepType.parameterCount() == 0
+              ? new ArrayList<Class<?>>()
+              : new ArrayList<Class<?>>(
+                  stepType.parameterList().subList(1, stepType.parameterCount()));
         }
       }
     } else {
