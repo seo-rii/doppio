@@ -51,7 +51,7 @@ out_dir="$work_dir/out"
 rm -rf "$out_dir"
 mkdir -p "$out_dir"
 
-compile_timeout="${KOTLIN_ADVANCED_CONSTRUCT_SMOKE_COMPILE_TIMEOUT_SECONDS:-360}"
+compile_timeout="${KOTLIN_ADVANCED_CONSTRUCT_SMOKE_COMPILE_TIMEOUT_SECONDS:-480}"
 run_timeout="${KOTLIN_ADVANCED_CONSTRUCT_SMOKE_RUN_TIMEOUT_SECONDS:-60}"
 responsiveness="${DOPPIO_KOTLIN_RESPONSIVENESS:-100000}"
 
@@ -78,7 +78,7 @@ test -f "$out_dir/SmokeFactory\$Companion.class"
 test -f "$out_dir/META-INF/main.kotlin_module"
 
 runtime_cp="$out_dir:$stdlib_jar"
-expected_output="${KOTLIN_ADVANCED_CONSTRUCT_SMOKE_EXPECTED_OUTPUT:-"mode-FAST:3:2,3:caught"}"
+expected_output="${KOTLIN_ADVANCED_CONSTRUCT_SMOKE_EXPECTED_OUTPUT:-"mode-FAST:3:2,3:caught:4,6:10"}"
 
 native_output="$(java -cp "$runtime_cp" KotlinAdvancedConstructHelloKt)"
 if [ "$native_output" != "$expected_output" ]; then

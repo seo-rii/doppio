@@ -332,11 +332,13 @@ Current verified checks:
 - A focused Kotlin advanced-construct smoke now lives in
   `classes/kotlin_advanced_construct_smoke` and runs through
   `ci/kotlin_advanced_construct_smoke.sh`. It compiles and runs sealed
-  class/data subclass, `object`, companion object, enum, collection pipeline
-  (`listOf`, `map`, `filter`, `joinToString`), and exception handling
-  constructs. A focused local run completed in 244 seconds and the remaining
-  full-classpath `ci/kotlin_smoke.sh` completed in 187 seconds. Both the host
-  JVM and Doppio print `mode-FAST:3:2,3:caught`.
+  class/data subclass, operator `plus` plus destructuring, `object`,
+  companion object, enum, collection pipeline (`listOf`, `map`, `filter`,
+  `joinToString`), and exception handling constructs. A focused local run with
+  the operator/destructuring slice completed in 343 seconds. The previous
+  split validation kept the remaining full-classpath `ci/kotlin_smoke.sh`
+  green in 187 seconds. Both the host JVM and Doppio print
+  `mode-FAST:3:2,3:caught:4,6:10`.
 - A focused Kotlin local-interop smoke now lives in
   `classes/kotlin_local_interop_smoke` and runs through
   `ci/kotlin_local_interop_smoke.sh`. It compiles and runs nullable

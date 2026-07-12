@@ -5,6 +5,9 @@ sealed class SmokeResult {
 
 enum class SmokeMode { FAST, SLOW }
 
+operator fun Pair<Int, Int>.plus(other: Pair<Int, Int>): Pair<Int, Int> =
+  Pair(first + other.first, second + other.second)
+
 object SmokeRegistry {
   private val values = linkedMapOf("one" to 1, "two" to 2)
   fun total(): Int = values.values.sum()
@@ -16,6 +19,12 @@ class SmokeFactory private constructor(private val prefix: String) {
   }
 
   fun describe(mode: SmokeMode): String = "$prefix-${mode.name}"
+}
+
+fun structuredSummary(): String {
+  val (left, right) = listOf(Pair(1, 2), Pair(3, 4))
+    .reduce { acc, pair -> acc + pair }
+  return "$left,$right:${left + right}"
 }
 
 fun advancedSummary(): String {
@@ -30,5 +39,9 @@ fun advancedSummary(): String {
   } catch (e: IllegalStateException) {
     e.message ?: "missing"
   }
-  return SmokeFactory.create().describe(SmokeMode.FAST) + ":" + score + ":" + lengths + ":" + caught
+  return SmokeFactory.create().describe(SmokeMode.FAST) + ":" +
+    score + ":" +
+    lengths + ":" +
+    caught + ":" +
+    structuredSummary()
 }

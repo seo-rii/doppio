@@ -223,7 +223,8 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   primitive/object arrays, spread varargs, copied arrays, typed arrays, and
   component-type reflection, plus runtime-retained annotation use-site targets
   observed through Java reflection, repeatable annotation containers, and
-  annotation enum/class/array elements, plus Kotlin `fun interface`, sealed
+  annotation enum/class/array elements, plus Kotlin operator/destructuring
+  lowering, `fun interface`, sealed
   interface exhaustiveness, `data object`, `Enum.entries`, enum constant class
   bodies with overridden members, property references,
   class literals, default-argument `$default` methods, `@JvmOverloads`,
