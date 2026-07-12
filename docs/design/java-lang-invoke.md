@@ -273,7 +273,9 @@ handles, dynamic constants, and record object-method linkage:
   overloads for non-`void` state loops plus selected `void` side-effect loops,
   and selected single-clause `loop` state flows with explicit or `null` `init`
   plus selected `null step`, external-state false-predicate exits, and optional
-  `fini`, including selected explicit-init prefix-parameter clause handles.
+  `fini`, including selected explicit-init prefix-parameter clause handles and
+  explicit-init external argument inference from longer prefix-compatible
+  clause handles.
   The `tryFinally` slice is tracked separately in
   `docs/design/methodhandles-try-finally.md`; the control-flow family and
   selected state-loop slices are tracked in
@@ -311,7 +313,8 @@ handles, dynamic constants, and record object-method linkage:
   `loop` slice covers one `init`/`step`/`pred` clause with explicit or `null`
   `init`, selected explicit-init `null step`, selected null-init/null-step
   external-state false-predicate exits, selected explicit-init prefix
-  parameter lists, and optional `fini`. Broad state-loop parity and the
+  parameter lists, selected explicit-init external argument inference, and
+  optional `fini`. Broad state-loop parity and the
   remaining multi-clause Java 9+ `loop` combinator still need separate fixtures
   and implementation slices because they need control-flow, exception, and
   argument-flow parity beyond the simple public overlay helper shape.

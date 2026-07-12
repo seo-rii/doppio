@@ -40,6 +40,9 @@ class MethodHandleOwner(@JvmField var text: String) {
     fun loopZero(limit: Int): Int = 0
 
     @JvmStatic
+    fun loopZeroNoArgs(): Int = 0
+
+    @JvmStatic
     fun loopBelow(value: Int, limit: Int): Boolean = value < limit
 
     @JvmStatic
@@ -593,6 +596,11 @@ fun methodHandleSummary(): String {
     "loopZero",
     MethodType.methodType(intClass, intClass)
   )
+  val loopZeroNoArgs = lookup.findStatic(
+    ownerClass,
+    "loopZeroNoArgs",
+    MethodType.methodType(intClass)
+  )
   val loopBelow = lookup.findStatic(
     ownerClass,
     "loopBelow",
@@ -631,6 +639,10 @@ fun methodHandleSummary(): String {
   val genericLoop = loopMethod.invoke(
     null,
     arrayOf(arrayOf<MethodHandle?>(null, loopIncrement, loopBelow, loopFinish))
+  ) as MethodHandle
+  val genericLoopInferredExternal = loopMethod.invoke(
+    null,
+    arrayOf(arrayOf<MethodHandle?>(loopZeroNoArgs, loopIncrement, loopBelow, loopFinish))
   ) as MethodHandle
   val genericLoopNoStep = loopMethod.invoke(
     null,
@@ -822,6 +834,7 @@ fun methodHandleSummary(): String {
     spreadVarargs,
     genericLoop.invokeWithArguments(3).toString(),
     genericLoop.invokeWithArguments(0).toString(),
+    genericLoopInferredExternal.invokeWithArguments(4).toString(),
     genericLoopNoStep.invokeWithArguments(7).toString(),
     genericLoopExternalState.invokeWithArguments(5, 9).toString(),
     genericLoopPrefix.invokeWithArguments(5).toString(),
@@ -864,6 +877,7 @@ fun methodHandleSummary(): String {
     spreadArrayMiddle,
     spreadInvoker,
     genericLoop,
+    genericLoopInferredExternal,
     genericLoopNoStep,
     genericLoopExternalState,
     genericLoopPrefix,

@@ -9,6 +9,10 @@ public class Java17MethodHandleLoop {
     return 0;
   }
 
+  public static int initNoArgs() {
+    return 0;
+  }
+
   public static int step(int state, int limit) {
     return state + 1;
   }
@@ -75,6 +79,10 @@ public class Java17MethodHandleLoop {
         Java17MethodHandleLoop.class,
         "init",
         MethodType.methodType(int.class, int.class));
+    MethodHandle initNoArgs = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "initNoArgs",
+        MethodType.methodType(int.class));
     MethodHandle step = lookup.findStatic(
         Java17MethodHandleLoop.class,
         "step",
@@ -125,6 +133,10 @@ public class Java17MethodHandleLoop {
     MethodHandle noStep = MethodHandles.loop(new MethodHandle[] { init, null, never, fini });
     System.out.println(noStep.type().toMethodDescriptorString());
     System.out.println((String) noStep.invokeExact(7));
+
+    MethodHandle inferredExternal = MethodHandles.loop(new MethodHandle[] { initNoArgs, step, pred, fini });
+    System.out.println(inferredExternal.type().toMethodDescriptorString());
+    System.out.println((String) inferredExternal.invokeExact(4));
 
     MethodHandle prefixPredicate = MethodHandles.loop(new MethodHandle[] { init, stepStateOnly, predStateOnly, fini });
     System.out.println(prefixPredicate.type().toMethodDescriptorString());

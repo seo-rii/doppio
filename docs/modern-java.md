@@ -44,11 +44,12 @@ support including no-arg explicit iterator handles, plus selected
 non-`void` state-loop and selected `void` side-effect slices through public
 overlays, plus selected single-clause `MethodHandles.loop` state-loop flows
 with explicit or `null` `init`, selected `null step`, external-state exits, and
-prefix-parameter clause handles, plus optional `fini`, covering normal,
-exceptional, and `void` `tryFinally` target flows, same-typed `tableSwitch`
-target/fallback dispatch, selected iterated `Iterable`/`Iterator` flows, plus
-stateful loop flows in the Java fixtures and Kotlin smoke. Full control-flow
-combinator parity is still not claimed.
+prefix-parameter clause handles, selected explicit-init external argument
+inference, plus optional `fini`, covering normal, exceptional, and `void`
+`tryFinally` target flows, same-typed `tableSwitch` target/fallback dispatch,
+selected iterated `Iterable`/`Iterator` flows, plus stateful loop flows in the
+Java fixtures and Kotlin smoke. Full control-flow combinator parity is still
+not claimed.
 
 Java 17 I/O note: the compatibility row above now also includes selected
 `FileChannel.force(boolean)` data/metadata flush behavior, read-only-channel
@@ -976,8 +977,8 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `arrayLength`, `arrayConstructor`, `dropArgumentsToMatch`, `dropReturn`,
   selected `tryFinally`, `tableSwitch`, and `iteratedLoop` flows, and selected
   `whileLoop`/`doWhileLoop`/`countedLoop` non-`void` state plus `void`
-  side-effect loops with
-  descriptor checks, sealed
+  side-effect loops with descriptor checks, plus selected single-clause
+  `MethodHandles.loop` external argument inference, sealed
   metadata, and
   illegal direct subtype rejection; Java 18-26 simple parser-only class-file
   containers; and runnable Java 9/10/11/12/13/14/15/16/17 comparisons.
