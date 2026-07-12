@@ -63,8 +63,11 @@ timeout -s INT "${compile_timeout}s" \
 compile_end="$(date +%s)"
 
 test -f "$out_dir/KotlinModernConstructHelloKt.class"
+test -f "$out_dir/ContextParametersSmokeKt.class"
 test -f "$out_dir/ModernConstructSmokeKt.class"
 test -f "$out_dir/EmptyStage.class"
+test -f "$out_dir/PrefixContext.class"
+test -f "$out_dir/SmokeContext.class"
 test -f "$out_dir/StageKind.class"
 test -f "$out_dir/StageMapper.class"
 test -f "$out_dir/StageNode.class"
@@ -72,8 +75,12 @@ test -f "$out_dir/StagePayload.class"
 test -f "$out_dir/ValueStage.class"
 test -f "$out_dir/META-INF/main.kotlin_module"
 
+context_javap="$(javap -p -s "$out_dir/ContextParametersSmokeKt.class")"
+grep -Fq 'descriptor: (LSmokeContext;I)Ljava/lang/String;' <<<"$context_javap"
+grep -Fq 'descriptor: (LSmokeContext;)Ljava/lang/String;' <<<"$context_javap"
+
 runtime_cp="$out_dir:$stdlib_jar"
-expected_output="${KOTLIN_MODERN_CONSTRUCT_SMOKE_EXPECTED_OUTPUT:-"ABG:1:15:kt5:StagePayload:EmptyStage:true"}"
+expected_output="${KOTLIN_MODERN_CONSTRUCT_SMOKE_EXPECTED_OUTPUT:-"ABG:1:15:kt5:StagePayload:EmptyStage:true:c8:c4"}"
 
 native_output="$(java -cp "$runtime_cp" KotlinModernConstructHelloKt)"
 if [ "$native_output" != "$expected_output" ]; then

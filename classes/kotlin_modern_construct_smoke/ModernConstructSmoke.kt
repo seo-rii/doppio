@@ -40,5 +40,6 @@ fun modernConstructSummary(): String {
       title(payload) + count(payload) + ":" +
       StagePayload::class.java.simpleName + ":" +
       EmptyStage.toString() + ":" +
-      sameObject
+      sameObject + ":" +
+      contextParameterSummary()
 }

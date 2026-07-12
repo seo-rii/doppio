@@ -279,7 +279,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `sequence` and `iterator` builders, `SequenceScope.yield`/`yieldAll`,
   restricted suspend sequence state machines, `constrainOnce`,
   `generateSequence`, lazy `onEach`/`filter`/`map`/`zipWithNext` pipelines,
-  and sequence `windowed`, plus deeper `Result` success/failure flow through
+  and sequence `windowed`, plus Kotlin 2.4 context function/property lowering
+  with context parameters verified in generated JVM descriptors, plus deeper
+  `Result` success/failure flow through
   `mapCatching`, `recoverCatching`, `getOrDefault`, `getOrElse`, boxed
   failures, exception cause retention, `try`/`finally` ordering, and inline
   lambda labeled returns, plus Kotlin text/regex APIs covering named groups,

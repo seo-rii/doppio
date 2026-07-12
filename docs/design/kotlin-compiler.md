@@ -469,11 +469,15 @@ Current verified checks:
   `ci/kotlin_modern_construct_smoke.sh`. A focused local run completed in 185
   seconds and a follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 213 seconds. Both the host JVM and Doppio
-  printed `ABG:1:15:kt5:StagePayload:EmptyStage:true`. It covers Kotlin
+  printed `ABG:1:15:kt5:StagePayload:EmptyStage:true:c8:c4`. It covers Kotlin
   `fun interface` SAM conversion through `invokedynamic`, sealed interface
   exhaustiveness, `data object` singleton behavior, Kotlin 1.9
   `Enum.entries`/`EnumEntries`, property-reference classes, and class-literal
-  lookup.
+  lookup, plus Kotlin 2.4 context functions and properties. The runner checks
+  that both context declarations lower their context to leading JVM method
+  parameters before running the generated code on the host JVM and Doppio. A
+  2026-07-13 local run with the context-parameter coverage completed in 305
+  seconds within the unchanged 360-second compile budget.
 - A standalone `@JvmRecord` smoke now compiles with `-jvm-target 17` in
   `ci/kotlin_record_smoke.sh`, separate from the main smoke so the broad
   Kotlin suite can keep its default target. It verifies Kotlin-generated JVM
