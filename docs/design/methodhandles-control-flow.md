@@ -53,12 +53,12 @@ The control-flow family is split into small implementation slices:
   non-null `init`, a clause with both `init` and `step` null is a `void` clause,
   a `null` `pred` marks a helper clause that does not terminate the loop, and a
   `null` or omitted `fini` returns the selected result type's default value
-  when that clause terminates the loop. Clause arrays with only
-  `{ init, step }` are accepted as helper clauses. The returned handle's
-  external argument list is inferred from prefix-compatible `init` handles and
-  from `step`/`pred`/`fini` handles that consume prefixes of the effective
-  `(V..., A...)` loop argument list. The general multi-clause form remains a
-  later slice.
+  when that clause terminates the loop. Clause arrays with only `{ init }`,
+  `{ init, step }`, or no handles are accepted as helper clauses. The returned
+  handle's external argument list is inferred from prefix-compatible `init`
+  handles and from `step`/`pred`/`fini` handles that consume prefixes of the
+  effective `(V..., A...)` loop argument list. The general multi-clause form
+  remains a later slice.
 - `tableSwitch(fallback, targets...)`: selected slice. It is control flow, but
   not a loop; the current coverage lives in the broader `java.lang.invoke`
   design notes.
@@ -247,7 +247,8 @@ handle returns `void`.
   flows, explicit-init external argument inference from longer
   prefix-compatible clause handles, explicit `fini` return adaptation, `null`
   and omitted `fini` void return adaptation, selected no-state loops with
-  `void` `init`/`step` handles and with or without external arguments, a selected
+  `void` `init`/`step` handles and with or without external arguments, selected
+  multi-clause empty, init-only, and init-step helper clauses, a selected
   two-clause two-state loop where the second predicate exits through its
   `fini`, descriptor strings, and selected validation failures including
   null-predicate rejection, short-clause missing-predicate rejection, and

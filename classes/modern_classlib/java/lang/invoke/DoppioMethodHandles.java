@@ -421,14 +421,14 @@ public final class DoppioMethodHandles {
       if (clause == null) {
         throw new IllegalArgumentException("null clauses are not allowed");
       }
-      if (clause.length < 2 || clause.length > 4) {
+      if (clause.length > 4) {
         throw new IllegalArgumentException(
             "multi-clause loops require init, step, and optional pred and fini handles");
       }
-      inits[i] = clause[0];
-      steps[i] = clause[1];
-      preds[i] = clause.length >= 3 ? clause[2] : null;
-      finis[i] = clause.length == 4 ? clause[3] : null;
+      inits[i] = clause.length > 0 ? clause[0] : null;
+      steps[i] = clause.length > 1 ? clause[1] : null;
+      preds[i] = clause.length > 2 ? clause[2] : null;
+      finis[i] = clause.length > 3 ? clause[3] : null;
       Class<?> stateType = void.class;
       if (inits[i] != null) {
         stateType = inits[i].type().returnType();

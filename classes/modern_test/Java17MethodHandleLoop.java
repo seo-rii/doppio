@@ -409,6 +409,18 @@ public class Java17MethodHandleLoop {
     System.out.println(multiHelperClauseLength2.type().toMethodDescriptorString());
     System.out.println((String) multiHelperClauseLength2.invokeExact(3));
 
+    MethodHandle multiEmptyHelperClause = MethodHandles.loop(
+        new MethodHandle[] {},
+        new MethodHandle[] { null, null, neverNoArgs, finiNoArgs });
+    System.out.println(multiEmptyHelperClause.type().toMethodDescriptorString());
+    System.out.println((String) multiEmptyHelperClause.invokeExact());
+
+    MethodHandle multiInitOnlyHelperClause = MethodHandles.loop(
+        new MethodHandle[] { init },
+        new MethodHandle[] { null, null, never, fini });
+    System.out.println(multiInitOnlyHelperClause.type().toMethodDescriptorString());
+    System.out.println((String) multiInitOnlyHelperClause.invokeExact(7));
+
     MethodHandle multiNullFiniExit = MethodHandles.loop(
         new MethodHandle[] { init, multiCountStep, multiNever, null },
         new MethodHandle[] { multiTextInit, multiTextStep, multiAlways, multiFini });
@@ -548,6 +560,15 @@ public class Java17MethodHandleLoop {
         () -> MethodHandles.loop(
             new MethodHandle[] { init, multiCountStep, null, null },
             new MethodHandle[] { multiTextInit, multiTextStep, null, null }));
+    printFailureContains(
+        "multi-short-no-pred",
+        () -> MethodHandles.loop(new MethodHandle[] {}, new MethodHandle[] { init }),
+        "no predicate found");
+    printFailure(
+        "multi-long-clause",
+        () -> MethodHandles.loop(
+            new MethodHandle[] { init, step, pred, fini, fini },
+            new MethodHandle[] { init, step, pred, fini }));
   }
 
   private static void printFailure(String label, Throwing action) {
