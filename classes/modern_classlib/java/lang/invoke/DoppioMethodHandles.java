@@ -265,7 +265,10 @@ public final class DoppioMethodHandles {
 
     MethodHandle init = clause[0];
     MethodHandle step = clause[1];
-    MethodHandle pred = Objects.requireNonNull(clause[2]);
+    MethodHandle pred = clause[2];
+    if (pred == null) {
+      throw new IllegalArgumentException("no predicate found");
+    }
     MethodHandle fini = clause.length == 4 ? clause[3] : null;
     MethodType stepType;
     Class<?> stateType;

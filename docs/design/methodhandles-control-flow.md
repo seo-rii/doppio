@@ -234,7 +234,8 @@ handle returns `void`.
   inference from longer prefix-compatible clause handles, explicit `fini`
   return adaptation, `null` and omitted `fini` void return adaptation,
   selected no-state `void init`/`void step` loops with and without external
-  arguments, descriptor strings, and selected validation failures.
+  arguments, descriptor strings, and selected validation failures including
+  null-predicate rejection.
 - Kotlin smoke coverage in
   `classes/kotlin_methodhandle_smoke/MethodHandleSmoke.kt`:
   reflective discovery of `MethodHandles.whileLoop` and

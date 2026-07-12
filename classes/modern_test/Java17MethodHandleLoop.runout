@@ -40,4 +40,5 @@ void-external-state-loop
 short-void-loop
 null-clauses:java.lang.IllegalArgumentException
 no-clauses:java.lang.IllegalArgumentException
+null-pred:java.lang.IllegalArgumentException
 bad-pred:java.lang.IllegalArgumentException

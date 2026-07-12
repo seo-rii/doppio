@@ -299,6 +299,7 @@ public class Java17MethodHandleLoop {
         Java17MethodHandleLoop.class,
         "badPred",
         MethodType.methodType(String.class, int.class, int.class));
+    printFailure("null-pred", () -> MethodHandles.loop(new MethodHandle[] { init, step, null, fini }));
     printFailure("bad-pred", () -> MethodHandles.loop(new MethodHandle[] { init, step, badPred, fini }));
   }
 
