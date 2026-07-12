@@ -679,6 +679,9 @@ public final class DoppioMethodHandles {
       }
       initArgumentCount = checkedPrefixArgumentCount(initType, externalTypes, "init");
     }
+    iterator = fixedArity(iterator);
+    init = fixedArity(init);
+    body = fixedArity(body);
 
     MethodHandle adapter = MethodHandles.publicLookup().findStatic(
         DoppioMethodHandles.class,
@@ -761,6 +764,10 @@ public final class DoppioMethodHandles {
       }
       initArgumentCount = checkedPrefixArgumentCount(initType, externalTypes, "init");
     }
+    start = fixedArity(start);
+    end = fixedArity(end);
+    init = fixedArity(init);
+    body = fixedArity(body);
 
     MethodHandle adapter = MethodHandles.publicLookup().findStatic(
         DoppioMethodHandles.class,
@@ -834,6 +841,9 @@ public final class DoppioMethodHandles {
         throw new IllegalArgumentException("predicate parameter types do not match loop state");
       }
     }
+    init = fixedArity(init);
+    pred = fixedArity(pred);
+    body = fixedArity(body);
 
     String targetName = bodyFirst ? "doWhileLoopTarget" : "whileLoopTarget";
     MethodHandle adapter = MethodHandles.publicLookup().findStatic(

@@ -43,8 +43,10 @@ support including no-arg explicit iterator handles, plus selected
 `MethodHandles.whileLoop`/`MethodHandles.doWhileLoop`/`MethodHandles.countedLoop`
 non-`void` state-loop and selected `void` side-effect slices through public
 overlays, including primitive and reference default state from a null
-initializer in four-handle `countedLoop`, plus selected single-clause
-`MethodHandles.loop` state-loop flows
+initializer in four-handle `countedLoop`, and fixed-arity normalization of
+varargs component handles across `whileLoop`, `doWhileLoop`, both
+`countedLoop` overloads, and explicit-iterator `iteratedLoop`, plus selected
+single-clause `MethodHandles.loop` state-loop flows
 with explicit or `null` `init`, null-init state inference from zero-argument
 non-`void` steps, selected `null step`, null-init/null-step no-state exits with
 external prefix arguments, and prefix-parameter clause handles, selected

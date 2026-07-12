@@ -237,6 +237,11 @@ handle returns `void`.
   reversed empty ranges, and selected `void` side-effect loops for
   `whileLoop`, `doWhileLoop`, and `countedLoop`.
 - Java fixture coverage in
+  `classes/modern_test/Java17MethodHandleConvenienceVarargs.java`: varargs
+  component handles normalized to fixed arity for `whileLoop`, `doWhileLoop`,
+  both `countedLoop` overloads, and explicit-iterator `iteratedLoop`, including
+  initializer, predicate, body, start/end, and iterator argument flow.
+- Java fixture coverage in
   `classes/modern_test/Java17MethodHandleIteratedLoop.java`: null-iterator
   `Iterable` dispatch, null-iterator body argument flow, explicit iterator
   handle dispatch, reference state, primitive `int` state with `null`
@@ -301,6 +306,11 @@ handle returns `void`.
   `asFixedArity()` after validation. Execution coverage currently exercises
   varargs finalizers in the single- and multi-clause adapter paths; broader
   varargs initializer, step, and predicate combinations remain untested.
+- All non-null convenience-loop component handles are also normalized with
+  `asFixedArity()` after validation. The selected fixture covers varargs
+  components across the four convenience APIs, but mixed fixed/varargs
+  component combinations and default-iterator varargs argument flow remain
+  untested.
 - The selected `void` loop slices cover simple side-effect loops only; broad
   no-state/state mixes, exact generic `loop` effectively-identical
   parameter-list inference, and full validation ordering are not claimed.
