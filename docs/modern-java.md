@@ -1381,7 +1381,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   line-based `write` including selected validation-order behavior, selected `newByteChannel` read/write/create/append and parent-target
   paths, `delete`, `deleteIfExists`, including non-empty-directory
   failure behavior, basic
-  existence/type/hidden/symlink/access queries, `size`, selected
+  existence/type/hidden/symlink/access queries, including permission-aware
+  default-provider `checkAccess` read/write/execute modes for POSIX owner-only
+  permissions and missing paths, `size`, selected
   `getFileStore` metadata/space/attribute-view behavior, including
   total/usable/unallocated space fields and `getBlockSize()`, selected
   `BasicFileAttributes` `readAttributes`, selected `BasicFileAttributeView`,

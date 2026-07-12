@@ -767,6 +767,14 @@ Current verified checks:
   `classes/modern_test/Java17FilesLinks.java`, covering `Files.createLink`,
   `createSymbolicLink`, `readSymbolicLink`, hard-link `isSameFile`,
   `NOFOLLOW_LINKS` symlink existence checks, and dangling symlink cleanup.
+- Repository-level permission-aware access coverage now lives in
+  `classes/modern_test/Java17FilesAccessPermissions.java`. It compares the
+  default `Files.isReadable`/`isWritable`/`isExecutable` facade with direct
+  `FileSystemProvider.checkAccess` calls for owner-read-only, owner-write-only,
+  owner-execute-only, no-permission, and missing paths. This protects compiler
+  source, classpath, cache, temporary-directory, and output-path capability
+  probes from treating every existing path as readable, writable, and
+  executable.
 - The focused I/O smoke includes `MappedByteBuffer` coverage; both runtimes
   print
   `aZcdYf:aZRSYf:ZRS:true:true:true:true:true:true:IndexOutOfBoundsException:0:true:true`.

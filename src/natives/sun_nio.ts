@@ -984,7 +984,6 @@ export default function (): any {
 
     public static 'access0(JI)V'(thread: JVMThread, pathAddress: Long, arg1: number): void {
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      // TODO: Need to check specific flags
       const pathString = getStringFromHeap(thread, pathAddress);
       // TODO: fs.access() is better but not currently supported in browserfs: https://github.com/jvilk/BrowserFS/issues/128
       if (util.are_in_browser()) {
@@ -996,7 +995,9 @@ export default function (): any {
           }
         });
       } else {
-        fs.access(pathString, (err: Error) => {
+        // Java and POSIX use the same read/write/execute access bits: 4/2/1.
+        const mode = arg1 & 7;
+        fs.access(pathString, mode, (err: Error) => {
           if (err) {
             throwNodeError(thread, err);
           } else {

@@ -1,0 +1,10 @@
+read-files:true:false:false
+read-provider:true:false:false
+write-files:false:true:false
+write-provider:false:true:false
+execute-files:false:false:true
+execute-provider:false:false:true
+none-files:false:false:false
+none-provider:false:false:false
+missing-files:false:false:false
+missing-provider:false:false:false
