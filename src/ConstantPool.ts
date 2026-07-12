@@ -1596,65 +1596,6 @@ export class MethodReference implements IConstantPoolItem {
             }
           };
           method = <Method> syntheticMethod;
-        } else if (syntheticCls.getInternalName() === 'Ljava/lang/Runtime;' && this.signature === 'version()Ljava/lang/Runtime$Version;') {
-          syntheticMethod = {
-            cls: syntheticCls,
-            slot: -1,
-            accessFlags: syntheticAccessFlags,
-            name: this.nameAndTypeInfo.name,
-            rawDescriptor: this.nameAndTypeInfo.descriptor,
-            attrs: [],
-            signature: this.signature,
-            fullSignature: syntheticFullSignature,
-            parameterTypes: [],
-            returnType: 'Ljava/lang/Runtime$Version;',
-            getParamWordSize: function(): number {
-              return 0;
-            },
-            convertArgs: function(thread: JVMThread, params: any[]): any[] {
-              return [thread];
-            },
-            getNativeFunction: function(): Function {
-              var versionMethod = this;
-              return function(thread: JVMThread): JVMTypes.java_lang_Object {
-                var runtimeCons = versionMethod.cls.getConstructor(thread),
-                  cachedVersion = runtimeCons['doppio/runtimeVersion'];
-                if (cachedVersion !== undefined) {
-                  return cachedVersion;
-                }
-                thread.setStatus(ThreadStatus.ASYNC_WAITING);
-                thread.getBsCl().initializeClass(thread, 'Ljava/lang/Runtime$Version;', (versionCls: ReferenceClassData<JVMTypes.java_lang_Object>) => {
-                  if (versionCls === null) {
-                    return;
-                  }
-                  var versionCons = <any> versionCls.getConstructor(thread),
-                    parse = versionCons['java/lang/Runtime$Version/parse(Ljava/lang/String;)Ljava/lang/Runtime$Version;'];
-                  parse(thread, [util.initString(thread.getBsCl(), '17')], (e?: JVMTypes.java_lang_Throwable, rv?: JVMTypes.java_lang_Object) => {
-                    if (e) {
-                      thread.throwException(e);
-                    } else {
-                      runtimeCons['doppio/runtimeVersion'] = rv;
-                      thread.asyncReturn(rv);
-                    }
-                  });
-                });
-                return null;
-              };
-            },
-            isSignaturePolymorphic: function(): boolean {
-              return false;
-            },
-            isHidden: function(): boolean {
-              return false;
-            },
-            isCallerSensitive: function(): boolean {
-              return false;
-            },
-            getFullSignature: function(): string {
-              return syntheticCls.getExternalName() + '.' + this.signature;
-            }
-          };
-          method = <Method> syntheticMethod;
 	        } else if (syntheticCls.getInternalName() === 'Ljava/lang/System;' &&
 	            (this.signature === 'getLogger(Ljava/lang/String;)Ljava/lang/System$Logger;' ||
 	             this.signature === 'getLogger(Ljava/lang/String;Ljava/util/ResourceBundle;)Ljava/lang/System$Logger;')) {
@@ -4312,7 +4253,6 @@ export class MethodReference implements IConstantPoolItem {
 	        this.fullSignature === 'java/lang/Math/absExact(J)J' ||
 	        this.fullSignature === 'java/lang/StrictMath/absExact(J)J' ||
 	        this.fullSignature === 'java/lang/Character/toString(I)Ljava/lang/String;' ||
-	        this.fullSignature === 'java/lang/Runtime/version()Ljava/lang/Runtime$Version;' ||
 	        this.fullSignature === 'java/lang/ClassLoader/getPlatformClassLoader()Ljava/lang/ClassLoader;' ||
 	        this.fullSignature === 'java/lang/System/getLogger(Ljava/lang/String;)Ljava/lang/System$Logger;' ||
 	        this.fullSignature === 'java/lang/System/getLogger(Ljava/lang/String;Ljava/util/ResourceBundle;)Ljava/lang/System$Logger;' ||

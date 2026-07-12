@@ -300,6 +300,17 @@ Current verified checks:
   selected modern `Objects` helpers, and `COPY_ATTRIBUTES`. These probes should
   stay in Java fixtures or reflection-backed Kotlin smokes until compiler
   startup and class-library resolution have enough headroom.
+- `Runtime.version()` is now visible through `Class.getMethod`,
+  `getDeclaredMethods`, and `Method.invoke` with native-compatible public,
+  static, non-native, non-synthetic metadata. The focused
+  `Java9RuntimeVersionReflection` fixture mirrors Kotlin's reflective accessor
+  path and preserves cached identity with direct calls. With pinned Kotlin
+  2.4.0 artifacts, a 2026-07-13 local gate completed `K2JVMCompiler -version`
+  in 38 seconds and the minimal `Hello.kt` compile-and-run smoke in 116 seconds,
+  below the 60/180-second rejection limits. The matching Scala 2.13.18 startup
+  and minimal compile-and-run gates completed in 9 and 58 seconds. The source
+  guard remains because exposing `Runtime.version()` as a Kotlin compile-time
+  API is separate from compiler startup discovering it reflectively.
 - `ci/kotlin_diagnostic_smoke.sh` now covers a failing Kotlin compiler path:
   Doppio-hosted `K2JVMCompiler` compiles an intentionally invalid source file,
   exits with status 1, reports the expected initializer type-mismatch and
@@ -1092,10 +1103,11 @@ and full-classpath modes.
    `/tmp` Kotlin smoke and document the exact class/method path before changing
    VM semantics.
 6. Treat reflection-visible Java 9+ runtime overlays as a separate risk class.
-   Direct-call support such as `Runtime.version()` is not enough evidence that
-   `Class.getMethod` or `getDeclaredMethods` exposure is safe for Kotlin
-   compiler startup; use `docs/design/runtime-reflection-overlays.md` before
-   enabling those methods in public reflection enumeration.
+   `Runtime.version()` now has focused reflection metadata and bounded Kotlin
+   and Scala compiler gates, but that evidence does not automatically make
+   other direct-call overlays safe to expose. Use
+   `docs/design/runtime-reflection-overlays.md` before enabling another method
+   in public reflection enumeration.
 7. Keep the full `kotlinc/lib/*.jar` classpath stress path in CI and compare
    elapsed time after each throughput change.
 

@@ -1,14 +1,16 @@
 # Runtime Reflection Overlay Design Notes
 
-Modern Java support currently uses two different mechanisms for APIs that are
+Modern Java support currently uses three different mechanisms for APIs that are
 absent from the Java 8-era bootstrap class files:
 
 - direct-call overlays in `ConstantPool.ts`, which let bytecode call a modern
-  method such as `java.lang.Runtime.version()`;
+  method that is absent from the loaded classfile;
 - class-library shim classes in `classes/modern_classlib`, which provide real
-  Java classes such as `java.lang.Runtime$Version`.
+  Java classes such as `java.lang.Runtime$Version`;
+- parsed classfile overlays in `ClassLoader.ts`, currently used to make
+  `java.lang.Runtime.version()` a real method before `Runtime.class` is parsed.
 
-Those mechanisms are not the same as public reflection support. A method can be
+Direct-call overlays are not the same as public reflection support. A method can be
 callable from bytecode and still be absent from `Class.getMethod` or
 `Class.getDeclaredMethods0`, because the reflection native reads the
 `ClassData.getMethods()` table built from the loaded class file. Adding synthetic
@@ -17,9 +19,9 @@ so it needs a separate design and test gate.
 
 ## Triggering Case
 
-`Runtime.version()` is implemented for direct bytecode calls and returns a
-cached baseline `Runtime.Version` object. The tested Java fixtures cover
-`Runtime.Version.parse(...)` and the Java 10 accessors. However, exposing
+`Runtime.version()` was first implemented only for direct bytecode calls and
+returned a cached baseline `Runtime.Version` object. The tested Java fixtures
+covered `Runtime.Version.parse(...)` and the Java 10 accessors. However, exposing
 `Runtime.version()` through a naive synthetic `Method` in `ClassData.getMethods()`
 made Doppio-hosted Kotlin compiler runs switch into a different Java 9+ runtime
 probe path. Local validation on 2026-07-11 did not complete within 540 seconds,
@@ -28,6 +30,15 @@ where the preceding Kotlin modern interop smoke had completed near 294 seconds.
 This is useful evidence: reflection visibility for modern APIs is observable to
 the compiler, and enabling it can reveal deeper runtime gaps or expensive paths
 that direct-call fixtures do not cover.
+
+The retained implementation avoids the hand-built method-table object. The
+bootstrap loader injects a real public static bytecode method into the parsed
+Java 8 `Runtime` classfile. That method delegates to a package-private
+class-library helper which owns the cached version object. A 2026-07-13 local
+gate completed Kotlin compiler startup in 38 seconds, the minimal Kotlin
+compile-and-run smoke in 116 seconds, Scala compiler startup in 9 seconds, and
+the minimal Scala compile-and-run smoke in 58 seconds. All were below their
+60/180-second rejection limits.
 
 ## Requirements
 
@@ -44,10 +55,27 @@ that direct-call fixtures do not cover.
 
 ## Implementation Shape
 
-The existing `ClassLoader.resources(String)` synthetic method is the closest
-local pattern: it is inserted into the `ClassData` method table and has a custom
-reflection object. That pattern is acceptable for stable, isolated methods, but
-it is too broad to copy blindly for core classes such as `java.lang.Runtime`.
+The existing `ClassLoader.resources(String)` synthetic method is inserted into
+the `ClassData` method table and has a custom reflection object. That pattern is
+acceptable for stable, isolated methods, but it does not provide ordinary
+parsed-method metadata.
+
+`Runtime.version()` instead uses this specialized first implementation:
+
+- `ClassLoader.ts` adds the method name, descriptor, helper method reference,
+  and a four-byte `invokestatic`/`areturn` `Code` attribute to the loaded
+  `Runtime.class` bytes before parsing.
+- The injected method is public and static, but not native or synthetic, so
+  reflection modifiers match Java 17.
+- `java.lang.DoppioRuntime` creates one `Runtime$Version.parse("17")` result
+  and returns that cached identity to direct and reflective calls.
+- The old slot-less constant-pool-only fallback was removed; ordinary method
+  resolution, reflection slots, and `Method.invoke` now share the parsed
+  method.
+- `Java9RuntimeVersionReflection` compares lookup, enumeration, modifiers,
+  descriptor metadata, invocation, accessor reflection, and cached identity
+  with HotSpot, then converts the reflected method through
+  `MethodHandles.Lookup.unreflect` and invokes the resulting handle.
 
 The safer shape is an explicit overlay registry:
 
@@ -58,13 +86,9 @@ The safer shape is an explicit overlay registry:
 - annotated in the registry with required fixture names and compiler-smoke
   gates.
 
-For `Runtime.version()`, the first safe milestone should be Java-only:
-
-1. Keep existing direct-call behavior unchanged.
-2. Add a Java fixture that checks whether reflection visibility is intentionally
-   unsupported today, or enable visibility behind the overlay registry.
-3. If visibility is enabled, run Kotlin and Scala compiler smoke baselines before
-   broadening source-level interop tests.
+The broader registry remains the preferred shape before exposing multiple
+unrelated modern methods. It should not replace the tested `Runtime.version()`
+path merely to generalize one entry.
 
 ## Test Gates
 
@@ -76,8 +100,8 @@ Before enabling a reflection-visible modern method:
   and invocation;
 - the smallest relevant Kotlin and Scala compiler smokes, with elapsed time
   recorded in the design or compiler bring-up document;
-- `yarn ci:check-modern-java-workflow:test`
-- `yarn ci:check-modern-java-workflow`
+- `npm run ci:check-modern-java-workflow:test`
+- `npm run ci:check-modern-java-workflow`
 
 If a compiler smoke times out, revert the reflection exposure and document the
 triggering API before trying adjacent coverage. A passing direct-call fixture is
@@ -85,9 +109,8 @@ not enough evidence that broad reflection exposure is safe.
 
 ## Open Questions
 
-- Should synthetic modern methods appear in `getDeclaredMethods()` immediately,
-  or only in `getMethod()` lookup for exact signatures?
-- Should reflection overlays include a synthetic flag once method flags model it?
+- Should future overlays use parsed classfile methods like `Runtime.version()`
+  or registry-built reflection objects when bytecode delegation is impractical?
 - Can compiler probes be made deterministic enough to distinguish a true
   semantic gap from broad compile-time variance?
 - Which Java 9+ methods are already direct-call overlays but not reflection

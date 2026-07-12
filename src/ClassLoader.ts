@@ -20,6 +20,12 @@ function u2(value: number): Buffer {
   return rv;
 }
 
+function u4(value: number): Buffer {
+  var rv = Buffer.alloc(4);
+  rv.writeUInt32BE(value, 0);
+  return rv;
+}
+
 function utf8Constant(value: string): Buffer {
   var text = Buffer.from(value, 'utf8'),
     rv = Buffer.alloc(3 + text.length);
@@ -142,6 +148,70 @@ function addJavaLangClassModernOverlays(data: Buffer): Buffer {
     withConstants.slice(methods.countOffset + 2, methods.endOffset),
     getModuleMethod,
     getRecordComponentsMethod,
+    withConstants.slice(methods.endOffset)
+  ]);
+}
+
+// Inject a parsed method so direct calls and reflection share exact metadata.
+function addJavaLangRuntimeModernOverlays(data: Buffer): Buffer {
+  var cp = constantPoolEnd(data),
+    versionNameIndex = cp.count,
+    versionDescriptorIndex = cp.count + 1,
+    codeNameIndex = cp.count + 2,
+    helperNameIndex = cp.count + 3,
+    helperClassIndex = cp.count + 4,
+    helperNameAndTypeIndex = cp.count + 5,
+    helperMethodIndex = cp.count + 6,
+    extraConstants = Buffer.concat([
+      utf8Constant('version'),
+      utf8Constant('()Ljava/lang/Runtime$Version;'),
+      utf8Constant('Code'),
+      utf8Constant('java/lang/DoppioRuntime'),
+      Buffer.concat([Buffer.from([7]), u2(helperNameIndex)]),
+      Buffer.concat([
+        Buffer.from([12]),
+        u2(versionNameIndex),
+        u2(versionDescriptorIndex)
+      ]),
+      Buffer.concat([
+        Buffer.from([10]),
+        u2(helperClassIndex),
+        u2(helperNameAndTypeIndex)
+      ])
+    ]),
+    withConstants = Buffer.concat([
+      data.slice(0, 8),
+      u2(cp.count + 7),
+      data.slice(10, cp.offset),
+      extraConstants,
+      data.slice(cp.offset)
+    ]),
+    methods = methodsInfo(withConstants, cp.offset + extraConstants.length),
+    code = Buffer.concat([
+      Buffer.from([0xb8]),
+      u2(helperMethodIndex),
+      Buffer.from([0xb0])
+    ]),
+    versionMethod = Buffer.concat([
+      u2(0x0009),
+      u2(versionNameIndex),
+      u2(versionDescriptorIndex),
+      u2(1),
+      u2(codeNameIndex),
+      u4(12 + code.length),
+      u2(1),
+      u2(0),
+      u4(code.length),
+      code,
+      u2(0),
+      u2(0)
+    ]);
+
+  return Buffer.concat([
+    withConstants.slice(0, methods.countOffset),
+    u2(methods.count + 1),
+    withConstants.slice(methods.countOffset + 2, methods.endOffset),
+    versionMethod,
     withConstants.slice(methods.endOffset)
   ]);
 }
@@ -767,6 +837,9 @@ export class BootstrapClassLoader extends ClassLoader {
       if (pItem) {
         if (typeStr === 'Ljava/lang/Class;') {
           clsData = addJavaLangClassModernOverlays(clsData);
+        }
+        if (typeStr === 'Ljava/lang/Runtime;') {
+          clsData = addJavaLangRuntimeModernOverlays(clsData);
         }
         if (typeStr === 'Ljava/lang/invoke/MethodHandles;') {
           clsData = addJavaLangInvokeMethodHandlesModernOverlays(clsData);
