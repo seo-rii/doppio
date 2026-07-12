@@ -359,6 +359,12 @@ public class Java17MethodHandleLoop {
     System.out.println(multiHelperClauseLength4.type().toMethodDescriptorString());
     System.out.println((String) multiHelperClauseLength4.invokeExact(3));
 
+    MethodHandle multiHelperClauseLength2 = MethodHandles.loop(
+        new MethodHandle[] { init, multiCountStep },
+        new MethodHandle[] { multiTextInit, multiTextStep, multiBelow, multiFini });
+    System.out.println(multiHelperClauseLength2.type().toMethodDescriptorString());
+    System.out.println((String) multiHelperClauseLength2.invokeExact(3));
+
     MethodHandle multiNullFiniExit = MethodHandles.loop(
         new MethodHandle[] { init, multiCountStep, multiNever, null },
         new MethodHandle[] { multiTextInit, multiTextStep, multiAlways, multiFini });
@@ -377,6 +383,36 @@ public class Java17MethodHandleLoop {
     System.out.println(multiVoidNullFiniExit.type().toMethodDescriptorString());
     multiVoidNullFiniExit.invokeExact(3);
     System.out.println("multi-null-fini-void");
+
+    MethodHandle multiNullInitInt = MethodHandles.loop(
+        new MethodHandle[] { null, multiCountStep, multiAlways, multiFini },
+        new MethodHandle[] { multiTextInit, multiTextStep, multiBelow, multiFini });
+    System.out.println(multiNullInitInt.type().toMethodDescriptorString());
+    System.out.println((String) multiNullInitInt.invokeExact(3));
+
+    MethodHandle multiNullInitText = MethodHandles.loop(
+        new MethodHandle[] { init, multiCountStep, multiAlways, multiFini },
+        new MethodHandle[] { null, multiTextStep, multiBelow, multiFini });
+    System.out.println(multiNullInitText.type().toMethodDescriptorString());
+    System.out.println((String) multiNullInitText.invokeExact(3));
+
+    MethodHandle multiNullStepInt = MethodHandles.loop(
+        new MethodHandle[] { init, null, multiNever, multiFini },
+        new MethodHandle[] { multiTextInit, multiTextStep, multiAlways, multiFini });
+    System.out.println(multiNullStepInt.type().toMethodDescriptorString());
+    System.out.println((String) multiNullStepInt.invokeExact(3));
+
+    MethodHandle multiNullStepText = MethodHandles.loop(
+        new MethodHandle[] { init, multiCountStep, multiAlways, multiFini },
+        new MethodHandle[] { multiTextInit, null, multiBelow, multiFini });
+    System.out.println(multiNullStepText.type().toMethodDescriptorString());
+    System.out.println((String) multiNullStepText.invokeExact(3));
+
+    MethodHandle multiVoidClause = MethodHandles.loop(
+        new MethodHandle[] { init, multiCountStepStateOnly, multiAlwaysNoArgs, finiStateOnly },
+        new MethodHandle[] { null, null, multiBelowCountOnly, finiStateOnly });
+    System.out.println(multiVoidClause.type().toMethodDescriptorString());
+    System.out.println((String) multiVoidClause.invokeExact(5));
 
     MethodHandle externalState = MethodHandles.loop(new MethodHandle[] { null, null, never, fini });
     System.out.println(externalState.type().toMethodDescriptorString());

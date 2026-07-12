@@ -46,12 +46,16 @@ The control-flow family is split into small implementation slices:
   no-state loops where `init` and `step` return `void` and all clause handles
   consume matching prefixes of the external argument list. A selected
   multi-clause state-loop slice supports multiple explicit non-`void` state
-  variables when every clause has non-null `init` and `step` handles. A
-  `null` `pred` marks a helper clause that does not terminate the loop, and a
+  variables plus selected `void` clauses. In that selected multi-clause slice,
+  a `null` `init` starts a non-`void` state from the Java default value inferred
+  from a non-null `step`, a `null` `step` preserves the current state from a
+  non-null `init`, a clause with both `init` and `step` null is a `void` clause,
+  a `null` `pred` marks a helper clause that does not terminate the loop, and a
   `null` or omitted `fini` returns the selected result type's default value
-  when that clause terminates the loop. The returned handle's external argument
-  list is inferred from prefix-compatible `init` handles and from
-  `step`/`pred`/`fini` handles that consume prefixes of the effective
+  when that clause terminates the loop. Clause arrays with only
+  `{ init, step }` are accepted as helper clauses. The returned handle's
+  external argument list is inferred from prefix-compatible `init` handles and
+  from `step`/`pred`/`fini` handles that consume prefixes of the effective
   `(V..., A...)` loop argument list. The general multi-clause form remains a
   later slice.
 - `tableSwitch(fallback, targets...)`: selected slice. It is control flow, but
@@ -263,12 +267,13 @@ handle returns `void`.
 - The selected `loop` slice covers one-clause non-`void` state variables, the
   selected no-state `void init`/`void step` shape, and selected explicit
   multi-clause non-`void` state loops with prefix-compatible clause handles,
+  selected `void` clauses, selected `null` initializers, selected `null` steps,
   selected `null` helper predicates, and selected `null` finalizers. Broad
-  multi-clause loops with null `init` or `step` handles, broad null-init plus
-  null-step inference beyond the tested external-state shape, no-state clauses
-  beyond the selected `void init`/`void step` shape, external argument
-  inference beyond the selected prefix-compatible shapes, and exact validation
-  ordering remain open.
+  multi-clause state/no-state mixes beyond the selected fixtures, broad
+  null-init plus null-step inference beyond the tested external-state shape,
+  no-state clauses beyond the selected `void init`/`void step` shape, external
+  argument inference beyond the selected prefix-compatible shapes, and exact
+  validation ordering remain open.
 - The selected `void` loop slices cover simple side-effect loops only; broad
   no-state/state mixes, exact generic `loop` effectively-identical
   parameter-list inference, and full validation ordering are not claimed.
