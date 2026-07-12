@@ -43,9 +43,10 @@ support including no-arg explicit iterator handles, plus selected
 `MethodHandles.whileLoop`/`MethodHandles.doWhileLoop`/`MethodHandles.countedLoop`
 non-`void` state-loop and selected `void` side-effect slices through public
 overlays, plus selected single-clause `MethodHandles.loop` state-loop flows
-with explicit or `null` `init`, selected `null step`, external-state exits, and
-prefix-parameter clause handles, selected explicit-init external argument
-inference, selected no-state loops, selected explicit multi-clause state
+with explicit or `null` `init`, selected `null step`, null-init/null-step
+no-state exits with external prefix arguments, and prefix-parameter clause
+handles, selected explicit-init external argument inference, selected no-state
+loops, selected explicit multi-clause state
 loops with prefix-compatible clause handles, selected `null` initializers,
 selected `null` steps, selected `void` clauses, selected `null` helper
 predicates, and selected `null` finalizers, plus optional `fini`, covering
@@ -983,8 +984,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   selected `tryFinally`, `tableSwitch`, and `iteratedLoop` flows, and selected
   `whileLoop`/`doWhileLoop`/`countedLoop` non-`void` state plus `void`
   side-effect loops with descriptor checks, plus selected single-clause
-  `MethodHandles.loop` external argument inference, no-state loops, and
-  selected prefix-compatible multi-clause state loops with selected `null`
+  `MethodHandles.loop` external argument inference, null-init/null-step
+  no-state external-prefix loops, no-state loops, and selected
+  prefix-compatible multi-clause state loops with selected `null`
   initializers, `null` steps, `void` clauses, `null` helper predicates, and
   `null` finalizers, sealed metadata, and illegal direct subtype rejection;
   Java 18-26 simple parser-only class-file

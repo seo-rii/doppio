@@ -15,6 +15,18 @@ state:6
 (I)Ljava/lang/String;
 none
 ()Ljava/lang/String;
+none
+()I
+17
+()V
+no-state-null-handles-void-fini
+()V
+no-state-null-handles-void
+(II)Ljava/lang/String;
+none
+(II)Ljava/lang/String;
+done:5:9
+()Ljava/lang/String;
 nostate:3
 (I)Ljava/lang/String;
 nostate:4:4
@@ -61,7 +73,7 @@ void-loop
 (I)V
 void-no-step-loop
 (II)V
-void-external-state-loop
+void-no-state-external-prefix-loop
 (I)V
 short-void-loop
 null-clauses:java.lang.IllegalArgumentException

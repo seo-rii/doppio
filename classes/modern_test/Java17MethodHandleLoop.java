@@ -51,6 +51,13 @@ public class Java17MethodHandleLoop {
     return "none";
   }
 
+  public static int finiIntNoArgs() {
+    return 17;
+  }
+
+  public static void finiVoidNoArgs() {
+  }
+
   public static void resetNoState() {
     noStateCounter = 0;
   }
@@ -205,6 +212,14 @@ public class Java17MethodHandleLoop {
         Java17MethodHandleLoop.class,
         "finiNoArgs",
         MethodType.methodType(String.class));
+    MethodHandle finiIntNoArgs = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "finiIntNoArgs",
+        MethodType.methodType(int.class));
+    MethodHandle finiVoidNoArgs = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "finiVoidNoArgs",
+        MethodType.methodType(void.class));
     MethodHandle resetNoState = lookup.findStatic(
         Java17MethodHandleLoop.class,
         "resetNoState",
@@ -320,6 +335,35 @@ public class Java17MethodHandleLoop {
     System.out.println(noArgPrefix.type().toMethodDescriptorString());
     System.out.println((String) noArgPrefix.invokeExact(5));
 
+    MethodHandle noStateNullHandles = MethodHandles.loop(new MethodHandle[] { null, null, neverNoArgs, finiNoArgs });
+    System.out.println(noStateNullHandles.type().toMethodDescriptorString());
+    System.out.println((String) noStateNullHandles.invokeExact());
+
+    MethodHandle noStateNullHandlesInt = MethodHandles.loop(new MethodHandle[] { null, null, neverNoArgs, finiIntNoArgs });
+    System.out.println(noStateNullHandlesInt.type().toMethodDescriptorString());
+    System.out.println((int) noStateNullHandlesInt.invokeExact());
+
+    MethodHandle noStateNullHandlesVoidFini = MethodHandles.loop(
+        new MethodHandle[] { null, null, neverNoArgs, finiVoidNoArgs });
+    System.out.println(noStateNullHandlesVoidFini.type().toMethodDescriptorString());
+    noStateNullHandlesVoidFini.invokeExact();
+    System.out.println("no-state-null-handles-void-fini");
+
+    MethodHandle noStateNullHandlesVoid = MethodHandles.loop(new MethodHandle[] { null, null, neverNoArgs });
+    System.out.println(noStateNullHandlesVoid.type().toMethodDescriptorString());
+    noStateNullHandlesVoid.invokeExact();
+    System.out.println("no-state-null-handles-void");
+
+    MethodHandle noStateNullHandlesPredPrefix = MethodHandles.loop(
+        new MethodHandle[] { null, null, never, finiNoArgs });
+    System.out.println(noStateNullHandlesPredPrefix.type().toMethodDescriptorString());
+    System.out.println((String) noStateNullHandlesPredPrefix.invokeExact(5, 9));
+
+    MethodHandle noStateNullHandlesFiniPrefix = MethodHandles.loop(
+        new MethodHandle[] { null, null, neverNoArgs, fini });
+    System.out.println(noStateNullHandlesFiniPrefix.type().toMethodDescriptorString());
+    System.out.println((String) noStateNullHandlesFiniPrefix.invokeExact(5, 9));
+
     MethodHandle noState = MethodHandles.loop(
         new MethodHandle[] { resetNoState, stepNoState, predNoState, finiNoState });
     System.out.println(noState.type().toMethodDescriptorString());
@@ -414,9 +458,9 @@ public class Java17MethodHandleLoop {
     System.out.println(multiVoidClause.type().toMethodDescriptorString());
     System.out.println((String) multiVoidClause.invokeExact(5));
 
-    MethodHandle externalState = MethodHandles.loop(new MethodHandle[] { null, null, never, fini });
-    System.out.println(externalState.type().toMethodDescriptorString());
-    System.out.println((String) externalState.invokeExact(5, 9));
+    MethodHandle noStateExternalPrefix = MethodHandles.loop(new MethodHandle[] { null, null, never, fini });
+    System.out.println(noStateExternalPrefix.type().toMethodDescriptorString());
+    System.out.println((String) noStateExternalPrefix.invokeExact(5, 9));
 
     MethodHandle textInit = lookup.findStatic(
         Java17MethodHandleLoop.class,
@@ -452,9 +496,9 @@ public class Java17MethodHandleLoop {
     System.out.println(noStepText.type().toMethodDescriptorString());
     System.out.println((String) noStepText.invokeExact("x", 7));
 
-    MethodHandle externalTextState = MethodHandles.loop(new MethodHandle[] { null, null, textNever, textFini });
-    System.out.println(externalTextState.type().toMethodDescriptorString());
-    System.out.println((String) externalTextState.invokeExact("x", "ignored", 7));
+    MethodHandle noStateTextExternalPrefix = MethodHandles.loop(new MethodHandle[] { null, null, textNever, textFini });
+    System.out.println(noStateTextExternalPrefix.type().toMethodDescriptorString());
+    System.out.println((String) noStateTextExternalPrefix.invokeExact("x", "ignored", 7));
 
     MethodHandle voidLoop = MethodHandles.loop(new MethodHandle[] { init, step, pred, null });
     System.out.println(voidLoop.type().toMethodDescriptorString());
@@ -466,10 +510,10 @@ public class Java17MethodHandleLoop {
     voidNoStep.invokeExact(7);
     System.out.println("void-no-step-loop");
 
-    MethodHandle voidExternalState = MethodHandles.loop(new MethodHandle[] { null, null, never });
-    System.out.println(voidExternalState.type().toMethodDescriptorString());
-    voidExternalState.invokeExact(5, 9);
-    System.out.println("void-external-state-loop");
+    MethodHandle voidNoStateExternalPrefix = MethodHandles.loop(new MethodHandle[] { null, null, never });
+    System.out.println(voidNoStateExternalPrefix.type().toMethodDescriptorString());
+    voidNoStateExternalPrefix.invokeExact(5, 9);
+    System.out.println("void-no-state-external-prefix-loop");
 
     MethodHandle shortVoidLoop = MethodHandles.loop(new MethodHandle[] { init, step, pred });
     System.out.println(shortVoidLoop.type().toMethodDescriptorString());

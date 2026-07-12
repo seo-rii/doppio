@@ -272,10 +272,11 @@ handles, dynamic constants, and record object-method linkage:
   handles, and selected `whileLoop`, `doWhileLoop`, and both `countedLoop`
   overloads for non-`void` state loops plus selected `void` side-effect loops,
   and selected single-clause `loop` state flows with explicit or `null` `init`
-  plus selected `null step`, external-state false-predicate exits, and optional
-  `fini`, including selected explicit-init prefix-parameter clause handles and
-  explicit-init external argument inference from longer prefix-compatible
-  clause handles, selected no-state `void init`/`void step` loops, and selected
+  plus selected `null step`, null-init/null-step no-state false-predicate
+  exits with external prefix arguments, and optional `fini`, including selected
+  explicit-init prefix-parameter clause handles and explicit-init external
+  argument inference from longer prefix-compatible clause handles, selected
+  no-state `void init`/`void step` loops, and selected
   explicit multi-clause state loops with prefix-compatible `init`,
   `step`, `pred`, and `fini` handles, including selected `null` initializers,
   selected `null` steps, selected `void` clauses, selected `null` helper
@@ -316,9 +317,10 @@ handles, dynamic constants, and record object-method linkage:
   iteration, empty iteration, and selected validation errors. The selected
   `loop` slice covers one `init`/`step`/`pred` clause with explicit or `null`
   `init`, selected explicit-init `null step`, selected null-init/null-step
-  external-state false-predicate exits, selected explicit-init prefix
-  parameter lists, selected explicit-init external argument inference, and
-  optional `fini`, plus selected no-state `void init`/`void step` loops and
+  no-state false-predicate exits with external prefix arguments, selected
+  explicit-init prefix parameter lists, selected explicit-init external
+  argument inference, and optional `fini`, plus selected no-state loops with
+  `void` `init`/`step` handles and
   selected explicit multi-clause state loops with prefix-compatible clause
   handles, selected `null` initializers, selected `null` steps, selected
   `void` clauses, selected `null` helper predicates, and selected `null`

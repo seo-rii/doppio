@@ -36,15 +36,16 @@ The control-flow family is split into small implementation slices:
   handle over one non-`void` loop state variable. A `null` `init` starts from
   the Java default value for the state type inferred from `step`; a `null`
   `step` is supported when `init` is explicit and preserves the current state.
-  When both `init` and `step` are `null`, the selected slice supports a first
-  external argument as the loop state for false-predicate exit paths. For
-  explicit-init state loops, `step`, `pred`, and `fini` may consume a matching
-  prefix of the state plus external argument list, and a shorter explicit
-  `init` can infer the returned handle's external argument list from a longer
-  prefix-compatible `step`, `pred`, or `fini` handle. The `fini` handle may be
-  `null` or omitted from the selected clause. The selected slice also supports
-  no-state loops where `init` and `step` return `void` and all clause handles
-  consume matching prefixes of the external argument list. A selected
+  When both `init` and `step` are `null`, the selected slice treats the clause
+  as a no-state `void` clause whose `pred` and `fini` handles consume matching
+  prefixes of the external argument list. For explicit-init state loops,
+  `step`, `pred`, and `fini` may consume a matching prefix of the state plus
+  external argument list, and a shorter explicit `init` can infer the returned
+  handle's external argument list from a longer prefix-compatible `step`,
+  `pred`, or `fini` handle. The `fini` handle may be `null` or omitted from the
+  selected clause. The selected slice also supports no-state loops where
+  `init` and `step` return `void` and all clause handles consume matching
+  prefixes of the external argument list. A selected
   multi-clause state-loop slice supports multiple explicit non-`void` state
   variables plus selected `void` clauses. In that selected multi-clause slice,
   a `null` `init` starts a non-`void` state from the Java default value inferred
@@ -241,21 +242,22 @@ handle returns `void`.
   `loop(MethodHandle[]...)` state flows, including `init -> step -> pred`
   ordering, primitive and reference state, `null init` default-state behavior
   for primitive and reference state, explicit-init `null step` identity-state
-  behavior, null-init/null-step external-state false-predicate exits, explicit
-  prefix-parameter `step`/`pred`/`fini` flows, explicit-init external argument
-  inference from longer prefix-compatible clause handles, explicit `fini`
-  return adaptation, `null` and omitted `fini` void return adaptation,
-  selected no-state `void init`/`void step` loops with and without external
-  arguments, a selected two-clause two-state loop where the second predicate
-  exits through its `fini`, descriptor strings, and selected validation
-  failures including null-predicate rejection.
+  behavior, null-init/null-step no-state false-predicate exits with and without
+  external prefix arguments, explicit prefix-parameter `step`/`pred`/`fini`
+  flows, explicit-init external argument inference from longer
+  prefix-compatible clause handles, explicit `fini` return adaptation, `null`
+  and omitted `fini` void return adaptation, selected no-state loops with
+  `void` `init`/`step` handles and with or without external arguments, a selected
+  two-clause two-state loop where the second predicate exits through its
+  `fini`, descriptor strings, and selected validation failures including
+  null-predicate rejection.
 - Kotlin smoke coverage in
   `classes/kotlin_methodhandle_smoke/MethodHandleSmoke.kt`:
   reflective discovery of `MethodHandles.whileLoop` and
   `MethodHandles.doWhileLoop` plus both `MethodHandles.countedLoop` overloads,
   integer and reference state invocation, null initializer invocation,
   body-first `doWhileLoop` behavior, explicit counted ranges, selected
-  `MethodHandles.loop` null-init, null-step, external-state, prefix
+  `MethodHandles.loop` null-init, null-step, no-state external-prefix
   invocation, explicit-init external argument inference, no-state invocation,
   and descriptor checks.
 
@@ -270,10 +272,10 @@ handle returns `void`.
   selected `void` clauses, selected `null` initializers, selected `null` steps,
   selected `null` helper predicates, and selected `null` finalizers. Broad
   multi-clause state/no-state mixes beyond the selected fixtures, broad
-  null-init plus null-step inference beyond the tested external-state shape,
-  no-state clauses beyond the selected `void init`/`void step` shape, external
-  argument inference beyond the selected prefix-compatible shapes, and exact
-  validation ordering remain open.
+  null-init plus null-step inference beyond the tested no-state external-prefix
+  shape, no-state clauses beyond the selected `void init`/`void step` and
+  null-init/null-step shapes, external argument inference beyond the selected
+  prefix-compatible shapes, and exact validation ordering remain open.
 - The selected `void` loop slices cover simple side-effect loops only; broad
   no-state/state mixes, exact generic `loop` effectively-identical
   parameter-list inference, and full validation ordering are not claimed.
