@@ -283,8 +283,8 @@ handles, dynamic constants, and record object-method linkage:
   selected `null` steps, selected `void` clauses, selected `null` helper
   predicates, selected `null` finalizers, distinct state/external parameter
   domains, non-init-only external argument inference, executing void/state
-  mixed clauses, and selected single- and multi-clause null, length, finalizer,
-  predicate, and parameter validation precedence.
+  mixed clauses, and selected single- and multi-clause null, length, init/step
+  return, finalizer, predicate, and parameter validation precedence.
   The `tryFinally` slice is tracked separately in
   `docs/design/methodhandles-try-finally.md`; the control-flow family and
   selected state-loop slices are tracked in
@@ -333,6 +333,7 @@ handles, dynamic constants, and record object-method linkage:
   selected single-clause and multi-clause missing-predicate validation for
   short clause arrays, plus selected single null-clause rejection,
   multi-clause null-before-length validation,
+  single-clause init/step return-before-predicate and multi-clause
   finalizer/predicate-before-parameter validation ordering, non-init-only
   external argument inference, and executing void/state mixed clauses.
   Broad state-loop parity and the

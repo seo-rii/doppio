@@ -736,6 +736,10 @@ public class Java17MethodHandleLoop {
         "two-handle-clause-pred",
         () -> MethodHandles.loop(new MethodHandle[] { init, step }),
         "no predicate found");
+    printFailureContains(
+        "single-step-return-before-pred",
+        () -> MethodHandles.loop(new MethodHandle[] { init, multiTextStep }),
+        "init and step return types");
     printFailure(
         "long-clause",
         () -> MethodHandles.loop(new MethodHandle[] { init, step, pred, fini, fini }));

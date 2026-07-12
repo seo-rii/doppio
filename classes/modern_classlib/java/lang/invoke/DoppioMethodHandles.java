@@ -274,10 +274,14 @@ public final class DoppioMethodHandles {
     MethodHandle init = clause.length > 0 ? clause[0] : null;
     MethodHandle step = clause.length > 1 ? clause[1] : null;
     MethodHandle pred = clause.length > 2 ? clause[2] : null;
+    MethodHandle fini = clause.length > 3 ? clause[3] : null;
+    if (init != null && step != null &&
+        init.type().returnType() != step.type().returnType()) {
+      throw new IllegalArgumentException("clause 0: init and step return types must match");
+    }
     if (pred == null) {
       throw new IllegalArgumentException("no predicate found");
     }
-    MethodHandle fini = clause.length > 3 ? clause[3] : null;
     MethodType stepType;
     Class<?> stateType;
     List<Class<?>> externalTypes;
