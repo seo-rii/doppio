@@ -38,6 +38,8 @@ nostate:4:4
 multi:3:123:3
 (I)Ljava/lang/String;
 multi-prefix:3:123
+(Ljava/lang/String;)Ljava/lang/String;
+split:1:ok
 (I)Ljava/lang/String;
 multi:3:123:3
 (I)Ljava/lang/String;
@@ -94,4 +96,8 @@ null-pred:java.lang.IllegalArgumentException
 bad-pred:java.lang.IllegalArgumentException
 multi-no-pred:java.lang.IllegalArgumentException
 multi-short-no-pred:java.lang.IllegalArgumentException:true
+multi-no-pred-before-parameters:java.lang.IllegalArgumentException:true
+multi-bad-pred-before-parameters:java.lang.IllegalArgumentException:true
+multi-bad-fini-before-parameters:java.lang.IllegalArgumentException:true
+multi-null-clause-before-length:java.lang.IllegalArgumentException:true
 multi-long-clause:java.lang.IllegalArgumentException

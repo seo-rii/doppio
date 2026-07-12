@@ -281,7 +281,9 @@ handles, dynamic constants, and record object-method linkage:
   explicit multi-clause state loops with prefix-compatible `init`,
   `step`, `pred`, and `fini` handles, including selected `null` initializers,
   selected `null` steps, selected `void` clauses, selected `null` helper
-  predicates, and selected `null` finalizers.
+  predicates, selected `null` finalizers, distinct state/external parameter
+  domains, and selected null/length/finalizer/predicate/parameter validation
+  precedence.
   The `tryFinally` slice is tracked separately in
   `docs/design/methodhandles-try-finally.md`; the control-flow family and
   selected state-loop slices are tracked in
@@ -328,7 +330,8 @@ handles, dynamic constants, and record object-method linkage:
   `void` clauses, selected `null` helper predicates, selected `null`
   finalizers, selected multi-clause empty/init-only helper clauses, and
   selected single-clause and multi-clause missing-predicate validation for
-  short clause arrays.
+  short clause arrays, plus selected multi-clause null-before-length and
+  finalizer/predicate-before-parameter validation ordering.
   Broad state-loop parity and the
   remaining broad Java 9+ `loop` combinator still need separate fixtures and
   implementation slices because they need control-flow, exception, and

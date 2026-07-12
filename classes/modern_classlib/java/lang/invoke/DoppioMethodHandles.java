@@ -419,14 +419,19 @@ public final class DoppioMethodHandles {
     int[] finiArgumentCounts = new int[clauseCount];
 
     for (int i = 0; i < clauseCount; i++) {
-      MethodHandle[] clause = clauses[i];
-      if (clause == null) {
+      if (clauses[i] == null) {
         throw new IllegalArgumentException("null clauses are not allowed");
       }
-      if (clause.length > 4) {
+    }
+    for (int i = 0; i < clauseCount; i++) {
+      if (clauses[i].length > 4) {
         throw new IllegalArgumentException(
             "multi-clause loops require init, step, and optional pred and fini handles");
       }
+    }
+
+    for (int i = 0; i < clauseCount; i++) {
+      MethodHandle[] clause = clauses[i];
       inits[i] = clause.length > 0 ? clause[0] : null;
       steps[i] = clause.length > 1 ? clause[1] : null;
       preds[i] = clause.length > 2 ? clause[2] : null;
@@ -472,14 +477,15 @@ public final class DoppioMethodHandles {
           continue;
         }
         List<Class<?>> parameterTypes = loopHandles[roleIndex].type().parameterList();
-        int stateParameterCount = Math.min(parameterTypes.size(), stateTypes.length);
-        for (int parameterIndex = 0; parameterIndex < stateParameterCount; parameterIndex++) {
+        boolean hasCompleteStatePrefix = parameterTypes.size() >= stateTypes.length;
+        for (int parameterIndex = 0;
+            hasCompleteStatePrefix && parameterIndex < stateTypes.length;
+            parameterIndex++) {
           if (parameterTypes.get(parameterIndex) != stateTypes[parameterIndex]) {
-            throw new IllegalArgumentException(
-                loopRoles[roleIndex] + " state parameter types do not match");
+            hasCompleteStatePrefix = false;
           }
         }
-        if (parameterTypes.size() > stateTypes.length) {
+        if (hasCompleteStatePrefix && parameterTypes.size() > stateTypes.length) {
           List<Class<?>> candidateExternalTypes =
               parameterTypes.subList(stateTypes.length, parameterTypes.size());
           if (candidateExternalTypes.size() > externalTypes.size()) {
@@ -516,12 +522,17 @@ public final class DoppioMethodHandles {
           returnType = finiReturnType;
           hasFini = true;
         } else if (finiReturnType != returnType) {
-          throw new IllegalArgumentException("fini return types do not match");
+          throw new IllegalArgumentException("found non-identical finalizer return types");
         }
       }
     }
     if (!hasPredicate) {
       throw new IllegalArgumentException("no predicate found");
+    }
+    for (int i = 0; i < clauseCount; i++) {
+      if (preds[i] != null && preds[i].type().returnType() != boolean.class) {
+        throw new IllegalArgumentException("predicates must have boolean return type");
+      }
     }
 
     for (int i = 0; i < clauseCount; i++) {

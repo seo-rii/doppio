@@ -166,7 +166,35 @@ public class Java17MethodHandleLoop {
     return "multi-prefix:" + count + ":" + text;
   }
 
+  public static int splitIntInit(String marker) {
+    return 0;
+  }
+
+  public static String splitTextInit(String marker) {
+    return "";
+  }
+
+  public static String splitTextStep(int count, String text, String marker) {
+    return "split:" + count + ":" + marker;
+  }
+
+  public static boolean splitNever(int count, String text, String marker) {
+    return false;
+  }
+
+  public static String splitFini(int count, String text, String marker) {
+    return text;
+  }
+
   public static String badPred(int state, int limit) {
+    return "bad";
+  }
+
+  public static int badStateStep(long state) {
+    return 0;
+  }
+
+  public static String badStatePred(long state) {
     return "bad";
   }
 
@@ -312,6 +340,26 @@ public class Java17MethodHandleLoop {
         Java17MethodHandleLoop.class,
         "multiFiniStatesOnly",
         MethodType.methodType(String.class, int.class, String.class));
+    MethodHandle splitIntInit = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "splitIntInit",
+        MethodType.methodType(int.class, String.class));
+    MethodHandle splitTextInit = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "splitTextInit",
+        MethodType.methodType(String.class, String.class));
+    MethodHandle splitTextStep = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "splitTextStep",
+        MethodType.methodType(String.class, int.class, String.class, String.class));
+    MethodHandle splitNever = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "splitNever",
+        MethodType.methodType(boolean.class, int.class, String.class, String.class));
+    MethodHandle splitFini = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "splitFini",
+        MethodType.methodType(String.class, int.class, String.class, String.class));
 
     MethodHandle counted = MethodHandles.loop(new MethodHandle[] { init, step, pred, fini });
     System.out.println(counted.type().toMethodDescriptorString());
@@ -408,6 +456,12 @@ public class Java17MethodHandleLoop {
         new MethodHandle[] { multiTextInit, multiTextStepStatesOnly, multiBelowCountOnly, multiFiniStatesOnly });
     System.out.println(multiPrefixClause.type().toMethodDescriptorString());
     System.out.println((String) multiPrefixClause.invokeExact(5));
+
+    MethodHandle splitParameterDomains = MethodHandles.loop(
+        new MethodHandle[] { splitIntInit, multiCountStepStateOnly },
+        new MethodHandle[] { splitTextInit, splitTextStep, splitNever, splitFini });
+    System.out.println(splitParameterDomains.type().toMethodDescriptorString());
+    System.out.println((String) splitParameterDomains.invokeExact("ok"));
 
     MethodHandle multiHelperClause = MethodHandles.loop(
         new MethodHandle[] { init, multiCountStep, null },
@@ -556,6 +610,14 @@ public class Java17MethodHandleLoop {
         Java17MethodHandleLoop.class,
         "badPred",
         MethodType.methodType(String.class, int.class, int.class));
+    MethodHandle badStateStep = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "badStateStep",
+        MethodType.methodType(int.class, long.class));
+    MethodHandle badStatePred = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "badStatePred",
+        MethodType.methodType(String.class, long.class));
     printFailureContains(
         "empty-clause-pred",
         () -> MethodHandles.loop(new MethodHandle[] {}),
@@ -582,6 +644,30 @@ public class Java17MethodHandleLoop {
         "multi-short-no-pred",
         () -> MethodHandles.loop(new MethodHandle[] {}, new MethodHandle[] { init }),
         "no predicate found");
+    printFailureContains(
+        "multi-no-pred-before-parameters",
+        () -> MethodHandles.loop(
+            new MethodHandle[] { init, badStateStep },
+            new MethodHandle[] { multiTextInit, multiTextStep }),
+        "no predicate found");
+    printFailureContains(
+        "multi-bad-pred-before-parameters",
+        () -> MethodHandles.loop(
+            new MethodHandle[] { init, badStateStep, badStatePred },
+            new MethodHandle[] { multiTextInit, multiTextStep }),
+        "predicates must have boolean return type");
+    printFailureContains(
+        "multi-bad-fini-before-parameters",
+        () -> MethodHandles.loop(
+            new MethodHandle[] { init, badStateStep, neverNoArgs, finiNoArgs },
+            new MethodHandle[] { multiTextInit, multiTextStep, null, finiIntNoArgs }),
+        "finalizer return types");
+    printFailureContains(
+        "multi-null-clause-before-length",
+        () -> MethodHandles.loop(
+            new MethodHandle[] { init, step, pred, fini, fini },
+            (MethodHandle[]) null),
+        "null clauses are not allowed");
     printFailure(
         "multi-long-clause",
         () -> MethodHandles.loop(

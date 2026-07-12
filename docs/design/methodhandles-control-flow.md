@@ -59,8 +59,9 @@ The control-flow family is split into small implementation slices:
   `{ init, step }`, or no handles are accepted as helper clauses. The returned
   handle's external argument list is inferred from prefix-compatible `init`
   handles and from `step`/`pred`/`fini` handles that consume prefixes of the
-  effective `(V..., A...)` loop argument list. The general multi-clause form
-  remains a later slice.
+  effective `(V..., A...)` loop argument list. Selected coverage keeps the
+  state and external parameter domains distinct even when their types differ.
+  The general multi-clause form remains a later slice.
 - `tableSwitch(fallback, targets...)`: selected slice. It is control flow, but
   not a loop; the current coverage lives in the broader `java.lang.invoke`
   design notes.
@@ -254,9 +255,11 @@ handle returns `void`.
   `void` `init`/`step` handles and with or without external arguments, selected
   multi-clause empty, init-only, and init-step helper clauses, a selected
   two-clause two-state loop where the second predicate exits through its
-  `fini`, descriptor strings, and selected validation failures including
-  null-predicate rejection, short-clause missing-predicate rejection, and
-  overlong-clause rejection.
+  `fini`, and a two-state loop with distinct state and external parameter
+  domains, descriptor strings, and selected validation failures including
+  null-predicate rejection, short-clause missing-predicate rejection,
+  null-clause-before-length validation, and finalizer/predicate-before-parameter
+  validation ordering.
 - Kotlin smoke coverage in
   `classes/kotlin_methodhandle_smoke/MethodHandleSmoke.kt`:
   reflective discovery of `MethodHandles.whileLoop` and
@@ -281,7 +284,8 @@ handle returns `void`.
   null-init plus null-step inference beyond the tested no-state external-prefix
   shape, no-state clauses beyond the selected `void init`/`void step` and
   null-init/null-step shapes, external argument inference beyond the selected
-  prefix-compatible shapes, and exact validation ordering remain open.
+  prefix-compatible shapes, and exact validation ordering beyond the tested
+  null/length/finalizer/predicate/parameter precedence remain open.
 - The selected `void` loop slices cover simple side-effect loops only; broad
   no-state/state mixes, exact generic `loop` effectively-identical
   parameter-list inference, and full validation ordering are not claimed.
