@@ -258,10 +258,15 @@ public final class DoppioMethodHandles {
     if (clauses.length == 0) {
       throw new IllegalArgumentException("no loop clauses");
     }
+    for (int i = 0; i < clauses.length; i++) {
+      if (clauses[i] == null) {
+        throw new IllegalArgumentException("null clauses are not allowed");
+      }
+    }
     if (clauses.length != 1) {
       return multiClauseLoop(clauses);
     }
-    MethodHandle[] clause = Objects.requireNonNull(clauses[0]);
+    MethodHandle[] clause = clauses[0];
     if (clause.length > 4) {
       throw new IllegalArgumentException("loop clause must contain init, step, pred, and optional fini handles");
     }
@@ -418,11 +423,6 @@ public final class DoppioMethodHandles {
     int[] predArgumentCounts = new int[clauseCount];
     int[] finiArgumentCounts = new int[clauseCount];
 
-    for (int i = 0; i < clauseCount; i++) {
-      if (clauses[i] == null) {
-        throw new IllegalArgumentException("null clauses are not allowed");
-      }
-    }
     for (int i = 0; i < clauseCount; i++) {
       if (clauses[i].length > 4) {
         throw new IllegalArgumentException(

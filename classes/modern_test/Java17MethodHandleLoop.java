@@ -708,6 +708,10 @@ public class Java17MethodHandleLoop {
 
     printFailure("null-clauses", () -> MethodHandles.loop((MethodHandle[][]) null));
     printFailure("no-clauses", () -> MethodHandles.loop());
+    printFailureContains(
+        "null-clause",
+        () -> MethodHandles.loop(new MethodHandle[][] { null }),
+        "null clauses are not allowed");
     MethodHandle badPred = lookup.findStatic(
         Java17MethodHandleLoop.class,
         "badPred",

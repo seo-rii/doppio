@@ -92,6 +92,7 @@ void-no-state-external-prefix-loop
 short-void-loop
 null-clauses:java.lang.IllegalArgumentException
 no-clauses:java.lang.IllegalArgumentException
+null-clause:java.lang.IllegalArgumentException:true
 empty-clause-pred:java.lang.IllegalArgumentException:true
 one-handle-clause-pred:java.lang.IllegalArgumentException:true
 two-handle-clause-pred:java.lang.IllegalArgumentException:true
