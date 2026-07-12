@@ -14,6 +14,10 @@ done:6:5
 state:6
 (I)Ljava/lang/String;
 none
+()Ljava/lang/String;
+nostate:3
+(I)Ljava/lang/String;
+nostate:4:4
 (II)Ljava/lang/String;
 done:5:9
 (Ljava/lang/String;I)Ljava/lang/String;

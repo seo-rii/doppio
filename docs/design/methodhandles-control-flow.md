@@ -42,8 +42,10 @@ The control-flow family is split into small implementation slices:
   prefix of the state plus external argument list, and a shorter explicit
   `init` can infer the returned handle's external argument list from a longer
   prefix-compatible `step`, `pred`, or `fini` handle. The `fini` handle may be
-  `null` or omitted from the selected clause. The general multi-clause form
-  remains a later slice.
+  `null` or omitted from the selected clause. The selected slice also supports
+  no-state loops where `init` and `step` return `void` and all clause handles
+  consume matching prefixes of the external argument list. The general
+  multi-clause form remains a later slice.
 - `tableSwitch(fallback, targets...)`: selected slice. It is control flow, but
   not a loop; the current coverage lives in the broader `java.lang.invoke`
   design notes.
@@ -231,7 +233,8 @@ handle returns `void`.
   prefix-parameter `step`/`pred`/`fini` flows, explicit-init external argument
   inference from longer prefix-compatible clause handles, explicit `fini`
   return adaptation, `null` and omitted `fini` void return adaptation,
-  descriptor strings, and selected validation failures.
+  selected no-state `void init`/`void step` loops with and without external
+  arguments, descriptor strings, and selected validation failures.
 - Kotlin smoke coverage in
   `classes/kotlin_methodhandle_smoke/MethodHandleSmoke.kt`:
   reflective discovery of `MethodHandles.whileLoop` and
@@ -239,7 +242,8 @@ handle returns `void`.
   integer and reference state invocation, null initializer invocation,
   body-first `doWhileLoop` behavior, explicit counted ranges, selected
   `MethodHandles.loop` null-init, null-step, external-state, prefix
-  invocation, explicit-init external argument inference, and descriptor checks.
+  invocation, explicit-init external argument inference, no-state invocation,
+  and descriptor checks.
 
 ## Remaining Gaps
 
@@ -247,10 +251,12 @@ handle returns `void`.
   implementation of the generic `loop` effectively-identical parameter-list
   rules.
 - The selected `loop` slice covers only one clause with one non-`void` state
-  variable. Multi-clause loops, absent `pred` handles, broad null-init plus
-  null-step inference beyond the tested external-state shape, no-state clauses,
-  external argument inference beyond the selected prefix-compatible
-  single-clause shapes, and exact validation ordering remain open.
+  variable or the selected no-state `void init`/`void step` shape.
+  Multi-clause loops, absent `pred` handles, broad null-init plus null-step
+  inference beyond the tested external-state shape, no-state clauses beyond
+  the selected `void init`/`void step` shape, external argument inference
+  beyond the selected prefix-compatible single-clause shapes, and exact
+  validation ordering remain open.
 - The selected `void` loop slices cover simple side-effect loops only; broad
   no-state/state mixes, exact generic `loop` effectively-identical
   parameter-list inference, and full validation ordering are not claimed.

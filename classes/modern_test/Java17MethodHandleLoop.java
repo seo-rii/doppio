@@ -5,6 +5,8 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 
 public class Java17MethodHandleLoop {
+  private static int noStateCounter = 0;
+
   public static int init(int limit) {
     return 0;
   }
@@ -47,6 +49,38 @@ public class Java17MethodHandleLoop {
 
   public static String finiNoArgs() {
     return "none";
+  }
+
+  public static void resetNoState() {
+    noStateCounter = 0;
+  }
+
+  public static void resetNoStateWithLimit(int limit) {
+    noStateCounter = 0;
+  }
+
+  public static void stepNoState() {
+    noStateCounter++;
+  }
+
+  public static void stepNoStateWithLimit(int limit) {
+    noStateCounter++;
+  }
+
+  public static boolean predNoState() {
+    return noStateCounter < 3;
+  }
+
+  public static boolean predNoStateWithLimit(int limit) {
+    return noStateCounter < limit;
+  }
+
+  public static String finiNoState() {
+    return "nostate:" + noStateCounter;
+  }
+
+  public static String finiNoStateWithLimit(int limit) {
+    return "nostate:" + noStateCounter + ":" + limit;
   }
 
   public static String textInit(String prefix, int limit) {
@@ -119,6 +153,38 @@ public class Java17MethodHandleLoop {
         Java17MethodHandleLoop.class,
         "finiNoArgs",
         MethodType.methodType(String.class));
+    MethodHandle resetNoState = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "resetNoState",
+        MethodType.methodType(void.class));
+    MethodHandle resetNoStateWithLimit = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "resetNoStateWithLimit",
+        MethodType.methodType(void.class, int.class));
+    MethodHandle stepNoState = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "stepNoState",
+        MethodType.methodType(void.class));
+    MethodHandle stepNoStateWithLimit = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "stepNoStateWithLimit",
+        MethodType.methodType(void.class, int.class));
+    MethodHandle predNoState = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "predNoState",
+        MethodType.methodType(boolean.class));
+    MethodHandle predNoStateWithLimit = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "predNoStateWithLimit",
+        MethodType.methodType(boolean.class, int.class));
+    MethodHandle finiNoState = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "finiNoState",
+        MethodType.methodType(String.class));
+    MethodHandle finiNoStateWithLimit = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "finiNoStateWithLimit",
+        MethodType.methodType(String.class, int.class));
 
     MethodHandle counted = MethodHandles.loop(new MethodHandle[] { init, step, pred, fini });
     System.out.println(counted.type().toMethodDescriptorString());
@@ -149,6 +215,21 @@ public class Java17MethodHandleLoop {
     MethodHandle noArgPrefix = MethodHandles.loop(new MethodHandle[] { init, stepStateOnly, neverNoArgs, finiNoArgs });
     System.out.println(noArgPrefix.type().toMethodDescriptorString());
     System.out.println((String) noArgPrefix.invokeExact(5));
+
+    MethodHandle noState = MethodHandles.loop(
+        new MethodHandle[] { resetNoState, stepNoState, predNoState, finiNoState });
+    System.out.println(noState.type().toMethodDescriptorString());
+    System.out.println((String) noState.invokeExact());
+
+    MethodHandle noStateWithLimit = MethodHandles.loop(
+        new MethodHandle[] {
+            resetNoStateWithLimit,
+            stepNoStateWithLimit,
+            predNoStateWithLimit,
+            finiNoStateWithLimit
+        });
+    System.out.println(noStateWithLimit.type().toMethodDescriptorString());
+    System.out.println((String) noStateWithLimit.invokeExact(4));
 
     MethodHandle externalState = MethodHandles.loop(new MethodHandle[] { null, null, never, fini });
     System.out.println(externalState.type().toMethodDescriptorString());

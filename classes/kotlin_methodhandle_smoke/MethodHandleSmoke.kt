@@ -60,6 +60,24 @@ class MethodHandleOwner(@JvmField var text: String) {
     @JvmStatic
     fun loopFinishState(value: Int): String = "loop-state:$value"
 
+    private var loopNoStateCounter: Int = 0
+
+    @JvmStatic
+    fun loopResetNoState(limit: Int) {
+      loopNoStateCounter = 0
+    }
+
+    @JvmStatic
+    fun loopStepNoState(limit: Int) {
+      loopNoStateCounter++
+    }
+
+    @JvmStatic
+    fun loopBelowNoState(limit: Int): Boolean = loopNoStateCounter < limit
+
+    @JvmStatic
+    fun loopFinishNoState(limit: Int): String = "loop-nostate:$loopNoStateCounter:$limit"
+
     @JvmStatic
     fun loopBelowFive(value: Int): Boolean = value < 5
 
@@ -631,6 +649,26 @@ fun methodHandleSummary(): String {
     "loopFinishState",
     MethodType.methodType(stringClass, intClass)
   )
+  val loopResetNoState = lookup.findStatic(
+    ownerClass,
+    "loopResetNoState",
+    MethodType.methodType(java.lang.Void.TYPE, intClass)
+  )
+  val loopStepNoState = lookup.findStatic(
+    ownerClass,
+    "loopStepNoState",
+    MethodType.methodType(java.lang.Void.TYPE, intClass)
+  )
+  val loopBelowNoState = lookup.findStatic(
+    ownerClass,
+    "loopBelowNoState",
+    MethodType.methodType(java.lang.Boolean.TYPE, intClass)
+  )
+  val loopFinishNoState = lookup.findStatic(
+    ownerClass,
+    "loopFinishNoState",
+    MethodType.methodType(stringClass, intClass)
+  )
   val loopBelowFive = lookup.findStatic(
     ownerClass,
     "loopBelowFive",
@@ -655,6 +693,10 @@ fun methodHandleSummary(): String {
   val genericLoopPrefix = loopMethod.invoke(
     null,
     arrayOf(arrayOf<MethodHandle?>(loopZero, loopIncrementState, loopBelowFive, loopFinishState))
+  ) as MethodHandle
+  val genericLoopNoState = loopMethod.invoke(
+    null,
+    arrayOf(arrayOf<MethodHandle?>(loopResetNoState, loopStepNoState, loopBelowNoState, loopFinishNoState))
   ) as MethodHandle
   val whileInt = whileLoopMethod.invoke(null, loopZero, loopBelow, loopIncrement) as MethodHandle
   val whileDefaultInt = whileLoopMethod.invoke(null, null, loopBelow, loopIncrement) as MethodHandle
@@ -838,6 +880,7 @@ fun methodHandleSummary(): String {
     genericLoopNoStep.invokeWithArguments(7).toString(),
     genericLoopExternalState.invokeWithArguments(5, 9).toString(),
     genericLoopPrefix.invokeWithArguments(5).toString(),
+    genericLoopNoState.invokeWithArguments(3).toString(),
     whileLoops,
     doWhileLoops,
     countedLoops,
@@ -881,6 +924,7 @@ fun methodHandleSummary(): String {
     genericLoopNoStep,
     genericLoopExternalState,
     genericLoopPrefix,
+    genericLoopNoState,
     whileInt,
     whileDefaultInt,
     whileText,
