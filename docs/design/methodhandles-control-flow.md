@@ -47,9 +47,10 @@ The control-flow family is split into small implementation slices:
   consume matching prefixes of the external argument list. A selected
   multi-clause state-loop slice supports multiple explicit non-`void` state
   variables when every clause has non-null `init`, `step`, `pred`, and `fini`
-  handles and the `step`/`pred`/`fini` handles share the same
-  `(V..., A...)` parameter list. The general multi-clause form remains a later
-  slice.
+  handles. The returned handle's external argument list is inferred from
+  prefix-compatible `init` handles and from `step`/`pred`/`fini` handles that
+  consume prefixes of the effective `(V..., A...)` loop argument list. The
+  general multi-clause form remains a later slice.
 - `tableSwitch(fallback, targets...)`: selected slice. It is control flow, but
   not a loop; the current coverage lives in the broader `java.lang.invoke`
   design notes.
@@ -258,12 +259,12 @@ handle returns `void`.
   rules.
 - The selected `loop` slice covers one-clause non-`void` state variables, the
   selected no-state `void init`/`void step` shape, and selected explicit
-  multi-clause non-`void` state loops. Broad multi-clause loops with null or
-  prefix-varying clause handles, absent `pred` handles, broad null-init plus
-  null-step inference beyond the tested external-state shape, no-state clauses
-  beyond the selected `void init`/`void step` shape, external argument
-  inference beyond the selected prefix-compatible shapes, and exact validation
-  ordering remain open.
+  multi-clause non-`void` state loops with prefix-compatible clause handles.
+  Broad multi-clause loops with null clause handles, absent `pred` handles,
+  broad null-init plus null-step inference beyond the tested external-state
+  shape, no-state clauses beyond the selected `void init`/`void step` shape,
+  external argument inference beyond the selected prefix-compatible shapes, and
+  exact validation ordering remain open.
 - The selected `void` loop slices cover simple side-effect loops only; broad
   no-state/state mixes, exact generic `loop` effectively-identical
   parameter-list inference, and full validation ordering are not claimed.

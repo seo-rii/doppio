@@ -20,6 +20,8 @@ nostate:3
 nostate:4:4
 (I)Ljava/lang/String;
 multi:3:123:3
+(I)Ljava/lang/String;
+multi-prefix:3:123
 (II)Ljava/lang/String;
 done:5:9
 (Ljava/lang/String;I)Ljava/lang/String;

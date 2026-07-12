@@ -127,6 +127,26 @@ public class Java17MethodHandleLoop {
     return "multi:" + count + ":" + text + ":" + limit;
   }
 
+  public static int multiCountStepStateOnly(int count) {
+    return count + 1;
+  }
+
+  public static String multiTextStepStatesOnly(int count, String text) {
+    return text + count;
+  }
+
+  public static boolean multiAlwaysNoArgs() {
+    return true;
+  }
+
+  public static boolean multiBelowCountOnly(int count) {
+    return count < 3;
+  }
+
+  public static String multiFiniStatesOnly(int count, String text) {
+    return "multi-prefix:" + count + ":" + text;
+  }
+
   public static String badPred(int state, int limit) {
     return "bad";
   }
@@ -233,6 +253,26 @@ public class Java17MethodHandleLoop {
         Java17MethodHandleLoop.class,
         "multiFini",
         MethodType.methodType(String.class, int.class, String.class, int.class));
+    MethodHandle multiCountStepStateOnly = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "multiCountStepStateOnly",
+        MethodType.methodType(int.class, int.class));
+    MethodHandle multiTextStepStatesOnly = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "multiTextStepStatesOnly",
+        MethodType.methodType(String.class, int.class, String.class));
+    MethodHandle multiAlwaysNoArgs = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "multiAlwaysNoArgs",
+        MethodType.methodType(boolean.class));
+    MethodHandle multiBelowCountOnly = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "multiBelowCountOnly",
+        MethodType.methodType(boolean.class, int.class));
+    MethodHandle multiFiniStatesOnly = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "multiFiniStatesOnly",
+        MethodType.methodType(String.class, int.class, String.class));
 
     MethodHandle counted = MethodHandles.loop(new MethodHandle[] { init, step, pred, fini });
     System.out.println(counted.type().toMethodDescriptorString());
@@ -284,6 +324,12 @@ public class Java17MethodHandleLoop {
         new MethodHandle[] { multiTextInit, multiTextStep, multiBelow, multiFini });
     System.out.println(multiClause.type().toMethodDescriptorString());
     System.out.println((String) multiClause.invokeExact(3));
+
+    MethodHandle multiPrefixClause = MethodHandles.loop(
+        new MethodHandle[] { init, multiCountStepStateOnly, multiAlwaysNoArgs, multiFiniStatesOnly },
+        new MethodHandle[] { multiTextInit, multiTextStepStatesOnly, multiBelowCountOnly, multiFiniStatesOnly });
+    System.out.println(multiPrefixClause.type().toMethodDescriptorString());
+    System.out.println((String) multiPrefixClause.invokeExact(5));
 
     MethodHandle externalState = MethodHandles.loop(new MethodHandle[] { null, null, never, fini });
     System.out.println(externalState.type().toMethodDescriptorString());

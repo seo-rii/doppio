@@ -425,6 +425,9 @@ public final class DoppioMethodHandles {
     MethodHandle[] finis = new MethodHandle[clauseCount];
     Class<?>[] stateTypes = new Class<?>[clauseCount];
     int[] initArgumentCounts = new int[clauseCount];
+    int[] stepArgumentCounts = new int[clauseCount];
+    int[] predArgumentCounts = new int[clauseCount];
+    int[] finiArgumentCounts = new int[clauseCount];
 
     for (int i = 0; i < clauseCount; i++) {
       MethodHandle[] clause = clauses[i];
@@ -447,24 +450,62 @@ public final class DoppioMethodHandles {
       }
     }
 
-    List<Class<?>> loopParameterTypes = new ArrayList<Class<?>>(steps[0].type().parameterList());
-    if (loopParameterTypes.size() < clauseCount) {
-      throw new IllegalArgumentException("multi-clause step parameter list does not include all state types");
-    }
+    List<Class<?>> externalTypes = new ArrayList<Class<?>>();
     for (int i = 0; i < clauseCount; i++) {
-      if (loopParameterTypes.get(i) != stateTypes[i]) {
-        throw new IllegalArgumentException("multi-clause state parameter types do not match");
+      List<Class<?>> initParameterTypes = inits[i].type().parameterList();
+      if (initParameterTypes.size() > externalTypes.size()) {
+        if (!initParameterTypes.subList(0, externalTypes.size()).equals(externalTypes)) {
+          throw new IllegalArgumentException("init external parameter types do not match");
+        }
+        externalTypes = new ArrayList<Class<?>>(initParameterTypes);
+      } else if (!externalTypes.subList(0, initParameterTypes.size()).equals(initParameterTypes)) {
+        throw new IllegalArgumentException("init external parameter types do not match");
+      }
+
+      MethodHandle[] loopHandles = new MethodHandle[] { steps[i], preds[i], finis[i] };
+      String[] loopRoles = new String[] { "step", "pred", "fini" };
+      for (int roleIndex = 0; roleIndex < loopHandles.length; roleIndex++) {
+        List<Class<?>> parameterTypes = loopHandles[roleIndex].type().parameterList();
+        int stateParameterCount = Math.min(parameterTypes.size(), clauseCount);
+        for (int parameterIndex = 0; parameterIndex < stateParameterCount; parameterIndex++) {
+          if (parameterTypes.get(parameterIndex) != stateTypes[parameterIndex]) {
+            throw new IllegalArgumentException(
+                loopRoles[roleIndex] + " state parameter types do not match");
+          }
+        }
+        if (parameterTypes.size() > clauseCount) {
+          List<Class<?>> candidateExternalTypes =
+              parameterTypes.subList(clauseCount, parameterTypes.size());
+          if (candidateExternalTypes.size() > externalTypes.size()) {
+            if (!candidateExternalTypes.subList(0, externalTypes.size()).equals(externalTypes)) {
+              throw new IllegalArgumentException(
+                  loopRoles[roleIndex] + " external parameter types do not match");
+            }
+            externalTypes = new ArrayList<Class<?>>(candidateExternalTypes);
+          } else if (!externalTypes.subList(0, candidateExternalTypes.size())
+              .equals(candidateExternalTypes)) {
+            throw new IllegalArgumentException(
+                loopRoles[roleIndex] + " external parameter types do not match");
+          }
+        }
       }
     }
-    List<Class<?>> externalTypes = new ArrayList<Class<?>>(
-        loopParameterTypes.subList(clauseCount, loopParameterTypes.size()));
+
+    List<Class<?>> loopParameterTypes = new ArrayList<Class<?>>();
+    for (int i = 0; i < clauseCount; i++) {
+      loopParameterTypes.add(stateTypes[i]);
+    }
+    loopParameterTypes.addAll(externalTypes);
 
     Class<?> returnType = finis[0].type().returnType();
     for (int i = 0; i < clauseCount; i++) {
       initArgumentCounts[i] = checkedPrefixArgumentCount(inits[i].type(), externalTypes, "init");
-      checkMultiClauseHandle(steps[i].type(), loopParameterTypes, stateTypes[i], "step");
-      checkMultiClauseHandle(preds[i].type(), loopParameterTypes, boolean.class, "pred");
-      checkMultiClauseHandle(finis[i].type(), loopParameterTypes, returnType, "fini");
+      stepArgumentCounts[i] =
+          checkMultiClauseHandle(steps[i].type(), loopParameterTypes, stateTypes[i], "step");
+      predArgumentCounts[i] =
+          checkMultiClauseHandle(preds[i].type(), loopParameterTypes, boolean.class, "pred");
+      finiArgumentCounts[i] =
+          checkMultiClauseHandle(finis[i].type(), loopParameterTypes, returnType, "fini");
     }
 
     MethodHandle adapter = MethodHandles.publicLookup().findStatic(
@@ -477,6 +518,9 @@ public final class DoppioMethodHandles {
             MethodHandle[].class,
             MethodHandle[].class,
             int[].class,
+            int[].class,
+            int[].class,
+            int[].class,
             Object[].class));
     return MethodHandles.insertArguments(
             adapter,
@@ -485,7 +529,10 @@ public final class DoppioMethodHandles {
             steps,
             preds,
             finis,
-            initArgumentCounts)
+            initArgumentCounts,
+            stepArgumentCounts,
+            predArgumentCounts,
+            finiArgumentCounts)
         .asCollector(Object[].class, externalTypes.size())
         .asType(MethodType.methodType(returnType, externalTypes));
   }
@@ -941,6 +988,9 @@ public final class DoppioMethodHandles {
       MethodHandle[] preds,
       MethodHandle[] finis,
       int[] initArgumentCounts,
+      int[] stepArgumentCounts,
+      int[] predArgumentCounts,
+      int[] finiArgumentCounts,
       Object[] args) throws Throwable {
     int stateCount = inits.length;
     Object[] states = new Object[stateCount];
@@ -955,10 +1005,16 @@ public final class DoppioMethodHandles {
     System.arraycopy(args, 0, loopArgs, stateCount, args.length);
     while (true) {
       for (int i = 0; i < stateCount; i++) {
-        states[i] = steps[i].invokeWithArguments(loopArgs);
+        Object[] stepArgs = new Object[stepArgumentCounts[i]];
+        System.arraycopy(loopArgs, 0, stepArgs, 0, stepArgumentCounts[i]);
+        states[i] = steps[i].invokeWithArguments(stepArgs);
         loopArgs[i] = states[i];
-        if (!((Boolean) preds[i].invokeWithArguments(loopArgs)).booleanValue()) {
-          return finis[i].invokeWithArguments(loopArgs);
+        Object[] predArgs = new Object[predArgumentCounts[i]];
+        System.arraycopy(loopArgs, 0, predArgs, 0, predArgumentCounts[i]);
+        if (!((Boolean) preds[i].invokeWithArguments(predArgs)).booleanValue()) {
+          Object[] finiArgs = new Object[finiArgumentCounts[i]];
+          System.arraycopy(loopArgs, 0, finiArgs, 0, finiArgumentCounts[i]);
+          return finis[i].invokeWithArguments(finiArgs);
         }
       }
     }
@@ -1206,14 +1262,20 @@ public final class DoppioMethodHandles {
     return type.parameterCount();
   }
 
-  private static void checkMultiClauseHandle(
+  private static int checkMultiClauseHandle(
       MethodType type, List<Class<?>> loopParameterTypes, Class<?> returnType, String role) {
     if (type.returnType() != returnType) {
       throw new IllegalArgumentException(role + " return type does not match");
     }
-    if (!type.parameterList().equals(loopParameterTypes)) {
-      throw new IllegalArgumentException(role + " parameter types do not match loop parameters");
+    if (type.parameterCount() > loopParameterTypes.size()) {
+      throw new IllegalArgumentException(role + " parameter count does not match");
     }
+    for (int i = 0; i < type.parameterCount(); i++) {
+      if (type.parameterType(i) != loopParameterTypes.get(i)) {
+        throw new IllegalArgumentException(role + " parameter types do not match loop parameters");
+      }
+    }
+    return type.parameterCount();
   }
 
   private static void checkExternalStateLoopHandle(
