@@ -434,15 +434,16 @@ public final class DoppioMethodHandles {
       if (clause == null) {
         throw new IllegalArgumentException("null clauses are not allowed");
       }
-      if (clause.length != 4) {
-        throw new IllegalArgumentException("multi-clause loops require init, step, pred, and fini handles");
+      if (clause.length != 3 && clause.length != 4) {
+        throw new IllegalArgumentException(
+            "multi-clause loops require init, step, pred, and optional fini handles");
       }
       inits[i] = clause[0];
       steps[i] = clause[1];
       preds[i] = clause[2];
-      finis[i] = clause[3];
-      if (inits[i] == null || steps[i] == null || preds[i] == null || finis[i] == null) {
-        throw new IllegalArgumentException("multi-clause loops require non-null handles");
+      finis[i] = clause.length == 4 ? clause[3] : null;
+      if (inits[i] == null || steps[i] == null) {
+        throw new IllegalArgumentException("multi-clause loops require non-null init and step handles");
       }
       stateTypes[i] = inits[i].type().returnType();
       if (stateTypes[i] == void.class) {
@@ -465,6 +466,9 @@ public final class DoppioMethodHandles {
       MethodHandle[] loopHandles = new MethodHandle[] { steps[i], preds[i], finis[i] };
       String[] loopRoles = new String[] { "step", "pred", "fini" };
       for (int roleIndex = 0; roleIndex < loopHandles.length; roleIndex++) {
+        if (loopHandles[roleIndex] == null) {
+          continue;
+        }
         List<Class<?>> parameterTypes = loopHandles[roleIndex].type().parameterList();
         int stateParameterCount = Math.min(parameterTypes.size(), clauseCount);
         for (int parameterIndex = 0; parameterIndex < stateParameterCount; parameterIndex++) {
@@ -497,15 +501,39 @@ public final class DoppioMethodHandles {
     }
     loopParameterTypes.addAll(externalTypes);
 
-    Class<?> returnType = finis[0].type().returnType();
+    boolean hasPredicate = false;
+    boolean hasFini = false;
+    Class<?> returnType = void.class;
+    for (int i = 0; i < clauseCount; i++) {
+      if (preds[i] != null) {
+        hasPredicate = true;
+      }
+      if (finis[i] != null) {
+        Class<?> finiReturnType = finis[i].type().returnType();
+        if (!hasFini) {
+          returnType = finiReturnType;
+          hasFini = true;
+        } else if (finiReturnType != returnType) {
+          throw new IllegalArgumentException("fini return types do not match");
+        }
+      }
+    }
+    if (!hasPredicate) {
+      throw new IllegalArgumentException("no predicate found");
+    }
+
     for (int i = 0; i < clauseCount; i++) {
       initArgumentCounts[i] = checkedPrefixArgumentCount(inits[i].type(), externalTypes, "init");
       stepArgumentCounts[i] =
           checkMultiClauseHandle(steps[i].type(), loopParameterTypes, stateTypes[i], "step");
-      predArgumentCounts[i] =
-          checkMultiClauseHandle(preds[i].type(), loopParameterTypes, boolean.class, "pred");
-      finiArgumentCounts[i] =
-          checkMultiClauseHandle(finis[i].type(), loopParameterTypes, returnType, "fini");
+      if (preds[i] != null) {
+        predArgumentCounts[i] =
+            checkMultiClauseHandle(preds[i].type(), loopParameterTypes, boolean.class, "pred");
+      }
+      if (finis[i] != null) {
+        finiArgumentCounts[i] =
+            checkMultiClauseHandle(finis[i].type(), loopParameterTypes, returnType, "fini");
+      }
     }
 
     MethodHandle adapter = MethodHandles.publicLookup().findStatic(
@@ -521,6 +549,7 @@ public final class DoppioMethodHandles {
             int[].class,
             int[].class,
             int[].class,
+            Class.class,
             Object[].class));
     return MethodHandles.insertArguments(
             adapter,
@@ -532,7 +561,8 @@ public final class DoppioMethodHandles {
             initArgumentCounts,
             stepArgumentCounts,
             predArgumentCounts,
-            finiArgumentCounts)
+            finiArgumentCounts,
+            returnType)
         .asCollector(Object[].class, externalTypes.size())
         .asType(MethodType.methodType(returnType, externalTypes));
   }
@@ -991,6 +1021,7 @@ public final class DoppioMethodHandles {
       int[] stepArgumentCounts,
       int[] predArgumentCounts,
       int[] finiArgumentCounts,
+      Class<?> returnType,
       Object[] args) throws Throwable {
     int stateCount = inits.length;
     Object[] states = new Object[stateCount];
@@ -1009,9 +1040,15 @@ public final class DoppioMethodHandles {
         System.arraycopy(loopArgs, 0, stepArgs, 0, stepArgumentCounts[i]);
         states[i] = steps[i].invokeWithArguments(stepArgs);
         loopArgs[i] = states[i];
+        if (preds[i] == null) {
+          continue;
+        }
         Object[] predArgs = new Object[predArgumentCounts[i]];
         System.arraycopy(loopArgs, 0, predArgs, 0, predArgumentCounts[i]);
         if (!((Boolean) preds[i].invokeWithArguments(predArgs)).booleanValue()) {
+          if (finis[i] == null) {
+            return defaultValue(returnType);
+          }
           Object[] finiArgs = new Object[finiArgumentCounts[i]];
           System.arraycopy(loopArgs, 0, finiArgs, 0, finiArgumentCounts[i]);
           return finis[i].invokeWithArguments(finiArgs);

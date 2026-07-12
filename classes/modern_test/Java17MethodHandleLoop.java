@@ -123,8 +123,16 @@ public class Java17MethodHandleLoop {
     return count < limit;
   }
 
+  public static boolean multiNever(int count, String text, int limit) {
+    return false;
+  }
+
   public static String multiFini(int count, String text, int limit) {
     return "multi:" + count + ":" + text + ":" + limit;
+  }
+
+  public static int multiIntFini(int count, String text, int limit) {
+    return count;
   }
 
   public static int multiCountStepStateOnly(int count) {
@@ -249,10 +257,18 @@ public class Java17MethodHandleLoop {
         Java17MethodHandleLoop.class,
         "multiBelow",
         MethodType.methodType(boolean.class, int.class, String.class, int.class));
+    MethodHandle multiNever = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "multiNever",
+        MethodType.methodType(boolean.class, int.class, String.class, int.class));
     MethodHandle multiFini = lookup.findStatic(
         Java17MethodHandleLoop.class,
         "multiFini",
         MethodType.methodType(String.class, int.class, String.class, int.class));
+    MethodHandle multiIntFini = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "multiIntFini",
+        MethodType.methodType(int.class, int.class, String.class, int.class));
     MethodHandle multiCountStepStateOnly = lookup.findStatic(
         Java17MethodHandleLoop.class,
         "multiCountStepStateOnly",
@@ -331,6 +347,37 @@ public class Java17MethodHandleLoop {
     System.out.println(multiPrefixClause.type().toMethodDescriptorString());
     System.out.println((String) multiPrefixClause.invokeExact(5));
 
+    MethodHandle multiHelperClause = MethodHandles.loop(
+        new MethodHandle[] { init, multiCountStep, null },
+        new MethodHandle[] { multiTextInit, multiTextStep, multiBelow, multiFini });
+    System.out.println(multiHelperClause.type().toMethodDescriptorString());
+    System.out.println((String) multiHelperClause.invokeExact(3));
+
+    MethodHandle multiHelperClauseLength4 = MethodHandles.loop(
+        new MethodHandle[] { init, multiCountStep, null, null },
+        new MethodHandle[] { multiTextInit, multiTextStep, multiBelow, multiFini });
+    System.out.println(multiHelperClauseLength4.type().toMethodDescriptorString());
+    System.out.println((String) multiHelperClauseLength4.invokeExact(3));
+
+    MethodHandle multiNullFiniExit = MethodHandles.loop(
+        new MethodHandle[] { init, multiCountStep, multiNever, null },
+        new MethodHandle[] { multiTextInit, multiTextStep, multiAlways, multiFini });
+    System.out.println(multiNullFiniExit.type().toMethodDescriptorString());
+    System.out.println((String) multiNullFiniExit.invokeExact(3));
+
+    MethodHandle multiPrimitiveNullFiniExit = MethodHandles.loop(
+        new MethodHandle[] { init, multiCountStep, multiNever, null },
+        new MethodHandle[] { multiTextInit, multiTextStep, multiAlways, multiIntFini });
+    System.out.println(multiPrimitiveNullFiniExit.type().toMethodDescriptorString());
+    System.out.println((int) multiPrimitiveNullFiniExit.invokeExact(3));
+
+    MethodHandle multiVoidNullFiniExit = MethodHandles.loop(
+        new MethodHandle[] { init, multiCountStep, multiNever, null },
+        new MethodHandle[] { multiTextInit, multiTextStep, null, null });
+    System.out.println(multiVoidNullFiniExit.type().toMethodDescriptorString());
+    multiVoidNullFiniExit.invokeExact(3);
+    System.out.println("multi-null-fini-void");
+
     MethodHandle externalState = MethodHandles.loop(new MethodHandle[] { null, null, never, fini });
     System.out.println(externalState.type().toMethodDescriptorString());
     System.out.println((String) externalState.invokeExact(5, 9));
@@ -401,6 +448,11 @@ public class Java17MethodHandleLoop {
         MethodType.methodType(String.class, int.class, int.class));
     printFailure("null-pred", () -> MethodHandles.loop(new MethodHandle[] { init, step, null, fini }));
     printFailure("bad-pred", () -> MethodHandles.loop(new MethodHandle[] { init, step, badPred, fini }));
+    printFailure(
+        "multi-no-pred",
+        () -> MethodHandles.loop(
+            new MethodHandle[] { init, multiCountStep, null, null },
+            new MethodHandle[] { multiTextInit, multiTextStep, null, null }));
   }
 
   private static void printFailure(String label, Throwing action) {
