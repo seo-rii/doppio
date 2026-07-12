@@ -6,6 +6,8 @@ import java.lang.invoke.MethodType;
 
 public class Java17MethodHandleLoop {
   private static int noStateCounter = 0;
+  private static int mixedVoidInitCount = 0;
+  private static int mixedVoidStepCount = 0;
 
   public static int init(int limit) {
     return 0;
@@ -186,6 +188,50 @@ public class Java17MethodHandleLoop {
     return text;
   }
 
+  public static String inferredTextInit() {
+    return "";
+  }
+
+  public static String inferredTextStep(
+      int count, String text, long marker, double fraction) {
+    return "inferred:" + count + ":" + marker + ":" + fraction;
+  }
+
+  public static boolean inferredNever(int count, String text, long marker) {
+    return false;
+  }
+
+  public static String inferredFini(
+      int count, String text, long marker, double fraction) {
+    return text;
+  }
+
+  public static void mixedVoidInit(String prefix) {
+    mixedVoidInitCount++;
+    mixedVoidStepCount = 0;
+  }
+
+  public static void mixedVoidStep(int state, String prefix, int limit) {
+    mixedVoidStepCount++;
+  }
+
+  public static int mixedStateInit(String prefix) {
+    return 1;
+  }
+
+  public static int mixedStateStep(int state, String prefix, int limit) {
+    return state + 1;
+  }
+
+  public static boolean mixedNever(int state, String prefix, int limit) {
+    return false;
+  }
+
+  public static String mixedFini(int state, String prefix, int limit) {
+    return "mixed:" + state + ":" + prefix + ":" + limit + ":"
+        + mixedVoidInitCount + ":" + mixedVoidStepCount;
+  }
+
   public static String badPred(int state, int limit) {
     return "bad";
   }
@@ -360,6 +406,48 @@ public class Java17MethodHandleLoop {
         Java17MethodHandleLoop.class,
         "splitFini",
         MethodType.methodType(String.class, int.class, String.class, String.class));
+    MethodHandle inferredTextInit = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "inferredTextInit",
+        MethodType.methodType(String.class));
+    MethodHandle inferredTextStep = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "inferredTextStep",
+        MethodType.methodType(
+            String.class, int.class, String.class, long.class, double.class));
+    MethodHandle inferredNever = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "inferredNever",
+        MethodType.methodType(boolean.class, int.class, String.class, long.class));
+    MethodHandle inferredFini = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "inferredFini",
+        MethodType.methodType(
+            String.class, int.class, String.class, long.class, double.class));
+    MethodHandle mixedVoidInit = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "mixedVoidInit",
+        MethodType.methodType(void.class, String.class));
+    MethodHandle mixedVoidStep = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "mixedVoidStep",
+        MethodType.methodType(void.class, int.class, String.class, int.class));
+    MethodHandle mixedStateInit = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "mixedStateInit",
+        MethodType.methodType(int.class, String.class));
+    MethodHandle mixedStateStep = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "mixedStateStep",
+        MethodType.methodType(int.class, int.class, String.class, int.class));
+    MethodHandle mixedNever = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "mixedNever",
+        MethodType.methodType(boolean.class, int.class, String.class, int.class));
+    MethodHandle mixedFini = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "mixedFini",
+        MethodType.methodType(String.class, int.class, String.class, int.class));
 
     MethodHandle counted = MethodHandles.loop(new MethodHandle[] { init, step, pred, fini });
     System.out.println(counted.type().toMethodDescriptorString());
@@ -462,6 +550,20 @@ public class Java17MethodHandleLoop {
         new MethodHandle[] { splitTextInit, splitTextStep, splitNever, splitFini });
     System.out.println(splitParameterDomains.type().toMethodDescriptorString());
     System.out.println((String) splitParameterDomains.invokeExact("ok"));
+
+    MethodHandle inferredExternalOnly = MethodHandles.loop(
+        new MethodHandle[] { initNoArgs, multiCountStepStateOnly },
+        new MethodHandle[] {
+            inferredTextInit, inferredTextStep, inferredNever, inferredFini
+        });
+    System.out.println(inferredExternalOnly.type().toMethodDescriptorString());
+    System.out.println((String) inferredExternalOnly.invokeExact(7L, 2.5d));
+
+    MethodHandle mixedVoidState = MethodHandles.loop(
+        new MethodHandle[] { mixedVoidInit, mixedVoidStep, null },
+        new MethodHandle[] { mixedStateInit, mixedStateStep, mixedNever, mixedFini });
+    System.out.println(mixedVoidState.type().toMethodDescriptorString());
+    System.out.println((String) mixedVoidState.invokeExact("p", 7));
 
     MethodHandle multiHelperClause = MethodHandles.loop(
         new MethodHandle[] { init, multiCountStep, null },

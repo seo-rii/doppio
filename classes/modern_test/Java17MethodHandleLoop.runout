@@ -40,6 +40,10 @@ multi:3:123:3
 multi-prefix:3:123
 (Ljava/lang/String;)Ljava/lang/String;
 split:1:ok
+(JD)Ljava/lang/String;
+inferred:1:7:2.5
+(Ljava/lang/String;I)Ljava/lang/String;
+mixed:2:p:7:1:1
 (I)Ljava/lang/String;
 multi:3:123:3
 (I)Ljava/lang/String;
