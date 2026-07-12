@@ -249,7 +249,8 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   interface exhaustiveness, `data object`, `Enum.entries`, enum constant class
   bodies with overridden members, property references,
   class literals, default-argument `$default` methods, `@JvmOverloads`,
-  interface `DefaultImpls`, data-class `copy$default`, enum `when`
+  interface `DefaultImpls`, qualified interface-super method/property dispatch,
+  data-class `copy$default`, enum `when`
   `$WhenMappings`, string `when` hash switching, and subjectless `when`
   branches, plus inline `try/finally`, non-local returns, `crossinline`, and
   `noinline` function-object retention, plus `@file:JvmName`, `@JvmName`,

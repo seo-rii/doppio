@@ -52,5 +52,6 @@ fun defaultSyntheticSummary(): String {
       formatter.label() + ":" +
       copied.name + copied.count + copied.flags.joinToString("") + ":" +
       reflectedConstructors + ":" +
-      reflectedMethods
+      reflectedMethods + ":" +
+      qualifiedSuperSummary()
 }

@@ -493,11 +493,18 @@ Current verified checks:
   seconds and a follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 331 seconds. Both the host JVM and Doppio
   printed
-  `p-box:6!:p-wide:6?:[CORE]:cfg23ab:p-box:6!|p-named:6!|p-full:9!:p-r:3!|q-r:3!|q-r:3?`.
+  `p-box:6!:p-wide:6?:[CORE]:cfg23ab:p-box:6!|p-named:6!|p-full:9!:p-r:3!|q-r:3!|q-r:3?:L4R6:7:2816`.
   It covers default-argument `$default` dispatch,
   `@JvmOverloads` constructors and methods observed through Java reflection,
   interface `DefaultImpls`, data-class `copy$default`, and
-  `kotlin.jvm.internal.DefaultConstructorMarker` constructor lowering.
+  `kotlin.jvm.internal.DefaultConstructorMarker` constructor lowering, plus
+  qualified `super<Interface>` dispatch for conflicting default methods and
+  property getters. The runner verifies all four generated interface
+  `invokespecial` targets before executing the class on both runtimes. The
+  runtime summary repeats both qualified paths 256 times so Doppio covers cold
+  interpreter calls and the hot method path beyond its basic-block threshold.
+  A 2026-07-13 local run with this coverage completed in 218 seconds within
+  the unchanged 360-second compile budget.
 - A focused Kotlin enum/string `when` lowering smoke now lives in
   `classes/kotlin_when_mapping_smoke` and runs through
   `ci/kotlin_when_mapping_smoke.sh`. A focused local run completed in 96

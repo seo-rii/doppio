@@ -69,10 +69,30 @@ test -f "$out_dir/DefaultFormatter.class"
 test -f "$out_dir/DefaultFormatter\$DefaultImpls.class"
 test -f "$out_dir/DefaultFormatterImpl.class"
 test -f "$out_dir/DefaultSyntheticSmokeKt.class"
+test -f "$out_dir/LeftPath.class"
+test -f "$out_dir/LeftPath\$DefaultImpls.class"
+test -f "$out_dir/QualifiedSuperOwner.class"
+test -f "$out_dir/QualifiedSuperSmokeKt.class"
+test -f "$out_dir/RightPath.class"
+test -f "$out_dir/RightPath\$DefaultImpls.class"
 test -f "$out_dir/META-INF/main.kotlin_module"
 
+qualified_javap="$(javap -c -p "$out_dir/QualifiedSuperOwner.class")"
+qualified_targets=(
+  'InterfaceMethod LeftPath.getWeight:()I'
+  'InterfaceMethod RightPath.getWeight:()I'
+  'InterfaceMethod LeftPath.tag:(I)Ljava/lang/String;'
+  'InterfaceMethod RightPath.tag:(I)Ljava/lang/String;'
+)
+for target in "${qualified_targets[@]}"; do
+  if ! grep -Fq "$target" <<<"$qualified_javap"; then
+    echo "Missing qualified interface-super target: $target" >&2
+    exit 1
+  fi
+done
+
 runtime_cp="$out_dir:$stdlib_jar"
-expected_output="${KOTLIN_DEFAULT_SYNTHETIC_SMOKE_EXPECTED_OUTPUT:-"p-box:6!:p-wide:6?:[CORE]:cfg23ab:p-box:6!|p-named:6!|p-full:9!:p-r:3!|q-r:3!|q-r:3?"}"
+expected_output="${KOTLIN_DEFAULT_SYNTHETIC_SMOKE_EXPECTED_OUTPUT:-"p-box:6!:p-wide:6?:[CORE]:cfg23ab:p-box:6!|p-named:6!|p-full:9!:p-r:3!|q-r:3!|q-r:3?:L4R6:7:2816"}"
 
 native_output="$(java -cp "$runtime_cp" KotlinDefaultSyntheticHelloKt)"
 if [ "$native_output" != "$expected_output" ]; then
