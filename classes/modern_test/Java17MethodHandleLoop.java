@@ -740,6 +740,14 @@ public class Java17MethodHandleLoop {
         "single-step-return-before-pred",
         () -> MethodHandles.loop(new MethodHandle[] { init, multiTextStep }),
         "init and step return types");
+    printFailureContains(
+        "single-no-pred-before-parameters",
+        () -> MethodHandles.loop(new MethodHandle[] { init, badStateStep }),
+        "no predicate found");
+    printFailureContains(
+        "single-bad-pred-before-parameters",
+        () -> MethodHandles.loop(new MethodHandle[] { init, badStateStep, badPred }),
+        "predicates must have boolean return type");
     printFailure(
         "long-clause",
         () -> MethodHandles.loop(new MethodHandle[] { init, step, pred, fini, fini }));

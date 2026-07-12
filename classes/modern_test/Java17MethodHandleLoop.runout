@@ -97,6 +97,8 @@ empty-clause-pred:java.lang.IllegalArgumentException:true
 one-handle-clause-pred:java.lang.IllegalArgumentException:true
 two-handle-clause-pred:java.lang.IllegalArgumentException:true
 single-step-return-before-pred:java.lang.IllegalArgumentException:true
+single-no-pred-before-parameters:java.lang.IllegalArgumentException:true
+single-bad-pred-before-parameters:java.lang.IllegalArgumentException:true
 long-clause:java.lang.IllegalArgumentException
 null-pred:java.lang.IllegalArgumentException
 bad-pred:java.lang.IllegalArgumentException

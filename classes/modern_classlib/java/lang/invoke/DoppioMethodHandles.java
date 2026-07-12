@@ -279,9 +279,6 @@ public final class DoppioMethodHandles {
         init.type().returnType() != step.type().returnType()) {
       throw new IllegalArgumentException("clause 0: init and step return types must match");
     }
-    if (pred == null) {
-      throw new IllegalArgumentException("no predicate found");
-    }
     MethodType stepType;
     Class<?> stateType;
     List<Class<?>> externalTypes;
@@ -299,14 +296,13 @@ public final class DoppioMethodHandles {
         if (stateType == void.class) {
           voidState = true;
           externalTypes = new ArrayList<Class<?>>(stepType.parameterList());
-        } else if (stepType.parameterCount() > 0 &&
-            stepType.parameterType(0) != stateType) {
-          throw new IllegalArgumentException("step must accept and return the loop state type");
         } else {
-          externalTypes = stepType.parameterCount() == 0
-              ? new ArrayList<Class<?>>()
-              : new ArrayList<Class<?>>(
-                  stepType.parameterList().subList(1, stepType.parameterCount()));
+          externalTypes = new ArrayList<Class<?>>();
+          if (stepType.parameterCount() > 0 &&
+              stepType.parameterType(0) == stateType) {
+            externalTypes.addAll(
+                stepType.parameterList().subList(1, stepType.parameterCount()));
+          }
         }
       }
     } else {
@@ -319,7 +315,7 @@ public final class DoppioMethodHandles {
     }
     MethodType[] inferenceTypes = new MethodType[] {
         step == null ? null : step.type(),
-        pred.type(),
+        pred == null ? null : pred.type(),
         fini == null ? null : fini.type()
     };
     String[] inferenceRoles = new String[] { "step", "pred", "fini" };
@@ -333,7 +329,7 @@ public final class DoppioMethodHandles {
         candidateExternalTypes = type.parameterList();
       } else {
         if (type.parameterType(0) != stateType) {
-          throw new IllegalArgumentException(inferenceRoles[i] + " state parameter type does not match");
+          continue;
         }
         candidateExternalTypes = type.parameterList().subList(1, type.parameterCount());
       }
@@ -349,6 +345,12 @@ public final class DoppioMethodHandles {
     if (init != null) {
       initArgumentCount = checkedPrefixArgumentCount(init.type(), externalTypes, "init");
     }
+    if (pred == null) {
+      throw new IllegalArgumentException("no predicate found");
+    }
+    if (pred.type().returnType() != boolean.class) {
+      throw new IllegalArgumentException("predicates must have boolean return type");
+    }
     if (step != null) {
       if (voidState) {
         if (step.type().returnType() != void.class) {
@@ -361,9 +363,6 @@ public final class DoppioMethodHandles {
     }
     int predArgumentCount;
     if (voidState) {
-      if (pred.type().returnType() != boolean.class) {
-        throw new IllegalArgumentException("pred return type does not match");
-      }
       predArgumentCount = checkedPrefixArgumentCount(pred.type(), externalTypes, "pred");
     } else {
       predArgumentCount = checkLoopClauseHandle(pred.type(), stateType, externalTypes, boolean.class, "pred");

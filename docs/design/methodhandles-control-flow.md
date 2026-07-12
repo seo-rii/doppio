@@ -263,8 +263,9 @@ handle returns `void`.
   strings, and selected validation failures including null-predicate rejection,
   short-clause missing-predicate rejection, single null-clause rejection,
   multi-clause null-before-length validation, and
-  single-clause init/step return-before-predicate plus multi-clause
-  finalizer/predicate-before-parameter validation ordering.
+  single-clause init/step-return-before-predicate and
+  predicate-before-parameter ordering, plus multi-clause
+  finalizer/predicate-before-parameter ordering.
 - Kotlin smoke coverage in
   `classes/kotlin_methodhandle_smoke/MethodHandleSmoke.kt`:
   reflective discovery of `MethodHandles.whileLoop` and
@@ -291,8 +292,8 @@ handle returns `void`.
   shape, no-state clauses beyond the selected `void init`/`void step` and
   null-init/null-step shapes, external argument inference beyond the selected
   prefix-compatible and non-init-only shapes, and exact validation ordering
-  beyond the tested single- and multi-clause null, length, init/step return,
-  finalizer, predicate, and parameter precedence remain open.
+  beyond the tested single- and multi-clause null, length, init/step-return,
+  predicate-before-parameter, finalizer, and parameter precedence remain open.
 - The selected `void` loop slices cover simple side-effect loops only; broad
   no-state/state mixes, exact generic `loop` effectively-identical
   parameter-list inference, and full validation ordering are not claimed.
