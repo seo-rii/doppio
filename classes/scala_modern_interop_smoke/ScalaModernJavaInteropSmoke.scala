@@ -114,16 +114,14 @@ object ScalaModernJavaInteropSmoke {
     val optionalClass = classOf[java.util.Optional[_]]
     val optionalValue = java.util.Optional.of("opt")
     val optionalEmpty = java.util.Optional.empty[String]()
-    val optionalText = optionalClass.getMethod("orElseThrow").invoke(optionalValue)
+    val optionalText = optionalValue.orElseThrow()
     val optionalIsEmpty = optionalClass.getMethod("isEmpty").invoke(optionalEmpty)
     val optionalFailure =
       try {
-        optionalClass.getMethod("orElseThrow").invoke(optionalEmpty)
+        optionalEmpty.orElseThrow()
         "ok"
       } catch {
-        case e: InvocationTargetException
-            if e.getCause != null && e.getCause.getClass.getName == "java.util.NoSuchElementException" =>
-          "nse"
+        case _: java.util.NoSuchElementException => "nse"
       }
     val processHandleClass = Class.forName("java.lang.ProcessHandle")
     val currentProcess = processHandleClass.getMethod("current").invoke(null)

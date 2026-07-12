@@ -51,9 +51,17 @@ if [ -z "$jline_jar" ]; then
 fi
 
 compiler_cp="$compiler_jar:$library_jar:$reflect_jar:$diff_utils_jar:$jline_jar"
+modern_boot_jar="$repo_root/vendor/java_home/lib/doppio.jar"
+runtime_boot_jar="$repo_root/vendor/java_home/lib/rt.jar"
+compiler_boot_cp="$modern_boot_jar:$runtime_boot_jar"
 out_dir="$work_dir/out"
 source_cp="$library_jar"
 runtime_cp="$out_dir:$library_jar"
+
+if [ ! -f "$modern_boot_jar" ] || [ ! -f "$runtime_boot_jar" ]; then
+  echo "Doppio compiler boot classpath is incomplete; build the release CLI first." >&2
+  exit 1
+fi
 
 rm -rf "$out_dir"
 mkdir -p "$out_dir"
@@ -69,6 +77,7 @@ timeout -k "${kill_after}s" -s INT "${compile_timeout}s" \
   "-Xresponsiveness:$responsiveness" \
   -cp "$compiler_cp" \
   scala.tools.nsc.Main \
+  -javabootclasspath "$compiler_boot_cp" \
   -classpath "$source_cp" \
   -d "$out_dir" \
   "$source_dir"/*.scala
@@ -76,6 +85,13 @@ compile_end="$(date +%s)"
 
 test -f "$out_dir/ScalaModernInteropHello.class"
 test -f "$out_dir/ScalaModernJavaInteropSmoke.class"
+
+optional_javap="$(javap -classpath "$out_dir" -c -p 'ScalaModernJavaInteropSmoke$')"
+optional_call_count="$(grep -Fc 'java/util/Optional.orElseThrow:()Ljava/lang/Object;' <<<"$optional_javap" || true)"
+if [ "$optional_call_count" -ne 2 ]; then
+  echo "Expected two direct Optional.orElseThrow calls, found $optional_call_count." >&2
+  exit 1
+fi
 
 expected_output="0f10ff|0A0B|2:cafe:15|2020-01-02T03:04:05Z:1577934245000:2020-01-02T03:04:07Z:true|Random:82:376|SplittableRandom:true:88:574|QRS:uoe|entry:value:uoe|jk:uoe:iae:2:uoe:jk:opt:true:nse:true:true:true:true:true:true:true:true:true"
 

@@ -229,12 +229,22 @@ provider output, and `Map.Entry.copyOf` snapshot behavior from
 Scala-compiled code, plus a reflection-backed Java 16 `Stream.toList()` call
 with an unmodifiable-result check, plus reflection-backed Java 9 `List.of`,
 `Set.of`, and `Map.of` immutability/duplicate checks and Java 10
-`List.copyOf`, plus Java 11 `Optional.isEmpty()` and no-arg
-`Optional.orElseThrow()`, plus Java 9 `ProcessHandle.current()` and
+`List.copyOf`, plus reflection-backed Java 11 `Optional.isEmpty()` and direct
+source calls to no-arg `Optional.orElseThrow()` for present and empty values,
+plus Java 9 `ProcessHandle.current()` and
 `ProcessHandle.of(pid)` metadata plus selected `ProcessHandle.Info` optionals
 and display shape, while keeping the main Scala compiler smoke smaller.
+The focused compiler invocation puts the generated `doppio.jar` before the
+Java 8 `rt.jar` on scalac's explicit Java boot classpath. This uses scalac's
+`-javabootclasspath` option rather than its separate Scala `-bootclasspath`
+option, making scalac inspect the same modern class-library overlays that
+Doppio loads at runtime. Without that ordering, scalac sees only the
+supplier-taking Java 8 `Optional.orElseThrow` overload and rejects the
+no-argument source call.
 A local 2026-07-11 validation completed the focused Scala modern interop smoke
 in 184 seconds using Scala 2.13.18.
+A 2026-07-13 validation with the explicit Java boot classpath and direct
+`Optional.orElseThrow()` source calls completed in 156 seconds.
 `ci/check_scala_modern_source_guards.mjs` blocks Scala smoke sources from
 adding direct calls that have already exhausted or nearly exhausted local
 Doppio-hosted compiler budgets, including `Runtime.version`,

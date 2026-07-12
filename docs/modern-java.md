@@ -147,7 +147,10 @@ immutability/duplicate behavior plus Java 10 `List.copyOf` through the same
 reflection-backed path and Java 11 `Optional.isEmpty()` / no-arg
 `Optional.orElseThrow()` and Java 9 `ProcessHandle.current()` /
 `ProcessHandle.of(pid)` metadata plus selected `ProcessHandle.Info` optionals
-through reflection, while the Kotlin compiler interop smoke directly covers
+through reflection, except that Scala now compiles and executes the no-arg
+`Optional.orElseThrow()` calls directly using the packaged modern class library
+ahead of `rt.jar` on scalac's boot classpath. The Kotlin compiler interop smoke
+directly covers
 Java 10 `List.copyOf`/`Set.copyOf`/`Map.copyOf` and the same Java 11 Optional
 additions, plus Java 9 `StackWalker.walk(...)` frame discovery,
 `StackWalker.getCallerClass()`, and `StackWalker.forEach(...)` traversal plus
@@ -482,7 +485,8 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   covering reflection-backed Scala use of Java 16 `Stream.toList()` and its
   unmodifiable result behavior plus reflection-backed Scala use of Java 17
   `Map.Entry.copyOf` snapshot and unmodifiable-result behavior plus Java 9/10
-  collection factory/copy APIs, Java 11 Optional additions, and Java 9
+  collection factory/copy APIs, reflection-backed Java 11 `Optional.isEmpty`,
+  direct no-arg `Optional.orElseThrow` calls, and Java 9
   `ProcessHandle` / `ProcessHandle.Info` metadata,
   a focused Scala duration smoke covering `scala.concurrent.duration`
   arithmetic/sorting/parsing/scaling checks,
