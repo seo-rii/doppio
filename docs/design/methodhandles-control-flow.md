@@ -157,9 +157,10 @@ V countedLoop(A... args) {
 
 The four-handle overload replaces the implicit zero start with separate
 `start(A...)` and `end(A...)` handles. A start value greater than or equal to
-the end value executes no iterations. The three-handle overload accepts
-`init == null` and initializes state to the Java default value; the four-handle
-overload requires all four handles, matching Java 17 null validation.
+the end value executes no iterations. Both overloads accept `init == null` and
+initialize non-`void` state to the Java default value for the body return type.
+The explicit-range overload still requires non-null `start`, `end`, and `body`
+handles.
 
 The selected implementation requires the body to carry the complete external
 argument list. `start`, `end`/`iterations`, and `init` may accept matching
@@ -232,6 +233,7 @@ handle returns `void`.
   that body executes once when the initial predicate state would have failed.
   Counted-loop coverage includes zero-based iteration with explicit and null
   initializers, zero iterations, reference state, explicit start/end ranges,
+  four-handle null initializers with primitive and reference default state,
   reversed empty ranges, and selected `void` side-effect loops for
   `whileLoop`, `doWhileLoop`, and `countedLoop`.
 - Java fixture coverage in

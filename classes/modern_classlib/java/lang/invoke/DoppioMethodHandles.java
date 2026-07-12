@@ -624,7 +624,6 @@ public final class DoppioMethodHandles {
       throws NoSuchMethodException, IllegalAccessException {
     Objects.requireNonNull(start);
     Objects.requireNonNull(end);
-    Objects.requireNonNull(init);
     return countedLoop(start, end, init, body, true);
   }
 

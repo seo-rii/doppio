@@ -190,6 +190,19 @@ public class Java17MethodHandleControlFlow {
     System.out.println((String) countedRange.invokeExact("x", 5, 2));
     System.out.println(countedRange.type().toMethodDescriptorString());
 
+    MethodHandle one = MethodHandles.constant(int.class, 1);
+    MethodHandle three = MethodHandles.constant(int.class, 3);
+    MethodHandle keepState = MethodHandles.dropArguments(
+        MethodHandles.identity(int.class), 1, int.class);
+    MethodHandle countedDefaultPrimitive = MethodHandles.countedLoop(one, three, null, keepState);
+    System.out.println((int) countedDefaultPrimitive.invokeExact());
+    System.out.println(countedDefaultPrimitive.type().toMethodDescriptorString());
+
+    MethodHandle countedRangeDefaultReference = MethodHandles.countedLoop(
+        rangeStart, rangeEnd, null, rangeAppendIndex);
+    System.out.println((String) countedRangeDefaultReference.invokeExact("x", 2, 5));
+    System.out.println(countedRangeDefaultReference.type().toMethodDescriptorString());
+
     MethodHandle resetSideEffect = lookup.findStatic(
         Java17MethodHandleControlFlow.class,
         "resetSideEffect",

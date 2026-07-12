@@ -270,7 +270,9 @@ handles, dynamic constants, and record object-method linkage:
   selector/fallback flows including `void` side-effect targets, selected
   `iteratedLoop` `Iterable`/`Iterator` flows including no-arg explicit iterator
   handles, and selected `whileLoop`, `doWhileLoop`, and both `countedLoop`
-  overloads for non-`void` state loops plus selected `void` side-effect loops,
+  overloads for non-`void` state loops, including primitive and reference
+  default state from null initializers in the explicit-range overload, plus
+  selected `void` side-effect loops,
   and selected single-clause `loop` state flows with explicit or `null` `init`
   plus selected `null step`, null-init state inference from a zero-argument
   non-`void` step, null-init/null-step no-state false-predicate exits with
@@ -313,7 +315,8 @@ handles, dynamic constants, and record object-method linkage:
   with the existing Java 8 class library image.
 - The selected `whileLoop`, `doWhileLoop`, `countedLoop`, `iteratedLoop`, and
   `loop` slices cover non-`void` state loops plus selected
-  `void` side-effect loops.
+  `void` side-effect loops. Both `countedLoop` overloads cover null initializer
+  default state, including the four-handle explicit-range overload.
   The selected `tableSwitch` slice covers
   same-typed fallback/target handles with a leading `int` selector, in-range
   dispatch, fallback dispatch, `void` side-effect target dispatch, and selected

@@ -22,6 +22,10 @@ x012
 x234
 x
 (Ljava/lang/String;II)Ljava/lang/String;
+0
+()I
+null234
+(Ljava/lang/String;II)Ljava/lang/String;
 (I)V
 4
 ()V
