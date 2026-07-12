@@ -61,6 +61,10 @@ public class Java17MethodHandleLoop {
     return 17;
   }
 
+  public static int countVarargs(String... values) {
+    return values.length;
+  }
+
   public static void finiVoidNoArgs() {
   }
 
@@ -298,6 +302,10 @@ public class Java17MethodHandleLoop {
         Java17MethodHandleLoop.class,
         "finiIntNoArgs",
         MethodType.methodType(int.class));
+    MethodHandle varargsFini = lookup.findStatic(
+        Java17MethodHandleLoop.class,
+        "countVarargs",
+        MethodType.methodType(int.class, String[].class));
     MethodHandle finiVoidNoArgs = lookup.findStatic(
         Java17MethodHandleLoop.class,
         "finiVoidNoArgs",
@@ -496,6 +504,20 @@ public class Java17MethodHandleLoop {
     MethodHandle noStateNullHandlesInt = MethodHandles.loop(new MethodHandle[] { null, null, neverNoArgs, finiIntNoArgs });
     System.out.println(noStateNullHandlesInt.type().toMethodDescriptorString());
     System.out.println((int) noStateNullHandlesInt.invokeExact());
+
+    System.out.println(varargsFini.isVarargsCollector());
+    MethodHandle singleVarargsFini = MethodHandles.loop(
+        new MethodHandle[] { null, null, neverNoArgs, varargsFini });
+    System.out.println(singleVarargsFini.type().toMethodDescriptorString());
+    System.out.println(singleVarargsFini.isVarargsCollector());
+    System.out.println((int) singleVarargsFini.invokeExact(new String[] { "a", "b" }));
+
+    MethodHandle multiVarargsFini = MethodHandles.loop(
+        new MethodHandle[] { null, null, neverNoArgs, varargsFini },
+        new MethodHandle[] {});
+    System.out.println(multiVarargsFini.type().toMethodDescriptorString());
+    System.out.println(multiVarargsFini.isVarargsCollector());
+    System.out.println((int) multiVarargsFini.invokeExact(new String[] { "a", "b", "c" }));
 
     MethodHandle noStateNullHandlesVoidFini = MethodHandles.loop(
         new MethodHandle[] { null, null, neverNoArgs, finiVoidNoArgs });

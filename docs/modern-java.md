@@ -52,7 +52,8 @@ loops with prefix-compatible clause handles, selected `null` initializers,
 selected `null` steps, selected `void` clauses, selected `null` helper
 predicates, selected `null` finalizers, distinct state/external parameter
 domains, non-init-only external argument inference, executing void/state mixed
-clauses, single- and multi-clause null rejection, and selected validation
+clauses, fixed-arity normalization with tested single- and multi-clause varargs
+finalizers, single- and multi-clause null rejection, and selected validation
 precedence including single-clause init/step-return-before-predicate and
 predicate-before-parameter ordering, plus optional `fini`, covering
 normal, exceptional, and `void`
@@ -996,9 +997,11 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   initializers, `null` steps, `void` clauses, `null` helper predicates, and
   `null` finalizers, distinct state/external parameter domains, and selected
   non-init-only external argument inference, executing void/state mixed clauses,
-  single- and multi-clause null rejection, and validation precedence including
-  single-clause init/step-return-before-predicate and predicate-before-parameter
-  ordering, sealed metadata, and illegal direct subtype rejection;
+  fixed-arity normalization with tested single- and multi-clause varargs
+  finalizers, single- and multi-clause null rejection, and validation precedence
+  including single-clause init/step-return-before-predicate and
+  predicate-before-parameter ordering, sealed metadata, and illegal direct
+  subtype rejection;
   Java 18-26 simple parser-only class-file
   containers; and runnable Java 9/10/11/12/13/14/15/16/17 comparisons.
 - The default `grunt test` suite is not currently green under the Java 17 host

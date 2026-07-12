@@ -377,6 +377,10 @@ public final class DoppioMethodHandles {
       }
       returnType = fini.type().returnType();
     }
+    init = fixedArity(init);
+    step = fixedArity(step);
+    pred = fixedArity(pred);
+    fini = fixedArity(fini);
 
     MethodHandle adapter = MethodHandles.publicLookup().findStatic(
         DoppioMethodHandles.class,
@@ -555,6 +559,12 @@ public final class DoppioMethodHandles {
         finiArgumentCounts[i] =
             checkMultiClauseHandle(finis[i].type(), loopParameterTypes, returnType, "fini");
       }
+    }
+    for (int i = 0; i < clauseCount; i++) {
+      inits[i] = fixedArity(inits[i]);
+      steps[i] = fixedArity(steps[i]);
+      preds[i] = fixedArity(preds[i]);
+      finis[i] = fixedArity(finis[i]);
     }
 
     MethodHandle adapter = MethodHandles.publicLookup().findStatic(
@@ -1353,6 +1363,10 @@ public final class DoppioMethodHandles {
       }
     }
     return type.parameterCount();
+  }
+
+  private static MethodHandle fixedArity(MethodHandle handle) {
+    return handle == null ? null : handle.asFixedArity();
   }
 
   private static Object defaultValue(Class<?> type) {

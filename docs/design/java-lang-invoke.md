@@ -283,7 +283,8 @@ handles, dynamic constants, and record object-method linkage:
   selected `null` steps, selected `void` clauses, selected `null` helper
   predicates, selected `null` finalizers, distinct state/external parameter
   domains, non-init-only external argument inference, executing void/state
-  mixed clauses, and selected single- and multi-clause null, length,
+  mixed clauses, fixed-arity normalization with tested single- and multi-clause
+  varargs finalizers, and selected single- and multi-clause null, length,
   init/step-return, predicate-before-parameter, finalizer, and parameter
   validation precedence.
   The `tryFinally` slice is tracked separately in
@@ -337,7 +338,9 @@ handles, dynamic constants, and record object-method linkage:
   single-clause init/step-return-before-predicate and
   predicate-before-parameter ordering, plus multi-clause
   finalizer/predicate-before-parameter validation ordering, non-init-only
-  external argument inference, and executing void/state mixed clauses.
+  external argument inference, executing void/state mixed clauses, and
+  fixed-arity normalization with tested single- and multi-clause varargs
+  finalizers.
   Broad state-loop parity and the
   remaining broad Java 9+ `loop` combinator still need separate fixtures and
   implementation slices because they need control-flow, exception, and

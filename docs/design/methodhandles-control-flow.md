@@ -260,7 +260,8 @@ handle returns `void`.
   `fini`, and a two-state loop with distinct state and external parameter
   domains, non-init-only external argument inference, and a mixed void/state
   loop that verifies the void initializer and step each execute, descriptor
-  strings, and selected validation failures including null-predicate rejection,
+  strings, single- and multi-clause varargs finalizers normalized to fixed
+  arity, and selected validation failures including null-predicate rejection,
   short-clause missing-predicate rejection, single null-clause rejection,
   multi-clause null-before-length validation, and
   single-clause init/step-return-before-predicate and
@@ -294,6 +295,10 @@ handle returns `void`.
   prefix-compatible and non-init-only shapes, and exact validation ordering
   beyond the tested single- and multi-clause null, length, init/step-return,
   predicate-before-parameter, finalizer, and parameter precedence remain open.
+- All non-null generic `loop` clause handles are normalized with
+  `asFixedArity()` after validation. Execution coverage currently exercises
+  varargs finalizers in the single- and multi-clause adapter paths; broader
+  varargs initializer, step, and predicate combinations remain untested.
 - The selected `void` loop slices cover simple side-effect loops only; broad
   no-state/state mixes, exact generic `loop` effectively-identical
   parameter-list inference, and full validation ordering are not claimed.
