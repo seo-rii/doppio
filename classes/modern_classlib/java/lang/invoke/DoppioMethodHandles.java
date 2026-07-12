@@ -902,6 +902,8 @@ public final class DoppioMethodHandles {
         throw new IllegalArgumentException("target and cleanup parameter types do not match");
       }
     }
+    target = fixedArity(target);
+    cleanup = fixedArity(cleanup);
 
     MethodHandle adapter = MethodHandles.publicLookup().findStatic(
         DoppioMethodHandles.class,

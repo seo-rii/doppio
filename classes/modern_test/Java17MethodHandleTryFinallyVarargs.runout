@@ -1,0 +1,13 @@
+true
+false
+true
+false
+a,b:fixed:2
+false
+a,b:varargs:2
+false
+a,b:varargs:2
+boom:2
+1
+false
+22

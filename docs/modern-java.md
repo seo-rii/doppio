@@ -36,7 +36,8 @@ run.
 | 26 | 70 | current feature-release class-file and library surface | Partial: simple class-file container plus runnable print fixture | Very high |
 
 Java 17 `java.lang.invoke` note: the compatibility row above now also includes
-selected `MethodHandles.tryFinally` support, selected
+selected `MethodHandles.tryFinally` support including fixed-arity normalization
+for varargs target and cleanup handles, selected
 `MethodHandles.tableSwitch` selector/fallback support including `void`
 side-effect targets, selected `MethodHandles.iteratedLoop` `Iterable`/`Iterator`
 support including no-arg explicit iterator handles, plus selected
@@ -62,7 +63,7 @@ initializers, steps, predicates, and finalizers including mixed and no-state
 `void` clauses, single- and multi-clause null rejection, and selected validation
 precedence including single-clause init/step-return-before-predicate and
 predicate-before-parameter ordering, plus optional `fini`, covering
-normal, exceptional, and `void`
+normal, exceptional, `void`, and varargs-component
 `tryFinally` target flows, same-typed `tableSwitch` target/fallback dispatch,
 selected iterated `Iterable`/`Iterator` flows, plus stateful, multi-state, and
 no-state loop flows in the Java fixtures and Kotlin smoke. Full control-flow
@@ -335,7 +336,8 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `MethodHandle.asCollector`, `asSpreader`, `asVarargsCollector`, and
   `asFixedArity` adapter flows, and Java 17 public overlays `zero`, `empty`,
   `arrayLength`, `arrayConstructor`, `dropArgumentsToMatch`, `dropReturn`,
-  selected `tryFinally`, `tableSwitch`, and `iteratedLoop` flows, and selected
+  selected `tryFinally` flows including fixed-arity varargs target/cleanup
+  normalization, `tableSwitch`, and `iteratedLoop` flows, and selected
   `whileLoop`/`doWhileLoop`/`countedLoop` non-`void` state plus `void`
   side-effect loops), and
   method-type descriptor reporting, plus Kotlin unsigned
@@ -993,7 +995,8 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `MethodHandle.asCollector`, `asSpreader`, `asVarargsCollector`, and
   `asFixedArity` adapter flows, and Java 17 public overlays `zero`, `empty`,
   `arrayLength`, `arrayConstructor`, `dropArgumentsToMatch`, `dropReturn`,
-  selected `tryFinally`, `tableSwitch`, and `iteratedLoop` flows, and selected
+  selected `tryFinally` flows including fixed-arity varargs target/cleanup
+  normalization, `tableSwitch`, and `iteratedLoop` flows, and selected
   `whileLoop`/`doWhileLoop`/`countedLoop` non-`void` state plus `void`
   side-effect loops with descriptor checks, including four-handle `countedLoop`
   null initializer default state, plus selected single-clause

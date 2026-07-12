@@ -31,6 +31,9 @@ https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/invoke/Me
 - The helper validates the selected Java 17 type rules: matching target and
   cleanup return type, required cleanup leading parameters, and cleanup
   trailing parameters matching a prefix of the target parameters.
+- After validation, both component handles are normalized with
+  `asFixedArity()` so array parameters from varargs collectors remain single
+  adapter arguments during `invokeWithArguments` dispatch.
 - The helper builds a generic adapter around
   `DoppioMethodHandles.tryFinallyTarget`, binds target, cleanup, return type,
   and cleanup argument count, collects the adapter arguments into `Object[]`,
@@ -47,6 +50,12 @@ https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/invoke/Me
   normal `String` target where cleanup omits the trailing `int` argument,
   exceptional `String` target with cleanup side-effect proof and original
   exception propagation, and `void` target/cleanup descriptor parity.
+- Java 17 fixture coverage in
+  `classes/modern_test/Java17MethodHandleTryFinallyVarargs.java`: varargs
+  target with fixed cleanup, fixed target with varargs cleanup, both component
+  handles as varargs collectors, original exception propagation after varargs
+  cleanup, and `void` varargs target/cleanup side effects. It also verifies
+  that each resulting adapter is fixed arity.
 - Kotlin smoke coverage in `classes/kotlin_smoke/MethodHandleSmoke.kt`:
   reflective discovery of `MethodHandles.tryFinally`, normal/exception/void
   invocation, cleanup side-effect proof, and descriptor checks.
