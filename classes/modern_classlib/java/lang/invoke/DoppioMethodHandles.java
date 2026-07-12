@@ -262,17 +262,17 @@ public final class DoppioMethodHandles {
       return multiClauseLoop(clauses);
     }
     MethodHandle[] clause = Objects.requireNonNull(clauses[0]);
-    if (clause.length != 3 && clause.length != 4) {
+    if (clause.length > 4) {
       throw new IllegalArgumentException("loop clause must contain init, step, pred, and optional fini handles");
     }
 
-    MethodHandle init = clause[0];
-    MethodHandle step = clause[1];
-    MethodHandle pred = clause[2];
+    MethodHandle init = clause.length > 0 ? clause[0] : null;
+    MethodHandle step = clause.length > 1 ? clause[1] : null;
+    MethodHandle pred = clause.length > 2 ? clause[2] : null;
     if (pred == null) {
       throw new IllegalArgumentException("no predicate found");
     }
-    MethodHandle fini = clause.length == 4 ? clause[3] : null;
+    MethodHandle fini = clause.length > 3 ? clause[3] : null;
     MethodType stepType;
     Class<?> stateType;
     List<Class<?>> externalTypes;

@@ -323,8 +323,9 @@ handles, dynamic constants, and record object-method linkage:
   `void` `init`/`step` handles and
   selected explicit multi-clause state loops with prefix-compatible clause
   handles, selected `null` initializers, selected `null` steps, selected
-  `void` clauses, selected `null` helper predicates, and selected `null`
-  finalizers.
+  `void` clauses, selected `null` helper predicates, selected `null`
+  finalizers, and selected single-clause missing-predicate validation for
+  short clause arrays.
   Broad state-loop parity and the
   remaining broad Java 9+ `loop` combinator still need separate fixtures and
   implementation slices because they need control-flow, exception, and

@@ -250,7 +250,8 @@ handle returns `void`.
   `void` `init`/`step` handles and with or without external arguments, a selected
   two-clause two-state loop where the second predicate exits through its
   `fini`, descriptor strings, and selected validation failures including
-  null-predicate rejection.
+  null-predicate rejection, short-clause missing-predicate rejection, and
+  overlong-clause rejection.
 - Kotlin smoke coverage in
   `classes/kotlin_methodhandle_smoke/MethodHandleSmoke.kt`:
   reflective discovery of `MethodHandles.whileLoop` and

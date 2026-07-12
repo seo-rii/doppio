@@ -526,6 +526,21 @@ public class Java17MethodHandleLoop {
         Java17MethodHandleLoop.class,
         "badPred",
         MethodType.methodType(String.class, int.class, int.class));
+    printFailureContains(
+        "empty-clause-pred",
+        () -> MethodHandles.loop(new MethodHandle[] {}),
+        "no predicate found");
+    printFailureContains(
+        "one-handle-clause-pred",
+        () -> MethodHandles.loop(new MethodHandle[] { init }),
+        "no predicate found");
+    printFailureContains(
+        "two-handle-clause-pred",
+        () -> MethodHandles.loop(new MethodHandle[] { init, step }),
+        "no predicate found");
+    printFailure(
+        "long-clause",
+        () -> MethodHandles.loop(new MethodHandle[] { init, step, pred, fini, fini }));
     printFailure("null-pred", () -> MethodHandles.loop(new MethodHandle[] { init, step, null, fini }));
     printFailure("bad-pred", () -> MethodHandles.loop(new MethodHandle[] { init, step, badPred, fini }));
     printFailure(
@@ -541,6 +556,17 @@ public class Java17MethodHandleLoop {
       System.out.println(label + ":" + value.getClass().getName());
     } catch (Throwable t) {
       System.out.println(label + ":" + t.getClass().getName());
+    }
+  }
+
+  private static void printFailureContains(String label, Throwing action, String fragment) {
+    try {
+      Object value = action.run();
+      System.out.println(label + ":success:" + value.getClass().getName());
+    } catch (Throwable t) {
+      String message = t.getMessage();
+      boolean contains = message != null && message.indexOf(fragment) >= 0;
+      System.out.println(label + ":" + t.getClass().getName() + ":" + contains);
     }
   }
 
