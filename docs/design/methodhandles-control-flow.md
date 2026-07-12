@@ -44,8 +44,12 @@ The control-flow family is split into small implementation slices:
   prefix-compatible `step`, `pred`, or `fini` handle. The `fini` handle may be
   `null` or omitted from the selected clause. The selected slice also supports
   no-state loops where `init` and `step` return `void` and all clause handles
-  consume matching prefixes of the external argument list. The general
-  multi-clause form remains a later slice.
+  consume matching prefixes of the external argument list. A selected
+  multi-clause state-loop slice supports multiple explicit non-`void` state
+  variables when every clause has non-null `init`, `step`, `pred`, and `fini`
+  handles and the `step`/`pred`/`fini` handles share the same
+  `(V..., A...)` parameter list. The general multi-clause form remains a later
+  slice.
 - `tableSwitch(fallback, targets...)`: selected slice. It is control flow, but
   not a loop; the current coverage lives in the broader `java.lang.invoke`
   design notes.
@@ -234,8 +238,9 @@ handle returns `void`.
   inference from longer prefix-compatible clause handles, explicit `fini`
   return adaptation, `null` and omitted `fini` void return adaptation,
   selected no-state `void init`/`void step` loops with and without external
-  arguments, descriptor strings, and selected validation failures including
-  null-predicate rejection.
+  arguments, a selected two-clause two-state loop where the second predicate
+  exits through its `fini`, descriptor strings, and selected validation
+  failures including null-predicate rejection.
 - Kotlin smoke coverage in
   `classes/kotlin_methodhandle_smoke/MethodHandleSmoke.kt`:
   reflective discovery of `MethodHandles.whileLoop` and
@@ -251,13 +256,14 @@ handle returns `void`.
 - Predicate and initializer validation is prefix-based but not a complete
   implementation of the generic `loop` effectively-identical parameter-list
   rules.
-- The selected `loop` slice covers only one clause with one non-`void` state
-  variable or the selected no-state `void init`/`void step` shape.
-  Multi-clause loops, absent `pred` handles, broad null-init plus null-step
-  inference beyond the tested external-state shape, no-state clauses beyond
-  the selected `void init`/`void step` shape, external argument inference
-  beyond the selected prefix-compatible single-clause shapes, and exact
-  validation ordering remain open.
+- The selected `loop` slice covers one-clause non-`void` state variables, the
+  selected no-state `void init`/`void step` shape, and selected explicit
+  multi-clause non-`void` state loops. Broad multi-clause loops with null or
+  prefix-varying clause handles, absent `pred` handles, broad null-init plus
+  null-step inference beyond the tested external-state shape, no-state clauses
+  beyond the selected `void init`/`void step` shape, external argument
+  inference beyond the selected prefix-compatible shapes, and exact validation
+  ordering remain open.
 - The selected `void` loop slices cover simple side-effect loops only; broad
   no-state/state mixes, exact generic `loop` effectively-identical
   parameter-list inference, and full validation ordering are not claimed.

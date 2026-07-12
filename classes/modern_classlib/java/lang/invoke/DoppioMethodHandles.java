@@ -255,8 +255,11 @@ public final class DoppioMethodHandles {
     if (clauses == null) {
       throw new IllegalArgumentException("null clauses");
     }
+    if (clauses.length == 0) {
+      throw new IllegalArgumentException("no loop clauses");
+    }
     if (clauses.length != 1) {
-      throw new IllegalArgumentException("only one loop clause is supported");
+      return multiClauseLoop(clauses);
     }
     MethodHandle[] clause = Objects.requireNonNull(clauses[0]);
     if (clause.length != 3 && clause.length != 4) {
@@ -409,6 +412,80 @@ public final class DoppioMethodHandles {
             Integer.valueOf(finiArgumentCount),
             Boolean.valueOf(externalState),
             Boolean.valueOf(voidState))
+        .asCollector(Object[].class, externalTypes.size())
+        .asType(MethodType.methodType(returnType, externalTypes));
+  }
+
+  private static MethodHandle multiClauseLoop(MethodHandle[][] clauses)
+      throws NoSuchMethodException, IllegalAccessException {
+    int clauseCount = clauses.length;
+    MethodHandle[] inits = new MethodHandle[clauseCount];
+    MethodHandle[] steps = new MethodHandle[clauseCount];
+    MethodHandle[] preds = new MethodHandle[clauseCount];
+    MethodHandle[] finis = new MethodHandle[clauseCount];
+    Class<?>[] stateTypes = new Class<?>[clauseCount];
+    int[] initArgumentCounts = new int[clauseCount];
+
+    for (int i = 0; i < clauseCount; i++) {
+      MethodHandle[] clause = clauses[i];
+      if (clause == null) {
+        throw new IllegalArgumentException("null clauses are not allowed");
+      }
+      if (clause.length != 4) {
+        throw new IllegalArgumentException("multi-clause loops require init, step, pred, and fini handles");
+      }
+      inits[i] = clause[0];
+      steps[i] = clause[1];
+      preds[i] = clause[2];
+      finis[i] = clause[3];
+      if (inits[i] == null || steps[i] == null || preds[i] == null || finis[i] == null) {
+        throw new IllegalArgumentException("multi-clause loops require non-null handles");
+      }
+      stateTypes[i] = inits[i].type().returnType();
+      if (stateTypes[i] == void.class) {
+        throw new IllegalArgumentException("multi-clause init must return a state type");
+      }
+    }
+
+    List<Class<?>> loopParameterTypes = new ArrayList<Class<?>>(steps[0].type().parameterList());
+    if (loopParameterTypes.size() < clauseCount) {
+      throw new IllegalArgumentException("multi-clause step parameter list does not include all state types");
+    }
+    for (int i = 0; i < clauseCount; i++) {
+      if (loopParameterTypes.get(i) != stateTypes[i]) {
+        throw new IllegalArgumentException("multi-clause state parameter types do not match");
+      }
+    }
+    List<Class<?>> externalTypes = new ArrayList<Class<?>>(
+        loopParameterTypes.subList(clauseCount, loopParameterTypes.size()));
+
+    Class<?> returnType = finis[0].type().returnType();
+    for (int i = 0; i < clauseCount; i++) {
+      initArgumentCounts[i] = checkedPrefixArgumentCount(inits[i].type(), externalTypes, "init");
+      checkMultiClauseHandle(steps[i].type(), loopParameterTypes, stateTypes[i], "step");
+      checkMultiClauseHandle(preds[i].type(), loopParameterTypes, boolean.class, "pred");
+      checkMultiClauseHandle(finis[i].type(), loopParameterTypes, returnType, "fini");
+    }
+
+    MethodHandle adapter = MethodHandles.publicLookup().findStatic(
+        DoppioMethodHandles.class,
+        "multiClauseLoopTarget",
+        MethodType.methodType(
+            Object.class,
+            MethodHandle[].class,
+            MethodHandle[].class,
+            MethodHandle[].class,
+            MethodHandle[].class,
+            int[].class,
+            Object[].class));
+    return MethodHandles.insertArguments(
+            adapter,
+            0,
+            inits,
+            steps,
+            preds,
+            finis,
+            initArgumentCounts)
         .asCollector(Object[].class, externalTypes.size())
         .asType(MethodType.methodType(returnType, externalTypes));
   }
@@ -858,6 +935,35 @@ public final class DoppioMethodHandles {
     return fini.invokeWithArguments(finiArgs);
   }
 
+  public static Object multiClauseLoopTarget(
+      MethodHandle[] inits,
+      MethodHandle[] steps,
+      MethodHandle[] preds,
+      MethodHandle[] finis,
+      int[] initArgumentCounts,
+      Object[] args) throws Throwable {
+    int stateCount = inits.length;
+    Object[] states = new Object[stateCount];
+    for (int i = 0; i < stateCount; i++) {
+      Object[] initArgs = new Object[initArgumentCounts[i]];
+      System.arraycopy(args, 0, initArgs, 0, initArgumentCounts[i]);
+      states[i] = inits[i].invokeWithArguments(initArgs);
+    }
+
+    Object[] loopArgs = new Object[stateCount + args.length];
+    System.arraycopy(states, 0, loopArgs, 0, stateCount);
+    System.arraycopy(args, 0, loopArgs, stateCount, args.length);
+    while (true) {
+      for (int i = 0; i < stateCount; i++) {
+        states[i] = steps[i].invokeWithArguments(loopArgs);
+        loopArgs[i] = states[i];
+        if (!((Boolean) preds[i].invokeWithArguments(loopArgs)).booleanValue()) {
+          return finis[i].invokeWithArguments(loopArgs);
+        }
+      }
+    }
+  }
+
   public static Object iteratedLoopTarget(
       MethodHandle iterator,
       MethodHandle init,
@@ -1098,6 +1204,16 @@ public final class DoppioMethodHandles {
       }
     }
     return type.parameterCount();
+  }
+
+  private static void checkMultiClauseHandle(
+      MethodType type, List<Class<?>> loopParameterTypes, Class<?> returnType, String role) {
+    if (type.returnType() != returnType) {
+      throw new IllegalArgumentException(role + " return type does not match");
+    }
+    if (!type.parameterList().equals(loopParameterTypes)) {
+      throw new IllegalArgumentException(role + " parameter types do not match loop parameters");
+    }
   }
 
   private static void checkExternalStateLoopHandle(

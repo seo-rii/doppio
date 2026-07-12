@@ -45,11 +45,12 @@ non-`void` state-loop and selected `void` side-effect slices through public
 overlays, plus selected single-clause `MethodHandles.loop` state-loop flows
 with explicit or `null` `init`, selected `null step`, external-state exits, and
 prefix-parameter clause handles, selected explicit-init external argument
-inference, selected no-state loops, plus optional `fini`, covering normal,
-exceptional, and `void` `tryFinally` target flows, same-typed `tableSwitch`
-target/fallback dispatch, selected iterated `Iterable`/`Iterator` flows, plus
-stateful and no-state loop flows in the Java fixtures and Kotlin smoke. Full
-control-flow combinator parity is still not claimed.
+inference, selected no-state loops, selected explicit multi-clause state
+loops, plus optional `fini`, covering normal, exceptional, and `void`
+`tryFinally` target flows, same-typed `tableSwitch` target/fallback dispatch,
+selected iterated `Iterable`/`Iterator` flows, plus stateful, multi-state, and
+no-state loop flows in the Java fixtures and Kotlin smoke. Full control-flow
+combinator parity is still not claimed.
 
 Java 17 I/O note: the compatibility row above now also includes selected
 `FileChannel.force(boolean)` data/metadata flush behavior, read-only-channel
