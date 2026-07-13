@@ -396,6 +396,23 @@ Current verified checks:
 - `ci/kotlin_coroutine_smoke.sh` adds a smaller companion compile that checks
   nested `try`/`finally` cleanup across the same queued suspension shape with
   `clean>inner>outer`; a local 2026-06-22 run completed in 127 seconds.
+- A dedicated suspend-inline smoke now lives in
+  `classes/kotlin_suspend_inline_smoke` and runs through
+  `ci/kotlin_suspend_inline_smoke.sh`. It combines a `suspend inline` helper
+  with a delayed continuation and an inlined `try`/`finally`, verifying
+  successful and exceptional resume ordering with
+  `pending>done5>enter>body>wait>after:4>exit|pending>fail:boom>enter>body>wait>exit`.
+  The runner checks that the generated `SuspendLambda` contains its label
+  `tableswitch`, checkpoint call, inlined enter/exit body, and exception table
+  without retaining a call to the inline helper. Adding the initial
+  generic/resume-action source shape to the larger suspend-control compile
+  exceeded its unchanged 420-second budget; the existing coroutine
+  companion and an initial dedicated compile also exceeded 360 seconds on
+  2026-07-13. Removing the incidental generic return and resume-action function
+  object while preserving both successful and exceptional resume paths let the
+  dedicated smoke complete in 181 seconds. The retained fixture therefore uses
+  its own source set and the original 360-second bounded budget rather than
+  increasing shared timeouts or reducing semantic coverage.
 - A queued suspend control-flow smoke now lives in
   `classes/kotlin_suspend_control_smoke` and runs through
   `ci/kotlin_suspend_control_smoke.sh`. It covers a three-resume state machine

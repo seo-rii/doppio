@@ -314,7 +314,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   lowering smoke covering queued `ContinuationInterceptor` resumption through
   nested `try`/`finally` cleanup, plus a focused queued suspend control-flow
   smoke covering `try`/`catch`/`finally`, `break`, `continue`, and
-  `resumeWithException` unwinding, plus a focused Kotlin I/O smoke covering
+  `resumeWithException` unwinding, plus suspend-inline delayed continuation
+  resumption with inlined `finally` cleanup on success and failure, plus a
+  focused Kotlin I/O smoke covering
   file helpers, Java NIO `Path`/`Files`, `FileStore` space/block-size queries,
   `MappedByteBuffer`, classpath resource lookup, `ServiceLoader`, and runtime
   jar/zip/classpath-style reads, plus
