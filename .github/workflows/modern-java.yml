@@ -258,6 +258,9 @@ jobs:
       - name: Run Scala functional smoke
         run: ./ci/scala_functional_smoke.sh
 
+      - name: Run Scala lambda serialization smoke
+        run: ./ci/scala_lambda_serialization_smoke.sh
+
       - name: Run Scala collection smoke
         run: ./ci/scala_collection_smoke.sh
 

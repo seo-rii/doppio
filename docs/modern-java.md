@@ -494,7 +494,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   a focused Scala duration smoke covering `scala.concurrent.duration`
   arithmetic/sorting/parsing/scaling checks,
   classfile assertions for `InvokeDynamic`/`LambdaMetafactory` emission in the
-  main and focused functional Scala smokes, representative
+  main and focused functional Scala smokes, plus a dedicated captured-lambda
+  serialization path through `altMetafactory`, `SerializedLambda`, and
+  `$deserializeLambda$`, representative
   generic `Signature` metadata, Scala `SourceFile`/`LineNumberTable`,
   `ScalaSignature`, `ScalaInlineInfo`, and `ScalaSig` classfile attributes,
   path-dependent types, higher-kinded implicit typeclass lookup, self-types,

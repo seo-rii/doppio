@@ -284,6 +284,14 @@ close-failure suppressed-exception preservation, `Try` recovery, `Either.cond`,
 `LambdaMetafactory` while keeping the main Scala compiler smoke smaller.
 A local 2026-07-03 validation completed the focused Scala functional smoke in
 153 seconds using Scala 2.13.18.
+A dedicated captured-lambda serialization smoke now lives in
+`classes/scala_lambda_serialization_smoke` and runs through
+`ci/scala_lambda_serialization_smoke.sh`. It verifies Scala 2.13's
+`altMetafactory`/`SerializedLambda`/`$deserializeLambda$` path, captured `Int`
+restoration, distinct-object identity, and host JVM versus Doppio output. See
+`docs/design/scala-lambda-serialization.md` for the layered completion gates.
+A 2026-07-13 local validation completed the Doppio-hosted compile and full
+round trip in 108 seconds using Scala 2.13.18.
 The Scala collection-library coverage now lives in
 `classes/scala_collection_smoke` and runs through
 `ci/scala_collection_smoke.sh`. It checks `LazyList`, extractor `unapply`,
