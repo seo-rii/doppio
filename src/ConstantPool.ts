@@ -2905,44 +2905,6 @@ export class MethodReference implements IConstantPoolItem {
 	          };
 	          method = <Method> syntheticMethod;
 	        } else if (syntheticCls.getInternalName() === 'Ljava/lang/Class;' &&
-	            this.signature === 'descriptorString()Ljava/lang/String;') {
-	          syntheticMethod = {
-	            cls: syntheticCls,
-	            slot: -1,
-	            accessFlags: new util.Flags(util.FlagMasks.PUBLIC | util.FlagMasks.NATIVE),
-	            name: this.nameAndTypeInfo.name,
-	            rawDescriptor: this.nameAndTypeInfo.descriptor,
-	            attrs: [],
-	            signature: this.signature,
-	            fullSignature: syntheticFullSignature,
-	            parameterTypes: [],
-	            returnType: 'Ljava/lang/String;',
-	            getParamWordSize: function(): number {
-	              return 0;
-	            },
-	            convertArgs: function(thread: JVMThread, params: any[]): any[] {
-	              return [thread, params[0]];
-	            },
-	            getNativeFunction: function(): Function {
-	              return function(thread: JVMThread, javaThis: JVMTypes.java_lang_Class): JVMTypes.java_lang_String {
-	                return util.initString(thread.getBsCl(), javaThis.$cls.getInternalName());
-	              };
-	            },
-	            isSignaturePolymorphic: function(): boolean {
-	              return false;
-	            },
-	            isHidden: function(): boolean {
-	              return false;
-	            },
-	            isCallerSensitive: function(): boolean {
-	              return false;
-	            },
-	            getFullSignature: function(): string {
-	              return syntheticCls.getExternalName() + '.' + this.signature;
-	            }
-	          };
-	          method = <Method> syntheticMethod;
-	        } else if (syntheticCls.getInternalName() === 'Ljava/lang/Class;' &&
 	            this.signature === 'describeConstable()Ljava/util/Optional;') {
 	          syntheticMethod = {
 	            cls: syntheticCls,
@@ -3764,7 +3726,6 @@ export class MethodReference implements IConstantPoolItem {
 	      };
 	    } else if ((this.fullSignature === 'java/lang/Class/arrayType()Ljava/lang/Class;' ||
 	        this.fullSignature === 'java/lang/Class/componentType()Ljava/lang/Class;' ||
-	        this.fullSignature === 'java/lang/Class/descriptorString()Ljava/lang/String;' ||
 	        this.fullSignature === 'java/lang/Class/getNestHost()Ljava/lang/Class;' ||
 	        this.fullSignature === 'java/lang/Class/getNestMembers()[Ljava/lang/Class;' ||
 	        this.fullSignature === 'java/lang/Class/isNestmateOf(Ljava/lang/Class;)Z' ||

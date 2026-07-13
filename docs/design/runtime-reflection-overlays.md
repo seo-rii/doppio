@@ -187,6 +187,26 @@ The Java 9 `Class.getPackageName()` overlay is a parsed ordinary method:
 - The compiler-discovery gates passed locally on 2026-07-13 in 188 seconds for
   Kotlin 2.4.0 and 241 seconds for Scala 2.13.18.
 
+The Java 12 `Class.descriptorString()` overlay is a parsed ordinary method:
+
+- `ClassLoader.ts` injects the exact public, non-native descriptor into the
+  Java 8 bootstrap `Class` classfile. Its bytecode passes the receiver to a
+  package-private native `DoppioClass` helper that returns Doppio's canonical
+  internal class descriptor for ordinary, primitive, void, and array classes.
+- The previous slot-less constant-pool fallback and synthetic native-frame
+  trampoline were removed, so direct calls, reflection slots,
+  `Method.invoke`, and `Lookup.unreflect` resolve the same parsed method with
+  empty annotation and generic metadata.
+- `Java12ClassDescriptorStringReflection` compares exact modifiers,
+  descriptors, annotation and parameter metadata, declared/public lookup and
+  enumeration, direct and reflective results across ordinary, nested, local,
+  anonymous, JDK, primitive, void, and array classes, and exact unreflected
+  handle type and invocation with HotSpot. The original direct fixture remains
+  a separate regression.
+- The compiler-discovery gates passed locally on 2026-07-13 in 524 seconds for
+  Kotlin 2.4.0 under a heavily contended shared host and 236 seconds for Scala
+  2.13.18.
+
 The Java 15 `Class.isHidden()` overlay is also a parsed native method:
 
 - `ClassLoader.ts` injects the exact public native `isHidden()` descriptor and

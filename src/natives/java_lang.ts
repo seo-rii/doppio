@@ -694,6 +694,10 @@ export default function (): any {
       return util.initString(thread.getBsCl(), packageName);
     }
 
+    public static 'descriptorString(Ljava/lang/Class;)Ljava/lang/String;'(thread: JVMThread, type: JVMTypes.java_lang_Class): JVMTypes.java_lang_String {
+      return util.initString(thread.getBsCl(), type.$cls.getInternalName());
+    }
+
   }
 
   class java_lang_ClassLoader$NativeLibrary {

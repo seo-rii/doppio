@@ -11,4 +11,6 @@ final class DoppioClass {
   static native Class<?>[] getPermittedSubclasses(Class<?> type);
 
   static native String getPackageName(Class<?> type);
+
+  static native String descriptorString(Class<?> type);
 }

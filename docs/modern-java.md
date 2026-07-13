@@ -1146,9 +1146,12 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   host/member/local/anonymous classes, primitives, void, arrays, and selected
   JDK `getNestHost`/non-nestmate checks, including null argument validation
   for `isNestmateOf`.
-- `java.lang.Class` now exposes selected Java 12 `descriptorString()` behavior
-  for ordinary, nested, local, primitive, void, reference-array, and
-  primitive-array classes.
+- `java.lang.Class.descriptorString()` is a parsed public, non-native Java 12
+  method, so direct calls, reflective lookup and enumeration, `Method.invoke`,
+  and `Lookup.unreflect` share one implementation. Coverage includes exact
+  method and empty annotation metadata plus ordinary, nested, local,
+  anonymous, JDK, primitive, void, reference-array, primitive-array, and user
+  array classes.
 - `java.lang.Class` now exposes selected Java 12 `componentType()` behavior
   for non-array, primitive, void, reference-array, primitive-array, and
   multidimensional-array classes.

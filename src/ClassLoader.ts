@@ -194,6 +194,9 @@ function addJavaLangClassModernOverlays(data: Buffer): Buffer {
     getPackageNameHelperDescriptorIndex = cp.count + 28,
     getPackageNameHelperNameAndTypeIndex = cp.count + 29,
     getPackageNameHelperMethodIndex = cp.count + 30,
+    descriptorStringNameIndex = cp.count + 31,
+    descriptorStringHelperNameAndTypeIndex = cp.count + 32,
+    descriptorStringHelperMethodIndex = cp.count + 33,
     extraConstants = Buffer.concat([
       utf8Constant('getModule'),
       utf8Constant('()Ljava/lang/Module;'),
@@ -257,11 +260,22 @@ function addJavaLangClassModernOverlays(data: Buffer): Buffer {
         Buffer.from([10]),
         u2(helperClassIndex),
         u2(getPackageNameHelperNameAndTypeIndex)
+      ]),
+      utf8Constant('descriptorString'),
+      Buffer.concat([
+        Buffer.from([12]),
+        u2(descriptorStringNameIndex),
+        u2(getPackageNameHelperDescriptorIndex)
+      ]),
+      Buffer.concat([
+        Buffer.from([10]),
+        u2(helperClassIndex),
+        u2(descriptorStringHelperNameAndTypeIndex)
       ])
     ]),
     withConstants = Buffer.concat([
       data.slice(0, 8),
-      u2(cp.count + 31),
+      u2(cp.count + 34),
       data.slice(10, cp.offset),
       extraConstants,
       data.slice(cp.offset)
@@ -373,11 +387,30 @@ function addJavaLangClassModernOverlays(data: Buffer): Buffer {
       getPackageNameCode,
       u2(0),
       u2(0)
+    ]),
+    descriptorStringCode = Buffer.concat([
+      Buffer.from([0x2a, 0xb8]),
+      u2(descriptorStringHelperMethodIndex),
+      Buffer.from([0xb0])
+    ]),
+    descriptorStringMethod = Buffer.concat([
+      u2(0x0001),
+      u2(descriptorStringNameIndex),
+      u2(getPackageNameDescriptorIndex),
+      u2(1),
+      u2(codeNameIndex),
+      u4(12 + descriptorStringCode.length),
+      u2(1),
+      u2(1),
+      u4(descriptorStringCode.length),
+      descriptorStringCode,
+      u2(0),
+      u2(0)
     ]);
 
   return Buffer.concat([
     withConstants.slice(0, methods.countOffset),
-    u2(methods.count + 7),
+    u2(methods.count + 8),
     withConstants.slice(methods.countOffset + 2, methods.endOffset),
     getModuleMethod,
     getRecordComponentsMethod,
@@ -386,6 +419,7 @@ function addJavaLangClassModernOverlays(data: Buffer): Buffer {
     isSealedMethod,
     getPermittedSubclassesMethod,
     getPackageNameMethod,
+    descriptorStringMethod,
     withConstants.slice(methods.endOffset)
   ]);
 }
