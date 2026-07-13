@@ -8,7 +8,8 @@ absent from the Java 8-era bootstrap class files:
 - class-library shim classes in `classes/modern_classlib`, which provide real
   Java classes such as `java.lang.Runtime$Version`;
 - parsed classfile overlays in `ClassLoader.ts`, currently used to make
-  `java.lang.Runtime.version()` a real method before `Runtime.class` is parsed.
+  `java.lang.Runtime.version()` and modern `Math`/`StrictMath` helpers real
+  methods before their Java 8 bootstrap classfiles are parsed.
 
 Direct-call overlays are not the same as public reflection support. A method can be
 callable from bytecode and still be absent from `Class.getMethod` or
@@ -77,24 +78,30 @@ parsed-method metadata.
   with HotSpot, then converts the reflected method through
   `MethodHandles.Lookup.unreflect` and invokes the resulting handle.
 
-The Java 18 integer-division family is the first multi-method parsed overlay:
+The modern integer arithmetic family is the first multi-method parsed overlay:
 
-- `ClassLoader.ts` injects all 12 `ceilDiv`, `ceilMod`, `divideExact`,
-  `floorDivExact`, and `ceilDivExact` overloads into both `Math` and
-  `StrictMath` before parsing their Java 8 bootstrap classfiles.
+- `ClassLoader.ts` injects 19 methods into each of `Math` and `StrictMath`
+  before parsing their Java 8 bootstrap classfiles: the 12 Java 18 `ceilDiv`,
+  `ceilMod`, `divideExact`, `floorDivExact`, and `ceilDivExact` overloads;
+  Java 9 `multiplyFull`, `multiplyHigh`, `floorDiv(long, int)`, and
+  `floorMod(long, int)`; Java 15 `absExact(int/long)`; and Java 18
+  `unsignedMultiplyHigh`.
 - Each injected method is ordinary public static bytecode, without native or
   synthetic modifiers, and delegates to the package-private `DoppioMath`
   class-library helper. The previous slot-less constant-pool fallback was
   removed so direct resolution, reflection enumeration, slots, and invocation
   use one implementation.
-- `Java18Division` verifies all 24 reflection methods through
+- `Java18Division` verifies all 38 reflection methods through
   `getDeclaredMethod`, `getMethod`, `getDeclaredMethods`, metadata, invocation,
-  and exact-overflow `InvocationTargetException` causes while retaining the
-  direct sign, mixed-width, identity, and exception matrices. The complete
-  output matches Temurin 21.0.11.
-- The compiler-discovery gates passed locally on 2026-07-13: Kotlin 2.4 startup
-  in 50 seconds and minimal compile/run in 168 seconds, plus Scala 2.13.18
-  startup in 20 seconds and minimal compile/run in 185 seconds.
+  and exact/absolute-value overflow `InvocationTargetException` causes while
+  retaining the direct sign, mixed-width, identity, and exception matrices.
+  The complete output matches Temurin 21.0.11.
+- The initial 12-method compiler-discovery gates passed locally on 2026-07-13:
+  Kotlin 2.4 startup in 50 seconds and minimal compile/run in 168 seconds, plus
+  Scala 2.13.18 startup in 20 seconds and minimal compile/run in 185 seconds.
+  After expanding to all 19 methods per class and removing the old direct-call
+  fallbacks, the complete minimal compile/run gates passed again in 404 seconds
+  for Kotlin 2.4.0 and 253 seconds for Scala 2.13.18 under a contended host.
 
 The safer shape is an explicit overlay registry:
 

@@ -226,7 +226,9 @@ public class Java18Division {
       "ceilMod", "ceilMod", "ceilMod",
       "divideExact", "divideExact",
       "floorDivExact", "floorDivExact",
-      "ceilDivExact", "ceilDivExact"
+      "ceilDivExact", "ceilDivExact",
+      "multiplyFull", "multiplyHigh", "unsignedMultiplyHigh",
+      "floorDiv", "floorMod", "absExact", "absExact"
     };
     Class<?>[][] parameterTypes = {
       {Integer.TYPE, Integer.TYPE},
@@ -240,28 +242,41 @@ public class Java18Division {
       {Integer.TYPE, Integer.TYPE},
       {Long.TYPE, Long.TYPE},
       {Integer.TYPE, Integer.TYPE},
-      {Long.TYPE, Long.TYPE}
+      {Long.TYPE, Long.TYPE},
+      {Integer.TYPE, Integer.TYPE},
+      {Long.TYPE, Long.TYPE},
+      {Long.TYPE, Long.TYPE},
+      {Long.TYPE, Integer.TYPE},
+      {Long.TYPE, Integer.TYPE},
+      {Integer.TYPE},
+      {Long.TYPE}
     };
     Class<?>[] returnTypes = {
       Integer.TYPE, Long.TYPE, Long.TYPE,
       Integer.TYPE, Integer.TYPE, Long.TYPE,
       Integer.TYPE, Long.TYPE,
       Integer.TYPE, Long.TYPE,
-      Integer.TYPE, Long.TYPE
+      Integer.TYPE, Long.TYPE,
+      Long.TYPE, Long.TYPE, Long.TYPE,
+      Long.TYPE, Integer.TYPE, Integer.TYPE, Long.TYPE
     };
     Object[][] arguments = {
       {4, 3}, {4L, 3}, {4L, 3L},
       {4, 3}, {4L, 3}, {4L, 3L},
       {4, 3}, {4L, 3L},
       {4, 3}, {4L, 3L},
-      {4, 3}, {4L, 3L}
+      {4, 3}, {4L, 3L},
+      {4, -3}, {Long.MIN_VALUE, 2L}, {-1L, -1L},
+      {-7L, 3}, {-7L, 3}, {-4}, {-4L}
     };
     Object[] expected = {
       2, 2L, 2L,
       -2, -2, -2L,
       1, 1L,
       1, 1L,
-      2, 2L
+      2, 2L,
+      -12L, -1L, -2L,
+      -3L, 2, 4, 4L
     };
 
     for (int i = 0; i < names.length; i++) {
@@ -269,20 +284,26 @@ public class Java18Division {
       java.lang.reflect.Method inherited = owner.getMethod(names[i], parameterTypes[i]);
       if (!declared.equals(inherited) || declared.getDeclaringClass() != owner ||
           declared.getModifiers() != (java.lang.reflect.Modifier.PUBLIC | java.lang.reflect.Modifier.STATIC) ||
-          declared.getReturnType() != returnTypes[i] || declared.getParameterTypes().length != 2 ||
-          declared.getParameterTypes()[0] != parameterTypes[i][0] ||
-          declared.getParameterTypes()[1] != parameterTypes[i][1] ||
+          declared.getReturnType() != returnTypes[i] ||
+          declared.getParameterTypes().length != parameterTypes[i].length ||
           declared.getExceptionTypes().length != 0 || declared.isBridge() ||
           declared.isSynthetic() || declared.isVarArgs() ||
           !expected[i].equals(declared.invoke(null, arguments[i]))) {
         return false;
       }
+      for (int parameter = 0; parameter < parameterTypes[i].length; parameter++) {
+        if (declared.getParameterTypes()[parameter] != parameterTypes[i][parameter]) {
+          return false;
+        }
+      }
     }
 
     int enumerated = 0;
     for (java.lang.reflect.Method method : owner.getDeclaredMethods()) {
-      for (String name : names) {
-        if (method.getName().equals(name)) {
+      for (int i = 0; i < names.length; i++) {
+        if (method.getName().equals(names[i]) &&
+            method.getReturnType() == returnTypes[i] &&
+            java.util.Arrays.equals(method.getParameterTypes(), parameterTypes[i])) {
           enumerated++;
           break;
         }
@@ -292,13 +313,24 @@ public class Java18Division {
       return false;
     }
 
+    boolean divideOverflow = false;
     try {
       owner.getMethod("divideExact", Integer.TYPE, Integer.TYPE)
           .invoke(null, Integer.MIN_VALUE, -1);
+    } catch (java.lang.reflect.InvocationTargetException expectedFailure) {
+      Throwable cause = expectedFailure.getCause();
+      divideOverflow = cause instanceof ArithmeticException && "integer overflow".equals(cause.getMessage());
+    }
+    if (!divideOverflow) {
+      return false;
+    }
+    try {
+      owner.getMethod("absExact", Long.TYPE).invoke(null, Long.MIN_VALUE);
       return false;
     } catch (java.lang.reflect.InvocationTargetException expectedFailure) {
       Throwable cause = expectedFailure.getCause();
-      return cause instanceof ArithmeticException && "integer overflow".equals(cause.getMessage());
+      return cause instanceof ArithmeticException &&
+          "Overflow to represent absolute value of Long.MIN_VALUE".equals(cause.getMessage());
     }
   }
 
