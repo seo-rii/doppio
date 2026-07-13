@@ -408,26 +408,32 @@ function addJavaLangSystemModernOverlays(data: Buffer): Buffer {
     methodNameIndex = cp.count,
     singleDescriptorIndex = cp.count + 1,
     bundledDescriptorIndex = cp.count + 2,
-    codeNameIndex = cp.count + 3,
-    helperNameIndex = cp.count + 4,
-    helperClassIndex = cp.count + 5,
-    singleNameAndTypeIndex = cp.count + 6,
-    singleHelperMethodIndex = cp.count + 7,
-    bundledNameAndTypeIndex = cp.count + 8,
-    bundledHelperMethodIndex = cp.count + 9,
-    annotationsNameIndex = cp.count + 10,
-    annotationTypeIndex = cp.count + 11,
+    singleHelperDescriptorIndex = cp.count + 3,
+    bundledHelperDescriptorIndex = cp.count + 4,
+    codeNameIndex = cp.count + 5,
+    helperNameIndex = cp.count + 6,
+    helperClassIndex = cp.count + 7,
+    singleNameAndTypeIndex = cp.count + 8,
+    singleHelperMethodIndex = cp.count + 9,
+    bundledNameAndTypeIndex = cp.count + 10,
+    bundledHelperMethodIndex = cp.count + 11,
+    loggerNameIndex = cp.count + 12,
+    loggerClassIndex = cp.count + 13,
+    annotationsNameIndex = cp.count + 14,
+    annotationTypeIndex = cp.count + 15,
     extraConstants = Buffer.concat([
       utf8Constant('getLogger'),
       utf8Constant('(Ljava/lang/String;)Ljava/lang/System$Logger;'),
       utf8Constant('(Ljava/lang/String;Ljava/util/ResourceBundle;)Ljava/lang/System$Logger;'),
+      utf8Constant('(Ljava/lang/String;)Ljava/lang/Object;'),
+      utf8Constant('(Ljava/lang/String;Ljava/util/ResourceBundle;)Ljava/lang/Object;'),
       utf8Constant('Code'),
       utf8Constant('java/lang/DoppioSystem'),
       Buffer.concat([Buffer.from([7]), u2(helperNameIndex)]),
       Buffer.concat([
         Buffer.from([12]),
         u2(methodNameIndex),
-        u2(singleDescriptorIndex)
+        u2(singleHelperDescriptorIndex)
       ]),
       Buffer.concat([
         Buffer.from([10]),
@@ -437,19 +443,21 @@ function addJavaLangSystemModernOverlays(data: Buffer): Buffer {
       Buffer.concat([
         Buffer.from([12]),
         u2(methodNameIndex),
-        u2(bundledDescriptorIndex)
+        u2(bundledHelperDescriptorIndex)
       ]),
       Buffer.concat([
         Buffer.from([10]),
         u2(helperClassIndex),
         u2(bundledNameAndTypeIndex)
       ]),
+      utf8Constant('java/lang/System$Logger'),
+      Buffer.concat([Buffer.from([7]), u2(loggerNameIndex)]),
       utf8Constant('RuntimeVisibleAnnotations'),
       utf8Constant('Ljdk/internal/reflect/CallerSensitive;')
     ]),
     withConstants = Buffer.concat([
       data.slice(0, 8),
-      u2(cp.count + 12),
+      u2(cp.count + 16),
       data.slice(10, cp.offset),
       extraConstants,
       data.slice(cp.offset)
@@ -458,11 +466,15 @@ function addJavaLangSystemModernOverlays(data: Buffer): Buffer {
     singleCode = Buffer.concat([
       Buffer.from([0x2a, 0xb8]),
       u2(singleHelperMethodIndex),
+      Buffer.from([0xc0]),
+      u2(loggerClassIndex),
       Buffer.from([0xb0])
     ]),
     bundledCode = Buffer.concat([
       Buffer.from([0x2a, 0x2b, 0xb8]),
       u2(bundledHelperMethodIndex),
+      Buffer.from([0xc0]),
+      u2(loggerClassIndex),
       Buffer.from([0xb0])
     ]),
     singleMethod = Buffer.concat([

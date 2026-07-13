@@ -678,6 +678,43 @@ export default function (): any {
 
   }
 
+  function createDoppioSystemLogger(thread: JVMThread, name: JVMTypes.java_lang_String): void {
+    thread.setStatus(ThreadStatus.ASYNC_WAITING);
+    thread.getBsCl().initializeClass(thread, 'Ljava/lang/System$DoppioLogger;', (loggerCls: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+      if (loggerCls === null) {
+        return;
+      }
+      var logger = util.newObjectFromClass<JVMTypes.java_lang_Object>(thread, loggerCls);
+      (<any> logger)['<init>(Ljava/lang/String;)V'](thread, [name], (e?: JVMTypes.java_lang_Throwable) => {
+        if (e) {
+          thread.throwException(e);
+        } else {
+          thread.asyncReturn(logger);
+        }
+      });
+    });
+  }
+
+  class java_lang_DoppioSystem {
+
+    public static 'getLogger(Ljava/lang/String;)Ljava/lang/Object;'(thread: JVMThread, name: JVMTypes.java_lang_String): void {
+      if (name === null) {
+        thread.throwNewException('Ljava/lang/NullPointerException;', '');
+        return;
+      }
+      createDoppioSystemLogger(thread, name);
+    }
+
+    public static 'getLogger(Ljava/lang/String;Ljava/util/ResourceBundle;)Ljava/lang/Object;'(thread: JVMThread, name: JVMTypes.java_lang_String, bundle: JVMTypes.java_lang_Object): void {
+      if (bundle === null || name === null) {
+        thread.throwNewException('Ljava/lang/NullPointerException;', '');
+        return;
+      }
+      createDoppioSystemLogger(thread, name);
+    }
+
+  }
+
   // Fun Note: The bootstrap classloader object is represented by null.
   class java_lang_ClassLoader {
 
@@ -2813,6 +2850,7 @@ export default function (): any {
     'java/lang/ClassLoader$NativeLibrary': java_lang_ClassLoader$NativeLibrary,
     'java/lang/ClassLoader': java_lang_ClassLoader,
     'java/lang/DoppioClassLoader': java_lang_DoppioClassLoader,
+    'java/lang/DoppioSystem': java_lang_DoppioSystem,
     'java/lang/Compiler': java_lang_Compiler,
     'java/lang/Double': java_lang_Double,
     'java/lang/Float': java_lang_Float,
