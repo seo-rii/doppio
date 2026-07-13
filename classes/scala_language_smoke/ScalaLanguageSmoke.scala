@@ -97,7 +97,8 @@ object ScalaLanguageSmoke {
     }.mkString("/")
 
     val linearized = ScalaTraitLinearizationSmoke.summary()
+    val nonLocalReturn = ScalaNonLocalReturnSmoke.summary()
 
-    s"$dependent:$encoded:$folded:$marked:$byName:$refined:$switched:$linearized"
+    s"$dependent:$encoded:$folded:$marked:$byName:$refined:$switched:$linearized:$nonLocalReturn"
   }
 }

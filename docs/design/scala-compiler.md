@@ -309,11 +309,18 @@ matching, value-class extension methods, structural refinement dispatch, and
 also covers two opposing stackable-trait linearizations, with
 `abstract override` methods routing ordinary calls through generated `token$`
 trait bridges and `$$super$token` accessors. The runner verifies both bridge
-orders before comparing `ABC/ACB` on the host JVM and Doppio.
+orders before comparing `ABC/ACB` on the host JVM and Doppio. A closure
+non-local return path also verifies specialized `NonLocalReturnControl` throw,
+key/value recovery, and enclosing `finally` cleanup for both an early result
+and normal no-match completion. The expected suffix is
+`4:n1>n4>finally/-1:n1>n3>finally`.
 A local 2026-07-10 validation completed the focused Scala language smoke in
 220 seconds using Scala 2.13.18.
 A 2026-07-13 validation with the stackable-trait coverage completed in 266
 seconds within the unchanged 420-second budget.
+A subsequent validation with the non-local-return coverage completed in 168
+seconds, preserving the same budget while illustrating the known compiler
+throughput variance.
 The Scala library/lowering coverage now lives in
 `classes/scala_library_smoke` and runs through `ci/scala_library_smoke.sh`. It
 checks `groupMapReduce`, implicit value classes, default arguments, case-class

@@ -77,6 +77,8 @@ compile_end="$(date +%s)"
 test -f "$out_dir/ScalaLanguageHello.class"
 test -f "$out_dir/ScalaLanguageSmoke.class"
 test -f "$out_dir/ScalaLanguageSmoke\$.class"
+test -f "$out_dir/ScalaNonLocalReturnSmoke.class"
+test -f "$out_dir/ScalaNonLocalReturnSmoke\$.class"
 test -f "$out_dir/ScalaTraitLinearizationSmoke\$.class"
 test -f "$out_dir/LeftThenRightTokenOwner.class"
 test -f "$out_dir/LeftToken.class"
@@ -119,7 +121,20 @@ if ! grep -Fq 'InterfaceMethod RightToken$$super$token:()Ljava/lang/String;' <<<
   exit 1
 fi
 
-expected_output="L:a7:R:b3:some(i2)|none|some(i4):a1,b2,c3:op7:12:2:fer:r12:dozen/sx/seven:ABC/ACB"
+nonlocal_javap="$(javap -classpath "$out_dir" -c -p 'ScalaNonLocalReturnSmoke$')"
+for marker in \
+    'scala/runtime/NonLocalReturnControl$mcI$sp' \
+    'scala/runtime/NonLocalReturnControl.key:()Ljava/lang/Object;' \
+    'scala/runtime/NonLocalReturnControl.value$mcI$sp:()I' \
+    'Class scala/runtime/NonLocalReturnControl' \
+    'Exception table:'; do
+  if ! grep -Fq "$marker" <<<"$nonlocal_javap"; then
+    echo "Missing non-local return bytecode marker: $marker" >&2
+    exit 1
+  fi
+done
+
+expected_output="L:a7:R:b3:some(i2)|none|some(i4):a1,b2,c3:op7:12:2:fer:r12:dozen/sx/seven:ABC/ACB:4:n1>n4>finally/-1:n1>n3>finally"
 
 native_output="$(java -cp "$runtime_cp" ScalaLanguageHello)"
 if [ "$native_output" != "$expected_output" ]; then
