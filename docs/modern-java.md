@@ -28,7 +28,7 @@ run.
 | 18 | 62 | UTF-8-by-default expectations, simple web server tooling output, `Math`/`StrictMath` unsigned multiplication and integer division helpers | Partial: simple class-file container, selected UTF-8 default charset behavior for `file.encoding`, `Charset.defaultCharset()`, default `String` byte conversion, and default `InputStreamReader`/`OutputStreamWriter` byte conversion, direct and reflection-visible `Math.unsignedMultiplyHigh(long, long)` and `StrictMath.unsignedMultiplyHigh(long, long)` behavior for zero, power-of-two, negative-bit-pattern, `Long.MIN_VALUE`, and mixed-sign unsigned products, plus direct and reflection-visible support for all Java 18 `Math`/`StrictMath` `ceilDiv`, `ceilMod`, `divideExact`, `floorDivExact`, and `ceilDivExact` overloads with tested metadata, sign, mixed-width, zero-divisor, and integer-overflow behavior | Medium |
 | 19 | 63 | virtual threads preview dependencies, record pattern preview output, `Thread.threadId()`, `Thread.sleep(Duration)` | Partial: simple class-file container, selected `Thread.threadId()` current-thread behavior matching the existing positive `Thread.getId()` identifier, and selected `Thread.sleep(Duration)` behavior for negative no-op, zero duration, short positive duration, null rejection, and interrupt delivery | High |
 | 20 | 64 | scoped values preview dependencies, pattern matching output | Partial: simple class-file container plus runnable print fixture | High |
-| 21 | 65 | virtual threads, sequenced collections, string templates preview | Partial: simple class-file container, runnable print fixture, selected `Thread.isVirtual()` platform-thread behavior for current, unstarted, and started platform threads, and selected `SequencedCollection`/`List`/`Deque`/`SequencedSet`/`SequencedMap` endpoint, view, and reverse-view behavior | Very high |
+| 21 | 65 | virtual threads, sequenced collections, `Math`/`StrictMath.clamp`, string templates preview | Partial: simple class-file container, runnable print fixture, selected `Thread.isVirtual()` platform-thread behavior for current, unstarted, and started platform threads, direct and reflection-visible integer/floating-point `Math.clamp` and `StrictMath.clamp` overloads, and selected `SequencedCollection`/`List`/`Deque`/`SequencedSet`/`SequencedMap` endpoint, view, and reverse-view behavior | Very high |
 | 22 | 66 | class-file API ecosystem expectations, unnamed variables | Partial: simple class-file container plus runnable print fixture | Medium |
 | 23 | 67 | primitive patterns preview, module/JDK library drift | Partial: simple class-file container plus runnable print fixture | High |
 | 24 | 68 | stream gatherers, compact object headers ecosystem assumptions | Partial: simple class-file container plus runnable print fixture | High |
@@ -1184,9 +1184,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   mixed-width overloads, `MIN_VALUE / -1` wrapping for non-exact ceiling
   division, exact-method overflow messages, zero-divisor exceptions, and
   matrix checks for the quotient/remainder identity and `Math`/`StrictMath`
-  parity. The 19 parsed public static methods injected into each bootstrap
-  class, 38 reflection methods in total, share one `DoppioMath` helper with
-  reflection slots and direct calls. The fixture checks lookup,
+  parity. The 19 parsed public static methods covered through Java 18 on each
+  bootstrap class, 38 reflection methods in this fixture, share one
+  `DoppioMath` helper with reflection slots and direct calls. The fixture checks lookup,
   declared-method enumeration, modifiers, declaring class,
   parameter/return/exception metadata, invocation, and wrapped exact and
   absolute-value overflow failures. Its complete output matches Temurin
@@ -1211,6 +1211,15 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   unstarted platform `Thread`, and a started platform `Thread`.
   `Thread.ofVirtual()` and
   `Thread.startVirtualThread(...)` are not implemented.
+- All four Java 21 `Math.clamp` and `StrictMath.clamp` overloads are direct and
+  reflection-visible parsed methods. The major-65 fixture covers saturating
+  `long`-to-`int` conversion, integer and long extrema, float/double NaN and
+  infinities, signed-zero ordering and bit preservation, equal bounds, invalid
+  bound messages, exact reflection metadata and enumeration, wrapped
+  reflection failures, and `MethodHandles.Lookup.unreflect` invocation. The
+  complete output matches Temurin 21.0.11. These eight methods extend the
+  shared parsed `DoppioMath` surface to 23 methods per bootstrap class and 46
+  reflection methods in total.
 - Selected Java 21 `SequencedCollection`/`List`/`Deque`/`SequencedSet`
   behavior is covered for
   `List` assignability to `SequencedCollection`, `List.of(...)`

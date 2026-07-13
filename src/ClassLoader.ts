@@ -237,7 +237,11 @@ function addJavaLangMathModernOverlays(data: Buffer): Buffer {
       ['floorDiv', '(JI)J'],
       ['floorMod', '(JI)I'],
       ['absExact', '(I)I'],
-      ['absExact', '(J)J']
+      ['absExact', '(J)J'],
+      ['clamp', '(JII)I'],
+      ['clamp', '(JJJ)J'],
+      ['clamp', '(DDD)D'],
+      ['clamp', '(FFF)F']
     ],
     helperNameIndex = cp.count,
     helperClassIndex = cp.count + 1,
@@ -298,10 +302,28 @@ function addJavaLangMathModernOverlays(data: Buffer): Buffer {
         code = Buffer.concat([Buffer.from([0x1e, 0xb8]), u2(helperMethodIndex), Buffer.from([0xad])]);
         maxStack = 2;
         maxLocals = 2;
-      } else {
+      } else if (descriptor === '(JJ)J') {
         code = Buffer.concat([Buffer.from([0x1e, 0x20, 0xb8]), u2(helperMethodIndex), Buffer.from([0xad])]);
         maxStack = 4;
         maxLocals = 4;
+      } else if (descriptor === '(JII)I') {
+        code = Buffer.concat([Buffer.from([0x1e, 0x1c, 0x1d, 0xb8]), u2(helperMethodIndex), Buffer.from([0xac])]);
+        maxStack = 4;
+        maxLocals = 4;
+      } else if (descriptor === '(JJJ)J') {
+        code = Buffer.concat([Buffer.from([0x1e, 0x20, 0x16, 0x04, 0xb8]), u2(helperMethodIndex), Buffer.from([0xad])]);
+        maxStack = 6;
+        maxLocals = 6;
+      } else if (descriptor === '(DDD)D') {
+        code = Buffer.concat([Buffer.from([0x26, 0x28, 0x18, 0x04, 0xb8]), u2(helperMethodIndex), Buffer.from([0xaf])]);
+        maxStack = 6;
+        maxLocals = 6;
+      } else if (descriptor === '(FFF)F') {
+        code = Buffer.concat([Buffer.from([0x22, 0x23, 0x24, 0xb8]), u2(helperMethodIndex), Buffer.from([0xae])]);
+        maxStack = 3;
+        maxLocals = 3;
+      } else {
+        throw new Error('Unsupported java.lang.Math overlay descriptor: ' + descriptor);
       }
       return Buffer.concat([
         u2(0x0009),

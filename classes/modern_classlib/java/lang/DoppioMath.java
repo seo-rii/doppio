@@ -113,4 +113,48 @@ final class DoppioMath {
     }
     return value < 0 ? -value : value;
   }
+
+  static int clamp(long value, int min, int max) {
+    if (min > max) {
+      throw new IllegalArgumentException(min + " > " + max);
+    }
+    return (int) Math.min(max, Math.max(value, min));
+  }
+
+  static long clamp(long value, long min, long max) {
+    if (min > max) {
+      throw new IllegalArgumentException(min + " > " + max);
+    }
+    return Math.min(max, Math.max(value, min));
+  }
+
+  static double clamp(double value, double min, double max) {
+    if (!(min < max)) {
+      if (Double.isNaN(min)) {
+        throw new IllegalArgumentException("min is NaN");
+      }
+      if (Double.isNaN(max)) {
+        throw new IllegalArgumentException("max is NaN");
+      }
+      if (Double.compare(min, max) > 0) {
+        throw new IllegalArgumentException(min + " > " + max);
+      }
+    }
+    return Math.min(max, Math.max(value, min));
+  }
+
+  static float clamp(float value, float min, float max) {
+    if (!(min < max)) {
+      if (Float.isNaN(min)) {
+        throw new IllegalArgumentException("min is NaN");
+      }
+      if (Float.isNaN(max)) {
+        throw new IllegalArgumentException("max is NaN");
+      }
+      if (Float.compare(min, max) > 0) {
+        throw new IllegalArgumentException(min + " > " + max);
+      }
+    }
+    return Math.min(max, Math.max(value, min));
+  }
 }

@@ -80,12 +80,13 @@ parsed-method metadata.
 
 The modern integer arithmetic family is the first multi-method parsed overlay:
 
-- `ClassLoader.ts` injects 19 methods into each of `Math` and `StrictMath`
+- `ClassLoader.ts` injects 23 methods into each of `Math` and `StrictMath`
   before parsing their Java 8 bootstrap classfiles: the 12 Java 18 `ceilDiv`,
   `ceilMod`, `divideExact`, `floorDivExact`, and `ceilDivExact` overloads;
   Java 9 `multiplyFull`, `multiplyHigh`, `floorDiv(long, int)`, and
   `floorMod(long, int)`; Java 15 `absExact(int/long)`; and Java 18
-  `unsignedMultiplyHigh`.
+  `unsignedMultiplyHigh`; plus the four Java 21 integer and floating-point
+  `clamp` overloads.
 - Each injected method is ordinary public static bytecode, without native or
   synthetic modifiers, and delegates to the package-private `DoppioMath`
   class-library helper. The previous slot-less constant-pool fallback was
@@ -96,12 +97,20 @@ The modern integer arithmetic family is the first multi-method parsed overlay:
   and exact/absolute-value overflow `InvocationTargetException` causes while
   retaining the direct sign, mixed-width, identity, and exception matrices.
   The complete output matches Temurin 21.0.11.
+- `Java21MathClamp` verifies the remaining eight reflection methods, bringing
+  the parsed surface to 46 methods across both classes. It covers exact method
+  metadata and enumeration, reflective and `Lookup.unreflect` invocation,
+  integer saturation and extrema, float/double NaN and infinities, signed zero,
+  equal bounds, and native-compatible invalid-bound exception messages. Its
+  complete output also matches Temurin 21.0.11.
 - The initial 12-method compiler-discovery gates passed locally on 2026-07-13:
   Kotlin 2.4 startup in 50 seconds and minimal compile/run in 168 seconds, plus
   Scala 2.13.18 startup in 20 seconds and minimal compile/run in 185 seconds.
   After expanding to all 19 methods per class and removing the old direct-call
   fallbacks, the complete minimal compile/run gates passed again in 404 seconds
   for Kotlin 2.4.0 and 253 seconds for Scala 2.13.18 under a contended host.
+  After adding the four Java 21 `clamp` methods to each class, the same gates
+  passed in 170 seconds for Kotlin 2.4.0 and 101 seconds for Scala 2.13.18.
 
 The safer shape is an explicit overlay registry:
 
