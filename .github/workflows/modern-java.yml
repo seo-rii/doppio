@@ -177,6 +177,9 @@ jobs:
       - name: Run Kotlin default/synthetic smoke
         run: ./ci/kotlin_default_synthetic_smoke.sh
 
+      - name: Run Kotlin JVM-default smoke
+        run: ./ci/kotlin_jvm_default_smoke.sh
+
       - name: Run Kotlin when-mapping smoke
         run: ./ci/kotlin_when_mapping_smoke.sh
 

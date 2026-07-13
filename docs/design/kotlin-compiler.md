@@ -522,6 +522,18 @@ Current verified checks:
   interpreter calls and the hot method path beyond its basic-block threshold.
   A 2026-07-13 local run with this coverage completed in 218 seconds within
   the unchanged 360-second compile budget.
+- A separate no-compatibility JVM-default smoke now lives in
+  `classes/kotlin_jvm_default_smoke` and runs through
+  `ci/kotlin_jvm_default_smoke.sh` with `-jvm-target 1.8` and
+  `-jvm-default=no-compatibility`. It requires Kotlin 2.4 to emit default
+  method bodies and the default-argument bridge directly on the interface and
+  rejects any generated `$DefaultImpls` class. `javap` checks qualified
+  interface-super `invokespecial` calls and `by`-delegation `invokeinterface`
+  forwarders. Host JVM and Doppio both print
+  `UPPER:KT:upper:DIAMOND:X|diamond:x!:UPPER:D:true:true:true`, covering
+  inherited/default-argument dispatch, diamond resolution, delegation, and
+  reflection-visible `Method.isDefault()` metadata. A local 2026-07-13 run
+  completed in 237 seconds within the 360-second compile budget.
 - A focused Kotlin enum/string `when` lowering smoke now lives in
   `classes/kotlin_when_mapping_smoke` and runs through
   `ci/kotlin_when_mapping_smoke.sh`. A focused local run completed in 96
