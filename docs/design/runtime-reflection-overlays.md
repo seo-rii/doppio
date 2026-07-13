@@ -199,6 +199,28 @@ The Java 16 `Class.isRecord()` overlay is a parsed ordinary method:
 - The compiler-discovery gates passed locally on 2026-07-13 in 170 seconds for
   Kotlin 2.4.0 and 97 seconds for Scala 2.13.18.
 
+The Java 17 sealed-class accessors are parsed ordinary methods:
+
+- `ClassLoader.ts` injects public, non-native `isSealed()` and
+  `getPermittedSubclasses()` methods. Their bytecode passes the receiver to
+  package-private native `DoppioClass` helpers that reuse Doppio's parsed
+  `PermittedSubclasses` metadata and asynchronous class resolution.
+- The permitted-subclass method carries HotSpot's runtime-visible
+  `CallerSensitive` marker and `Class<?>[]` generic method signature. The
+  sealed predicate has empty annotation and generic metadata.
+- The previous slot-less constant-pool fallbacks and synthetic native-frame
+  trampolines were removed, so direct calls, reflection slots,
+  `Method.invoke`, and `Lookup.unreflect` resolve the same parsed methods.
+- `Java17ClassSealedReflection` compares exact raw and generic method metadata,
+  modifiers, annotations, declared/public lookup and enumeration, direct and
+  reflective results for sealed and unsealed class kinds, deterministic permit
+  order, fresh array snapshots, mutation isolation, and exact unreflected
+  handle types and invocation with HotSpot. The original sealed reflection
+  fixture remains a separate direct-call regression.
+- The compiler-discovery gates passed locally on 2026-07-13 in 540 seconds for
+  Kotlin 2.4.0 and 262 seconds for Scala 2.13.18 under a heavily contended
+  shared host.
+
 The two Java 9 `System.getLogger` overloads reuse the caller-sensitive path:
 
 - `ClassLoader.ts` injects ordinary public static methods for the name-only and

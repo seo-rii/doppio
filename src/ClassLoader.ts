@@ -178,6 +178,17 @@ function addJavaLangClassModernOverlays(data: Buffer): Buffer {
     helperDescriptorIndex = cp.count + 12,
     helperNameAndTypeIndex = cp.count + 13,
     helperMethodIndex = cp.count + 14,
+    isSealedNameIndex = cp.count + 15,
+    getPermittedSubclassesNameIndex = cp.count + 16,
+    getPermittedSubclassesDescriptorIndex = cp.count + 17,
+    getPermittedSubclassesHelperDescriptorIndex = cp.count + 18,
+    isSealedHelperNameAndTypeIndex = cp.count + 19,
+    isSealedHelperMethodIndex = cp.count + 20,
+    getPermittedSubclassesHelperNameAndTypeIndex = cp.count + 21,
+    getPermittedSubclassesHelperMethodIndex = cp.count + 22,
+    signatureNameIndex = cp.count + 23,
+    getPermittedSubclassesSignatureIndex = cp.count + 24,
+    callerSensitiveTypeIndex = cp.count + 25,
     extraConstants = Buffer.concat([
       utf8Constant('getModule'),
       utf8Constant('()Ljava/lang/Module;'),
@@ -201,11 +212,38 @@ function addJavaLangClassModernOverlays(data: Buffer): Buffer {
         Buffer.from([10]),
         u2(helperClassIndex),
         u2(helperNameAndTypeIndex)
-      ])
+      ]),
+      utf8Constant('isSealed'),
+      utf8Constant('getPermittedSubclasses'),
+      utf8Constant('()[Ljava/lang/Class;'),
+      utf8Constant('(Ljava/lang/Class;)[Ljava/lang/Class;'),
+      Buffer.concat([
+        Buffer.from([12]),
+        u2(isSealedNameIndex),
+        u2(helperDescriptorIndex)
+      ]),
+      Buffer.concat([
+        Buffer.from([10]),
+        u2(helperClassIndex),
+        u2(isSealedHelperNameAndTypeIndex)
+      ]),
+      Buffer.concat([
+        Buffer.from([12]),
+        u2(getPermittedSubclassesNameIndex),
+        u2(getPermittedSubclassesHelperDescriptorIndex)
+      ]),
+      Buffer.concat([
+        Buffer.from([10]),
+        u2(helperClassIndex),
+        u2(getPermittedSubclassesHelperNameAndTypeIndex)
+      ]),
+      utf8Constant('Signature'),
+      utf8Constant('()[Ljava/lang/Class<*>;'),
+      utf8Constant('Ljdk/internal/reflect/CallerSensitive;')
     ]),
     withConstants = Buffer.concat([
       data.slice(0, 8),
-      u2(cp.count + 15),
+      u2(cp.count + 26),
       data.slice(10, cp.offset),
       extraConstants,
       data.slice(cp.offset)
@@ -252,16 +290,64 @@ function addJavaLangClassModernOverlays(data: Buffer): Buffer {
       isRecordCode,
       u2(0),
       u2(0)
+    ]),
+    isSealedCode = Buffer.concat([
+      Buffer.from([0x2a, 0xb8]),
+      u2(isSealedHelperMethodIndex),
+      Buffer.from([0xac])
+    ]),
+    isSealedMethod = Buffer.concat([
+      u2(0x0001),
+      u2(isSealedNameIndex),
+      u2(isHiddenDescriptorIndex),
+      u2(1),
+      u2(codeNameIndex),
+      u4(12 + isSealedCode.length),
+      u2(1),
+      u2(1),
+      u4(isSealedCode.length),
+      isSealedCode,
+      u2(0),
+      u2(0)
+    ]),
+    getPermittedSubclassesCode = Buffer.concat([
+      Buffer.from([0x2a, 0xb8]),
+      u2(getPermittedSubclassesHelperMethodIndex),
+      Buffer.from([0xb0])
+    ]),
+    getPermittedSubclassesMethod = Buffer.concat([
+      u2(0x0001),
+      u2(getPermittedSubclassesNameIndex),
+      u2(getPermittedSubclassesDescriptorIndex),
+      u2(3),
+      u2(codeNameIndex),
+      u4(12 + getPermittedSubclassesCode.length),
+      u2(1),
+      u2(1),
+      u4(getPermittedSubclassesCode.length),
+      getPermittedSubclassesCode,
+      u2(0),
+      u2(0),
+      u2(signatureNameIndex),
+      u4(2),
+      u2(getPermittedSubclassesSignatureIndex),
+      u2(annotationsNameIndex),
+      u4(6),
+      u2(1),
+      u2(callerSensitiveTypeIndex),
+      u2(0)
     ]);
 
   return Buffer.concat([
     withConstants.slice(0, methods.countOffset),
-    u2(methods.count + 4),
+    u2(methods.count + 6),
     withConstants.slice(methods.countOffset + 2, methods.endOffset),
     getModuleMethod,
     getRecordComponentsMethod,
     isHiddenMethod,
     isRecordMethod,
+    isSealedMethod,
+    getPermittedSubclassesMethod,
     withConstants.slice(methods.endOffset)
   ]);
 }

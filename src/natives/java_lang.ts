@@ -643,6 +643,39 @@ export default function (): any {
       return type.$cls instanceof ReferenceClassData && type.$cls.isRecord();
     }
 
+    public static 'isSealed(Ljava/lang/Class;)Z'(thread: JVMThread, type: JVMTypes.java_lang_Class): boolean {
+      return type.$cls instanceof ReferenceClassData &&
+        type.$cls.getPermittedSubclassNames().length > 0;
+    }
+
+    public static 'getPermittedSubclasses(Ljava/lang/Class;)[Ljava/lang/Class;'(thread: JVMThread, type: JVMTypes.java_lang_Class): any {
+      if (!(type.$cls instanceof ReferenceClassData)) {
+        return null;
+      }
+      var permittedSubclassNames = type.$cls.getPermittedSubclassNames();
+      if (permittedSubclassNames.length === 0) {
+        return null;
+      }
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      var loader = type.$cls.getLoader(),
+        permittedSubclasses: JVMTypes.java_lang_Class[] = [],
+        i = 0,
+        resolveNext = () => {
+          if (i >= permittedSubclassNames.length) {
+            thread.asyncReturn(util.newArrayFromData<JVMTypes.java_lang_Class>(thread, thread.getBsCl(), '[Ljava/lang/Class;', permittedSubclasses));
+            return;
+          }
+          loader.resolveClass(thread, permittedSubclassNames[i++], (permittedSubclass: ClassData) => {
+            if (permittedSubclass !== null) {
+              permittedSubclasses.push(permittedSubclass.getClassObject(thread));
+              resolveNext();
+            }
+          });
+        };
+      resolveNext();
+      return null;
+    }
+
   }
 
   class java_lang_ClassLoader$NativeLibrary {

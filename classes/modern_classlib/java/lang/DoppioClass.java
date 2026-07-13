@@ -5,4 +5,8 @@ final class DoppioClass {
   }
 
   static native boolean isRecord(Class<?> type);
+
+  static native boolean isSealed(Class<?> type);
+
+  static native Class<?>[] getPermittedSubclasses(Class<?> type);
 }

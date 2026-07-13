@@ -2797,74 +2797,6 @@ export class MethodReference implements IConstantPoolItem {
 	          };
 	          method = <Method> syntheticMethod;
 	        } else if (syntheticCls.getInternalName() === 'Ljava/lang/Class;' &&
-	            (this.signature === 'isSealed()Z' ||
-	             this.signature === 'getPermittedSubclasses()[Ljava/lang/Class;')) {
-	          syntheticMethod = {
-	            cls: syntheticCls,
-	            slot: -1,
-	            accessFlags: new util.Flags(util.FlagMasks.PUBLIC | util.FlagMasks.NATIVE),
-	            name: this.nameAndTypeInfo.name,
-	            rawDescriptor: this.nameAndTypeInfo.descriptor,
-	            attrs: [],
-	            signature: this.signature,
-	            fullSignature: syntheticFullSignature,
-	            parameterTypes: [],
-	            returnType: this.signature === 'isSealed()Z' ? 'Z' : '[Ljava/lang/Class;',
-	            getParamWordSize: function(): number {
-	              return 0;
-	            },
-	            convertArgs: function(thread: JVMThread, params: any[]): any[] {
-	              return [thread, params[0]];
-	            },
-	            getNativeFunction: function(): Function {
-	              var classSealedSignature = this.signature;
-	              return function(thread: JVMThread, javaThis: JVMTypes.java_lang_Class): any {
-	                var cls = javaThis.$cls;
-	                if (!(cls instanceof ReferenceClassData)) {
-	                  return classSealedSignature === 'isSealed()Z' ? 0 : null;
-	                }
-	                var permittedSubclassNames = cls.getPermittedSubclassNames();
-	                if (classSealedSignature === 'isSealed()Z') {
-	                  return permittedSubclassNames.length > 0 ? 1 : 0;
-	                }
-	                if (permittedSubclassNames.length === 0) {
-	                  return null;
-	                }
-	                thread.setStatus(ThreadStatus.ASYNC_WAITING);
-	                var loader = cls.getLoader(),
-	                  permittedSubclasses: JVMTypes.java_lang_Class[] = [],
-	                  i = 0,
-	                  resolveNext = () => {
-	                    if (i >= permittedSubclassNames.length) {
-	                      thread.asyncReturn(util.newArrayFromData<JVMTypes.java_lang_Class>(thread, thread.getBsCl(), '[Ljava/lang/Class;', permittedSubclasses));
-	                      return;
-	                    }
-	                    loader.resolveClass(thread, permittedSubclassNames[i++], (permittedSubclass: ClassData) => {
-	                      if (permittedSubclass !== null) {
-	                        permittedSubclasses.push(permittedSubclass.getClassObject(thread));
-	                        resolveNext();
-	                      }
-	                    });
-	                  };
-	                resolveNext();
-	                return null;
-	              };
-	            },
-	            isSignaturePolymorphic: function(): boolean {
-	              return false;
-	            },
-	            isHidden: function(): boolean {
-	              return false;
-	            },
-	            isCallerSensitive: function(): boolean {
-	              return false;
-	            },
-	            getFullSignature: function(): string {
-	              return syntheticCls.getExternalName() + '.' + this.signature;
-	            }
-	          };
-	          method = <Method> syntheticMethod;
-	        } else if (syntheticCls.getInternalName() === 'Ljava/lang/Class;' &&
 	            this.signature === 'arrayType()Ljava/lang/Class;') {
 	          syntheticMethod = {
 	            cls: syntheticCls,
@@ -3885,11 +3817,9 @@ export class MethodReference implements IConstantPoolItem {
 	    } else if ((this.fullSignature === 'java/lang/Class/arrayType()Ljava/lang/Class;' ||
 	        this.fullSignature === 'java/lang/Class/componentType()Ljava/lang/Class;' ||
 	        this.fullSignature === 'java/lang/Class/descriptorString()Ljava/lang/String;' ||
-	        this.fullSignature === 'java/lang/Class/getPermittedSubclasses()[Ljava/lang/Class;' ||
 	        this.fullSignature === 'java/lang/Class/getNestHost()Ljava/lang/Class;' ||
 	        this.fullSignature === 'java/lang/Class/getNestMembers()[Ljava/lang/Class;' ||
 	        this.fullSignature === 'java/lang/Class/getPackageName()Ljava/lang/String;' ||
-	        this.fullSignature === 'java/lang/Class/isSealed()Z' ||
 	        this.fullSignature === 'java/lang/Class/isNestmateOf(Ljava/lang/Class;)Z' ||
 	        this.fullSignature === 'java/lang/Class/describeConstable()Ljava/util/Optional;') &&
 	        typeof this.jsConstructor.prototype[this.fullSignature] !== 'function') {

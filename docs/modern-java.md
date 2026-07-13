@@ -1968,10 +1968,14 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
 
 ## Known Sealed-Class Gaps
 
-- `java.lang.Class` now exposes selected Java 17 sealed reflection behavior:
-  `isSealed()` and `getPermittedSubclasses()` for sealed interfaces, final
-  permitted classes, ordinary classes, selected JDK classes, primitives, void,
-  and arrays.
+- `java.lang.Class.isSealed()` and `getPermittedSubclasses()` are parsed public,
+  non-native Java 17 methods, so direct calls, reflective lookup and
+  enumeration, `Method.invoke`, and `Lookup.unreflect` share one
+  implementation. The permitted-subclass method exposes its native-compatible
+  `Class<?>[]` generic return and `CallerSensitive` metadata. Coverage includes
+  sealed interfaces, final permitted classes, ordinary classes, selected JDK
+  classes, primitives, void, arrays, permit order, fresh arrays, and mutation
+  isolation.
 - Direct superclass and direct interface `PermittedSubclasses` checks are
   enforced during class resolution.
 - The current illegal-subtype fixture verifies rejection through `LinkageError`
