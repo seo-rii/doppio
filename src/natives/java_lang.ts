@@ -676,6 +676,32 @@ export default function (): any {
       return platformObj;
     }
 
+    public static 'getDefinedPackage(Ljava/lang/ClassLoader;Ljava/lang/String;)Ljava/lang/Package;'(thread: JVMThread, loader: JVMTypes.java_lang_ClassLoader, name: JVMTypes.java_lang_String): JVMTypes.java_lang_Package {
+      if (name === null) {
+        thread.throwNewException('Ljava/lang/NullPointerException;', '');
+        return null;
+      }
+      var entries = util.getClassLoaderDefinedPackageEntries(loader),
+        packageName = name.toString(),
+        i: number;
+      for (i = 0; i < entries.length; i++) {
+        if (entries[i].name === packageName) {
+          return entries[i].pkg;
+        }
+      }
+      return null;
+    }
+
+    public static 'getDefinedPackages(Ljava/lang/ClassLoader;)[Ljava/lang/Package;'(thread: JVMThread, loader: JVMTypes.java_lang_ClassLoader): JVMTypes.JVMArray<JVMTypes.java_lang_Package> {
+      var entries = util.getClassLoaderDefinedPackageEntries(loader),
+        values: JVMTypes.java_lang_Package[] = [],
+        i: number;
+      for (i = 0; i < entries.length; i++) {
+        values.push(entries[i].pkg);
+      }
+      return util.newArrayFromData<JVMTypes.java_lang_Package>(thread, thread.getBsCl(), '[Ljava/lang/Package;', values);
+    }
+
   }
 
   function createDoppioSystemLogger(thread: JVMThread, name: JVMTypes.java_lang_String): void {

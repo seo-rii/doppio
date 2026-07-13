@@ -403,6 +403,109 @@ function addJavaLangClassLoaderModernOverlays(data: Buffer): Buffer {
   ]);
 }
 
+function addJavaLangClassLoaderPackageModernOverlays(data: Buffer): Buffer {
+  var cp = constantPoolEnd(data),
+    definedPackageNameIndex = cp.count,
+    definedPackageDescriptorIndex = cp.count + 1,
+    definedPackagesNameIndex = cp.count + 2,
+    definedPackagesDescriptorIndex = cp.count + 3,
+    codeNameIndex = cp.count + 4,
+    helperNameIndex = cp.count + 5,
+    helperClassIndex = cp.count + 6,
+    definedPackageHelperDescriptorIndex = cp.count + 7,
+    definedPackageNameAndTypeIndex = cp.count + 8,
+    definedPackageHelperMethodIndex = cp.count + 9,
+    definedPackagesHelperDescriptorIndex = cp.count + 10,
+    definedPackagesNameAndTypeIndex = cp.count + 11,
+    definedPackagesHelperMethodIndex = cp.count + 12,
+    extraConstants = Buffer.concat([
+      utf8Constant('getDefinedPackage'),
+      utf8Constant('(Ljava/lang/String;)Ljava/lang/Package;'),
+      utf8Constant('getDefinedPackages'),
+      utf8Constant('()[Ljava/lang/Package;'),
+      utf8Constant('Code'),
+      utf8Constant('java/lang/DoppioClassLoader'),
+      Buffer.concat([Buffer.from([7]), u2(helperNameIndex)]),
+      utf8Constant('(Ljava/lang/ClassLoader;Ljava/lang/String;)Ljava/lang/Package;'),
+      Buffer.concat([
+        Buffer.from([12]),
+        u2(definedPackageNameIndex),
+        u2(definedPackageHelperDescriptorIndex)
+      ]),
+      Buffer.concat([
+        Buffer.from([10]),
+        u2(helperClassIndex),
+        u2(definedPackageNameAndTypeIndex)
+      ]),
+      utf8Constant('(Ljava/lang/ClassLoader;)[Ljava/lang/Package;'),
+      Buffer.concat([
+        Buffer.from([12]),
+        u2(definedPackagesNameIndex),
+        u2(definedPackagesHelperDescriptorIndex)
+      ]),
+      Buffer.concat([
+        Buffer.from([10]),
+        u2(helperClassIndex),
+        u2(definedPackagesNameAndTypeIndex)
+      ])
+    ]),
+    withConstants = Buffer.concat([
+      data.slice(0, 8),
+      u2(cp.count + 13),
+      data.slice(10, cp.offset),
+      extraConstants,
+      data.slice(cp.offset)
+    ]),
+    methods = methodsInfo(withConstants, cp.offset + extraConstants.length),
+    definedPackageCode = Buffer.concat([
+      Buffer.from([0x2a, 0x2b, 0xb8]),
+      u2(definedPackageHelperMethodIndex),
+      Buffer.from([0xb0])
+    ]),
+    definedPackagesCode = Buffer.concat([
+      Buffer.from([0x2a, 0xb8]),
+      u2(definedPackagesHelperMethodIndex),
+      Buffer.from([0xb0])
+    ]),
+    definedPackageMethod = Buffer.concat([
+      u2(0x0011),
+      u2(definedPackageNameIndex),
+      u2(definedPackageDescriptorIndex),
+      u2(1),
+      u2(codeNameIndex),
+      u4(12 + definedPackageCode.length),
+      u2(2),
+      u2(2),
+      u4(definedPackageCode.length),
+      definedPackageCode,
+      u2(0),
+      u2(0)
+    ]),
+    definedPackagesMethod = Buffer.concat([
+      u2(0x0011),
+      u2(definedPackagesNameIndex),
+      u2(definedPackagesDescriptorIndex),
+      u2(1),
+      u2(codeNameIndex),
+      u4(12 + definedPackagesCode.length),
+      u2(1),
+      u2(1),
+      u4(definedPackagesCode.length),
+      definedPackagesCode,
+      u2(0),
+      u2(0)
+    ]);
+
+  return Buffer.concat([
+    withConstants.slice(0, methods.countOffset),
+    u2(methods.count + 2),
+    withConstants.slice(methods.countOffset + 2, methods.endOffset),
+    definedPackageMethod,
+    definedPackagesMethod,
+    withConstants.slice(methods.endOffset)
+  ]);
+}
+
 function addJavaLangSystemModernOverlays(data: Buffer): Buffer {
   var cp = constantPoolEnd(data),
     methodNameIndex = cp.count,
@@ -1292,6 +1395,7 @@ export class BootstrapClassLoader extends ClassLoader {
         }
         if (typeStr === 'Ljava/lang/ClassLoader;') {
           clsData = addJavaLangClassLoaderModernOverlays(clsData);
+          clsData = addJavaLangClassLoaderPackageModernOverlays(clsData);
         }
         if (typeStr === 'Ljava/lang/System;') {
           clsData = addJavaLangSystemModernOverlays(clsData);

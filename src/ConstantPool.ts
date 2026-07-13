@@ -885,63 +885,6 @@ export class MethodReference implements IConstantPoolItem {
           };
           method = <Method> syntheticMethod;
         } else if (syntheticCls.isSubclass(thread.getBsCl().getResolvedClass('Ljava/lang/ClassLoader;')) &&
-            (this.signature === 'getDefinedPackage(Ljava/lang/String;)Ljava/lang/Package;' ||
-             this.signature === 'getDefinedPackages()[Ljava/lang/Package;')) {
-          syntheticMethod = {
-            cls: syntheticCls,
-            slot: -1,
-            accessFlags: new util.Flags(util.FlagMasks.PUBLIC | util.FlagMasks.FINAL | util.FlagMasks.NATIVE),
-            name: this.nameAndTypeInfo.name,
-            rawDescriptor: this.nameAndTypeInfo.descriptor,
-            attrs: [],
-            signature: this.signature,
-            fullSignature: syntheticFullSignature,
-            parameterTypes: this.signature === 'getDefinedPackage(Ljava/lang/String;)Ljava/lang/Package;' ? ['Ljava/lang/String;'] : [],
-            returnType: this.signature === 'getDefinedPackage(Ljava/lang/String;)Ljava/lang/Package;' ? 'Ljava/lang/Package;' : '[Ljava/lang/Package;',
-            getParamWordSize: function(): number {
-              return this.parameterTypes.length;
-            },
-            convertArgs: function(thread: JVMThread, params: any[]): any[] {
-              return [thread].concat(params);
-            },
-            getNativeFunction: function(): Function {
-              return function(thread: JVMThread, javaThis: JVMTypes.java_lang_ClassLoader, name?: JVMTypes.java_lang_String): any {
-                var classLoaderPackageSignature = syntheticMethod.signature,
-                  entries = util.getClassLoaderDefinedPackageEntries(javaThis),
-                  values: JVMTypes.java_lang_Package[] = [],
-                  i: number;
-                if (classLoaderPackageSignature === 'getDefinedPackage(Ljava/lang/String;)Ljava/lang/Package;' && name === null) {
-                  thread.throwNewException('Ljava/lang/NullPointerException;', '');
-                  return null;
-                }
-                for (i = 0; i < entries.length; i++) {
-                  if (classLoaderPackageSignature === 'getDefinedPackage(Ljava/lang/String;)Ljava/lang/Package;' &&
-                      entries[i].name === name.toString()) {
-                    return entries[i].pkg;
-                  } else if (classLoaderPackageSignature === 'getDefinedPackages()[Ljava/lang/Package;') {
-                    values.push(entries[i].pkg);
-                  }
-                }
-                return classLoaderPackageSignature === 'getDefinedPackages()[Ljava/lang/Package;' ?
-                  util.newArrayFromData<JVMTypes.java_lang_Package>(thread, thread.getBsCl(), '[Ljava/lang/Package;', values) :
-                  null;
-              };
-            },
-            isSignaturePolymorphic: function(): boolean {
-              return false;
-            },
-            isHidden: function(): boolean {
-              return false;
-            },
-            isCallerSensitive: function(): boolean {
-              return false;
-            },
-            getFullSignature: function(): string {
-              return syntheticCls.getExternalName() + '.' + this.signature;
-            }
-          };
-          method = <Method> syntheticMethod;
-        } else if (syntheticCls.isSubclass(thread.getBsCl().getResolvedClass('Ljava/lang/ClassLoader;')) &&
             this.signature === 'resources(Ljava/lang/String;)Ljava/util/stream/Stream;') {
           syntheticMethod = {
             cls: syntheticCls,
@@ -3882,8 +3825,6 @@ export class MethodReference implements IConstantPoolItem {
 	    } else if ((this.signature === 'getName()Ljava/lang/String;' ||
 	        this.signature === 'getUnnamedModule()Ljava/lang/Module;' ||
 	        this.signature === 'isRegisteredAsParallelCapable()Z' ||
-	        this.signature === 'getDefinedPackage(Ljava/lang/String;)Ljava/lang/Package;' ||
-	        this.signature === 'getDefinedPackages()[Ljava/lang/Package;' ||
 	        this.signature === 'resources(Ljava/lang/String;)Ljava/util/stream/Stream;') &&
 	        this.method.cls.isSubclass(thread.getBsCl().getResolvedClass('Ljava/lang/ClassLoader;')) &&
 	        typeof this.jsConstructor.prototype[this.fullSignature] !== 'function') {

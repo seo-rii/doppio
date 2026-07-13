@@ -1103,6 +1103,13 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `jdk.internal.reflect.CallerSensitive` runtime annotation metadata and keeps
   the tested platform/system loader identity and parent hierarchy. The legacy
   `SecurityManager` caller permission check is not implemented.
+- `java.lang.ClassLoader.getDefinedPackage(String)` and
+  `getDefinedPackages()` are parsed public final Java 9 methods, so direct
+  calls, reflective lookup and enumeration, `Method.invoke`, and
+  `Lookup.unreflect` share one implementation. Coverage includes exact-loader
+  system and empty-loader package visibility, missing and bootstrap-package
+  exclusion, fresh array snapshots, mutation isolation, null validation, and
+  native-compatible method metadata.
 - `java.lang.StringBuilder` and `StringBuffer` now expose selected Java 11
   `compareTo` behavior for lexicographic ordering, equal and mutated contents,
   prefix-length ordering, NUL character ordering, and null argument rejection.

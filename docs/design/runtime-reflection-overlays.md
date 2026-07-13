@@ -141,6 +141,25 @@ caller-sensitive parsed method:
   still unsupported. The local compiler-discovery gates passed on 2026-07-13
   in 78 seconds for Kotlin 2.4.0 and 53 seconds for Scala 2.13.18.
 
+The two Java 9 `ClassLoader` defined-package methods add parsed instance
+methods:
+
+- `ClassLoader.ts` injects ordinary public final `getDefinedPackage(String)`
+  and `getDefinedPackages()` methods. Their bytecode passes the receiver to
+  package-private native `DoppioClassLoader` helpers, preserving exact-loader
+  package ownership while sharing the existing package-table implementation.
+- The previous slot-less constant-pool fallbacks were removed, so direct
+  calls, reflection slots, `Method.invoke`, and `Lookup.unreflect` all resolve
+  the same parsed methods with non-native, non-synthetic metadata.
+- `Java9ClassLoaderPackagesReflection` compares exact modifiers, descriptors,
+  annotation and parameter metadata, declared/public lookup and enumeration,
+  system and empty-loader package visibility, bootstrap-package exclusion,
+  fresh array snapshots, mutation isolation, null exception causes, and exact
+  unreflected handle types and invocation with HotSpot. The original direct
+  package fixture remains a separate regression.
+- The compiler-discovery gates passed locally on 2026-07-13 in 146 seconds for
+  Kotlin 2.4.0 and 135 seconds for Scala 2.13.18.
+
 The two Java 9 `System.getLogger` overloads reuse the caller-sensitive path:
 
 - `ClassLoader.ts` injects ordinary public static methods for the name-only and
