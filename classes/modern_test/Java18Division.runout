@@ -1,0 +1,11 @@
+ceil-int=2,-1,-1,2,-2147483648
+ceil-long-int=4294967297,-4294967296
+ceil-long=3074457345618258603,-9223372036854775808
+mod-int=-2,-1,1,2,0
+mod-long-int=-1,-1
+mod-long=-2,0
+exact-int=2,ArithmeticException:integer overflow,ArithmeticException:/ by zero
+exact-long=2,ArithmeticException:long overflow,ArithmeticException:/ by zero
+round-exact=-2,2,ArithmeticException:integer overflow,ArithmeticException:long overflow
+matrix=true,true,true
+exceptions=true

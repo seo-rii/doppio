@@ -335,6 +335,86 @@ function modernJava(grunt: IGrunt) {
     grunt.log.ok('Generated ' + runoutPath);
   });
 
+  grunt.registerTask('generate_java18_division', 'Generate the Java 18 integer division API fixture.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      workDir = 'build/tmp/java18-division',
+      stubSrcDir = workDir + '/src',
+      stubOutDir = workDir + '/out',
+      fixturePath = 'classes/modern_fixture/Java18Division.java',
+      classPath = 'classes/modern_test/Java18Division.class',
+      runoutPath = 'classes/modern_test/Java18Division.runout',
+      expectedOutput = [
+        'ceil-int=2,-1,-1,2,-2147483648',
+        'ceil-long-int=4294967297,-4294967296',
+        'ceil-long=3074457345618258603,-9223372036854775808',
+        'mod-int=-2,-1,1,2,0',
+        'mod-long-int=-1,-1',
+        'mod-long=-2,0',
+        'exact-int=2,ArithmeticException:integer overflow,ArithmeticException:/ by zero',
+        'exact-long=2,ArithmeticException:long overflow,ArithmeticException:/ by zero',
+        'round-exact=-2,2,ArithmeticException:integer overflow,ArithmeticException:long overflow',
+        'matrix=true,true,true',
+        'exceptions=true'
+      ].join('\n') + '\n',
+      methodDeclarations = [
+        '  public static int ceilDiv(int x, int y) { return 0; }',
+        '  public static long ceilDiv(long x, int y) { return 0L; }',
+        '  public static long ceilDiv(long x, long y) { return 0L; }',
+        '  public static int ceilMod(int x, int y) { return 0; }',
+        '  public static int ceilMod(long x, int y) { return 0; }',
+        '  public static long ceilMod(long x, long y) { return 0L; }',
+        '  public static int divideExact(int x, int y) { return 0; }',
+        '  public static long divideExact(long x, long y) { return 0L; }',
+        '  public static int floorDivExact(int x, int y) { return 0; }',
+        '  public static long floorDivExact(long x, long y) { return 0L; }',
+        '  public static int ceilDivExact(int x, int y) { return 0; }',
+        '  public static long ceilDivExact(long x, long y) { return 0L; }',
+        '  public static int floorDiv(int x, int y) { return 0; }',
+        '  public static long floorDiv(long x, long y) { return 0L; }'
+      ],
+      stubSource = ['package java.lang;', 'public final class CLASS_NAME {']
+        .concat(methodDeclarations)
+        .concat(['}', ''])
+        .join('\n'),
+      javac: string;
+
+    grunt.config.requires('build.javac');
+    javac = shellEscape(grunt.config('build.javac'));
+    if (fs.existsSync(workDir)) {
+      grunt.file.delete(workDir);
+    }
+    grunt.file.mkdir(stubSrcDir + '/java/lang');
+    grunt.file.mkdir(stubOutDir);
+    grunt.file.write(stubSrcDir + '/java/lang/Math.java', stubSource.replace('CLASS_NAME', 'Math'));
+    grunt.file.write(stubSrcDir + '/java/lang/StrictMath.java', stubSource.replace('CLASS_NAME', 'StrictMath'));
+
+    child_process.exec(javac + ' -J-Dfile.encoding=UTF8 -source 17 -target 17 -implicit:none --patch-module java.base=' +
+        shellEscape(stubSrcDir) + ' -d ' + shellEscape(stubOutDir) + ' ' +
+        shellEscape(stubSrcDir + '/java/lang/Math.java') + ' ' + shellEscape(stubSrcDir + '/java/lang/StrictMath.java'),
+      function(stubErr?: any, stubStdout?: Buffer, stubStderr?: Buffer): void {
+        if (stubErr) {
+          grunt.fail.fatal('Error compiling Java 18 division API stubs: ' + stubErr + '\n' +
+            stubStdout.toString() + stubStderr.toString());
+        }
+        child_process.exec(javac + ' -J-Dfile.encoding=UTF8 -source 17 -target 17 -implicit:none --patch-module java.base=' +
+            shellEscape(stubOutDir) + ' -d . ' + shellEscape(fixturePath),
+          function(fixtureErr?: any, fixtureStdout?: Buffer, fixtureStderr?: Buffer): void {
+            if (fixtureErr) {
+              grunt.fail.fatal('Error compiling Java 18 division fixture: ' + fixtureErr + '\n' +
+                fixtureStdout.toString() + fixtureStderr.toString());
+            }
+            var classBytes = fs.readFileSync(classPath);
+            classBytes.writeUInt16BE(62, 6);
+            fs.writeFileSync(classPath, classBytes);
+            grunt.file.write(runoutPath, expectedOutput);
+            grunt.file.delete(workDir);
+            grunt.log.ok('Generated ' + classPath);
+            grunt.log.ok('Generated ' + runoutPath);
+            done();
+          });
+      });
+  });
+
   grunt.registerTask('generate_java18_default_charset', 'Generate a Java 18 UTF-8 default charset fixture.', function() {
     var done: (status?: boolean) => void = this.async(),
       sourcePath = 'classes/modern_test/Java18DefaultCharset.java',
@@ -4925,6 +5005,22 @@ function modernJava(grunt: IGrunt) {
           grunt.fail.fatal('Java 18 unsignedMultiplyHigh Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
         }
         grunt.log.ok('Java 18 unsignedMultiplyHigh output matched expected output.');
+        done();
+      });
+  });
+
+  grunt.registerTask('unit_test_java18_division', 'Run the Java 18 integer division API fixture on Doppio.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      mainClass = 'classes.modern_test.Java18Division',
+      outPath = 'classes/modern_test/Java18Division.runout';
+    child_process.exec('node --no-deprecation build/release-cli/console/runner.js -classpath . ' + mainClass,
+      function(err?: any, stdout?: Buffer, stderr?: Buffer) {
+        var actual = stdout.toString() + stderr.toString(),
+          expected = fs.readFileSync(outPath, 'utf8');
+        if (err || actual !== expected) {
+          grunt.fail.fatal('Java 18 integer division Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
+        }
+        grunt.log.ok('Java 18 integer division output matched expected output.');
         done();
       });
   });
