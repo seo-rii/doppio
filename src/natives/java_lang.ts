@@ -230,6 +230,10 @@ export default function (): any {
       });
     }
 
+    public static 'isHidden()Z'(thread: JVMThread, javaThis: JVMTypes.java_lang_Class): boolean {
+      return false;
+    }
+
     public static 'isInstance(Ljava/lang/Object;)Z'(thread: JVMThread, javaThis: JVMTypes.java_lang_Class, obj: JVMTypes.java_lang_Object): boolean {
       if (obj !== null) {
         return obj.getClass().isCastable(javaThis.$cls);

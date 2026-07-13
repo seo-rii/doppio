@@ -167,15 +167,23 @@ function addJavaLangClassModernOverlays(data: Buffer): Buffer {
     getModuleDescriptorIndex = cp.count + 1,
     getRecordComponentsNameIndex = cp.count + 2,
     getRecordComponentsDescriptorIndex = cp.count + 3,
+    isHiddenNameIndex = cp.count + 4,
+    isHiddenDescriptorIndex = cp.count + 5,
+    annotationsNameIndex = cp.count + 6,
+    annotationTypeIndex = cp.count + 7,
     extraConstants = Buffer.concat([
       utf8Constant('getModule'),
       utf8Constant('()Ljava/lang/Module;'),
       utf8Constant('getRecordComponents'),
-      utf8Constant('()[Ljava/lang/reflect/RecordComponent;')
+      utf8Constant('()[Ljava/lang/reflect/RecordComponent;'),
+      utf8Constant('isHidden'),
+      utf8Constant('()Z'),
+      utf8Constant('RuntimeVisibleAnnotations'),
+      utf8Constant('Ljdk/internal/vm/annotation/IntrinsicCandidate;')
     ]),
     withConstants = Buffer.concat([
       data.slice(0, 8),
-      u2(cp.count + 4),
+      u2(cp.count + 8),
       data.slice(10, cp.offset),
       extraConstants,
       data.slice(cp.offset)
@@ -192,14 +200,26 @@ function addJavaLangClassModernOverlays(data: Buffer): Buffer {
       u2(getRecordComponentsNameIndex),
       u2(getRecordComponentsDescriptorIndex),
       u2(0)
+    ]),
+    isHiddenMethod = Buffer.concat([
+      u2(0x0101),
+      u2(isHiddenNameIndex),
+      u2(isHiddenDescriptorIndex),
+      u2(1),
+      u2(annotationsNameIndex),
+      u4(6),
+      u2(1),
+      u2(annotationTypeIndex),
+      u2(0)
     ]);
 
   return Buffer.concat([
     withConstants.slice(0, methods.countOffset),
-    u2(methods.count + 2),
+    u2(methods.count + 3),
     withConstants.slice(methods.countOffset + 2, methods.endOffset),
     getModuleMethod,
     getRecordComponentsMethod,
+    isHiddenMethod,
     withConstants.slice(methods.endOffset)
   ]);
 }
