@@ -654,6 +654,8 @@ export class MethodReference implements IConstantPoolItem {
             thread.throwException(e);
             cb(false);
           } else {
+            assert(rv !== null && rv !== undefined,
+              `MethodHandleNatives.linkMethod returned no MemberName for ${this.signature}`);
             this.appendix = appendix.array[0];
             this.memberName = rv;
             cb(true);
@@ -730,60 +732,6 @@ export class MethodReference implements IConstantPoolItem {
               return function(thread: JVMThread, javaThis: JVMTypes.java_lang_Thread): gLong {
                 var tid = (<any> javaThis)['java/lang/Thread/tid'];
                 return tid !== null && tid !== undefined ? tid : gLong.fromNumber(javaThis.$thread.getRef());
-              };
-            },
-            isSignaturePolymorphic: function(): boolean {
-              return false;
-            },
-            isHidden: function(): boolean {
-              return false;
-            },
-            isCallerSensitive: function(): boolean {
-              return false;
-            },
-            getFullSignature: function(): string {
-              return syntheticCls.getExternalName() + '.' + this.signature;
-            }
-          };
-          method = <Method> syntheticMethod;
-        } else if (syntheticCls.getInternalName() === 'Ljava/lang/ClassLoader;' &&
-            this.signature === 'getPlatformClassLoader()Ljava/lang/ClassLoader;') {
-          syntheticMethod = {
-            cls: syntheticCls,
-            slot: -1,
-            accessFlags: syntheticAccessFlags,
-            name: this.nameAndTypeInfo.name,
-            rawDescriptor: this.nameAndTypeInfo.descriptor,
-            attrs: [],
-            signature: this.signature,
-            fullSignature: syntheticFullSignature,
-            parameterTypes: [],
-            returnType: 'Ljava/lang/ClassLoader;',
-            getParamWordSize: function(): number {
-              return 0;
-            },
-            convertArgs: function(thread: JVMThread, params: any[]): any[] {
-              return [thread];
-            },
-            getNativeFunction: function(): Function {
-              return function(thread: JVMThread): JVMTypes.java_lang_ClassLoader {
-                var systemLoader = thread.getJVM().getSystemClassLoader(),
-                  systemObj = systemLoader === null ? null : systemLoader.getLoaderObject(),
-                  platformObj = systemObj === null ? null : (<any> systemObj)['java/lang/ClassLoader/parent'],
-                  classLoaderCons: any;
-                if (platformObj !== null && platformObj !== undefined) {
-                  (<any> platformObj)['java/lang/ClassLoader/doppioPlatform'] = true;
-                  return platformObj;
-                }
-                classLoaderCons = syntheticCls.getConstructor(thread);
-                platformObj = (<any> classLoaderCons).$doppioPlatformClassLoader;
-                if (platformObj === null || platformObj === undefined) {
-                  platformObj = new classLoaderCons(thread);
-                  (<any> platformObj)['java/lang/ClassLoader/parent'] = null;
-                  (<any> platformObj)['java/lang/ClassLoader/doppioPlatform'] = true;
-                  (<any> classLoaderCons).$doppioPlatformClassLoader = platformObj;
-                }
-                return platformObj;
               };
             },
             isSignaturePolymorphic: function(): boolean {
@@ -3870,23 +3818,22 @@ export class MethodReference implements IConstantPoolItem {
           method = <Method> syntheticMethod;
         }
       }
-      if (method === null) {
-        if (util.is_reference_type(cls.getInternalName())) {
-          // Signature polymorphic lookup.
-          method = (<ReferenceClassData<JVMTypes.java_lang_Object>> cls).signaturePolymorphicAwareMethodLookup(this.signature);
-          if (method !== null && (method.name === 'invoke' || method.name === 'invokeExact')) {
-            // In order to completely resolve the signature polymorphic function,
-            // we need to resolve its MemberName object and Appendix.
-            return this.resolveMemberName(method, thread, loader, caller, (status: boolean) => {
-              if (status === true) {
-                this.setResolved(thread, method);
-              } else {
-                thread.throwNewException('Ljava/lang/NoSuchMethodError;', `Method ${this.signature} does not exist in class ${this.classInfo.cls.getExternalName()}.`);
-              }
-              cb(status);
-            });
+      if (method === null && util.is_reference_type(cls.getInternalName())) {
+        // Signature polymorphic lookup.
+        method = (<ReferenceClassData<JVMTypes.java_lang_Object>> cls).signaturePolymorphicAwareMethodLookup(this.signature);
+      }
+      if (method !== null && method.isSignaturePolymorphic() &&
+          (method.name === 'invoke' || method.name === 'invokeExact')) {
+        // The erased Object[] descriptor can resolve through ordinary lookup,
+        // but it still requires the signature-polymorphic MemberName linkage.
+        return this.resolveMemberName(method, thread, loader, caller, (status: boolean) => {
+          if (status === true) {
+            this.setResolved(thread, method);
+          } else {
+            thread.throwNewException('Ljava/lang/NoSuchMethodError;', `Method ${this.signature} does not exist in class ${this.classInfo.cls.getExternalName()}.`);
           }
-        }
+          cb(status);
+        });
       }
       if (method !== null) {
         if (caller !== null && !util.checkAccess(caller, method.cls, method.accessFlags)) {
@@ -3934,7 +3881,6 @@ export class MethodReference implements IConstantPoolItem {
         this.fullSignature === 'java/nio/file/FileSystems/newFileSystem(Ljava/nio/file/Path;Ljava/lang/ClassLoader;)Ljava/nio/file/FileSystem;' ||
         this.fullSignature === 'java/nio/file/FileSystems/newFileSystem(Ljava/nio/file/Path;Ljava/util/Map;Ljava/lang/ClassLoader;)Ljava/nio/file/FileSystem;';
 	    if ((this.fullSignature === 'java/lang/Thread/sleep(Ljava/time/Duration;)V' ||
-	        this.fullSignature === 'java/lang/ClassLoader/getPlatformClassLoader()Ljava/lang/ClassLoader;' ||
 	        this.fullSignature === 'java/lang/System/getLogger(Ljava/lang/String;)Ljava/lang/System$Logger;' ||
 	        this.fullSignature === 'java/lang/System/getLogger(Ljava/lang/String;Ljava/util/ResourceBundle;)Ljava/lang/System$Logger;' ||
 	        resolvedNumberFormatCompact ||

@@ -1096,6 +1096,13 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `Lookup.unreflect` share one implementation. Coverage includes exact method
   and empty annotation metadata, BMP, supplementary, NUL, and max code points,
   plus native-compatible invalid-range exception messages.
+- `java.lang.ClassLoader.getPlatformClassLoader()` is a parsed public static
+  Java 9 method, so direct calls, reflective lookup and enumeration,
+  `Method.invoke`, and caller-sensitive `Lookup.unreflect` invocation share one
+  implementation. It exposes HotSpot-compatible
+  `jdk.internal.reflect.CallerSensitive` runtime annotation metadata and keeps
+  the tested platform/system loader identity and parent hierarchy. The legacy
+  `SecurityManager` caller permission check is not implemented.
 - `java.lang.StringBuilder` and `StringBuffer` now expose selected Java 11
   `compareTo` behavior for lexicographic ordering, equal and mutated contents,
   prefix-length ordering, NUL character ordering, and null argument rejection.

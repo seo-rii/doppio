@@ -113,6 +113,34 @@ rule while delegating nontrivial string construction:
 - The complete compiler gates passed locally on 2026-07-13 in 97 seconds for
   Kotlin 2.4.0 and 58 seconds for Scala 2.13.18.
 
+The Java 9 `ClassLoader.getPlatformClassLoader()` overlay adds the first
+caller-sensitive parsed method:
+
+- `ClassLoader.ts` injects an ordinary public static method that delegates to
+  the package-private `DoppioClassLoader` helper. The previous slot-less
+  constant-pool fallback was removed, so direct calls, reflection slots, and
+  invocation use the same method and cached platform-loader identity.
+- The parsed method has the exact runtime-visible
+  `jdk.internal.reflect.CallerSensitive` marker used by HotSpot. The matching
+  annotation class lives in the modern class library, and the runtime
+  annotation parser recognizes both the legacy and modern descriptors.
+- Enabling caller-sensitive `Lookup.unreflect` exposed three shared
+  `java.lang.invoke` defects. Anonymous classes now inherit the host protection
+  domain and are linked before `Unsafe.defineAnonymousClass` returns; an erased
+  `invokeExact(Object[])` call site now performs signature-polymorphic
+  `MemberName` linkage even when ordinary lookup finds the declared method;
+  and caller discovery excludes `LambdaForm.Hidden` frames before counting
+  frames.
+- `Java9PlatformClassLoaderReflection` compares exact modifiers, descriptor,
+  annotation metadata, declared-method enumeration, direct and reflective
+  identity, `Method.invoke`, caller-sensitive `Lookup.unreflect`, handle type,
+  and the platform/system loader hierarchy with HotSpot. The broader modern
+  Java suite and the Kotlin/Scala MethodHandle output comparisons cover the
+  shared runtime fixes in both development and optimized release runners.
+- The legacy `SecurityManager` caller permission check performed by HotSpot is
+  still unsupported. The local compiler-discovery gates passed on 2026-07-13
+  in 78 seconds for Kotlin 2.4.0 and 53 seconds for Scala 2.13.18.
+
 The modern integer arithmetic family is the first multi-method parsed overlay:
 
 - `ClassLoader.ts` injects 23 methods into each of `Math` and `StrictMath`

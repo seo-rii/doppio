@@ -556,6 +556,7 @@ export class RuntimeVisibleAnnotations implements IAttribute {
           isHidden = true;
           break;
         case 'Lsig/sun/reflect/CallerSensitive;':
+        case 'Ljdk/internal/reflect/CallerSensitive;':
           isCallerSensitive = true;
           break;
         case 'Lsig/java/lang/invoke/LambdaForm$Compiled':

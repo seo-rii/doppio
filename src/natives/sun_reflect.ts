@@ -196,18 +196,18 @@ export default function (): any {
    */
   function getCallerClass(thread: JVMThread, framesToSkip: number): JVMTypes.java_lang_Class {
     var caller = thread.getStackTrace(),
-      idx = caller.length - 1 - framesToSkip,
-      frame: IStackTraceFrame = caller[idx];
-    while (frame.method.fullSignature.indexOf('java/lang/reflect/Method/invoke') === 0) {
-      if (idx === 0) {
-        // No more stack to search!
-        // XXX: What does the JDK do here, throw an exception?
-        return null;
+      remaining = framesToSkip;
+    for (var idx = caller.length - 1; idx >= 0; idx--) {
+      var frame: IStackTraceFrame = caller[idx];
+      if (frame.method.isHidden() ||
+          frame.method.fullSignature.indexOf('java/lang/reflect/Method/invoke') === 0) {
+        continue;
       }
-      frame = caller[--idx];
+      if (remaining-- === 0) {
+        return frame.method.cls.getClassObject(thread);
+      }
     }
-
-    return frame.method.cls.getClassObject(thread);
+    return null;
   }
 
   class sun_reflect_Reflection {

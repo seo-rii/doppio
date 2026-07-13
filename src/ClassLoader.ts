@@ -331,6 +331,78 @@ function addJavaLangCharacterModernOverlays(data: Buffer): Buffer {
   ]);
 }
 
+function addJavaLangClassLoaderModernOverlays(data: Buffer): Buffer {
+  var cp = constantPoolEnd(data),
+    methodNameIndex = cp.count,
+    methodDescriptorIndex = cp.count + 1,
+    codeNameIndex = cp.count + 2,
+    helperNameIndex = cp.count + 3,
+    helperClassIndex = cp.count + 4,
+    helperNameAndTypeIndex = cp.count + 5,
+    helperMethodIndex = cp.count + 6,
+    annotationsNameIndex = cp.count + 7,
+    annotationTypeIndex = cp.count + 8,
+    extraConstants = Buffer.concat([
+      utf8Constant('getPlatformClassLoader'),
+      utf8Constant('()Ljava/lang/ClassLoader;'),
+      utf8Constant('Code'),
+      utf8Constant('java/lang/DoppioClassLoader'),
+      Buffer.concat([Buffer.from([7]), u2(helperNameIndex)]),
+      Buffer.concat([
+        Buffer.from([12]),
+        u2(methodNameIndex),
+        u2(methodDescriptorIndex)
+      ]),
+      Buffer.concat([
+        Buffer.from([10]),
+        u2(helperClassIndex),
+        u2(helperNameAndTypeIndex)
+      ]),
+      utf8Constant('RuntimeVisibleAnnotations'),
+      utf8Constant('Ljdk/internal/reflect/CallerSensitive;')
+    ]),
+    withConstants = Buffer.concat([
+      data.slice(0, 8),
+      u2(cp.count + 9),
+      data.slice(10, cp.offset),
+      extraConstants,
+      data.slice(cp.offset)
+    ]),
+    methods = methodsInfo(withConstants, cp.offset + extraConstants.length),
+    code = Buffer.concat([
+      Buffer.from([0xb8]),
+      u2(helperMethodIndex),
+      Buffer.from([0xb0])
+    ]),
+    method = Buffer.concat([
+      u2(0x0009),
+      u2(methodNameIndex),
+      u2(methodDescriptorIndex),
+      u2(2),
+      u2(codeNameIndex),
+      u4(12 + code.length),
+      u2(1),
+      u2(0),
+      u4(code.length),
+      code,
+      u2(0),
+      u2(0),
+      u2(annotationsNameIndex),
+      u4(6),
+      u2(1),
+      u2(annotationTypeIndex),
+      u2(0)
+    ]);
+
+  return Buffer.concat([
+    withConstants.slice(0, methods.countOffset),
+    u2(methods.count + 1),
+    withConstants.slice(methods.countOffset + 2, methods.endOffset),
+    method,
+    withConstants.slice(methods.endOffset)
+  ]);
+}
+
 function addJavaLangMathModernOverlays(data: Buffer): Buffer {
   var cp = constantPoolEnd(data),
     overlays = [
@@ -1094,6 +1166,9 @@ export class BootstrapClassLoader extends ClassLoader {
         }
         if (typeStr === 'Ljava/lang/Class;') {
           clsData = addJavaLangClassModernOverlays(clsData);
+        }
+        if (typeStr === 'Ljava/lang/ClassLoader;') {
+          clsData = addJavaLangClassLoaderModernOverlays(clsData);
         }
         if (typeStr === 'Ljava/lang/Runtime;') {
           clsData = addJavaLangRuntimeModernOverlays(clsData);

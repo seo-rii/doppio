@@ -927,7 +927,11 @@ export default function (): any {
      * @params cpPatches where non-null entries exist, they replace corresponding CP entries in data
      */
     public static 'defineAnonymousClass(Ljava/lang/Class;[B[Ljava/lang/Object;)Ljava/lang/Class;'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, hostClass: JVMTypes.java_lang_Class, data: JVMTypes.JVMArray<number>, cpPatches: JVMTypes.JVMArray<JVMTypes.java_lang_Object>): JVMTypes.java_lang_Class {
-      return new ReferenceClassData(new Buffer(data.array), null, hostClass.$cls.getLoader(), cpPatches).getClassObject(thread);
+      var anonymousClass = new ReferenceClassData(new Buffer(data.array),
+          hostClass.$cls.getProtectionDomain(), hostClass.$cls.getLoader(), cpPatches),
+        resolved = anonymousClass.tryToResolve();
+      assert(resolved, 'Unable to link anonymous class synchronously.');
+      return anonymousClass.getClassObject(thread);
     }
 
     /**

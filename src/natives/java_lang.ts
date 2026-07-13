@@ -651,6 +651,33 @@ export default function (): any {
 
   }
 
+  class java_lang_DoppioClassLoader {
+
+    public static 'getPlatformClassLoader()Ljava/lang/ClassLoader;'(thread: JVMThread): JVMTypes.java_lang_ClassLoader {
+      var systemLoader = thread.getJVM().getSystemClassLoader(),
+        systemObj = systemLoader === null ? null : systemLoader.getLoaderObject(),
+        platformObj = systemObj === null ? null : (<any> systemObj)['java/lang/ClassLoader/parent'],
+        classLoaderCls: ReferenceClassData<JVMTypes.java_lang_ClassLoader>,
+        classLoaderCons: any;
+      if (platformObj !== null && platformObj !== undefined) {
+        (<any> platformObj)['java/lang/ClassLoader/doppioPlatform'] = true;
+        return platformObj;
+      }
+      classLoaderCls = <ReferenceClassData<JVMTypes.java_lang_ClassLoader>>
+        thread.getBsCl().getInitializedClass(thread, 'Ljava/lang/ClassLoader;');
+      classLoaderCons = classLoaderCls.getConstructor(thread);
+      platformObj = (<any> classLoaderCons).$doppioPlatformClassLoader;
+      if (platformObj === null || platformObj === undefined) {
+        platformObj = new classLoaderCons(thread);
+        (<any> platformObj)['java/lang/ClassLoader/parent'] = null;
+        (<any> platformObj)['java/lang/ClassLoader/doppioPlatform'] = true;
+        (<any> classLoaderCons).$doppioPlatformClassLoader = platformObj;
+      }
+      return platformObj;
+    }
+
+  }
+
   // Fun Note: The bootstrap classloader object is represented by null.
   class java_lang_ClassLoader {
 
@@ -2785,6 +2812,7 @@ export default function (): any {
     'java/lang/Class': java_lang_Class,
     'java/lang/ClassLoader$NativeLibrary': java_lang_ClassLoader$NativeLibrary,
     'java/lang/ClassLoader': java_lang_ClassLoader,
+    'java/lang/DoppioClassLoader': java_lang_DoppioClassLoader,
     'java/lang/Compiler': java_lang_Compiler,
     'java/lang/Double': java_lang_Double,
     'java/lang/Float': java_lang_Float,

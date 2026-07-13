@@ -1748,11 +1748,15 @@ export class Opcodes {
     const pc = frame.pc;
     var methodReference = <MethodReference> frame.method.cls.constantPool.getUnchecked(code.readUInt16BE(pc + 1)),
       opStack = frame.opStack,
-      fcn = methodReference.memberName.vmtarget,
+      memberName = methodReference.memberName,
       // Add in 1 for the method handle itself.
       paramSize = methodReference.paramWordSize + 1,
       appendix = methodReference.appendix,
       args = opStack.sliceFromTop(paramSize);
+
+    assert(memberName !== null && memberName !== undefined,
+      `Missing linked MemberName for ${frame.method.fullSignature} -> ${methodReference.signature}`);
+    var fcn = memberName.vmtarget;
 
     if (appendix !== null) {
       args.push(appendix);
