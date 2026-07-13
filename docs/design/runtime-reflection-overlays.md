@@ -207,6 +207,31 @@ The Java 12 `Class.descriptorString()` overlay is a parsed ordinary method:
   Kotlin 2.4.0 under a heavily contended shared host and 236 seconds for Scala
   2.13.18.
 
+The Java 12 `Class` field-type descriptor overlay preserves its covariant API:
+
+- `ClassLoader.ts` appends `TypeDescriptor.OfField` to the Java 8 bootstrap
+  `Class` interface table and extends its class-level generic signature with
+  `TypeDescriptor.OfField<Class<?>>`.
+- `componentType()` and `arrayType()` are parsed public, non-native methods.
+  Each has the Java 17-compatible public synthetic bridge returning raw
+  `TypeDescriptor.OfField`; bridge bytecode delegates to the corresponding
+  `Class`-returning primary method.
+- Primary bytecode passes the receiver to package-private native `DoppioClass`
+  helpers. Component lookup reuses resolved `ArrayClassData`; array creation
+  resolves the next-rank array class asynchronously and preserves the no-arg,
+  null-message `IllegalArgumentException` for void and rank-overflow inputs.
+- The previous slot-less constant-pool fallbacks and native-frame trampolines
+  were removed. `Java12ClassComponentTypeReflection` and
+  `Java12ClassArrayTypeReflection` compare exact metadata, lookup selection,
+  direct and reflective calls, interface dispatch, `Lookup.unreflect`, and both
+  primary and bridge `Lookup.findVirtual` descriptors with HotSpot.
+- The Java 8 `ParameterizedTypeImpl.getTypeName()` nested-owner duplication is
+  a separate display-only reflection gap; structured raw type and type argument
+  metadata are correct and are tested directly.
+- The compiler-discovery gates passed locally on 2026-07-13 in 285 seconds for
+  Kotlin 2.4.0 with the full compiler classpath and 292 seconds for Scala
+  2.13.18.
+
 The Java 15 `Class.isHidden()` overlay is also a parsed native method:
 
 - `ClassLoader.ts` injects the exact public native `isHidden()` descriptor and

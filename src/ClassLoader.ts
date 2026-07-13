@@ -163,7 +163,54 @@ function addStaticNoopModernOverlay(data: Buffer, name: string, descriptor: stri
 
 function addJavaLangClassModernOverlays(data: Buffer): Buffer {
   var cp = constantPoolEnd(data),
-    getModuleNameIndex = cp.count,
+    existingSignatureNameIndex = 0,
+    constantOffset = 10,
+    constantLength: number,
+    constantTag: number;
+  for (var constantIndex = 1; constantIndex < cp.count; constantIndex++) {
+    constantTag = data.readUInt8(constantOffset++);
+    switch (constantTag) {
+      case 1:
+        constantLength = data.readUInt16BE(constantOffset);
+        if (data.toString('utf8', constantOffset + 2, constantOffset + 2 + constantLength) === 'Signature') {
+          existingSignatureNameIndex = constantIndex;
+        }
+        constantOffset += 2 + constantLength;
+        break;
+      case 3:
+      case 4:
+      case 9:
+      case 10:
+      case 11:
+      case 12:
+      case 17:
+      case 18:
+        constantOffset += 4;
+        break;
+      case 5:
+      case 6:
+        constantOffset += 8;
+        constantIndex++;
+        break;
+      case 7:
+      case 8:
+      case 16:
+      case 19:
+      case 20:
+        constantOffset += 2;
+        break;
+      case 15:
+        constantOffset += 3;
+        break;
+      default:
+        throw new Error('Unknown constant-pool tag ' + constantTag);
+    }
+  }
+  if (existingSignatureNameIndex === 0) {
+    throw new Error('java.lang.Class is missing its Signature constant');
+  }
+
+  var getModuleNameIndex = cp.count,
     getModuleDescriptorIndex = cp.count + 1,
     getRecordComponentsNameIndex = cp.count + 2,
     getRecordComponentsDescriptorIndex = cp.count + 3,
@@ -197,6 +244,25 @@ function addJavaLangClassModernOverlays(data: Buffer): Buffer {
     descriptorStringNameIndex = cp.count + 31,
     descriptorStringHelperNameAndTypeIndex = cp.count + 32,
     descriptorStringHelperMethodIndex = cp.count + 33,
+    ofFieldNameIndex = cp.count + 34,
+    ofFieldClassIndex = cp.count + 35,
+    classNameIndex = cp.count + 36,
+    classClassIndex = cp.count + 37,
+    componentTypeNameIndex = cp.count + 38,
+    classReturnDescriptorIndex = cp.count + 39,
+    classHelperDescriptorIndex = cp.count + 40,
+    componentTypeHelperNameAndTypeIndex = cp.count + 41,
+    componentTypeHelperMethodIndex = cp.count + 42,
+    ofFieldReturnDescriptorIndex = cp.count + 43,
+    componentTypeNameAndTypeIndex = cp.count + 44,
+    componentTypeMethodIndex = cp.count + 45,
+    classReturnSignatureIndex = cp.count + 46,
+    arrayTypeNameIndex = cp.count + 47,
+    arrayTypeHelperNameAndTypeIndex = cp.count + 48,
+    arrayTypeHelperMethodIndex = cp.count + 49,
+    arrayTypeNameAndTypeIndex = cp.count + 50,
+    arrayTypeMethodIndex = cp.count + 51,
+    classSignatureIndex = cp.count + 52,
     extraConstants = Buffer.concat([
       utf8Constant('getModule'),
       utf8Constant('()Ljava/lang/Module;'),
@@ -271,16 +337,77 @@ function addJavaLangClassModernOverlays(data: Buffer): Buffer {
         Buffer.from([10]),
         u2(helperClassIndex),
         u2(descriptorStringHelperNameAndTypeIndex)
-      ])
+      ]),
+      utf8Constant('java/lang/invoke/TypeDescriptor$OfField'),
+      Buffer.concat([Buffer.from([7]), u2(ofFieldNameIndex)]),
+      utf8Constant('java/lang/Class'),
+      Buffer.concat([Buffer.from([7]), u2(classNameIndex)]),
+      utf8Constant('componentType'),
+      utf8Constant('()Ljava/lang/Class;'),
+      utf8Constant('(Ljava/lang/Class;)Ljava/lang/Class;'),
+      Buffer.concat([
+        Buffer.from([12]),
+        u2(componentTypeNameIndex),
+        u2(classHelperDescriptorIndex)
+      ]),
+      Buffer.concat([
+        Buffer.from([10]),
+        u2(helperClassIndex),
+        u2(componentTypeHelperNameAndTypeIndex)
+      ]),
+      utf8Constant('()Ljava/lang/invoke/TypeDescriptor$OfField;'),
+      Buffer.concat([
+        Buffer.from([12]),
+        u2(componentTypeNameIndex),
+        u2(classReturnDescriptorIndex)
+      ]),
+      Buffer.concat([
+        Buffer.from([10]),
+        u2(classClassIndex),
+        u2(componentTypeNameAndTypeIndex)
+      ]),
+      utf8Constant('()Ljava/lang/Class<*>;'),
+      utf8Constant('arrayType'),
+      Buffer.concat([
+        Buffer.from([12]),
+        u2(arrayTypeNameIndex),
+        u2(classHelperDescriptorIndex)
+      ]),
+      Buffer.concat([
+        Buffer.from([10]),
+        u2(helperClassIndex),
+        u2(arrayTypeHelperNameAndTypeIndex)
+      ]),
+      Buffer.concat([
+        Buffer.from([12]),
+        u2(arrayTypeNameIndex),
+        u2(classReturnDescriptorIndex)
+      ]),
+      Buffer.concat([
+        Buffer.from([10]),
+        u2(classClassIndex),
+        u2(arrayTypeNameAndTypeIndex)
+      ]),
+      utf8Constant('<T:Ljava/lang/Object;>Ljava/lang/Object;Ljava/io/Serializable;Ljava/lang/reflect/GenericDeclaration;Ljava/lang/reflect/Type;Ljava/lang/reflect/AnnotatedElement;Ljava/lang/invoke/TypeDescriptor$OfField<Ljava/lang/Class<*>;>;')
     ]),
     withConstants = Buffer.concat([
       data.slice(0, 8),
-      u2(cp.count + 34),
+      u2(cp.count + 53),
       data.slice(10, cp.offset),
       extraConstants,
       data.slice(cp.offset)
     ]),
-    methods = methodsInfo(withConstants, cp.offset + extraConstants.length),
+    interfacesCountOffset = cp.offset + extraConstants.length + 6,
+    interfacesCount = withConstants.readUInt16BE(interfacesCountOffset),
+    interfacesEndOffset = interfacesCountOffset + 2 + interfacesCount * 2,
+    withInterface = Buffer.concat([
+      withConstants.slice(0, interfacesCountOffset),
+      u2(interfacesCount + 1),
+      withConstants.slice(interfacesCountOffset + 2, interfacesEndOffset),
+      u2(ofFieldClassIndex),
+      withConstants.slice(interfacesEndOffset)
+    ]),
+    methods = methodsInfo(withInterface, cp.offset + extraConstants.length),
     getModuleMethod = Buffer.concat([
       u2(0x0101),
       u2(getModuleNameIndex),
@@ -406,12 +533,94 @@ function addJavaLangClassModernOverlays(data: Buffer): Buffer {
       descriptorStringCode,
       u2(0),
       u2(0)
+    ]),
+    componentTypeCode = Buffer.concat([
+      Buffer.from([0x2a, 0xb8]),
+      u2(componentTypeHelperMethodIndex),
+      Buffer.from([0xb0])
+    ]),
+    componentTypeMethod = Buffer.concat([
+      u2(0x0001),
+      u2(componentTypeNameIndex),
+      u2(classReturnDescriptorIndex),
+      u2(2),
+      u2(codeNameIndex),
+      u4(12 + componentTypeCode.length),
+      u2(1),
+      u2(1),
+      u4(componentTypeCode.length),
+      componentTypeCode,
+      u2(0),
+      u2(0),
+      u2(signatureNameIndex),
+      u4(2),
+      u2(classReturnSignatureIndex)
+    ]),
+    componentTypeBridgeCode = Buffer.concat([
+      Buffer.from([0x2a, 0xb6]),
+      u2(componentTypeMethodIndex),
+      Buffer.from([0xb0])
+    ]),
+    componentTypeBridgeMethod = Buffer.concat([
+      u2(0x1041),
+      u2(componentTypeNameIndex),
+      u2(ofFieldReturnDescriptorIndex),
+      u2(1),
+      u2(codeNameIndex),
+      u4(12 + componentTypeBridgeCode.length),
+      u2(1),
+      u2(1),
+      u4(componentTypeBridgeCode.length),
+      componentTypeBridgeCode,
+      u2(0),
+      u2(0)
+    ]),
+    arrayTypeCode = Buffer.concat([
+      Buffer.from([0x2a, 0xb8]),
+      u2(arrayTypeHelperMethodIndex),
+      Buffer.from([0xb0])
+    ]),
+    arrayTypeMethod = Buffer.concat([
+      u2(0x0001),
+      u2(arrayTypeNameIndex),
+      u2(classReturnDescriptorIndex),
+      u2(2),
+      u2(codeNameIndex),
+      u4(12 + arrayTypeCode.length),
+      u2(1),
+      u2(1),
+      u4(arrayTypeCode.length),
+      arrayTypeCode,
+      u2(0),
+      u2(0),
+      u2(signatureNameIndex),
+      u4(2),
+      u2(classReturnSignatureIndex)
+    ]),
+    arrayTypeBridgeCode = Buffer.concat([
+      Buffer.from([0x2a, 0xb6]),
+      u2(arrayTypeMethodIndex),
+      Buffer.from([0xb0])
+    ]),
+    arrayTypeBridgeMethod = Buffer.concat([
+      u2(0x1041),
+      u2(arrayTypeNameIndex),
+      u2(ofFieldReturnDescriptorIndex),
+      u2(1),
+      u2(codeNameIndex),
+      u4(12 + arrayTypeBridgeCode.length),
+      u2(1),
+      u2(1),
+      u4(arrayTypeBridgeCode.length),
+      arrayTypeBridgeCode,
+      u2(0),
+      u2(0)
     ]);
 
-  return Buffer.concat([
-    withConstants.slice(0, methods.countOffset),
-    u2(methods.count + 8),
-    withConstants.slice(methods.countOffset + 2, methods.endOffset),
+  var withMethods = Buffer.concat([
+    withInterface.slice(0, methods.countOffset),
+    u2(methods.count + 12),
+    withInterface.slice(methods.countOffset + 2, methods.endOffset),
     getModuleMethod,
     getRecordComponentsMethod,
     isHiddenMethod,
@@ -420,8 +629,31 @@ function addJavaLangClassModernOverlays(data: Buffer): Buffer {
     getPermittedSubclassesMethod,
     getPackageNameMethod,
     descriptorStringMethod,
-    withConstants.slice(methods.endOffset)
-  ]);
+    componentTypeMethod,
+    componentTypeBridgeMethod,
+    arrayTypeMethod,
+    arrayTypeBridgeMethod,
+    withInterface.slice(methods.endOffset)
+  ]),
+    overlaidMethods = methodsInfo(withMethods, cp.offset + extraConstants.length),
+    classAttributesOffset = overlaidMethods.endOffset,
+    classAttributesCount = withMethods.readUInt16BE(classAttributesOffset),
+    classSignaturePatched = false;
+  classAttributesOffset += 2;
+  for (var attributeIndex = 0; attributeIndex < classAttributesCount; attributeIndex++) {
+    var attributeNameIndex = withMethods.readUInt16BE(classAttributesOffset),
+      attributeLength = withMethods.readUInt32BE(classAttributesOffset + 2);
+    if (attributeNameIndex === existingSignatureNameIndex && attributeLength === 2) {
+      withMethods.writeUInt16BE(classSignatureIndex, classAttributesOffset + 6);
+      classSignaturePatched = true;
+      break;
+    }
+    classAttributesOffset += 6 + attributeLength;
+  }
+  if (!classSignaturePatched) {
+    throw new Error('java.lang.Class is missing its Signature attribute');
+  }
+  return withMethods;
 }
 
 // Inject a parsed method so direct calls and reflection share exact metadata.

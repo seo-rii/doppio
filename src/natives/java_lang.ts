@@ -698,6 +698,46 @@ export default function (): any {
       return util.initString(thread.getBsCl(), type.$cls.getInternalName());
     }
 
+    public static 'componentType(Ljava/lang/Class;)Ljava/lang/Class;'(thread: JVMThread, type: JVMTypes.java_lang_Class): JVMTypes.java_lang_Class {
+      if (!(type.$cls instanceof ArrayClassData)) {
+        return null;
+      }
+      return (<ArrayClassData<any>> type.$cls).getComponentClass().getClassObject(thread);
+    }
+
+    public static 'arrayType(Ljava/lang/Class;)Ljava/lang/Class;'(thread: JVMThread, type: JVMTypes.java_lang_Class): any {
+      var internalName = type.$cls.getInternalName(),
+        arrayDepth = 0,
+        loader = type.$cls.getLoader();
+      while (arrayDepth < internalName.length && internalName[arrayDepth] === '[') {
+        arrayDepth++;
+      }
+      if (internalName === 'V' || arrayDepth >= 255) {
+        thread.setStatus(ThreadStatus.ASYNC_WAITING);
+        thread.getBsCl().initializeClass(thread, 'Ljava/lang/IllegalArgumentException;', (exceptionCls: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+          if (exceptionCls === null) {
+            return;
+          }
+          var exception = util.newObjectFromClass<JVMTypes.java_lang_Object>(thread, exceptionCls);
+          (<any> exception)['<init>()V'](thread, [], (e?: JVMTypes.java_lang_Throwable) => {
+            if (e) {
+              thread.throwException(e);
+            } else {
+              thread.throwException(<JVMTypes.java_lang_Throwable> exception);
+            }
+          });
+        });
+        return null;
+      }
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      loader.resolveClass(thread, '[' + internalName, (arrayCls: ClassData) => {
+        if (arrayCls !== null) {
+          thread.asyncReturn(arrayCls.getClassObject(thread));
+        }
+      });
+      return null;
+    }
+
   }
 
   class java_lang_ClassLoader$NativeLibrary {

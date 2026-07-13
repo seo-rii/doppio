@@ -13,4 +13,8 @@ final class DoppioClass {
   static native String getPackageName(Class<?> type);
 
   static native String descriptorString(Class<?> type);
+
+  static native Class<?> componentType(Class<?> type);
+
+  static native Class<?> arrayType(Class<?> type);
 }

@@ -2797,114 +2797,6 @@ export class MethodReference implements IConstantPoolItem {
 	          };
 	          method = <Method> syntheticMethod;
 	        } else if (syntheticCls.getInternalName() === 'Ljava/lang/Class;' &&
-	            this.signature === 'arrayType()Ljava/lang/Class;') {
-	          syntheticMethod = {
-	            cls: syntheticCls,
-	            slot: -1,
-	            accessFlags: new util.Flags(util.FlagMasks.PUBLIC | util.FlagMasks.NATIVE),
-	            name: this.nameAndTypeInfo.name,
-	            rawDescriptor: this.nameAndTypeInfo.descriptor,
-	            attrs: [],
-	            signature: this.signature,
-	            fullSignature: syntheticFullSignature,
-	            parameterTypes: [],
-	            returnType: 'Ljava/lang/Class;',
-	            getParamWordSize: function(): number {
-	              return 0;
-	            },
-	            convertArgs: function(thread: JVMThread, params: any[]): any[] {
-	              return [thread, params[0]];
-	            },
-	            getNativeFunction: function(): Function {
-	              return function(thread: JVMThread, javaThis: JVMTypes.java_lang_Class): any {
-	                var internalName = javaThis.$cls.getInternalName(),
-	                  arrayDepth = 0,
-	                  loader = javaThis.$cls.getLoader();
-	                while (arrayDepth < internalName.length && internalName[arrayDepth] === '[') {
-	                  arrayDepth++;
-	                }
-	                if (internalName === 'V' || arrayDepth >= 255) {
-	                  thread.setStatus(ThreadStatus.ASYNC_WAITING);
-	                  thread.getBsCl().initializeClass(thread, 'Ljava/lang/IllegalArgumentException;', (exceptionCls: ReferenceClassData<JVMTypes.java_lang_Object>) => {
-	                    if (exceptionCls === null) {
-	                      return;
-	                    }
-	                    var exception = util.newObjectFromClass<JVMTypes.java_lang_Object>(thread, exceptionCls);
-	                    (<any> exception)['<init>()V'](thread, [], (e?: JVMTypes.java_lang_Throwable) => {
-	                      if (e) {
-	                        thread.throwException(e);
-	                      } else {
-	                        thread.throwException(<JVMTypes.java_lang_Throwable> exception);
-	                      }
-	                    });
-	                  });
-	                  return null;
-	                }
-	                thread.setStatus(ThreadStatus.ASYNC_WAITING);
-	                loader.resolveClass(thread, '[' + internalName, (arrayCls: ClassData) => {
-	                  if (arrayCls !== null) {
-	                    thread.asyncReturn(arrayCls.getClassObject(thread));
-	                  }
-	                });
-	                return null;
-	              };
-	            },
-	            isSignaturePolymorphic: function(): boolean {
-	              return false;
-	            },
-	            isHidden: function(): boolean {
-	              return false;
-	            },
-	            isCallerSensitive: function(): boolean {
-	              return false;
-	            },
-	            getFullSignature: function(): string {
-	              return syntheticCls.getExternalName() + '.' + this.signature;
-	            }
-	          };
-	          method = <Method> syntheticMethod;
-	        } else if (syntheticCls.getInternalName() === 'Ljava/lang/Class;' &&
-	            this.signature === 'componentType()Ljava/lang/Class;') {
-	          syntheticMethod = {
-	            cls: syntheticCls,
-	            slot: -1,
-	            accessFlags: new util.Flags(util.FlagMasks.PUBLIC | util.FlagMasks.NATIVE),
-	            name: this.nameAndTypeInfo.name,
-	            rawDescriptor: this.nameAndTypeInfo.descriptor,
-	            attrs: [],
-	            signature: this.signature,
-	            fullSignature: syntheticFullSignature,
-	            parameterTypes: [],
-	            returnType: 'Ljava/lang/Class;',
-	            getParamWordSize: function(): number {
-	              return 0;
-	            },
-	            convertArgs: function(thread: JVMThread, params: any[]): any[] {
-	              return [thread, params[0]];
-	            },
-	            getNativeFunction: function(): Function {
-	              return function(thread: JVMThread, javaThis: JVMTypes.java_lang_Class): JVMTypes.java_lang_Class {
-	                if (!(javaThis.$cls instanceof ArrayClassData)) {
-	                  return null;
-	                }
-	                return (<ArrayClassData<any>> javaThis.$cls).getComponentClass().getClassObject(thread);
-	              };
-	            },
-	            isSignaturePolymorphic: function(): boolean {
-	              return false;
-	            },
-	            isHidden: function(): boolean {
-	              return false;
-	            },
-	            isCallerSensitive: function(): boolean {
-	              return false;
-	            },
-	            getFullSignature: function(): string {
-	              return syntheticCls.getExternalName() + '.' + this.signature;
-	            }
-	          };
-	          method = <Method> syntheticMethod;
-	        } else if (syntheticCls.getInternalName() === 'Ljava/lang/Class;' &&
 	            this.signature === 'describeConstable()Ljava/util/Optional;') {
 	          syntheticMethod = {
 	            cls: syntheticCls,
@@ -3724,9 +3616,7 @@ export class MethodReference implements IConstantPoolItem {
 	        (<any> thread).stack.push(new NativeStackFrame(syntheticBulkBufferMethod, [this].concat(args)));
 	        thread.setStatus(ThreadStatus.RUNNABLE);
 	      };
-	    } else if ((this.fullSignature === 'java/lang/Class/arrayType()Ljava/lang/Class;' ||
-	        this.fullSignature === 'java/lang/Class/componentType()Ljava/lang/Class;' ||
-	        this.fullSignature === 'java/lang/Class/getNestHost()Ljava/lang/Class;' ||
+	    } else if ((this.fullSignature === 'java/lang/Class/getNestHost()Ljava/lang/Class;' ||
 	        this.fullSignature === 'java/lang/Class/getNestMembers()[Ljava/lang/Class;' ||
 	        this.fullSignature === 'java/lang/Class/isNestmateOf(Ljava/lang/Class;)Z' ||
 	        this.fullSignature === 'java/lang/Class/describeConstable()Ljava/util/Optional;') &&
