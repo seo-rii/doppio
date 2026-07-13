@@ -96,6 +96,8 @@ object ScalaLanguageSmoke {
       case other => s"s$other"
     }.mkString("/")
 
-    s"$dependent:$encoded:$folded:$marked:$byName:$refined:$switched"
+    val linearized = ScalaTraitLinearizationSmoke.summary()
+
+    s"$dependent:$encoded:$folded:$marked:$byName:$refined:$switched:$linearized"
   }
 }

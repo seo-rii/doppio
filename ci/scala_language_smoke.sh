@@ -77,10 +77,49 @@ compile_end="$(date +%s)"
 test -f "$out_dir/ScalaLanguageHello.class"
 test -f "$out_dir/ScalaLanguageSmoke.class"
 test -f "$out_dir/ScalaLanguageSmoke\$.class"
+test -f "$out_dir/ScalaTraitLinearizationSmoke\$.class"
+test -f "$out_dir/LeftThenRightTokenOwner.class"
+test -f "$out_dir/LeftToken.class"
+test -f "$out_dir/RightThenLeftTokenOwner.class"
+test -f "$out_dir/RightToken.class"
+test -f "$out_dir/RootToken.class"
 test -f "$out_dir/SmokeCodec.class"
 test -f "$out_dir/SmokeFolder.class"
 
-expected_output="L:a7:R:b3:some(i2)|none|some(i4):a1,b2,c3:op7:12:2:fer:r12:dozen/sx/seven"
+left_owner_javap="$(javap -classpath "$out_dir" -c -p LeftThenRightTokenOwner)"
+for target in \
+    'InterfaceMethod RootToken.token$:(LRootToken;)Ljava/lang/String;' \
+    'InterfaceMethod LeftToken.token$:(LLeftToken;)Ljava/lang/String;' \
+    'InterfaceMethod RightToken.token$:(LRightToken;)Ljava/lang/String;'; do
+  if ! grep -Fq "$target" <<<"$left_owner_javap"; then
+    echo "Missing left-then-right trait bridge: $target" >&2
+    exit 1
+  fi
+done
+
+right_owner_javap="$(javap -classpath "$out_dir" -c -p RightThenLeftTokenOwner)"
+for target in \
+    'InterfaceMethod RootToken.token$:(LRootToken;)Ljava/lang/String;' \
+    'InterfaceMethod RightToken.token$:(LRightToken;)Ljava/lang/String;' \
+    'InterfaceMethod LeftToken.token$:(LLeftToken;)Ljava/lang/String;'; do
+  if ! grep -Fq "$target" <<<"$right_owner_javap"; then
+    echo "Missing right-then-left trait bridge: $target" >&2
+    exit 1
+  fi
+done
+
+left_trait_javap="$(javap -classpath "$out_dir" -c -p LeftToken)"
+right_trait_javap="$(javap -classpath "$out_dir" -c -p RightToken)"
+if ! grep -Fq 'InterfaceMethod LeftToken$$super$token:()Ljava/lang/String;' <<<"$left_trait_javap"; then
+  echo 'Missing LeftToken super accessor dispatch.' >&2
+  exit 1
+fi
+if ! grep -Fq 'InterfaceMethod RightToken$$super$token:()Ljava/lang/String;' <<<"$right_trait_javap"; then
+  echo 'Missing RightToken super accessor dispatch.' >&2
+  exit 1
+fi
+
+expected_output="L:a7:R:b3:some(i2)|none|some(i4):a1,b2,c3:op7:12:2:fer:r12:dozen/sx/seven:ABC/ACB"
 
 native_output="$(java -cp "$runtime_cp" ScalaLanguageHello)"
 if [ "$native_output" != "$expected_output" ]; then

@@ -297,9 +297,15 @@ The Scala language/type-system coverage now lives in
 `ci/scala_language_smoke.sh`. It checks path-dependent types, higher-kinded
 implicit typeclass lookup, self-types, by-name argument evaluation, extractor
 matching, value-class extension methods, structural refinement dispatch, and
-`@switch` lowering while keeping the main Scala compiler smoke smaller.
+`@switch` lowering while keeping the main Scala compiler smoke smaller. It now
+also covers two opposing stackable-trait linearizations, with
+`abstract override` methods routing ordinary calls through generated `token$`
+trait bridges and `$$super$token` accessors. The runner verifies both bridge
+orders before comparing `ABC/ACB` on the host JVM and Doppio.
 A local 2026-07-10 validation completed the focused Scala language smoke in
 220 seconds using Scala 2.13.18.
+A 2026-07-13 validation with the stackable-trait coverage completed in 266
+seconds within the unchanged 420-second budget.
 The Scala library/lowering coverage now lives in
 `classes/scala_library_smoke` and runs through `ci/scala_library_smoke.sh`. It
 checks `groupMapReduce`, implicit value classes, default arguments, case-class

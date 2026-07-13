@@ -499,7 +499,8 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `ScalaSignature`, `ScalaInlineInfo`, and `ScalaSig` classfile attributes,
   path-dependent types, higher-kinded implicit typeclass lookup, self-types,
   by-name argument evaluation, extractor matching, value-class extension
-  methods, structural refinement dispatch, and `@switch` lowering, and a
+  methods, structural refinement dispatch, `@switch` lowering, and opposing
+  stackable-trait linearization orders through generated super bridges, and a
   diagnostic smoke covering single-line and multiline type-mismatch plus
   missing-member source filename, line number, found/required types, source
   lines, carets, and multi-error count,
