@@ -78,6 +78,24 @@ parsed-method metadata.
   with HotSpot, then converts the reflected method through
   `MethodHandles.Lookup.unreflect` and invokes the resulting handle.
 
+The Java 9 no-op runtime hints use a smaller reusable parsed overlay:
+
+- `ClassLoader.ts` injects an ordinary one-byte `return` method into
+  `Thread.class` for `onSpinWait()` and `Reference.class` for
+  `reachabilityFence(Object)` before either class is parsed.
+- The methods are public and static, with real reflection slots and no native
+  or synthetic modifier. The old slot-less constant-pool fallbacks and the
+  obsolete `Thread.onSpinWait` native were removed.
+- The overlay preserves HotSpot's runtime-visible marker metadata:
+  `IntrinsicCandidate` on `Thread.onSpinWait()` and `ForceInline` on
+  `Reference.reachabilityFence(Object)`. Minimal matching annotation classes
+  live in the modern class library.
+- `Java9NoopReflection` compares direct calls, declared/public lookup,
+  declared-method enumeration, exact method and annotation metadata,
+  `Method.invoke`, and `Lookup.unreflect` invocation with HotSpot.
+- The complete compiler gates passed locally on 2026-07-13 in 139 seconds for
+  Kotlin 2.4.0 and 77 seconds for Scala 2.13.18.
+
 The modern integer arithmetic family is the first multi-method parsed overlay:
 
 - `ClassLoader.ts` injects 23 methods into each of `Math` and `StrictMath`

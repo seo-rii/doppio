@@ -1141,77 +1141,6 @@ export class MethodReference implements IConstantPoolItem {
             }
           };
           method = <Method> syntheticMethod;
-        } else if (syntheticCls.getInternalName() === 'Ljava/lang/Thread;' && this.signature === 'onSpinWait()V') {
-          syntheticMethod = {
-            cls: syntheticCls,
-            slot: -1,
-            accessFlags: syntheticAccessFlags,
-            name: this.nameAndTypeInfo.name,
-            rawDescriptor: this.nameAndTypeInfo.descriptor,
-            attrs: [],
-            signature: this.signature,
-            fullSignature: syntheticFullSignature,
-            parameterTypes: [],
-            returnType: 'V',
-            getParamWordSize: function(): number {
-              return 0;
-            },
-            convertArgs: function(thread: JVMThread, params: any[]): any[] {
-              return [thread];
-            },
-            getNativeFunction: function(): Function {
-              return function(thread: JVMThread): void { };
-            },
-            isSignaturePolymorphic: function(): boolean {
-              return false;
-            },
-            isHidden: function(): boolean {
-              return false;
-            },
-            isCallerSensitive: function(): boolean {
-              return false;
-            },
-            getFullSignature: function(): string {
-              return syntheticCls.getExternalName() + '.' + this.signature;
-            }
-          };
-          method = <Method> syntheticMethod;
-        } else if (syntheticCls.getInternalName() === 'Ljava/lang/ref/Reference;' &&
-            this.signature === 'reachabilityFence(Ljava/lang/Object;)V') {
-          syntheticMethod = {
-            cls: syntheticCls,
-            slot: -1,
-            accessFlags: syntheticAccessFlags,
-            name: this.nameAndTypeInfo.name,
-            rawDescriptor: this.nameAndTypeInfo.descriptor,
-            attrs: [],
-            signature: this.signature,
-            fullSignature: syntheticFullSignature,
-            parameterTypes: ['Ljava/lang/Object;'],
-            returnType: 'V',
-            getParamWordSize: function(): number {
-              return 1;
-            },
-            convertArgs: function(thread: JVMThread, params: any[]): any[] {
-              return [thread, params[0]];
-            },
-            getNativeFunction: function(): Function {
-              return function(thread: JVMThread, ref: JVMTypes.java_lang_Object): void { };
-            },
-            isSignaturePolymorphic: function(): boolean {
-              return false;
-            },
-            isHidden: function(): boolean {
-              return false;
-            },
-            isCallerSensitive: function(): boolean {
-              return false;
-            },
-            getFullSignature: function(): string {
-              return syntheticCls.getExternalName() + '.' + this.signature;
-            }
-          };
-          method = <Method> syntheticMethod;
         } else if (syntheticCls.getInternalName() === 'Ljava/lang/Character;' &&
             this.signature === 'toString(I)Ljava/lang/String;') {
           syntheticMethod = {
@@ -4053,9 +3982,7 @@ export class MethodReference implements IConstantPoolItem {
         this.fullSignature === 'java/nio/file/FileSystems/newFileSystem(Ljava/nio/file/Path;Ljava/util/Map;)Ljava/nio/file/FileSystem;' ||
         this.fullSignature === 'java/nio/file/FileSystems/newFileSystem(Ljava/nio/file/Path;Ljava/lang/ClassLoader;)Ljava/nio/file/FileSystem;' ||
         this.fullSignature === 'java/nio/file/FileSystems/newFileSystem(Ljava/nio/file/Path;Ljava/util/Map;Ljava/lang/ClassLoader;)Ljava/nio/file/FileSystem;';
-	    if ((this.fullSignature === 'java/lang/Thread/onSpinWait()V' ||
-	        this.fullSignature === 'java/lang/Thread/sleep(Ljava/time/Duration;)V' ||
-	        this.fullSignature === 'java/lang/ref/Reference/reachabilityFence(Ljava/lang/Object;)V' ||
+	    if ((this.fullSignature === 'java/lang/Thread/sleep(Ljava/time/Duration;)V' ||
 	        this.fullSignature === 'java/lang/Character/toString(I)Ljava/lang/String;' ||
 	        this.fullSignature === 'java/lang/ClassLoader/getPlatformClassLoader()Ljava/lang/ClassLoader;' ||
 	        this.fullSignature === 'java/lang/System/getLogger(Ljava/lang/String;)Ljava/lang/System$Logger;' ||

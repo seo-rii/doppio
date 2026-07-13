@@ -1688,10 +1688,6 @@ export default function (): any {
       });
     }
 
-    public static 'onSpinWait()V'(thread: JVMThread): void {
-      // Java 9 defines this as a spin-loop hint. Doppio has no CPU hint to emit.
-    }
-
     public static 'sleep(J)V'(thread: JVMThread, millis: Long): void {
       var beforeMethod = thread.currentMethod();
       thread.setStatus(ThreadStatus.ASYNC_WAITING);

@@ -109,6 +109,58 @@ function methodsInfo(data: Buffer, cpEnd: number): { countOffset: number; count:
   return { countOffset: countOffset, count: methodsCount, endOffset: offset };
 }
 
+function addStaticNoopModernOverlay(data: Buffer, name: string, descriptor: string,
+    maxLocals: number, annotationDescriptor: string): Buffer {
+  var cp = constantPoolEnd(data),
+    nameIndex = cp.count,
+    descriptorIndex = cp.count + 1,
+    codeNameIndex = cp.count + 2,
+    annotationsNameIndex = cp.count + 3,
+    annotationTypeIndex = cp.count + 4,
+    extraConstants = Buffer.concat([
+      utf8Constant(name),
+      utf8Constant(descriptor),
+      utf8Constant('Code'),
+      utf8Constant('RuntimeVisibleAnnotations'),
+      utf8Constant(annotationDescriptor)
+    ]),
+    withConstants = Buffer.concat([
+      data.slice(0, 8),
+      u2(cp.count + 5),
+      data.slice(10, cp.offset),
+      extraConstants,
+      data.slice(cp.offset)
+    ]),
+    methods = methodsInfo(withConstants, cp.offset + extraConstants.length),
+    method = Buffer.concat([
+      u2(0x0009),
+      u2(nameIndex),
+      u2(descriptorIndex),
+      u2(2),
+      u2(codeNameIndex),
+      u4(13),
+      u2(0),
+      u2(maxLocals),
+      u4(1),
+      Buffer.from([0xb1]),
+      u2(0),
+      u2(0),
+      u2(annotationsNameIndex),
+      u4(6),
+      u2(1),
+      u2(annotationTypeIndex),
+      u2(0)
+    ]);
+
+  return Buffer.concat([
+    withConstants.slice(0, methods.countOffset),
+    u2(methods.count + 1),
+    withConstants.slice(methods.countOffset + 2, methods.endOffset),
+    method,
+    withConstants.slice(methods.endOffset)
+  ]);
+}
+
 function addJavaLangClassModernOverlays(data: Buffer): Buffer {
   var cp = constantPoolEnd(data),
     getModuleNameIndex = cp.count,
@@ -969,6 +1021,14 @@ export class BootstrapClassLoader extends ClassLoader {
       });
     }, (pItem?: IClasspathItem) => {
       if (pItem) {
+        if (typeStr === 'Ljava/lang/Thread;') {
+          clsData = addStaticNoopModernOverlay(clsData, 'onSpinWait', '()V', 0,
+            'Ljdk/internal/vm/annotation/IntrinsicCandidate;');
+        }
+        if (typeStr === 'Ljava/lang/ref/Reference;') {
+          clsData = addStaticNoopModernOverlay(clsData, 'reachabilityFence', '(Ljava/lang/Object;)V', 1,
+            'Ljdk/internal/vm/annotation/ForceInline;');
+        }
         if (typeStr === 'Ljava/lang/Class;') {
           clsData = addJavaLangClassModernOverlays(clsData);
         }
