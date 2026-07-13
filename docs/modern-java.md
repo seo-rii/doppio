@@ -1145,9 +1145,14 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
 - `java.lang.System$Logger` covers the tested Java 9 nested interface and
   `Level` enum type surface, level metadata, and default log-method delegation
   for custom logger implementations, including null validation and lazy
-  disabled logger behavior for supplier and object overloads. `System.getLogger`
-  returns a minimal no-op `System.Logger` shim for the tested name/type,
-  null-argument, and returned-logger null-level validation paths.
+  disabled logger behavior for supplier and object overloads. Both
+  `System.getLogger` overloads are parsed public static Java 9 methods with
+  HotSpot-compatible `CallerSensitive` metadata, reflective lookup and
+  enumeration, `Method.invoke`, and caller-sensitive `Lookup.unreflect`
+  invocation. They return a minimal no-op `System.Logger` shim for the tested
+  name/type, null-argument, and returned-logger null-level validation paths.
+  LoggerFinder provider discovery, module-specific selection, resource-bundle
+  localization, and legacy `SecurityManager` behavior remain unsupported.
 - Selected `java.lang.StrictMath` native hooks are covered by Java 17 parity
   fixtures for `cbrt`, `cosh`, `expm1`, `hypot`, `log10`, `log1p`, `sinh`,
   and `tanh`. The shim delegates to host JavaScript `Math` functions for these

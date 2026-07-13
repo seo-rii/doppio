@@ -1242,66 +1242,7 @@ export class MethodReference implements IConstantPoolItem {
             }
           };
           method = <Method> syntheticMethod;
-	        } else if (syntheticCls.getInternalName() === 'Ljava/lang/System;' &&
-	            (this.signature === 'getLogger(Ljava/lang/String;)Ljava/lang/System$Logger;' ||
-	             this.signature === 'getLogger(Ljava/lang/String;Ljava/util/ResourceBundle;)Ljava/lang/System$Logger;')) {
-          syntheticMethod = {
-            cls: syntheticCls,
-            slot: -1,
-            accessFlags: syntheticAccessFlags,
-            name: this.nameAndTypeInfo.name,
-            rawDescriptor: this.nameAndTypeInfo.descriptor,
-            attrs: [],
-            signature: this.signature,
-            fullSignature: syntheticFullSignature,
-            parameterTypes: this.signature === 'getLogger(Ljava/lang/String;)Ljava/lang/System$Logger;' ?
-              ['Ljava/lang/String;'] : ['Ljava/lang/String;', 'Ljava/util/ResourceBundle;'],
-            returnType: 'Ljava/lang/System$Logger;',
-            getParamWordSize: function(): number {
-              return this.parameterTypes.length;
-            },
-            convertArgs: function(thread: JVMThread, params: any[]): any[] {
-              return params.length > 1 ? [thread, params[0], params[1]] : [thread, params[0]];
-            },
-            getNativeFunction: function(): Function {
-              var systemSignature = this.signature;
-              return function(thread: JVMThread, name: JVMTypes.java_lang_String, bundle?: JVMTypes.java_lang_Object): any {
-                if (name === null || (systemSignature === 'getLogger(Ljava/lang/String;Ljava/util/ResourceBundle;)Ljava/lang/System$Logger;' && bundle === null)) {
-                  thread.throwNewException('Ljava/lang/NullPointerException;', '');
-                  return null;
-                }
-                thread.setStatus(ThreadStatus.ASYNC_WAITING);
-                thread.getBsCl().initializeClass(thread, 'Ljava/lang/System$DoppioLogger;', (loggerCls: ReferenceClassData<JVMTypes.java_lang_Object>) => {
-                  if (loggerCls === null) {
-                    return;
-                  }
-                  var logger = util.newObjectFromClass<JVMTypes.java_lang_Object>(thread, loggerCls);
-                  (<any> logger)['<init>(Ljava/lang/String;)V'](thread, [name], (e?: JVMTypes.java_lang_Throwable) => {
-                    if (e) {
-                      thread.throwException(e);
-                    } else {
-                      thread.asyncReturn(logger);
-                    }
-                  });
-                });
-                return null;
-              };
-            },
-            isSignaturePolymorphic: function(): boolean {
-              return false;
-            },
-            isHidden: function(): boolean {
-              return false;
-            },
-            isCallerSensitive: function(): boolean {
-              return false;
-            },
-            getFullSignature: function(): string {
-              return syntheticCls.getExternalName() + '.' + this.signature;
-            }
-		          };
-		          method = <Method> syntheticMethod;
-		        } else if (syntheticCls.getInternalName() === 'Ljava/util/concurrent/CompletableFuture;' &&
+	        } else if (syntheticCls.getInternalName() === 'Ljava/util/concurrent/CompletableFuture;' &&
 		            (this.signature === 'completedStage(Ljava/lang/Object;)Ljava/util/concurrent/CompletionStage;' ||
 		             this.signature === 'delayedExecutor(JLjava/util/concurrent/TimeUnit;)Ljava/util/concurrent/Executor;' ||
 		             this.signature === 'delayedExecutor(JLjava/util/concurrent/TimeUnit;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/Executor;' ||
@@ -3881,8 +3822,6 @@ export class MethodReference implements IConstantPoolItem {
         this.fullSignature === 'java/nio/file/FileSystems/newFileSystem(Ljava/nio/file/Path;Ljava/lang/ClassLoader;)Ljava/nio/file/FileSystem;' ||
         this.fullSignature === 'java/nio/file/FileSystems/newFileSystem(Ljava/nio/file/Path;Ljava/util/Map;Ljava/lang/ClassLoader;)Ljava/nio/file/FileSystem;';
 	    if ((this.fullSignature === 'java/lang/Thread/sleep(Ljava/time/Duration;)V' ||
-	        this.fullSignature === 'java/lang/System/getLogger(Ljava/lang/String;)Ljava/lang/System$Logger;' ||
-	        this.fullSignature === 'java/lang/System/getLogger(Ljava/lang/String;Ljava/util/ResourceBundle;)Ljava/lang/System$Logger;' ||
 	        resolvedNumberFormatCompact ||
 	        this.fullSignature === 'java/util/concurrent/CompletableFuture/completedStage(Ljava/lang/Object;)Ljava/util/concurrent/CompletionStage;' ||
 	        this.fullSignature === 'java/util/concurrent/CompletableFuture/delayedExecutor(JLjava/util/concurrent/TimeUnit;)Ljava/util/concurrent/Executor;' ||

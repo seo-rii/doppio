@@ -141,6 +141,26 @@ caller-sensitive parsed method:
   still unsupported. The local compiler-discovery gates passed on 2026-07-13
   in 78 seconds for Kotlin 2.4.0 and 53 seconds for Scala 2.13.18.
 
+The two Java 9 `System.getLogger` overloads reuse the caller-sensitive path:
+
+- `ClassLoader.ts` injects ordinary public static methods for the name-only and
+  `ResourceBundle` descriptors. Both delegate to package-private
+  `DoppioSystem`, carry the exact runtime-visible `CallerSensitive` marker, and
+  replace the old slot-less constant-pool/native-frame implementations.
+- `DoppioSystem` preserves the existing minimal no-op logger behavior and
+  tested null validation, with HotSpot's bundle-first check in the two-argument
+  path. Full `LoggerFinder` provider lookup,
+  caller-module selection, resource-bundle localization, privileged access,
+  and `SecurityManager` behavior are not claimed.
+- `Java9SystemGetLoggerReflection` compares both overloads with HotSpot through
+  declared/public lookup, exact modifiers, parameters, return and annotation
+  metadata, declared-method enumeration, direct calls, `Method.invoke`, null
+  exception causes, caller-sensitive `Lookup.unreflect`, exact handle types,
+  and invocation. The original direct logger fixture remains a separate
+  regression.
+- The complete compiler-discovery gates passed locally on 2026-07-13 in 127
+  seconds for Kotlin 2.4.0 and 56 seconds for Scala 2.13.18.
+
 The modern integer arithmetic family is the first multi-method parsed overlay:
 
 - `ClassLoader.ts` injects 23 methods into each of `Math` and `StrictMath`
