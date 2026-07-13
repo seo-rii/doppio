@@ -676,6 +676,24 @@ export default function (): any {
       return null;
     }
 
+    public static 'getPackageName(Ljava/lang/Class;)Ljava/lang/String;'(thread: JVMThread, type: JVMTypes.java_lang_Class): JVMTypes.java_lang_String {
+      var internalName = type.$cls.getInternalName(),
+        packageName: string,
+        externalName: string,
+        lastDot: number;
+      while (internalName[0] === '[') {
+        internalName = internalName.slice(1);
+      }
+      if (util.is_primitive_type(internalName)) {
+        packageName = 'java.lang';
+      } else {
+        externalName = util.ext_classname(internalName);
+        lastDot = externalName.lastIndexOf('.');
+        packageName = lastDot >= 0 ? externalName.slice(0, lastDot) : '';
+      }
+      return util.initString(thread.getBsCl(), packageName);
+    }
+
   }
 
   class java_lang_ClassLoader$NativeLibrary {
@@ -1272,6 +1290,30 @@ export default function (): any {
   }
 
   class java_lang_reflect_Executable {
+    public static 'getTypeAnnotationBytes0()[B'(thread: JVMThread, javaThis: JVMTypes.java_lang_reflect_Executable): JVMTypes.JVMArray<number> {
+      var executable = <any> javaThis,
+        clazz: JVMTypes.java_lang_Class = null,
+        slot: number = -1,
+        method: Method,
+        typeAnnotations: attributes.RuntimeVisibleTypeAnnotations;
+
+      if (executable['java/lang/reflect/Method/clazz'] !== undefined) {
+        clazz = executable['java/lang/reflect/Method/clazz'];
+        slot = executable['java/lang/reflect/Method/slot'];
+      } else if (executable['java/lang/reflect/Constructor/clazz'] !== undefined) {
+        clazz = executable['java/lang/reflect/Constructor/clazz'];
+        slot = executable['java/lang/reflect/Constructor/slot'];
+      }
+
+      if (clazz === null || slot < 0) {
+        return null;
+      }
+
+      method = (<ReferenceClassData<JVMTypes.java_lang_Object>> clazz.$cls).getMethodFromSlot(slot);
+      typeAnnotations = <attributes.RuntimeVisibleTypeAnnotations> method.getAttribute('RuntimeVisibleTypeAnnotations');
+      return typeAnnotations === null ? null : byteArrayFromBuffer(thread, typeAnnotations.rawBytes);
+    }
+
     public static 'getParameters0()[Ljava/lang/reflect/Parameter;'(thread: JVMThread, javaThis: JVMTypes.java_lang_reflect_Executable): any {
       var executable = <any> javaThis,
         clazz: JVMTypes.java_lang_Class = null,

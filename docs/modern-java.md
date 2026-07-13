@@ -1124,9 +1124,18 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   constructor and accessor behavior for class-loader name, module name, and
   module version while preserving the existing class/method/file/line fields,
   plus metadata-aware `toString`, `equals`, and `hashCode` behavior.
-- `java.lang.Class` now exposes selected Java 9 `getPackageName()` behavior
-  for ordinary, nested, local, anonymous, primitive, void, reference-array, and
-  primitive-array classes.
+- `java.lang.Class.getPackageName()` is a parsed public, non-native Java 9
+  method, so direct calls, reflective lookup and enumeration, `Method.invoke`,
+  and `Lookup.unreflect` share one implementation. Coverage includes exact
+  method and empty annotation metadata plus ordinary, nested, local,
+  anonymous, JDK, primitive, void, reference-array, primitive-array, and user
+  array classes.
+- `java.lang.reflect.Executable.getTypeAnnotationBytes0()` now returns parsed
+  `RuntimeVisibleTypeAnnotations` bytes for methods and constructors. Coverage
+  includes annotated method return, nested generic argument, receiver,
+  parameter, and throws types, constructor parameter and throws types, and
+  unannotated methods. Top-level constructor receiver nullability still differs
+  from Java 17 and is tracked separately.
 - `java.lang.reflect.Array` now exposes selected generic and primitive accessor
   behavior: reference-array null/type checks, wrapper unboxing into primitive
   arrays, direct primitive array reads/writes, allowed widening conversions,

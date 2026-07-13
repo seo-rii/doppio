@@ -160,6 +160,33 @@ methods:
 - The compiler-discovery gates passed locally on 2026-07-13 in 146 seconds for
   Kotlin 2.4.0 and 135 seconds for Scala 2.13.18.
 
+The Java 9 `Class.getPackageName()` overlay is a parsed ordinary method:
+
+- `ClassLoader.ts` injects the exact public, non-native descriptor into the
+  Java 8 bootstrap `Class` classfile. Its bytecode passes the receiver to a
+  package-private native `DoppioClass` helper that preserves Java 9 primitive,
+  void, reference-array, primitive-array, and ordinary package-name behavior.
+- The previous slot-less constant-pool fallback and synthetic native-frame
+  trampoline were removed, so direct calls, reflection slots,
+  `Method.invoke`, and `Lookup.unreflect` resolve the same parsed method with
+  empty annotation and generic metadata.
+- `Java9ClassPackageNameReflection` compares exact modifiers, descriptors,
+  annotation and parameter metadata, declared/public lookup and enumeration,
+  direct and reflective results across ordinary, nested, local, anonymous,
+  JDK, primitive, void, and array classes, and exact unreflected handle type
+  and invocation with HotSpot. The original direct fixture remains a separate
+  regression.
+- Exercising annotated return metadata exposed the previously missing
+  `Executable.getTypeAnnotationBytes0()` native. The implementation now
+  returns each parsed method or constructor's raw
+  `RuntimeVisibleTypeAnnotations` bytes. `Java9ExecutableTypeAnnotations`
+  compares top-level and nested return, receiver, parameter, and throws
+  annotations plus constructor parameter/throws annotations and empty
+  metadata with HotSpot. Top-level constructor receiver nullability remains a
+  separate Java 8 class-library compatibility gap.
+- The compiler-discovery gates passed locally on 2026-07-13 in 188 seconds for
+  Kotlin 2.4.0 and 241 seconds for Scala 2.13.18.
+
 The Java 15 `Class.isHidden()` overlay is also a parsed native method:
 
 - `ClassLoader.ts` injects the exact public native `isHidden()` descriptor and
