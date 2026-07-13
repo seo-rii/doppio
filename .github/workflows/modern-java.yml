@@ -180,6 +180,9 @@ jobs:
       - name: Run Kotlin JVM-default smoke
         run: ./ci/kotlin_jvm_default_smoke.sh
 
+      - name: Run Kotlin indy string-concat smoke
+        run: ./ci/kotlin_indy_concat_smoke.sh
+
       - name: Run Kotlin when-mapping smoke
         run: ./ci/kotlin_when_mapping_smoke.sh
 

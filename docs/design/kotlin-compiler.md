@@ -534,6 +534,19 @@ Current verified checks:
   inherited/default-argument dispatch, diamond resolution, delegation, and
   reflection-visible `Method.isDefault()` metadata. A local 2026-07-13 run
   completed in 237 seconds within the 360-second compile budget.
+- A focused Java 17 indy string-concat smoke now lives in
+  `classes/kotlin_indy_concat_smoke` and runs through
+  `ci/kotlin_indy_concat_smoke.sh` with
+  `-Xstring-concat=indy-with-constants`. It checks classfile major 61,
+  `StringConcatFactory.makeConcatWithConstants` bootstrap metadata, an
+  `(int, long, long, float, double, boolean, char, Object)` descriptor with
+  adjacent wide slots, and the absence of `StringBuilder` lowering. The first
+  Doppio run exposed JavaScript `[object Object]` conversion at a direct
+  `Object` concat parameter. The concat fast path now dispatches JVM
+  `toString()` asynchronously, preserving observable call counts and original
+  exceptions. Host JVM and Doppio both print
+  `mix[7][4294967297][-9223372036854775808][1.25][-2.5][true][K][probe[box#1]]|nullable=null|calls=1|plain=17|throw=IllegalStateException:concat-boom`.
+  The complete focused compile and runtime comparison passed in 291 seconds.
 - A focused Kotlin enum/string `when` lowering smoke now lives in
   `classes/kotlin_when_mapping_smoke` and runs through
   `ci/kotlin_when_mapping_smoke.sh`. A focused local run completed in 96

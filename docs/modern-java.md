@@ -376,6 +376,13 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   targets, and compares inherited, diamond, delegated, and reflection
   `Method.isDefault()` behavior on the host JVM and Doppio. A local
   2026-07-13 run completed in 237 seconds.
+- The workflow also runs `ci/kotlin_indy_concat_smoke.sh`, compiling Kotlin 2.4
+  with Java 17 classfiles and `-Xstring-concat=indy-with-constants`. It asserts
+  `StringConcatFactory.makeConcatWithConstants` lowering without
+  `StringBuilder`, adjacent wide primitive slots, direct `Object` parameters,
+  null conversion, observable `toString()` dispatch, and original exception
+  propagation before comparing host JVM and Doppio output. The focused run
+  completed in 291 seconds after exposing and fixing direct-object conversion.
 - The workflow also runs `ci/kotlin_methodhandle_smoke.sh`, a focused Kotlin
   compiler smoke split out of the main full-classpath source set so the large
   `java.lang.invoke.MethodHandles` fixture still compares host JVM and Doppio

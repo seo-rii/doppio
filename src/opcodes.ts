@@ -1712,8 +1712,16 @@ export class Opcodes {
       args.push(appendix);
     }
     if (callSiteSpecifier.isStringConcatCallSite()) {
-      opStack.push(callSiteSpecifier.evaluateStringConcat(thread, args));
-      frame.pc += 3;
+      callSiteSpecifier.evaluateStringConcat(thread, args, (e?: JVMTypes.java_lang_Throwable, rv?: JVMTypes.java_lang_String) => {
+        if (e) {
+          thread.throwException(e);
+        } else {
+          opStack.push(rv);
+          frame.pc += 3;
+          thread.setStatus(ThreadStatus.RUNNABLE);
+        }
+      });
+      frame.returnToThreadLoop = true;
       return;
     }
     if (callSiteSpecifier.isObjectMethodsCallSite()) {

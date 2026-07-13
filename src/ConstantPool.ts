@@ -6277,28 +6277,41 @@ export class InvokeDynamic implements IConstantPoolItem {
     return this.objectMethodsMethodName !== null;
   }
 
-  public evaluateStringConcat(thread: JVMThread, args: any[]): JVMTypes.java_lang_String {
+  public evaluateStringConcat(thread: JVMThread, args: any[], cb: (e?: JVMTypes.java_lang_Throwable, rv?: JVMTypes.java_lang_String) => void): void {
     var paramTypes = util.getTypes(this.nameAndTypeInfo.descriptor),
       recipe = this.stringConcatRecipe,
       result = '',
       argIdx = 0,
       rawArgIdx = 0,
-      constIdx = 0;
+      constIdx = 0,
+      recipeIdx = 0,
+      appendNext: () => void;
     paramTypes.pop();
-    for (var i = 0; i < recipe.length; i++) {
-      var ch = recipe.charAt(i);
-      if (ch === '\u0001') {
-        var paramType = paramTypes[argIdx];
-        result += this.stringifyConcatArg(thread, paramType, args[rawArgIdx]);
-        rawArgIdx += paramType === 'J' || paramType === 'D' ? 2 : 1;
-        argIdx++;
-      } else if (ch === '\u0002') {
-        result += this.stringConcatConstants[constIdx++];
-      } else {
-        result += ch;
+    appendNext = () => {
+      while (recipeIdx < recipe.length) {
+        var ch = recipe.charAt(recipeIdx++);
+        if (ch === '\u0001') {
+          var paramType = paramTypes[argIdx++],
+            value = args[rawArgIdx];
+          rawArgIdx += paramType === 'J' || paramType === 'D' ? 2 : 1;
+          this.stringifyConcatArg(thread, paramType, value, (e?: JVMTypes.java_lang_Throwable, text?: string) => {
+            if (e) {
+              cb(e);
+            } else {
+              result += text;
+              appendNext();
+            }
+          });
+          return;
+        } else if (ch === '\u0002') {
+          result += this.stringConcatConstants[constIdx++];
+        } else {
+          result += ch;
+        }
       }
-    }
-    return util.initString(thread.getBsCl(), result);
+      cb(null, util.initString(thread.getBsCl(), result));
+    };
+    appendNext();
   }
 
   public evaluateObjectMethods(thread: JVMThread, args: any[], cb: (e?: JVMTypes.java_lang_Throwable, rv?: any) => void): void {
@@ -6397,50 +6410,77 @@ export class InvokeDynamic implements IConstantPoolItem {
     thread.throwNewException('Ljava/lang/BootstrapMethodError;', `Unsupported ObjectMethods call site: ${this.objectMethodsMethodName}`);
   }
 
-  private stringifyConcatArg(thread: JVMThread, type: string, value: any): string {
+  private stringifyConcatArg(thread: JVMThread, type: string, value: any, cb: (e?: JVMTypes.java_lang_Throwable, text?: string) => void): void {
     if (value === null) {
-      return 'null';
+      cb(null, 'null');
+      return;
     }
     switch (type) {
       case 'Z':
-        return value !== 0 ? 'true' : 'false';
+        cb(null, value !== 0 ? 'true' : 'false');
+        return;
       case 'C':
-        return String.fromCharCode(value);
+        cb(null, String.fromCharCode(value));
+        return;
       case 'J':
-        return value.toString();
+        cb(null, value.toString());
+        return;
       case 'B':
       case 'S':
       case 'I':
-        return '' + value;
+        cb(null, '' + value);
+        return;
       case 'F':
       case 'D':
-        return this.stringifyFloatingPointValue(value);
+        cb(null, this.stringifyFloatingPointValue(value));
+        return;
       default:
         if (type === 'Ljava/lang/String;') {
-          return value.toString();
+          cb(null, value.toString());
+          return;
         }
         if (value !== null && typeof value.getClass === 'function') {
           var valueClassName = value.getClass().getInternalName();
           switch (valueClassName) {
             case 'Ljava/lang/Boolean;':
-              return value['java/lang/Boolean/value'] !== 0 ? 'true' : 'false';
+              cb(null, value['java/lang/Boolean/value'] !== 0 ? 'true' : 'false');
+              return;
             case 'Ljava/lang/Byte;':
-              return '' + value['java/lang/Byte/value'];
+              cb(null, '' + value['java/lang/Byte/value']);
+              return;
             case 'Ljava/lang/Character;':
-              return String.fromCharCode(value['java/lang/Character/value']);
+              cb(null, String.fromCharCode(value['java/lang/Character/value']));
+              return;
             case 'Ljava/lang/Short;':
-              return '' + value['java/lang/Short/value'];
+              cb(null, '' + value['java/lang/Short/value']);
+              return;
             case 'Ljava/lang/Integer;':
-              return '' + value['java/lang/Integer/value'];
+              cb(null, '' + value['java/lang/Integer/value']);
+              return;
             case 'Ljava/lang/Long;':
-              return value['java/lang/Long/value'].toString();
+              cb(null, value['java/lang/Long/value'].toString());
+              return;
             case 'Ljava/lang/Float;':
-              return this.stringifyFloatingPointValue(value['java/lang/Float/value']);
+              cb(null, this.stringifyFloatingPointValue(value['java/lang/Float/value']));
+              return;
             case 'Ljava/lang/Double;':
-              return this.stringifyFloatingPointValue(value['java/lang/Double/value']);
+              cb(null, this.stringifyFloatingPointValue(value['java/lang/Double/value']));
+              return;
           }
         }
-        return value.toString();
+        var toStringMethod = value['toString()Ljava/lang/String;'];
+        if (typeof toStringMethod === 'function') {
+          toStringMethod.call(value, thread, [], (e?: JVMTypes.java_lang_Throwable, rv?: JVMTypes.java_lang_String) => {
+            if (e) {
+              cb(e);
+            } else {
+              cb(null, rv === null ? 'null' : rv.toString());
+            }
+          });
+        } else {
+          cb(null, value.toString());
+        }
+        return;
     }
   }
 
