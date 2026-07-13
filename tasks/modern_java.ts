@@ -354,7 +354,8 @@ function modernJava(grunt: IGrunt) {
         'exact-long=2,ArithmeticException:long overflow,ArithmeticException:/ by zero',
         'round-exact=-2,2,ArithmeticException:integer overflow,ArithmeticException:long overflow',
         'matrix=true,true,true',
-        'exceptions=true'
+        'exceptions=true',
+        'reflection=true,true'
       ].join('\n') + '\n',
       methodDeclarations = [
         '  public static int ceilDiv(int x, int y) { return 0; }',

@@ -1344,104 +1344,6 @@ export class MethodReference implements IConstantPoolItem {
           method = <Method> syntheticMethod;
         } else if ((syntheticCls.getInternalName() === 'Ljava/lang/Math;' ||
             syntheticCls.getInternalName() === 'Ljava/lang/StrictMath;') &&
-            ['ceilDiv(II)I', 'ceilDiv(JI)J', 'ceilDiv(JJ)J',
-             'ceilMod(II)I', 'ceilMod(JI)I', 'ceilMod(JJ)J',
-             'divideExact(II)I', 'divideExact(JJ)J',
-             'floorDivExact(II)I', 'floorDivExact(JJ)J',
-             'ceilDivExact(II)I', 'ceilDivExact(JJ)J'].indexOf(this.signature) !== -1) {
-          var mathDivisionSignature = this.signature,
-            mathDivisionDescriptor = this.nameAndTypeInfo.descriptor,
-            mathDivisionLongLeft = mathDivisionDescriptor.charAt(1) === 'J',
-            mathDivisionLongRight = mathDivisionDescriptor.charAt(mathDivisionLongLeft ? 2 : 1) === 'J',
-            mathDivisionReturnType = mathDivisionDescriptor.charAt(mathDivisionDescriptor.length - 1);
-          syntheticMethod = {
-            cls: syntheticCls,
-            slot: -1,
-            accessFlags: syntheticAccessFlags,
-            name: this.nameAndTypeInfo.name,
-            rawDescriptor: mathDivisionDescriptor,
-            attrs: [],
-            signature: mathDivisionSignature,
-            fullSignature: syntheticFullSignature,
-            parameterTypes: mathDivisionLongLeft ?
-              ['J', mathDivisionLongRight ? 'J' : 'I'] : ['I', 'I'],
-            returnType: mathDivisionReturnType,
-            getParamWordSize: function(): number {
-              return mathDivisionLongLeft ? (mathDivisionLongRight ? 4 : 3) : 2;
-            },
-            convertArgs: function(thread: JVMThread, params: any[]): any[] {
-              return mathDivisionLongLeft ? [thread, params[0], params[2]] : [thread, params[0], params[1]];
-            },
-            getNativeFunction: function(): Function {
-              return function(thread: JVMThread, left: any, right: any): any {
-                var methodName = mathDivisionSignature.slice(0, mathDivisionSignature.indexOf('(')),
-                  exact = methodName.indexOf('Exact') !== -1;
-                if (!mathDivisionLongLeft) {
-                  if (right === 0) {
-                    thread.throwNewException('Ljava/lang/ArithmeticException;', '/ by zero');
-                    return;
-                  }
-                  if (exact && left === -2147483648 && right === -1) {
-                    thread.throwNewException('Ljava/lang/ArithmeticException;', 'integer overflow');
-                    return;
-                  }
-                  var intQuotient = (left / right) | 0,
-                    intRemainder = left % right,
-                    intSameSigns = (left < 0) === (right < 0);
-                  if (methodName === 'ceilMod') {
-                    return intSameSigns && intRemainder !== 0 ? (intRemainder - right) | 0 : intRemainder;
-                  }
-                  if (methodName === 'floorDivExact') {
-                    return !intSameSigns && intRemainder !== 0 ? (intQuotient - 1) | 0 : intQuotient;
-                  }
-                  if (methodName === 'ceilDiv' || methodName === 'ceilDivExact') {
-                    return intSameSigns && intRemainder !== 0 ? (intQuotient + 1) | 0 : intQuotient;
-                  }
-                  return intQuotient;
-                }
-
-                var divisor = mathDivisionLongRight ? <gLong> right : gLong.fromInt(right);
-                if (divisor.isZero()) {
-                  thread.throwNewException('Ljava/lang/ArithmeticException;', '/ by zero');
-                  return;
-                }
-                if (exact && (<gLong> left).equals(gLong.MIN_VALUE) && divisor.equals(gLong.NEG_ONE)) {
-                  thread.throwNewException('Ljava/lang/ArithmeticException;', 'long overflow');
-                  return;
-                }
-                var longQuotient = (<gLong> left).div(divisor),
-                  longRemainder = (<gLong> left).subtract(longQuotient.multiply(divisor)),
-                  longSameSigns = (<gLong> left).isNegative() === divisor.isNegative();
-                if (methodName === 'ceilMod') {
-                  var adjustedRemainder = longSameSigns && !longRemainder.isZero() ?
-                    longRemainder.subtract(divisor) : longRemainder;
-                  return mathDivisionReturnType === 'I' ? adjustedRemainder.toInt() : adjustedRemainder;
-                }
-                if (methodName === 'floorDivExact') {
-                  return !longSameSigns && !longRemainder.isZero() ? longQuotient.subtract(gLong.ONE) : longQuotient;
-                }
-                if (methodName === 'ceilDiv' || methodName === 'ceilDivExact') {
-                  return longSameSigns && !longRemainder.isZero() ? longQuotient.add(gLong.ONE) : longQuotient;
-                }
-                return longQuotient;
-              };
-            },
-            isSignaturePolymorphic: function(): boolean {
-              return false;
-            },
-            isHidden: function(): boolean {
-              return false;
-            },
-            isCallerSensitive: function(): boolean {
-              return false;
-            },
-            getFullSignature: function(): string {
-              return syntheticCls.getExternalName() + '.' + this.signature;
-            }
-          };
-          method = <Method> syntheticMethod;
-        } else if ((syntheticCls.getInternalName() === 'Ljava/lang/Math;' ||
-            syntheticCls.getInternalName() === 'Ljava/lang/StrictMath;') &&
             (this.signature === 'absExact(I)I' ||
              this.signature === 'absExact(J)J')) {
           var mathAbsExactSignature = this.signature;
@@ -4332,14 +4234,7 @@ export class MethodReference implements IConstantPoolItem {
       resolvedFileSystemsPathNewFileSystem = this.fullSignature === 'java/nio/file/FileSystems/newFileSystem(Ljava/nio/file/Path;)Ljava/nio/file/FileSystem;' ||
         this.fullSignature === 'java/nio/file/FileSystems/newFileSystem(Ljava/nio/file/Path;Ljava/util/Map;)Ljava/nio/file/FileSystem;' ||
         this.fullSignature === 'java/nio/file/FileSystems/newFileSystem(Ljava/nio/file/Path;Ljava/lang/ClassLoader;)Ljava/nio/file/FileSystem;' ||
-        this.fullSignature === 'java/nio/file/FileSystems/newFileSystem(Ljava/nio/file/Path;Ljava/util/Map;Ljava/lang/ClassLoader;)Ljava/nio/file/FileSystem;',
-      resolvedMathDivision = (this.fullSignature.indexOf('java/lang/Math/') === 0 ||
-        this.fullSignature.indexOf('java/lang/StrictMath/') === 0) &&
-        ['ceilDiv(II)I', 'ceilDiv(JI)J', 'ceilDiv(JJ)J',
-         'ceilMod(II)I', 'ceilMod(JI)I', 'ceilMod(JJ)J',
-         'divideExact(II)I', 'divideExact(JJ)J',
-         'floorDivExact(II)I', 'floorDivExact(JJ)J',
-         'ceilDivExact(II)I', 'ceilDivExact(JJ)J'].indexOf(this.signature) !== -1;
+        this.fullSignature === 'java/nio/file/FileSystems/newFileSystem(Ljava/nio/file/Path;Ljava/util/Map;Ljava/lang/ClassLoader;)Ljava/nio/file/FileSystem;';
 	    if ((this.fullSignature === 'java/lang/Thread/onSpinWait()V' ||
 	        this.fullSignature === 'java/lang/Thread/sleep(Ljava/time/Duration;)V' ||
 	        this.fullSignature === 'java/lang/ref/Reference/reachabilityFence(Ljava/lang/Object;)V' ||
@@ -4353,7 +4248,6 @@ export class MethodReference implements IConstantPoolItem {
 	        this.fullSignature === 'java/lang/StrictMath/floorDiv(JI)J' ||
 	        this.fullSignature === 'java/lang/Math/floorMod(JI)I' ||
 	        this.fullSignature === 'java/lang/StrictMath/floorMod(JI)I' ||
-	        resolvedMathDivision ||
 	        this.fullSignature === 'java/lang/Math/absExact(I)I' ||
 	        this.fullSignature === 'java/lang/StrictMath/absExact(I)I' ||
 	        this.fullSignature === 'java/lang/Math/absExact(J)J' ||

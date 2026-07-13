@@ -9,3 +9,4 @@ exact-long=2,ArithmeticException:long overflow,ArithmeticException:/ by zero
 round-exact=-2,2,ArithmeticException:integer overflow,ArithmeticException:long overflow
 matrix=true,true,true
 exceptions=true
+reflection=true,true

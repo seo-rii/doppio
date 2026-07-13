@@ -216,6 +216,99 @@ function addJavaLangRuntimeModernOverlays(data: Buffer): Buffer {
   ]);
 }
 
+function addJavaLangMathModernOverlays(data: Buffer): Buffer {
+  var cp = constantPoolEnd(data),
+    overlays = [
+      ['ceilDiv', '(II)I'],
+      ['ceilDiv', '(JI)J'],
+      ['ceilDiv', '(JJ)J'],
+      ['ceilMod', '(II)I'],
+      ['ceilMod', '(JI)I'],
+      ['ceilMod', '(JJ)J'],
+      ['divideExact', '(II)I'],
+      ['divideExact', '(JJ)J'],
+      ['floorDivExact', '(II)I'],
+      ['floorDivExact', '(JJ)J'],
+      ['ceilDivExact', '(II)I'],
+      ['ceilDivExact', '(JJ)J']
+    ],
+    helperNameIndex = cp.count,
+    helperClassIndex = cp.count + 1,
+    codeNameIndex = cp.count + 2,
+    extraConstants = Buffer.concat([
+      utf8Constant('java/lang/DoppioMath'),
+      Buffer.concat([Buffer.from([7]), u2(helperNameIndex)]),
+      utf8Constant('Code')
+    ].concat(overlays.reduce((constants: Buffer[], overlay: string[], index: number) => {
+      var nameIndex = cp.count + 3 + index * 4,
+        descriptorIndex = nameIndex + 1,
+        nameAndTypeIndex = nameIndex + 2;
+      constants.push(
+        utf8Constant(overlay[0]),
+        utf8Constant(overlay[1]),
+        Buffer.concat([Buffer.from([12]), u2(nameIndex), u2(descriptorIndex)]),
+        Buffer.concat([Buffer.from([10]), u2(helperClassIndex), u2(nameAndTypeIndex)])
+      );
+      return constants;
+    }, []))),
+    withConstants = Buffer.concat([
+      data.slice(0, 8),
+      u2(cp.count + 3 + overlays.length * 4),
+      data.slice(10, cp.offset),
+      extraConstants,
+      data.slice(cp.offset)
+    ]),
+    methods = methodsInfo(withConstants, cp.offset + extraConstants.length),
+    methodData = Buffer.concat(overlays.map((overlay: string[], index: number) => {
+      var nameIndex = cp.count + 3 + index * 4,
+        descriptorIndex = nameIndex + 1,
+        helperMethodIndex = nameIndex + 3,
+        descriptor = overlay[1],
+        code: Buffer,
+        maxStack: number,
+        maxLocals: number;
+      if (descriptor === '(II)I') {
+        code = Buffer.concat([Buffer.from([0x1a, 0x1b, 0xb8]), u2(helperMethodIndex), Buffer.from([0xac])]);
+        maxStack = 2;
+        maxLocals = 2;
+      } else if (descriptor === '(JI)J') {
+        code = Buffer.concat([Buffer.from([0x1e, 0x1c, 0xb8]), u2(helperMethodIndex), Buffer.from([0xad])]);
+        maxStack = 3;
+        maxLocals = 3;
+      } else if (descriptor === '(JI)I') {
+        code = Buffer.concat([Buffer.from([0x1e, 0x1c, 0xb8]), u2(helperMethodIndex), Buffer.from([0xac])]);
+        maxStack = 3;
+        maxLocals = 3;
+      } else {
+        code = Buffer.concat([Buffer.from([0x1e, 0x20, 0xb8]), u2(helperMethodIndex), Buffer.from([0xad])]);
+        maxStack = 4;
+        maxLocals = 4;
+      }
+      return Buffer.concat([
+        u2(0x0009),
+        u2(nameIndex),
+        u2(descriptorIndex),
+        u2(1),
+        u2(codeNameIndex),
+        u4(12 + code.length),
+        u2(maxStack),
+        u2(maxLocals),
+        u4(code.length),
+        code,
+        u2(0),
+        u2(0)
+      ]);
+    }));
+
+  return Buffer.concat([
+    withConstants.slice(0, methods.countOffset),
+    u2(methods.count + overlays.length),
+    withConstants.slice(methods.countOffset + 2, methods.endOffset),
+    methodData,
+    withConstants.slice(methods.endOffset)
+  ]);
+}
+
 function addJavaLangInvokeMethodHandlesModernOverlays(data: Buffer): Buffer {
   var cp = constantPoolEnd(data),
     overlays = [
@@ -840,6 +933,9 @@ export class BootstrapClassLoader extends ClassLoader {
         }
         if (typeStr === 'Ljava/lang/Runtime;') {
           clsData = addJavaLangRuntimeModernOverlays(clsData);
+        }
+        if (typeStr === 'Ljava/lang/Math;' || typeStr === 'Ljava/lang/StrictMath;') {
+          clsData = addJavaLangMathModernOverlays(clsData);
         }
         if (typeStr === 'Ljava/lang/invoke/MethodHandles;') {
           clsData = addJavaLangInvokeMethodHandlesModernOverlays(clsData);

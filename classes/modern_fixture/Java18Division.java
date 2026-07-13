@@ -220,7 +220,89 @@ public class Java18Division {
         throwsArithmetic(() -> StrictMath.ceilDivExact(Long.MIN_VALUE, -1L));
   }
 
-  public static void main(String[] args) {
+  private static boolean checkReflection(Class<?> owner) throws Exception {
+    String[] names = {
+      "ceilDiv", "ceilDiv", "ceilDiv",
+      "ceilMod", "ceilMod", "ceilMod",
+      "divideExact", "divideExact",
+      "floorDivExact", "floorDivExact",
+      "ceilDivExact", "ceilDivExact"
+    };
+    Class<?>[][] parameterTypes = {
+      {Integer.TYPE, Integer.TYPE},
+      {Long.TYPE, Integer.TYPE},
+      {Long.TYPE, Long.TYPE},
+      {Integer.TYPE, Integer.TYPE},
+      {Long.TYPE, Integer.TYPE},
+      {Long.TYPE, Long.TYPE},
+      {Integer.TYPE, Integer.TYPE},
+      {Long.TYPE, Long.TYPE},
+      {Integer.TYPE, Integer.TYPE},
+      {Long.TYPE, Long.TYPE},
+      {Integer.TYPE, Integer.TYPE},
+      {Long.TYPE, Long.TYPE}
+    };
+    Class<?>[] returnTypes = {
+      Integer.TYPE, Long.TYPE, Long.TYPE,
+      Integer.TYPE, Integer.TYPE, Long.TYPE,
+      Integer.TYPE, Long.TYPE,
+      Integer.TYPE, Long.TYPE,
+      Integer.TYPE, Long.TYPE
+    };
+    Object[][] arguments = {
+      {4, 3}, {4L, 3}, {4L, 3L},
+      {4, 3}, {4L, 3}, {4L, 3L},
+      {4, 3}, {4L, 3L},
+      {4, 3}, {4L, 3L},
+      {4, 3}, {4L, 3L}
+    };
+    Object[] expected = {
+      2, 2L, 2L,
+      -2, -2, -2L,
+      1, 1L,
+      1, 1L,
+      2, 2L
+    };
+
+    for (int i = 0; i < names.length; i++) {
+      java.lang.reflect.Method declared = owner.getDeclaredMethod(names[i], parameterTypes[i]);
+      java.lang.reflect.Method inherited = owner.getMethod(names[i], parameterTypes[i]);
+      if (!declared.equals(inherited) || declared.getDeclaringClass() != owner ||
+          declared.getModifiers() != (java.lang.reflect.Modifier.PUBLIC | java.lang.reflect.Modifier.STATIC) ||
+          declared.getReturnType() != returnTypes[i] || declared.getParameterTypes().length != 2 ||
+          declared.getParameterTypes()[0] != parameterTypes[i][0] ||
+          declared.getParameterTypes()[1] != parameterTypes[i][1] ||
+          declared.getExceptionTypes().length != 0 || declared.isBridge() ||
+          declared.isSynthetic() || declared.isVarArgs() ||
+          !expected[i].equals(declared.invoke(null, arguments[i]))) {
+        return false;
+      }
+    }
+
+    int enumerated = 0;
+    for (java.lang.reflect.Method method : owner.getDeclaredMethods()) {
+      for (String name : names) {
+        if (method.getName().equals(name)) {
+          enumerated++;
+          break;
+        }
+      }
+    }
+    if (enumerated != names.length) {
+      return false;
+    }
+
+    try {
+      owner.getMethod("divideExact", Integer.TYPE, Integer.TYPE)
+          .invoke(null, Integer.MIN_VALUE, -1);
+      return false;
+    } catch (java.lang.reflect.InvocationTargetException expectedFailure) {
+      Throwable cause = expectedFailure.getCause();
+      return cause instanceof ArithmeticException && "integer overflow".equals(cause.getMessage());
+    }
+  }
+
+  public static void main(String[] args) throws Exception {
     System.out.println("ceil-int=" + ceilDivInt(false, 4, 3) + "," + ceilDivInt(false, -4, 3) + "," +
         ceilDivInt(false, 4, -3) + "," + ceilDivInt(false, -4, -3) + "," +
         ceilDivInt(false, Integer.MIN_VALUE, -1));
@@ -244,5 +326,6 @@ public class Java18Division {
         ceilDivExactLongResult(false, Long.MIN_VALUE, -1L));
     System.out.println("matrix=" + checkIntMatrix() + "," + checkLongMatrix() + "," + checkMixedMatrix());
     System.out.println("exceptions=" + checkExceptionMatrix());
+    System.out.println("reflection=" + checkReflection(Math.class) + "," + checkReflection(StrictMath.class));
   }
 }

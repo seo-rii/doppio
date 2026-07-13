@@ -77,6 +77,25 @@ parsed-method metadata.
   with HotSpot, then converts the reflected method through
   `MethodHandles.Lookup.unreflect` and invokes the resulting handle.
 
+The Java 18 integer-division family is the first multi-method parsed overlay:
+
+- `ClassLoader.ts` injects all 12 `ceilDiv`, `ceilMod`, `divideExact`,
+  `floorDivExact`, and `ceilDivExact` overloads into both `Math` and
+  `StrictMath` before parsing their Java 8 bootstrap classfiles.
+- Each injected method is ordinary public static bytecode, without native or
+  synthetic modifiers, and delegates to the package-private `DoppioMath`
+  class-library helper. The previous slot-less constant-pool fallback was
+  removed so direct resolution, reflection enumeration, slots, and invocation
+  use one implementation.
+- `Java18Division` verifies all 24 reflection methods through
+  `getDeclaredMethod`, `getMethod`, `getDeclaredMethods`, metadata, invocation,
+  and exact-overflow `InvocationTargetException` causes while retaining the
+  direct sign, mixed-width, identity, and exception matrices. The complete
+  output matches Temurin 21.0.11.
+- The compiler-discovery gates passed locally on 2026-07-13: Kotlin 2.4 startup
+  in 50 seconds and minimal compile/run in 168 seconds, plus Scala 2.13.18
+  startup in 20 seconds and minimal compile/run in 185 seconds.
+
 The safer shape is an explicit overlay registry:
 
 - keyed by internal class name and method descriptor;
