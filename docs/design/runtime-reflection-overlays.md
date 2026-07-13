@@ -96,6 +96,23 @@ The Java 9 no-op runtime hints use a smaller reusable parsed overlay:
 - The complete compiler gates passed locally on 2026-07-13 in 139 seconds for
   Kotlin 2.4.0 and 77 seconds for Scala 2.13.18.
 
+The Java 11 `Character.toString(int)` overlay follows the same parsed-method
+rule while delegating nontrivial string construction:
+
+- `ClassLoader.ts` injects an ordinary public static
+  `iload_0`/`invokestatic`/`areturn` method into `Character.class` and removes
+  the old slot-less constant-pool fallback.
+- The package-private `DoppioCharacter` helper validates the full Unicode code
+  point range, preserves HotSpot's exact invalid-code-point messages, and uses
+  the existing `Character.toChars` implementation for valid input.
+- `Java11CharacterToStringReflection` compares declared/public lookup,
+  declared-method enumeration, modifiers, descriptor and empty annotation
+  metadata, BMP/supplementary/max results, exact reflected exception causes,
+  `Method.invoke`, and `Lookup.unreflect` invocation with HotSpot. The original
+  direct-call fixture remains as a separate regression.
+- The complete compiler gates passed locally on 2026-07-13 in 97 seconds for
+  Kotlin 2.4.0 and 58 seconds for Scala 2.13.18.
+
 The modern integer arithmetic family is the first multi-method parsed overlay:
 
 - `ClassLoader.ts` injects 23 methods into each of `Math` and `StrictMath`

@@ -1091,9 +1091,11 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
 - `java.lang.CharSequence` preserves the tested Java 8 `chars` and
   `codePoints` default behavior and adds tested Java 11 `compare` plus Java 15
   `isEmpty` behavior.
-- `java.lang.Character.toString(int)` now covers selected Java 11 code-point
-  string construction for BMP, supplementary, NUL, and max code points plus
-  invalid-range rejection.
+- `java.lang.Character.toString(int)` is a parsed public static Java 11 method,
+  so direct calls, reflective lookup and enumeration, `Method.invoke`, and
+  `Lookup.unreflect` share one implementation. Coverage includes exact method
+  and empty annotation metadata, BMP, supplementary, NUL, and max code points,
+  plus native-compatible invalid-range exception messages.
 - `java.lang.StringBuilder` and `StringBuffer` now expose selected Java 11
   `compareTo` behavior for lexicographic ordering, equal and mutated contents,
   prefix-length ordering, NUL character ordering, and null argument rejection.

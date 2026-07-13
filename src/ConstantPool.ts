@@ -1141,55 +1141,6 @@ export class MethodReference implements IConstantPoolItem {
             }
           };
           method = <Method> syntheticMethod;
-        } else if (syntheticCls.getInternalName() === 'Ljava/lang/Character;' &&
-            this.signature === 'toString(I)Ljava/lang/String;') {
-          syntheticMethod = {
-            cls: syntheticCls,
-            slot: -1,
-            accessFlags: syntheticAccessFlags,
-            name: this.nameAndTypeInfo.name,
-            rawDescriptor: this.nameAndTypeInfo.descriptor,
-            attrs: [],
-            signature: this.signature,
-            fullSignature: syntheticFullSignature,
-            parameterTypes: ['I'],
-            returnType: 'Ljava/lang/String;',
-            getParamWordSize: function(): number {
-              return 1;
-            },
-            convertArgs: function(thread: JVMThread, params: any[]): any[] {
-              return [thread, params[0]];
-            },
-            getNativeFunction: function(): Function {
-              return function(thread: JVMThread, codePoint: number): JVMTypes.java_lang_String {
-                if (codePoint < 0 || codePoint > 0x10ffff) {
-                  thread.throwNewException('Ljava/lang/IllegalArgumentException;', '');
-                  return null;
-                }
-                if (codePoint <= 0xffff) {
-                  return util.initString(thread.getBsCl(), String.fromCharCode(codePoint));
-                }
-                codePoint -= 0x10000;
-                return util.initString(thread.getBsCl(), String.fromCharCode(
-                  0xd800 + (codePoint >> 10),
-                  0xdc00 + (codePoint & 0x3ff)
-                ));
-              };
-            },
-            isSignaturePolymorphic: function(): boolean {
-              return false;
-            },
-            isHidden: function(): boolean {
-              return false;
-            },
-            isCallerSensitive: function(): boolean {
-              return false;
-            },
-            getFullSignature: function(): string {
-              return syntheticCls.getExternalName() + '.' + this.signature;
-            }
-          };
-          method = <Method> syntheticMethod;
         } else if (syntheticCls.getInternalName() === 'Ljava/lang/StackTraceElement;' &&
             (this.signature === '<init>(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V' ||
              this.signature === 'getClassLoaderName()Ljava/lang/String;' ||
@@ -3983,7 +3934,6 @@ export class MethodReference implements IConstantPoolItem {
         this.fullSignature === 'java/nio/file/FileSystems/newFileSystem(Ljava/nio/file/Path;Ljava/lang/ClassLoader;)Ljava/nio/file/FileSystem;' ||
         this.fullSignature === 'java/nio/file/FileSystems/newFileSystem(Ljava/nio/file/Path;Ljava/util/Map;Ljava/lang/ClassLoader;)Ljava/nio/file/FileSystem;';
 	    if ((this.fullSignature === 'java/lang/Thread/sleep(Ljava/time/Duration;)V' ||
-	        this.fullSignature === 'java/lang/Character/toString(I)Ljava/lang/String;' ||
 	        this.fullSignature === 'java/lang/ClassLoader/getPlatformClassLoader()Ljava/lang/ClassLoader;' ||
 	        this.fullSignature === 'java/lang/System/getLogger(Ljava/lang/String;)Ljava/lang/System$Logger;' ||
 	        this.fullSignature === 'java/lang/System/getLogger(Ljava/lang/String;Ljava/util/ResourceBundle;)Ljava/lang/System$Logger;' ||
