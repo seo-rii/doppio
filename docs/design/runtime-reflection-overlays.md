@@ -179,6 +179,26 @@ The Java 15 `Class.isHidden()` overlay is also a parsed native method:
   Kotlin 2.4.0 and 283 seconds for Scala 2.13.18 under a heavily contended
   shared host.
 
+The Java 16 `Class.isRecord()` overlay is a parsed ordinary method:
+
+- `ClassLoader.ts` injects the exact public, non-native `isRecord()` descriptor
+  into the Java 8 bootstrap `Class` classfile. Its bytecode passes the receiver
+  to the package-private native `DoppioClass` helper, which reads Doppio's
+  parsed `Record` classfile metadata.
+- The previous slot-less constant-pool fallback and synthetic native-frame
+  trampoline were removed, so direct calls, reflection slots,
+  `Method.invoke`, and `Lookup.unreflect` all resolve the same parsed method
+  with empty annotation metadata.
+- `Java16ClassIsRecordReflection` compares exact modifiers, descriptors,
+  annotation and parameter metadata, declared/public lookup and enumeration,
+  direct and reflective results across non-empty, empty, and local records plus
+  ordinary, enum, JDK, primitive, void, and array classes, and exact
+  unreflected handle type and true/false invocation with HotSpot. The original
+  direct fixture and broader record-component fixture remain separate
+  regressions.
+- The compiler-discovery gates passed locally on 2026-07-13 in 170 seconds for
+  Kotlin 2.4.0 and 97 seconds for Scala 2.13.18.
+
 The two Java 9 `System.getLogger` overloads reuse the caller-sensitive path:
 
 - `ClassLoader.ts` injects ordinary public static methods for the name-only and

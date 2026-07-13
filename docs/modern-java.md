@@ -1951,9 +1951,11 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   record `toString`, primitive equality/hash behavior, and reference-component
   `equals`/`hashCode` dispatch, but it is not a general
   `java.lang.runtime.ObjectMethods` implementation.
-- `java.lang.Class` now exposes selected Java 16 `isRecord()` behavior for
-  non-empty, empty, and local records plus ordinary, enum, JDK, primitive,
-  void, and array classes.
+- `java.lang.Class.isRecord()` is a parsed public, non-native Java 16 method,
+  so direct calls, reflective lookup and enumeration, `Method.invoke`, and
+  `Lookup.unreflect` share one implementation with native-compatible empty
+  annotation metadata. Coverage includes non-empty, empty, and local records
+  plus ordinary, enum, JDK, primitive, void, and array classes.
 - `Class.getRecordComponents()` and a minimal
   `java.lang.reflect.RecordComponent` shim now cover component name, type, raw
   generic signature strings, raw generic/annotated type fallback for

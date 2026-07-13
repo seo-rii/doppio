@@ -171,6 +171,13 @@ function addJavaLangClassModernOverlays(data: Buffer): Buffer {
     isHiddenDescriptorIndex = cp.count + 5,
     annotationsNameIndex = cp.count + 6,
     annotationTypeIndex = cp.count + 7,
+    isRecordNameIndex = cp.count + 8,
+    codeNameIndex = cp.count + 9,
+    helperNameIndex = cp.count + 10,
+    helperClassIndex = cp.count + 11,
+    helperDescriptorIndex = cp.count + 12,
+    helperNameAndTypeIndex = cp.count + 13,
+    helperMethodIndex = cp.count + 14,
     extraConstants = Buffer.concat([
       utf8Constant('getModule'),
       utf8Constant('()Ljava/lang/Module;'),
@@ -179,11 +186,26 @@ function addJavaLangClassModernOverlays(data: Buffer): Buffer {
       utf8Constant('isHidden'),
       utf8Constant('()Z'),
       utf8Constant('RuntimeVisibleAnnotations'),
-      utf8Constant('Ljdk/internal/vm/annotation/IntrinsicCandidate;')
+      utf8Constant('Ljdk/internal/vm/annotation/IntrinsicCandidate;'),
+      utf8Constant('isRecord'),
+      utf8Constant('Code'),
+      utf8Constant('java/lang/DoppioClass'),
+      Buffer.concat([Buffer.from([7]), u2(helperNameIndex)]),
+      utf8Constant('(Ljava/lang/Class;)Z'),
+      Buffer.concat([
+        Buffer.from([12]),
+        u2(isRecordNameIndex),
+        u2(helperDescriptorIndex)
+      ]),
+      Buffer.concat([
+        Buffer.from([10]),
+        u2(helperClassIndex),
+        u2(helperNameAndTypeIndex)
+      ])
     ]),
     withConstants = Buffer.concat([
       data.slice(0, 8),
-      u2(cp.count + 8),
+      u2(cp.count + 15),
       data.slice(10, cp.offset),
       extraConstants,
       data.slice(cp.offset)
@@ -211,15 +233,35 @@ function addJavaLangClassModernOverlays(data: Buffer): Buffer {
       u2(1),
       u2(annotationTypeIndex),
       u2(0)
+    ]),
+    isRecordCode = Buffer.concat([
+      Buffer.from([0x2a, 0xb8]),
+      u2(helperMethodIndex),
+      Buffer.from([0xac])
+    ]),
+    isRecordMethod = Buffer.concat([
+      u2(0x0001),
+      u2(isRecordNameIndex),
+      u2(isHiddenDescriptorIndex),
+      u2(1),
+      u2(codeNameIndex),
+      u4(12 + isRecordCode.length),
+      u2(1),
+      u2(1),
+      u4(isRecordCode.length),
+      isRecordCode,
+      u2(0),
+      u2(0)
     ]);
 
   return Buffer.concat([
     withConstants.slice(0, methods.countOffset),
-    u2(methods.count + 3),
+    u2(methods.count + 4),
     withConstants.slice(methods.countOffset + 2, methods.endOffset),
     getModuleMethod,
     getRecordComponentsMethod,
     isHiddenMethod,
+    isRecordMethod,
     withConstants.slice(methods.endOffset)
   ]);
 }

@@ -637,6 +637,14 @@ export default function (): any {
 
   }
 
+  class java_lang_DoppioClass {
+
+    public static 'isRecord(Ljava/lang/Class;)Z'(thread: JVMThread, type: JVMTypes.java_lang_Class): boolean {
+      return type.$cls instanceof ReferenceClassData && type.$cls.isRecord();
+    }
+
+  }
+
   class java_lang_ClassLoader$NativeLibrary {
 
     public static 'load(Ljava/lang/String;Z)V'(thread: JVMThread, javaThis: JVMTypes.java_lang_ClassLoader$NativeLibrary, name: JVMTypes.java_lang_String, isBuiltIn: number): void {
@@ -2879,6 +2887,7 @@ export default function (): any {
     'java/lang/Class': java_lang_Class,
     'java/lang/ClassLoader$NativeLibrary': java_lang_ClassLoader$NativeLibrary,
     'java/lang/ClassLoader': java_lang_ClassLoader,
+    'java/lang/DoppioClass': java_lang_DoppioClass,
     'java/lang/DoppioClassLoader': java_lang_DoppioClassLoader,
     'java/lang/DoppioSystem': java_lang_DoppioSystem,
     'java/lang/Compiler': java_lang_Compiler,

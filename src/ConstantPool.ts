@@ -2696,44 +2696,6 @@ export class MethodReference implements IConstantPoolItem {
 	          };
 	          method = <Method> syntheticMethod;
 	        } else if (syntheticCls.getInternalName() === 'Ljava/lang/Class;' &&
-	            this.signature === 'isRecord()Z') {
-	          syntheticMethod = {
-	            cls: syntheticCls,
-	            slot: -1,
-	            accessFlags: new util.Flags(util.FlagMasks.PUBLIC | util.FlagMasks.NATIVE),
-	            name: this.nameAndTypeInfo.name,
-	            rawDescriptor: this.nameAndTypeInfo.descriptor,
-	            attrs: [],
-	            signature: this.signature,
-	            fullSignature: syntheticFullSignature,
-	            parameterTypes: [],
-	            returnType: 'Z',
-	            getParamWordSize: function(): number {
-	              return 0;
-	            },
-	            convertArgs: function(thread: JVMThread, params: any[]): any[] {
-	              return [thread, params[0]];
-	            },
-	            getNativeFunction: function(): Function {
-	              return function(thread: JVMThread, javaThis: JVMTypes.java_lang_Class): number {
-	                return javaThis.$cls instanceof ReferenceClassData && javaThis.$cls.isRecord() ? 1 : 0;
-	              };
-	            },
-	            isSignaturePolymorphic: function(): boolean {
-	              return false;
-	            },
-	            isHidden: function(): boolean {
-	              return false;
-	            },
-	            isCallerSensitive: function(): boolean {
-	              return false;
-	            },
-	            getFullSignature: function(): string {
-	              return syntheticCls.getExternalName() + '.' + this.signature;
-	            }
-	          };
-	          method = <Method> syntheticMethod;
-	        } else if (syntheticCls.getInternalName() === 'Ljava/lang/Class;' &&
 	            (this.signature === 'getNestHost()Ljava/lang/Class;' ||
 	             this.signature === 'isNestmateOf(Ljava/lang/Class;)Z' ||
 	             this.signature === 'getNestMembers()[Ljava/lang/Class;')) {
@@ -3929,7 +3891,6 @@ export class MethodReference implements IConstantPoolItem {
 	        this.fullSignature === 'java/lang/Class/getPackageName()Ljava/lang/String;' ||
 	        this.fullSignature === 'java/lang/Class/isSealed()Z' ||
 	        this.fullSignature === 'java/lang/Class/isNestmateOf(Ljava/lang/Class;)Z' ||
-	        this.fullSignature === 'java/lang/Class/isRecord()Z' ||
 	        this.fullSignature === 'java/lang/Class/describeConstable()Ljava/util/Optional;') &&
 	        typeof this.jsConstructor.prototype[this.fullSignature] !== 'function') {
 	      var syntheticClassMethod = this.method;
