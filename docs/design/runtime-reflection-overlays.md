@@ -265,6 +265,43 @@ The full Java 9-26 compatibility suite passed locally on 2026-07-14 in 16
 minutes 27 seconds. The compiler gates then passed in 228 seconds for Kotlin
 2.4.0 with the full compiler classpath and 136 seconds for Scala 2.13.18.
 
+### Accessible object access probes
+
+The Java 8 bootstrap `AccessibleObject` predates Java 9
+`canAccess(Object)` and `trySetAccessible()`. `ClassLoader.ts` appends both
+methods as public, final, non-native parsed methods with the modern
+`CallerSensitive` marker:
+
+- `canAccess` validates instance, static, and constructor receivers before it
+  observes the access-override flag. It then combines the actual caller from
+  `sun.reflect.Reflection.getCallerClass()`, Java 8
+  `verifyMemberAccess(...)`, and Doppio's nestmate metadata. Reflection
+  implementation frames derived from `MagicAccessorImpl` are excluded from
+  caller discovery, including when `canAccess` itself is invoked through
+  `Method.invoke`.
+- `trySetAccessible` reuses the existing `setAccessible` permission check,
+  preserves an already-enabled override, returns `false` without mutation for
+  the `java.lang.Class` constructor, and enables access for the unnamed-module
+  classpath model used by Doppio.
+
+`Java9AccessibleObjectAccess` compares exact method flags, inherited declaring
+class, caller-sensitive annotation shape, direct and reflective caller
+selection, public/protected/package/private members, cross-package protected
+receiver rules, static/instance/constructor validation before and after an
+override, repeated/reset state, non-`Member` subclasses, and the `Class`
+constructor. `Java11AccessibleObjectNestAccess` separately compiles with nest
+metadata and distinguishes a true private nestmate caller from an unrelated
+same-package helper.
+
+Strong named-module encapsulation remains outside this overlay: Doppio models
+bootstrap and application classes as unnamed-module members, so it cannot yet
+return `false` for JDK-private packages that Java 17 does not open to the
+caller. `ARCH-002` in `RISK_REGISTER.md` tracks the required module-model work.
+
+The full Java 9-26 compatibility suite passed locally on 2026-07-14 in 11
+minutes 41 seconds. The compiler gates then passed in 223 seconds for Kotlin
+2.4.0 with the full compiler classpath and 162 seconds for Scala 2.13.18.
+
 The Java 12 `Class.descriptorString()` overlay is a parsed ordinary method:
 
 - `ClassLoader.ts` injects the exact public, non-native descriptor into the

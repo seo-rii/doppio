@@ -397,6 +397,182 @@ function addJavaLangReflectExecutableReceiverModernOverlays(data: Buffer,
   ]);
 }
 
+function addJavaLangReflectAccessibleObjectModernOverlays(data: Buffer): Buffer {
+  var cp = constantPoolEnd(data),
+    constants: Buffer[] = [],
+    nextIndex = cp.count;
+
+  function addConstant(constant: Buffer): number {
+    constants.push(constant);
+    return nextIndex++;
+  }
+
+  function addUtf8(value: string): number {
+    return addConstant(utf8Constant(value));
+  }
+
+  function addClass(name: string): number {
+    var nameIndex = addUtf8(name);
+    return addConstant(Buffer.concat([Buffer.from([7]), u2(nameIndex)]));
+  }
+
+  function addNameAndType(name: string, descriptor: string): number {
+    var nameIndex = addUtf8(name),
+      descriptorIndex = addUtf8(descriptor);
+    return addConstant(Buffer.concat([
+      Buffer.from([12]),
+      u2(nameIndex),
+      u2(descriptorIndex)
+    ]));
+  }
+
+  function addMemberRef(tag: number, ownerIndex: number, name: string,
+      descriptor: string): number {
+    var nameAndTypeIndex = addNameAndType(name, descriptor);
+    return addConstant(Buffer.concat([
+      Buffer.from([tag]),
+      u2(ownerIndex),
+      u2(nameAndTypeIndex)
+    ]));
+  }
+
+  var codeNameIndex = addUtf8('Code'),
+    annotationsNameIndex = addUtf8('RuntimeVisibleAnnotations'),
+    callerSensitiveDescriptorIndex = addUtf8('Ljdk/internal/reflect/CallerSensitive;'),
+    canAccessNameIndex = addUtf8('canAccess'),
+    canAccessDescriptorIndex = addUtf8('(Ljava/lang/Object;)Z'),
+    trySetAccessibleNameIndex = addUtf8('trySetAccessible'),
+    trySetAccessibleDescriptorIndex = addUtf8('()Z'),
+    accessibleObjectClassIndex = addClass('java/lang/reflect/AccessibleObject'),
+    memberClassIndex = addClass('java/lang/reflect/Member'),
+    methodClassIndex = addClass('java/lang/reflect/Method'),
+    fieldClassIndex = addClass('java/lang/reflect/Field'),
+    constructorClassIndex = addClass('java/lang/reflect/Constructor'),
+    classClassIndex = addClass('java/lang/Class'),
+    modifierClassIndex = addClass('java/lang/reflect/Modifier'),
+    illegalArgumentExceptionClassIndex = addClass('java/lang/IllegalArgumentException'),
+    reflectionClassIndex = addClass('sun/reflect/Reflection'),
+    isAccessibleMethodIndex = addMemberRef(
+      10, accessibleObjectClassIndex, 'isAccessible', '()Z'),
+    memberGetDeclaringClassMethodIndex = addMemberRef(
+      11, memberClassIndex, 'getDeclaringClass', '()Ljava/lang/Class;'),
+    memberGetModifiersMethodIndex = addMemberRef(
+      11, memberClassIndex, 'getModifiers', '()I'),
+    modifierIsStaticMethodIndex = addMemberRef(
+      10, modifierClassIndex, 'isStatic', '(I)Z'),
+    classIsInstanceMethodIndex = addMemberRef(
+      10, classClassIndex, 'isInstance', '(Ljava/lang/Object;)Z'),
+    illegalArgumentExceptionConstructorIndex = addMemberRef(
+      10, illegalArgumentExceptionClassIndex, '<init>', '()V'),
+    reflectionGetCallerClassMethodIndex = addMemberRef(
+      10, reflectionClassIndex, 'getCallerClass', '()Ljava/lang/Class;'),
+    modifierIsPrivateMethodIndex = addMemberRef(
+      10, modifierClassIndex, 'isPrivate', '(I)Z'),
+    classIsNestmateOfMethodIndex = addMemberRef(
+      10, classClassIndex, 'isNestmateOf', '(Ljava/lang/Class;)Z'),
+    reflectionVerifyMemberAccessMethodIndex = addMemberRef(
+      10, reflectionClassIndex, 'verifyMemberAccess',
+      '(Ljava/lang/Class;Ljava/lang/Class;Ljava/lang/Object;I)Z'),
+    setAccessibleMethodIndex = addMemberRef(
+      10, accessibleObjectClassIndex, 'setAccessible', '(Z)V'),
+    constructorGetDeclaringClassMethodIndex = addMemberRef(
+      10, constructorClassIndex, 'getDeclaringClass', '()Ljava/lang/Class;'),
+    extraConstants = Buffer.concat(constants),
+    withConstants = Buffer.concat([
+      data.slice(0, 8),
+      u2(nextIndex),
+      data.slice(10, cp.offset),
+      extraConstants,
+      data.slice(cp.offset)
+    ]),
+    canAccessCode = Buffer.concat([
+      Buffer.from([0x2a, 0x4d, 0x2c, 0xc1]), u2(memberClassIndex),
+      Buffer.from([0x9a, 0x00, 0x08, 0x2a, 0xb6]), u2(isAccessibleMethodIndex),
+      Buffer.from([0xac, 0x2c, 0xc0]), u2(memberClassIndex),
+      Buffer.from([0x4e, 0x2d, 0xb9]), u2(memberGetDeclaringClassMethodIndex),
+      Buffer.from([0x01, 0x00, 0x3a, 0x04, 0x2d, 0xb9]),
+      u2(memberGetModifiersMethodIndex), Buffer.from([0x01, 0x00, 0x36, 0x05]),
+      Buffer.from([0x15, 0x05, 0xb8]), u2(modifierIsStaticMethodIndex),
+      Buffer.from([0x9a, 0x00, 0x2c, 0x2c, 0xc1]), u2(methodClassIndex),
+      Buffer.from([0x9a, 0x00, 0x0a, 0x2c, 0xc1]), u2(fieldClassIndex),
+      Buffer.from([0x99, 0x00, 0x1e, 0x2b, 0xc6, 0x00, 0x0c, 0x19, 0x04, 0x2b, 0xb6]),
+      u2(classIsInstanceMethodIndex),
+      Buffer.from([0x9a, 0x00, 0x0b, 0xbb]), u2(illegalArgumentExceptionClassIndex),
+      Buffer.from([0x59, 0xb7]), u2(illegalArgumentExceptionConstructorIndex),
+      Buffer.from([0xbf, 0x2b, 0x3a, 0x06, 0xa7, 0x00, 0x12, 0x2b, 0xc6, 0x00, 0x0b,
+        0xbb]), u2(illegalArgumentExceptionClassIndex),
+      Buffer.from([0x59, 0xb7]), u2(illegalArgumentExceptionConstructorIndex),
+      Buffer.from([0xbf, 0x01, 0x3a, 0x06, 0x2a, 0xb6]), u2(isAccessibleMethodIndex),
+      Buffer.from([0x99, 0x00, 0x05, 0x04, 0xac, 0xb8]),
+      u2(reflectionGetCallerClassMethodIndex),
+      Buffer.from([0x3a, 0x07, 0x15, 0x05, 0xb8]), u2(modifierIsPrivateMethodIndex),
+      Buffer.from([0x99, 0x00, 0x0f, 0x19, 0x07, 0x19, 0x04, 0xb6]),
+      u2(classIsNestmateOfMethodIndex),
+      Buffer.from([0x99, 0x00, 0x05, 0x04, 0xac, 0x19, 0x07, 0x19, 0x04, 0x19, 0x06,
+        0x15, 0x05, 0xb8]), u2(reflectionVerifyMemberAccessMethodIndex),
+      Buffer.from([0xac])
+    ]),
+    trySetAccessibleCode = Buffer.concat([
+      Buffer.from([0x2a, 0x2a, 0xb6]), u2(isAccessibleMethodIndex),
+      Buffer.from([0xb6]), u2(setAccessibleMethodIndex),
+      Buffer.from([0x2a, 0xb6]), u2(isAccessibleMethodIndex),
+      Buffer.from([0x99, 0x00, 0x05, 0x04, 0xac, 0x2a, 0x4c, 0x2b, 0xc1]),
+      u2(constructorClassIndex),
+      Buffer.from([0x99, 0x00, 0x12, 0x2b, 0xc0]), u2(constructorClassIndex),
+      Buffer.from([0xb6]), u2(constructorGetDeclaringClassMethodIndex),
+      Buffer.from([0x13]), u2(classClassIndex),
+      Buffer.from([0xa6, 0x00, 0x05, 0x03, 0xac, 0x2a, 0x04, 0xb6]),
+      u2(setAccessibleMethodIndex), Buffer.from([0x04, 0xac])
+    ]),
+    callerSensitiveAnnotation = Buffer.concat([
+      u2(annotationsNameIndex),
+      u4(6),
+      u2(1),
+      u2(callerSensitiveDescriptorIndex),
+      u2(0)
+    ]),
+    canAccessMethod = Buffer.concat([
+      u2(0x0011),
+      u2(canAccessNameIndex),
+      u2(canAccessDescriptorIndex),
+      u2(2),
+      u2(codeNameIndex),
+      u4(12 + canAccessCode.length),
+      u2(4),
+      u2(8),
+      u4(canAccessCode.length),
+      canAccessCode,
+      u2(0),
+      u2(0),
+      callerSensitiveAnnotation
+    ]),
+    trySetAccessibleMethod = Buffer.concat([
+      u2(0x0011),
+      u2(trySetAccessibleNameIndex),
+      u2(trySetAccessibleDescriptorIndex),
+      u2(2),
+      u2(codeNameIndex),
+      u4(12 + trySetAccessibleCode.length),
+      u2(2),
+      u2(2),
+      u4(trySetAccessibleCode.length),
+      trySetAccessibleCode,
+      u2(0),
+      u2(0),
+      callerSensitiveAnnotation
+    ]),
+    methods = methodsInfo(withConstants, cp.offset + extraConstants.length);
+
+  return Buffer.concat([
+    withConstants.slice(0, methods.countOffset),
+    u2(methods.count + 2),
+    withConstants.slice(methods.countOffset + 2, methods.endOffset),
+    canAccessMethod,
+    trySetAccessibleMethod,
+    withConstants.slice(methods.endOffset)
+  ]);
+}
+
 function addParameterizedTypeImplModernOverlay(data: Buffer): Buffer {
   var cp = constantPoolEnd(data),
     constants: Buffer[] = [],
@@ -2347,6 +2523,9 @@ export class BootstrapClassLoader extends ClassLoader {
         }
         if (typeStr === 'Ljava/lang/reflect/Constructor;') {
           clsData = addJavaLangReflectExecutableReceiverModernOverlays(clsData, true);
+        }
+        if (typeStr === 'Ljava/lang/reflect/AccessibleObject;') {
+          clsData = addJavaLangReflectAccessibleObjectModernOverlays(clsData);
         }
         if (typeStr ===
             'Lsun/reflect/generics/reflectiveObjects/ParameterizedTypeImpl;') {

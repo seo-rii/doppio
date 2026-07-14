@@ -219,7 +219,7 @@ if (!Array.prototype.indexOf) {
  * y: accessible
  * n: not accessible
  */
-function isMagicAccessor(accessingCls: ReferenceClassData<JVMTypes.java_lang_Object>): boolean {
+export function isMagicAccessor(accessingCls: ReferenceClassData<JVMTypes.java_lang_Object>): boolean {
   while (accessingCls !== null) {
     if (accessingCls.getInternalName() === 'Lsun/reflect/MagicAccessorImpl;') {
       return true;

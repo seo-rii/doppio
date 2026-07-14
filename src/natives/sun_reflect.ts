@@ -200,6 +200,7 @@ export default function (): any {
     for (var idx = caller.length - 1; idx >= 0; idx--) {
       var frame: IStackTraceFrame = caller[idx];
       if (frame.method.isHidden() ||
+          util.isMagicAccessor(frame.method.cls) ||
           frame.method.fullSignature.indexOf('java/lang/reflect/Method/invoke') === 0) {
         continue;
       }

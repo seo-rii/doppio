@@ -1144,6 +1144,16 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   top-level, static-nested, local, and anonymous constructors. Coverage also
   protects `InnerClasses`-based class modifiers and the Java 8 annotated-type
   path adaptation needed by static nested receivers.
+- `java.lang.reflect.AccessibleObject` now exposes parsed public-final
+  `canAccess(Object)` and `trySetAccessible()` methods with caller-sensitive
+  metadata. Coverage includes direct and reflective caller selection,
+  public/protected/package/private access, cross-package protected receivers,
+  static/instance/constructor argument validation before and after overrides,
+  non-`Member` subclasses, Java 11 private nestmates, permission-preserving
+  state changes, and the `Class` constructor rejection. Named-module package
+  openness remains limited by Doppio's current unnamed-module model. The full
+  Java 9-26 suite and Kotlin 2.4.0/Scala 2.13.18 compiler gates passed after
+  this overlay was added.
 - `sun.reflect.generics.reflectiveObjects.ParameterizedTypeImpl` now renders
   Java 17-compatible nested type names without duplicating raw owners and uses
   `$` between parameterized owners and inner types. Coverage compares exact

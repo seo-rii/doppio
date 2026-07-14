@@ -1,0 +1,3 @@
+nest-host=true
+nest-private-self=true
+nest-private-helper=false
