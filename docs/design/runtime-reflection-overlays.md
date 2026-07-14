@@ -186,6 +186,31 @@ The Java 9 `Class.getPackageName()` overlay is a parsed ordinary method:
 - The compiler-discovery gates passed locally on 2026-07-13 in 188 seconds for
   Kotlin 2.4.0 and 241 seconds for Scala 2.13.18.
 
+The Java 9 `MethodHandles.Lookup.defineClass(byte[])` overlay is also a parsed
+ordinary method, despite delegating its runtime operation to native code:
+
+- `ClassLoader.ts` injects a public instance method with only `ACC_PUBLIC`, a
+  real `Code` attribute, generic return signature `Class<?>`, and the declared
+  `IllegalAccessException`. The bytecode passes both the lookup receiver and
+  byte array to package-private `DoppioMethodHandles.defineClass`.
+- Keeping the public method non-native preserves Java 17 reflection flags,
+  parameter fallback metadata, generic return structure, annotation surfaces,
+  ordinary `Method.invoke`, and `Lookup.unreflect` behavior.
+- The native helper owns the parts that cannot be expressed by a class-library
+  shim: lookup-mode ordering, defensive copying, detached classfile parsing,
+  package and module-class rejection, asynchronous linking, duplicate
+  reservation, defining-loader registration, and initialization avoidance.
+- `Java9LookupDefineClass` compiles payload classes into a directory outside
+  the test classpath, proving they cannot be loaded before definition. It
+  compares exact metadata, direct/reflected/unreflected invocation, loader,
+  module, package, protection-domain identity, initialization timing, duplicate
+  definition, malformed and future classfiles, wrong-package rejection, and
+  successful definition after failed attempts with HotSpot 17.
+
+The full Java 9-26 compatibility suite passed locally on 2026-07-15 in 22
+minutes 13 seconds. The compiler gates then passed in 382 seconds for Kotlin
+2.4.0 with the full compiler classpath and 292 seconds for Scala 2.13.18.
+
 ### Executable receiver types
 
 Java 9 changed executable receiver reflection beyond adding classfile syntax:

@@ -105,6 +105,46 @@ handles, dynamic constants, and record object-method linkage:
   These shims can describe targets but should not silently emulate runtime
   invocation without a matching Doppio runtime path.
 
+## `Lookup.defineClass` Definition Model
+
+Java 9 `MethodHandles.Lookup.defineClass(byte[])` is both a reflection surface
+and a class-loader operation. The public `Lookup` method is therefore injected
+as an ordinary parsed method with the Java 17 descriptor, generic signature,
+checked exception, and concrete bytecode. Its body delegates to a
+package-private native method on `DoppioMethodHandles`; the public method itself
+is not native or synthetic.
+
+The helper follows these ordering and ownership rules:
+
+1. Normalize the Java 8 trusted lookup sentinel and require `PACKAGE` access
+   before reading the byte array. A reduced lookup therefore throws
+   `IllegalAccessException` even for a null or malformed input.
+2. Copy the complete byte array before parsing, so caller mutation cannot
+   change the classfile being defined.
+3. Parse into detached `ReferenceClassData` using the lookup class's defining
+   loader and protection domain. Unsupported classfile majors become
+   `UnsupportedClassVersionError`; other parse failures become
+   `ClassFormatError`.
+4. Reject `ACC_MODULE` and require the parsed class's actual package to equal
+   the lookup class package before registration. Both failures use
+   `IllegalArgumentException`.
+5. Reserve the actual class name while superclass and interface resolution is
+   asynchronous. Competing lookup definitions fail with `LinkageError`; a
+   concurrent ordinary class-loader definition may win, in which case the
+   lookup definition also fails with `LinkageError`.
+6. Register only the successfully resolved class and return its `Class`
+   object. Do not initialize it; the first active use remains responsible for
+   running `<clinit>`.
+
+The generic class-loader definition path also rejects a duplicate before its
+asserting registration step. This keeps an ordinary classpath load racing a
+lookup definition from terminating the JavaScript runtime.
+
+The current model does not implement SecurityManager permission checks or full
+named-module package ownership. Doppio's modern runtime currently presents the
+tested unnamed-module model; those two surfaces remain separate compatibility
+work rather than implicit claims of this method.
+
 ## Implemented Slices
 
 - Java 17 `MethodHandles.Lookup` has a public same-class fixture covering

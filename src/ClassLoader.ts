@@ -2411,39 +2411,113 @@ function addJavaLangInvokeMethodHandleModernOverlays(data: Buffer): Buffer {
 
 function addJavaLangInvokeMethodHandlesLookupModernOverlays(data: Buffer): Buffer {
   var cp = constantPoolEnd(data),
-    overlays = [
+    constants: Buffer[] = [],
+    nextIndex = cp.count;
+
+  function addConstant(constant: Buffer): number {
+    constants.push(constant);
+    return nextIndex++;
+  }
+
+  function addUtf8(value: string): number {
+    return addConstant(utf8Constant(value));
+  }
+
+  function addClass(name: string): number {
+    var nameIndex = addUtf8(name);
+    return addConstant(Buffer.concat([Buffer.from([7]), u2(nameIndex)]));
+  }
+
+  function addNameAndType(name: string, descriptor: string): number {
+    var nameIndex = addUtf8(name),
+      descriptorIndex = addUtf8(descriptor);
+    return addConstant(Buffer.concat([
+      Buffer.from([12]),
+      u2(nameIndex),
+      u2(descriptorIndex)
+    ]));
+  }
+
+  function addMethodRef(ownerIndex: number, name: string, descriptor: string): number {
+    var nameAndTypeIndex = addNameAndType(name, descriptor);
+    return addConstant(Buffer.concat([
+      Buffer.from([10]),
+      u2(ownerIndex),
+      u2(nameAndTypeIndex)
+    ]));
+  }
+
+  var nativeOverlays = [
       ['previousLookupClass', '()Ljava/lang/Class;'],
       ['hasFullPrivilegeAccess', '()Z'],
       ['dropLookupMode', '(I)Ljava/lang/invoke/MethodHandles$Lookup;']
     ],
-    extraConstants = Buffer.concat(overlays.reduce((constants: Buffer[], overlay: string[]) => {
-      constants.push(utf8Constant(overlay[0]), utf8Constant(overlay[1]));
-      return constants;
-    }, [])),
+    nativeIndexes = nativeOverlays.map((overlay: string[]): number[] => [
+      addUtf8(overlay[0]),
+      addUtf8(overlay[1])
+    ]),
+    defineClassNameIndex = addUtf8('defineClass'),
+    defineClassDescriptorIndex = addUtf8('([B)Ljava/lang/Class;'),
+    codeNameIndex = addUtf8('Code'),
+    exceptionsNameIndex = addUtf8('Exceptions'),
+    signatureNameIndex = addUtf8('Signature'),
+    defineClassSignatureIndex = addUtf8('([B)Ljava/lang/Class<*>;'),
+    illegalAccessExceptionClassIndex = addClass('java/lang/IllegalAccessException'),
+    helperClassIndex = addClass('java/lang/invoke/DoppioMethodHandles'),
+    helperMethodIndex = addMethodRef(
+      helperClassIndex,
+      'defineClass',
+      '(Ljava/lang/invoke/MethodHandles$Lookup;[B)Ljava/lang/Class;'),
+    extraConstants = Buffer.concat(constants),
     withConstants = Buffer.concat([
       data.slice(0, 8),
-      u2(cp.count + overlays.length * 2),
+      u2(nextIndex),
       data.slice(10, cp.offset),
       extraConstants,
       data.slice(cp.offset)
     ]),
     methods = methodsInfo(withConstants, cp.offset + extraConstants.length),
-    methodData = Buffer.concat(overlays.map((overlay: string[], index: number) => {
-      var nameIndex = cp.count + index * 2,
-        descriptorIndex = nameIndex + 1;
+    nativeMethodData = Buffer.concat(nativeIndexes.map((indexes: number[]) => {
       return Buffer.concat([
         u2(0x0101),
-        u2(nameIndex),
-        u2(descriptorIndex),
+        u2(indexes[0]),
+        u2(indexes[1]),
         u2(0)
       ]);
-    }));
+    })),
+    code = Buffer.concat([
+      Buffer.from([0x2a, 0x2b, 0xb8]),
+      u2(helperMethodIndex),
+      Buffer.from([0xb0])
+    ]),
+    defineClassMethod = Buffer.concat([
+      u2(0x0001),
+      u2(defineClassNameIndex),
+      u2(defineClassDescriptorIndex),
+      u2(3),
+      u2(codeNameIndex),
+      u4(12 + code.length),
+      u2(2),
+      u2(2),
+      u4(code.length),
+      code,
+      u2(0),
+      u2(0),
+      u2(exceptionsNameIndex),
+      u4(4),
+      u2(1),
+      u2(illegalAccessExceptionClassIndex),
+      u2(signatureNameIndex),
+      u4(2),
+      u2(defineClassSignatureIndex)
+    ]);
 
   return Buffer.concat([
     withConstants.slice(0, methods.countOffset),
-    u2(methods.count + overlays.length),
+    u2(methods.count + nativeOverlays.length + 1),
     withConstants.slice(methods.countOffset + 2, methods.endOffset),
-    methodData,
+    nativeMethodData,
+    defineClassMethod,
     withConstants.slice(methods.endOffset)
   ]);
 }
@@ -2597,6 +2671,14 @@ export abstract class ClassLoader {
    * @return The defined class, or null if there was an issue.
    */
   public defineClass<T extends JVMTypes.java_lang_Object>(thread: JVMThread, typeStr: string, data: Buffer, protectionDomain: JVMTypes.java_security_ProtectionDomain): ReferenceClassData<T> {
+    if (this.getClass(typeStr) != null) {
+      if (thread === null) {
+        error(`JVM initialization failed: duplicate class definition ${typeStr}`);
+      } else {
+        thread.throwNewException('Ljava/lang/LinkageError;', `Duplicate class definition: ${ext_classname(typeStr)}`);
+      }
+      return null;
+    }
     try {
       var classData = new ReferenceClassData<T>(data, protectionDomain, this);
       this.addClass(typeStr, classData);

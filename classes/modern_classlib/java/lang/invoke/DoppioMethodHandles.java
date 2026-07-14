@@ -9,6 +9,9 @@ import java.util.Objects;
 public final class DoppioMethodHandles {
   private DoppioMethodHandles() {}
 
+  static native Class<?> defineClass(MethodHandles.Lookup lookup, byte[] bytes)
+      throws IllegalAccessException;
+
   public static MethodHandle zero(Class<?> type) {
     Objects.requireNonNull(type);
     if (type == void.class) {

@@ -15,6 +15,7 @@ import PrimitiveClassData = Doppio.VM.ClassFile.PrimitiveClassData;
 import MethodHandleReferenceKind = Doppio.VM.Enums.MethodHandleReferenceKind;
 import attributes = Doppio.VM.ClassFile.Attributes;
 import ClassData = Doppio.VM.ClassFile.ClassData;
+import ClassLoader = Doppio.VM.ClassFile.ClassLoader;
 import * as JVMTypes from '../../includes/JVMTypes';
 import {setImmediate} from 'browserfs';
 import {refreshMemberNameMethodTarget} from '../method_handles';
@@ -2597,10 +2598,11 @@ export default function (): any {
   var LOOKUP_PUBLIC = 0x0001,
     LOOKUP_PRIVATE = 0x0002,
     LOOKUP_PROTECTED = 0x0004,
-    LOOKUP_PACKAGE = 0x0008;
+    LOOKUP_PACKAGE = 0x0008,
+    lookupClassDefinitions: Array<{loader: ClassLoader; typeStr: string}> = [];
 
   class java_lang_invoke_MethodHandles$Lookup {
-    private static getAllowedModes(lookup: JVMTypes.java_lang_invoke_MethodHandles$Lookup): number {
+    public static getAllowedModes(lookup: JVMTypes.java_lang_invoke_MethodHandles$Lookup): number {
       var modes = lookup['java/lang/invoke/MethodHandles$Lookup/allowedModes'];
       return modes === -1 ? 0x000f : modes;
     }
@@ -2685,6 +2687,84 @@ export default function (): any {
       rv['java/lang/invoke/MethodHandles$Lookup/lookupClass'] = javaThis['java/lang/invoke/MethodHandles$Lookup/lookupClass'];
       rv['java/lang/invoke/MethodHandles$Lookup/allowedModes'] = newModes;
       return rv;
+    }
+  }
+
+  class java_lang_invoke_DoppioMethodHandles {
+    public static 'defineClass(Ljava/lang/invoke/MethodHandles$Lookup;[B)Ljava/lang/Class;'(
+      thread: JVMThread,
+      lookup: JVMTypes.java_lang_invoke_MethodHandles$Lookup,
+      bytes: JVMTypes.JVMArray<number>
+    ): void {
+      var modes = java_lang_invoke_MethodHandles$Lookup.getAllowedModes(lookup);
+      if ((modes & LOOKUP_PACKAGE) === 0) {
+        thread.throwNewException('Ljava/lang/IllegalAccessException;', 'Lookup does not have PACKAGE access');
+        return;
+      }
+      if (bytes === null) {
+        thread.throwNewException('Ljava/lang/NullPointerException;', '');
+        return;
+      }
+
+      var lookupClassObject = <JVMTypes.java_lang_Class> lookup['java/lang/invoke/MethodHandles$Lookup/lookupClass'],
+        lookupClass = <ReferenceClassData<JVMTypes.java_lang_Object>> lookupClassObject.$cls,
+        loader = lookupClass.getLoader(),
+        protectionDomain = lookupClass.getProtectionDomain(),
+        classBytes = util.byteArray2Buffer(bytes.array, 0, bytes.array.length),
+        parsedClass: ReferenceClassData<JVMTypes.java_lang_Object>;
+      try {
+        parsedClass = new ReferenceClassData<JVMTypes.java_lang_Object>(classBytes, protectionDomain, loader);
+      } catch (e) {
+        var parseError = <any> e,
+          message = parseError && parseError.message ? parseError.message : String(parseError);
+        thread.throwNewException(
+          message.indexOf('Major version invalid:') === 0 ?
+            'Ljava/lang/UnsupportedClassVersionError;' : 'Ljava/lang/ClassFormatError;',
+          message);
+        return;
+      }
+
+      if ((parsedClass.accessFlags.getRawByte() & 0x8000) !== 0) {
+        thread.throwNewException('Ljava/lang/IllegalArgumentException;', 'Cannot define a module descriptor');
+        return;
+      }
+      if (parsedClass.getPackageName() !== lookupClass.getPackageName()) {
+        thread.throwNewException('Ljava/lang/IllegalArgumentException;', 'Class is not in the lookup class package');
+        return;
+      }
+
+      var typeStr = parsedClass.getInternalName(),
+        reservation: {loader: ClassLoader; typeStr: string},
+        i: number;
+      if (loader.getLoadedClass(typeStr) !== null) {
+        thread.throwNewException('Ljava/lang/LinkageError;', `Duplicate class definition: ${parsedClass.getExternalName()}`);
+        return;
+      }
+      for (i = 0; i < lookupClassDefinitions.length; i++) {
+        if (lookupClassDefinitions[i].loader === loader && lookupClassDefinitions[i].typeStr === typeStr) {
+          thread.throwNewException('Ljava/lang/LinkageError;', `Duplicate class definition: ${parsedClass.getExternalName()}`);
+          return;
+        }
+      }
+
+      reservation = {loader: loader, typeStr: typeStr};
+      lookupClassDefinitions.push(reservation);
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      parsedClass.resolve(thread, (resolvedClass: ClassData) => {
+        var reservationIndex = lookupClassDefinitions.indexOf(reservation);
+        if (reservationIndex !== -1) {
+          lookupClassDefinitions.splice(reservationIndex, 1);
+        }
+        if (resolvedClass === null) {
+          return;
+        }
+        if (loader.getLoadedClass(typeStr) !== null) {
+          thread.throwNewException('Ljava/lang/LinkageError;', `Duplicate class definition: ${parsedClass.getExternalName()}`);
+          return;
+        }
+        loader.addClass(typeStr, parsedClass);
+        thread.asyncReturn(parsedClass.getClassObject(thread));
+      }, false);
     }
   }
 
@@ -3113,6 +3193,7 @@ export default function (): any {
     'java/lang/UNIXProcess': java_lang_UNIXProcess,
     'java/lang/invoke/MethodHandles': java_lang_invoke_MethodHandles,
     'java/lang/invoke/MethodHandles$Lookup': java_lang_invoke_MethodHandles$Lookup,
+    'java/lang/invoke/DoppioMethodHandles': java_lang_invoke_DoppioMethodHandles,
     'java/lang/invoke/MethodHandleNatives': java_lang_invoke_MethodHandleNatives,
     'java/lang/invoke/MethodHandle': java_lang_invoke_MethodHandle
   };

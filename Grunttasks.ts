@@ -475,6 +475,16 @@ export function setup(grunt: IGrunt) {
       }
     },
     javac_modern: {
+      lookup_define_payloads: {
+        options: {
+          release: 9,
+          destDir: 'classes/modern_lookup_define/out'
+        },
+        files: [{
+          expand: true,
+          src: 'classes/modern_fixture/lookup_define/*.java'
+        }]
+      },
       java9: {
         options: {
           release: 9
@@ -1204,6 +1214,7 @@ export function setup(grunt: IGrunt) {
     'parse_classfile_modern:module_info',
     'generate_return_top_modern',
     'generate_null_type_checks_modern',
+    'javac_modern:lookup_define_payloads',
     'javac_modern:java9',
     'generate_string_concat_constants_modern',
     'javac_modern:java10',
