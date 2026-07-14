@@ -182,10 +182,56 @@ The Java 9 `Class.getPackageName()` overlay is a parsed ordinary method:
   `RuntimeVisibleTypeAnnotations` bytes. `Java9ExecutableTypeAnnotations`
   compares top-level and nested return, receiver, parameter, and throws
   annotations plus constructor parameter/throws annotations and empty
-  metadata with HotSpot. Top-level constructor receiver nullability remains a
-  separate Java 8 class-library compatibility gap.
+  metadata with HotSpot.
 - The compiler-discovery gates passed locally on 2026-07-13 in 188 seconds for
   Kotlin 2.4.0 and 241 seconds for Scala 2.13.18.
+
+### Executable receiver types
+
+Java 9 changed executable receiver reflection beyond adding classfile syntax:
+
+- `Executable.getAnnotatedReceiverType()` now parameterizes a generic
+  declaring class recursively. A method declared by `Outer<T>.Inner<U>` must
+  therefore expose both the parameterized `Outer<T>` owner and the `U`
+  argument instead of the raw `Inner` class returned by the Java 8 bootstrap
+  implementation.
+- `Constructor.getAnnotatedReceiverType()` returns a receiver only for a
+  non-static member class. Top-level, static-nested, local, and anonymous
+  constructors return `null`, even when a local or anonymous constructor has a
+  synthetic enclosing-instance parameter.
+
+`ClassLoader.ts` implements these rules as parsed bootstrap methods:
+
+- a method-info transformer replaces only the existing `Code` attribute while
+  preserving access flags and all other method attributes;
+- `Executable.parameterize(Class<?>)` is appended with its Java 17
+  package-private descriptor and generic signature, using
+  `ParameterizedTypeImpl.make` recursively for generic owners;
+- the existing `Executable` and `Constructor` receiver method bodies are
+  replaced with the Java 17 algorithms adapted to the bundled Java 8
+  `sun.misc` constant-pool APIs.
+
+Two Java 8 compatibility details are handled before those algorithms run:
+
+- `Class.getModifiers()` reads the matching `InnerClasses` self-entry, where
+  member `private`, `protected`, and `static` flags are stored, instead of only
+  the top-level class access flags;
+- for a static member method receiver, the Java 9+ empty receiver type path is
+  translated to the one `INNER_TYPE` step expected by the Java 8
+  `AnnotatedTypeFactory`. Other annotation targets and non-empty paths remain
+  byte-for-byte unchanged.
+
+`Java9ExecutableReceiverReflection` compares structured raw, owner, and actual
+type-argument identities; receiver annotations; constructor nullability;
+member-class modifier classification; and exact public/package-private,
+non-native, non-synthetic method metadata across generic top-level,
+static-nested, inner, local, anonymous, and static cases. The earlier
+`Java9ExecutableTypeAnnotations` and `Java12ClassConstableReflection` fixtures
+remain focused regressions for the shared annotation-byte path.
+
+The full Java 9-26 compatibility suite passed locally on 2026-07-14 in 11
+minutes 2 seconds. The compiler-discovery gates then passed in 145 seconds for
+Kotlin 2.4.0 with the full compiler classpath and 98 seconds for Scala 2.13.18.
 
 The Java 12 `Class.descriptorString()` overlay is a parsed ordinary method:
 

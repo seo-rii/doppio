@@ -1,0 +1,16 @@
+top-method=parameterized(class:classes.modern_test.Java9ReceiverTopLevel,owner=null,arguments=[variable:V]):top-method
+outer-method=parameterized(class:classes.modern_test.Java9ExecutableReceiverReflection,owner=null,arguments=[variable:T]):outer-method
+static-nested-method=parameterized(class:classes.modern_test.Java9ExecutableReceiverReflection$StaticNested,owner=class:classes.modern_test.Java9ExecutableReceiverReflection,arguments=[variable:U]):static-nested-method
+inner-method=parameterized(class:classes.modern_test.Java9ExecutableReceiverReflection$Inner,owner=parameterized(class:classes.modern_test.Java9ExecutableReceiverReflection,owner=null,arguments=[variable:T]),arguments=[variable:U]):inner-method
+local-method=parameterized(class:local,owner=null,arguments=[variable:V]):local-method
+anonymous-method=class:anonymous:null
+static-method=null
+top-constructor=null
+static-nested-constructor=null
+inner-constructor=parameterized(class:classes.modern_test.Java9ExecutableReceiverReflection,owner=null,arguments=[variable:T]):inner-constructor
+local-constructor=null
+anonymous-constructor=null
+class-modifiers=true:false:false:false
+executable-receiver-metadata=java.lang.reflect.Executable:1:false:false
+constructor-receiver-metadata=java.lang.reflect.Constructor:1:false:false
+parameterize-metadata=java.lang.reflect.Executable:0:false:false:java.lang.Class<?>:java.lang.reflect.Type

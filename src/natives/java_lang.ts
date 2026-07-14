@@ -22,6 +22,21 @@ import {refreshMemberNameMethodTarget} from '../method_handles';
 export default function (): any {
   var debug = logging.debug;
 
+  function innerClassAccessFlags(cls: ReferenceClassData<JVMTypes.java_lang_Object>): number {
+    var myClass = cls.getInternalName(),
+      innerClasses = <attributes.InnerClasses[]> cls.getAttributes('InnerClasses');
+    for (var i = 0; i < innerClasses.length; i++) {
+      for (var j = 0; j < innerClasses[i].classes.length; j++) {
+        var entry = innerClasses[i].classes[j],
+          name = (<ConstantPool.ClassReference> cls.constantPool.get(entry.innerInfoIndex)).name;
+        if (name === myClass) {
+          return entry.innerAccessFlags;
+        }
+      }
+    }
+    return null;
+  }
+
   function getThrowableBacktraceFrames(throwable: JVMTypes.java_lang_Throwable): any[] {
     var backtrace = (<any> throwable)['java/lang/Throwable/backtrace'];
     if (backtrace === null || backtrace === undefined) {
@@ -290,6 +305,13 @@ export default function (): any {
     }
 
     public static 'getModifiers()I'(thread: JVMThread, javaThis: JVMTypes.java_lang_Class): number {
+      if (javaThis.$cls instanceof ReferenceClassData) {
+        var flags = innerClassAccessFlags(
+          <ReferenceClassData<JVMTypes.java_lang_Object>> javaThis.$cls);
+        if (flags !== null) {
+          return flags;
+        }
+      }
       return javaThis.$cls.accessFlags.getRawByte();
     }
 
@@ -1386,7 +1408,132 @@ export default function (): any {
 
       method = (<ReferenceClassData<JVMTypes.java_lang_Object>> clazz.$cls).getMethodFromSlot(slot);
       typeAnnotations = <attributes.RuntimeVisibleTypeAnnotations> method.getAttribute('RuntimeVisibleTypeAnnotations');
-      return typeAnnotations === null ? null : byteArrayFromBuffer(thread, typeAnnotations.rawBytes);
+      if (typeAnnotations === null) {
+        return null;
+      }
+
+      var rawBytes = typeAnnotations.rawBytes,
+        declaringClass = <ReferenceClassData<JVMTypes.java_lang_Object>> clazz.$cls,
+        declaringFlags = innerClassAccessFlags(declaringClass);
+      // Java 8's annotated-type factory counts a static member owner as one
+      // nesting step, while Java 9+ receiver attributes leave that path empty.
+      if (executable['java/lang/reflect/Method/clazz'] !== undefined &&
+          declaringFlags !== null && (declaringFlags & 0x0008) !== 0) {
+        var offset = 2,
+          annotationCount = rawBytes.readUInt16BE(0),
+          annotations: Buffer[] = [rawBytes.slice(0, 2)],
+          changed = false,
+          skipAnnotation: () => void,
+          skipElementValue: () => void;
+
+        var skipTargetInfo = function(targetType: number): void {
+          var tableLength: number;
+          switch (targetType) {
+            case 0x00:
+            case 0x01:
+            case 0x16:
+              offset += 1;
+              break;
+            case 0x10:
+            case 0x11:
+            case 0x12:
+            case 0x17:
+            case 0x42:
+            case 0x43:
+            case 0x44:
+            case 0x45:
+            case 0x46:
+              offset += 2;
+              break;
+            case 0x13:
+            case 0x14:
+            case 0x15:
+              break;
+            case 0x40:
+            case 0x41:
+              tableLength = rawBytes.readUInt16BE(offset);
+              offset += 2 + tableLength * 6;
+              break;
+            case 0x47:
+            case 0x48:
+            case 0x49:
+            case 0x4a:
+            case 0x4b:
+              offset += 3;
+              break;
+            default:
+              throw new Error('Unknown type annotation target type ' + targetType);
+          }
+        };
+
+        skipAnnotation = function(): void {
+          offset += 2;
+          var pairCount = rawBytes.readUInt16BE(offset);
+          offset += 2;
+          for (var pairIndex = 0; pairIndex < pairCount; pairIndex++) {
+            offset += 2;
+            skipElementValue();
+          }
+        };
+
+        skipElementValue = function(): void {
+          var tag = String.fromCharCode(rawBytes.readUInt8(offset++)),
+            valueCount: number;
+          switch (tag) {
+            case 'B':
+            case 'C':
+            case 'D':
+            case 'F':
+            case 'I':
+            case 'J':
+            case 'S':
+            case 'Z':
+            case 's':
+            case 'c':
+              offset += 2;
+              break;
+            case 'e':
+              offset += 4;
+              break;
+            case '@':
+              skipAnnotation();
+              break;
+            case '[':
+              valueCount = rawBytes.readUInt16BE(offset);
+              offset += 2;
+              for (var valueIndex = 0; valueIndex < valueCount; valueIndex++) {
+                skipElementValue();
+              }
+              break;
+            default:
+              throw new Error('Unknown annotation element value tag ' + tag);
+          }
+        };
+
+        for (var annotationIndex = 0; annotationIndex < annotationCount; annotationIndex++) {
+          var annotationStart = offset,
+            targetType = rawBytes.readUInt8(offset++);
+          skipTargetInfo(targetType);
+          var pathLengthOffset = offset,
+            pathLength = rawBytes.readUInt8(offset++);
+          offset += pathLength * 2;
+          var annotationBodyOffset = offset;
+          skipAnnotation();
+          if (targetType === 0x15 && pathLength === 0) {
+            annotations.push(
+              rawBytes.slice(annotationStart, pathLengthOffset),
+              Buffer.from([1, 1, 0]),
+              rawBytes.slice(annotationBodyOffset, offset));
+            changed = true;
+          } else {
+            annotations.push(rawBytes.slice(annotationStart, offset));
+          }
+        }
+        if (changed) {
+          rawBytes = Buffer.concat(annotations);
+        }
+      }
+      return byteArrayFromBuffer(thread, rawBytes);
     }
 
     public static 'getParameters0()[Ljava/lang/reflect/Parameter;'(thread: JVMThread, javaThis: JVMTypes.java_lang_reflect_Executable): any {

@@ -109,6 +109,294 @@ function methodsInfo(data: Buffer, cpEnd: number): { countOffset: number; count:
   return { countOffset: countOffset, count: methodsCount, endOffset: offset };
 }
 
+function replaceMethodCode(data: Buffer, cpEnd: number, name: string, descriptor: string,
+    codeNameIndex: number, maxStack: number, maxLocals: number, code: Buffer): Buffer {
+  var cp = constantPoolEnd(data),
+    utf8Constants: {[index: number]: string} = {},
+    constantOffset = 10,
+    constantLength: number,
+    constantTag: number;
+  for (var constantIndex = 1; constantIndex < cp.count; constantIndex++) {
+    constantTag = data.readUInt8(constantOffset++);
+    switch (constantTag) {
+      case 1:
+        constantLength = data.readUInt16BE(constantOffset);
+        utf8Constants[constantIndex] = data.toString(
+          'utf8', constantOffset + 2, constantOffset + 2 + constantLength);
+        constantOffset += 2 + constantLength;
+        break;
+      case 3:
+      case 4:
+      case 9:
+      case 10:
+      case 11:
+      case 12:
+      case 17:
+      case 18:
+        constantOffset += 4;
+        break;
+      case 5:
+      case 6:
+        constantOffset += 8;
+        constantIndex++;
+        break;
+      case 7:
+      case 8:
+      case 16:
+      case 19:
+      case 20:
+        constantOffset += 2;
+        break;
+      case 15:
+        constantOffset += 3;
+        break;
+      default:
+        throw new Error('Unknown constant-pool tag ' + constantTag);
+    }
+  }
+
+  var methods = methodsInfo(data, cpEnd),
+    methodOffset = methods.countOffset + 2;
+  for (var methodIndex = 0; methodIndex < methods.count; methodIndex++) {
+    var methodStart = methodOffset,
+      methodNameIndex = data.readUInt16BE(methodStart + 2),
+      methodDescriptorIndex = data.readUInt16BE(methodStart + 4),
+      attributesCount = data.readUInt16BE(methodStart + 6),
+      attributeOffset = methodStart + 8,
+      replacementAttributes: Buffer[] = [],
+      foundCode = false;
+    for (var attributeIndex = 0; attributeIndex < attributesCount; attributeIndex++) {
+      var attributeStart = attributeOffset,
+        attributeNameIndex = data.readUInt16BE(attributeStart),
+        attributeLength = data.readUInt32BE(attributeStart + 2);
+      attributeOffset += 6 + attributeLength;
+      if (utf8Constants[attributeNameIndex] === 'Code') {
+        replacementAttributes.push(Buffer.concat([
+          u2(codeNameIndex),
+          u4(12 + code.length),
+          u2(maxStack),
+          u2(maxLocals),
+          u4(code.length),
+          code,
+          u2(0),
+          u2(0)
+        ]));
+        foundCode = true;
+      } else {
+        replacementAttributes.push(data.slice(attributeStart, attributeOffset));
+      }
+    }
+    methodOffset = attributeOffset;
+    if (utf8Constants[methodNameIndex] === name &&
+        utf8Constants[methodDescriptorIndex] === descriptor) {
+      if (!foundCode) {
+        throw new Error(name + descriptor + ' is missing its Code attribute');
+      }
+      var replacement = Buffer.concat([
+        data.slice(methodStart, methodStart + 6),
+        u2(replacementAttributes.length),
+        Buffer.concat(replacementAttributes)
+      ]);
+      return Buffer.concat([
+        data.slice(0, methodStart),
+        replacement,
+        data.slice(methodOffset)
+      ]);
+    }
+  }
+  throw new Error('Missing method ' + name + descriptor);
+}
+
+function addJavaLangReflectExecutableReceiverModernOverlays(data: Buffer,
+    constructor: boolean): Buffer {
+  var cp = constantPoolEnd(data),
+    constants: Buffer[] = [],
+    nextIndex = cp.count;
+
+  function addConstant(constant: Buffer): number {
+    constants.push(constant);
+    return nextIndex++;
+  }
+
+  function addUtf8(value: string): number {
+    return addConstant(utf8Constant(value));
+  }
+
+  function addClass(name: string): number {
+    var nameIndex = addUtf8(name);
+    return addConstant(Buffer.concat([Buffer.from([7]), u2(nameIndex)]));
+  }
+
+  function addNameAndType(name: string, descriptor: string): number {
+    var nameIndex = addUtf8(name),
+      descriptorIndex = addUtf8(descriptor);
+    return addConstant(Buffer.concat([
+      Buffer.from([12]),
+      u2(nameIndex),
+      u2(descriptorIndex)
+    ]));
+  }
+
+  function addMemberRef(tag: number, ownerIndex: number, name: string,
+      descriptor: string): number {
+    var nameAndTypeIndex = addNameAndType(name, descriptor);
+    return addConstant(Buffer.concat([
+      Buffer.from([tag]),
+      u2(ownerIndex),
+      u2(nameAndTypeIndex)
+    ]));
+  }
+
+  var codeNameIndex = addUtf8('Code'),
+    signatureNameIndex = addUtf8('Signature'),
+    parameterizeNameIndex = addUtf8('parameterize'),
+    parameterizeDescriptorIndex = addUtf8('(Ljava/lang/Class;)Ljava/lang/reflect/Type;'),
+    parameterizeSignatureIndex = addUtf8('(Ljava/lang/Class<*>;)Ljava/lang/reflect/Type;'),
+    executableClassIndex = addClass('java/lang/reflect/Executable'),
+    classClassIndex = addClass('java/lang/Class'),
+    modifierClassIndex = addClass('java/lang/reflect/Modifier'),
+    sharedSecretsClassIndex = addClass('sun/misc/SharedSecrets'),
+    javaLangAccessClassIndex = addClass('sun/misc/JavaLangAccess'),
+    receiverTargetClassIndex = addClass(
+      'sun/reflect/annotation/TypeAnnotation$TypeAnnotationTarget'),
+    typeAnnotationParserClassIndex = addClass('sun/reflect/annotation/TypeAnnotationParser'),
+    parameterizedTypeImplClassIndex = addClass(
+      'sun/reflect/generics/reflectiveObjects/ParameterizedTypeImpl'),
+    getModifiersMethodIndex = addMemberRef(
+      10, executableClassIndex, 'getModifiers', '()I'),
+    isStaticMethodIndex = addMemberRef(
+      10, modifierClassIndex, 'isStatic', '(I)Z'),
+    getTypeAnnotationBytesMethodIndex = addMemberRef(
+      10, executableClassIndex, 'getTypeAnnotationBytes0', '()[B'),
+    getJavaLangAccessMethodIndex = addMemberRef(
+      10, sharedSecretsClassIndex, 'getJavaLangAccess', '()Lsun/misc/JavaLangAccess;'),
+    getDeclaringClassMethodIndex = addMemberRef(
+      10, executableClassIndex, 'getDeclaringClass', '()Ljava/lang/Class;'),
+    getConstantPoolMethodIndex = addMemberRef(
+      11, javaLangAccessClassIndex, 'getConstantPool',
+      '(Ljava/lang/Class;)Lsun/reflect/ConstantPool;'),
+    parameterizeMethodIndex = addMemberRef(
+      10, executableClassIndex, 'parameterize',
+      '(Ljava/lang/Class;)Ljava/lang/reflect/Type;'),
+    receiverTargetFieldIndex = addMemberRef(
+      9, receiverTargetClassIndex, 'METHOD_RECEIVER',
+      'Lsun/reflect/annotation/TypeAnnotation$TypeAnnotationTarget;'),
+    buildAnnotatedTypeMethodIndex = addMemberRef(
+      10, typeAnnotationParserClassIndex, 'buildAnnotatedType',
+      '([BLsun/reflect/ConstantPool;Ljava/lang/reflect/AnnotatedElement;Ljava/lang/Class;Ljava/lang/reflect/Type;Lsun/reflect/annotation/TypeAnnotation$TypeAnnotationTarget;)Ljava/lang/reflect/AnnotatedType;'),
+    classGetDeclaringClassMethodIndex = addMemberRef(
+      10, classClassIndex, 'getDeclaringClass', '()Ljava/lang/Class;'),
+    classGetEnclosingClassMethodIndex = addMemberRef(
+      10, classClassIndex, 'getEnclosingClass', '()Ljava/lang/Class;'),
+    classGetTypeParametersMethodIndex = addMemberRef(
+      10, classClassIndex, 'getTypeParameters', '()[Ljava/lang/reflect/TypeVariable;'),
+    classGetModifiersMethodIndex = addMemberRef(
+      10, classClassIndex, 'getModifiers', '()I'),
+    makeParameterizedTypeMethodIndex = addMemberRef(
+      10, parameterizedTypeImplClassIndex, 'make',
+      '(Ljava/lang/Class;[Ljava/lang/reflect/Type;Ljava/lang/reflect/Type;)Lsun/reflect/generics/reflectiveObjects/ParameterizedTypeImpl;'),
+    extraConstants = Buffer.concat(constants),
+    withConstants = Buffer.concat([
+      data.slice(0, 8),
+      u2(nextIndex),
+      data.slice(10, cp.offset),
+      extraConstants,
+      data.slice(cp.offset)
+    ]),
+    receiverCode: Buffer;
+
+  if (constructor) {
+    receiverCode = Buffer.concat([
+      Buffer.from([0x2a, 0xb6]), u2(getDeclaringClassMethodIndex), Buffer.from([0x4c]),
+      Buffer.from([0x2b, 0xb6]), u2(classGetEnclosingClassMethodIndex), Buffer.from([0x4d]),
+      Buffer.from([0x2c, 0xc7, 0x00, 0x05, 0x01, 0xb0]),
+      Buffer.from([0x2b, 0xb6]), u2(classGetDeclaringClassMethodIndex), Buffer.from([0x4e]),
+      Buffer.from([0x2d, 0xc7, 0x00, 0x05, 0x01, 0xb0]),
+      Buffer.from([0x2b, 0xb6]), u2(classGetModifiersMethodIndex),
+      Buffer.from([0xb8]), u2(isStaticMethodIndex),
+      Buffer.from([0x99, 0x00, 0x05, 0x01, 0xb0]),
+      Buffer.from([0x2a, 0xb6]), u2(getTypeAnnotationBytesMethodIndex),
+      Buffer.from([0xb8]), u2(getJavaLangAccessMethodIndex),
+      Buffer.from([0x2b, 0xb9]), u2(getConstantPoolMethodIndex), Buffer.from([0x02, 0x00]),
+      Buffer.from([0x2a, 0x2b, 0x2a, 0x2c, 0xb6]), u2(parameterizeMethodIndex),
+      Buffer.from([0xb2]), u2(receiverTargetFieldIndex),
+      Buffer.from([0xb8]), u2(buildAnnotatedTypeMethodIndex),
+      Buffer.from([0xb0])
+    ]);
+  } else {
+    receiverCode = Buffer.concat([
+      Buffer.from([0x2a, 0xb6]), u2(getModifiersMethodIndex),
+      Buffer.from([0xb8]), u2(isStaticMethodIndex),
+      Buffer.from([0x99, 0x00, 0x05, 0x01, 0xb0]),
+      Buffer.from([0x2a, 0xb6]), u2(getTypeAnnotationBytesMethodIndex),
+      Buffer.from([0xb8]), u2(getJavaLangAccessMethodIndex),
+      Buffer.from([0x2a, 0xb6]), u2(getDeclaringClassMethodIndex),
+      Buffer.from([0xb9]), u2(getConstantPoolMethodIndex), Buffer.from([0x02, 0x00]),
+      Buffer.from([0x2a, 0x2a, 0xb6]), u2(getDeclaringClassMethodIndex),
+      Buffer.from([0x2a, 0x2a, 0xb6]), u2(getDeclaringClassMethodIndex),
+      Buffer.from([0xb6]), u2(parameterizeMethodIndex),
+      Buffer.from([0xb2]), u2(receiverTargetFieldIndex),
+      Buffer.from([0xb8]), u2(buildAnnotatedTypeMethodIndex),
+      Buffer.from([0xb0])
+    ]);
+  }
+
+  var withReceiver = replaceMethodCode(
+    withConstants,
+    cp.offset + extraConstants.length,
+    'getAnnotatedReceiverType',
+    '()Ljava/lang/reflect/AnnotatedType;',
+    codeNameIndex,
+    6,
+    constructor ? 4 : 1,
+    receiverCode);
+  if (constructor) {
+    return withReceiver;
+  }
+
+  var parameterizeCode = Buffer.concat([
+      Buffer.from([0x2b, 0xb6]), u2(classGetDeclaringClassMethodIndex), Buffer.from([0x4d]),
+      Buffer.from([0x2b, 0xb6]), u2(classGetTypeParametersMethodIndex), Buffer.from([0x4e]),
+      Buffer.from([0x2c, 0xc6, 0x00, 0x0d]),
+      Buffer.from([0x2b, 0xb6]), u2(classGetModifiersMethodIndex),
+      Buffer.from([0xb8]), u2(isStaticMethodIndex),
+      Buffer.from([0x99, 0x00, 0x11]),
+      Buffer.from([0x2d, 0xbe, 0x9a, 0x00, 0x05, 0x2b, 0xb0]),
+      Buffer.from([0x2b, 0x2d, 0x01, 0xb8]), u2(makeParameterizedTypeMethodIndex),
+      Buffer.from([0xb0, 0x2a, 0x2c, 0xb6]), u2(parameterizeMethodIndex),
+      Buffer.from([0x3a, 0x04, 0x19, 0x04, 0xc1]), u2(classClassIndex),
+      Buffer.from([0x99, 0x00, 0x0a, 0x2d, 0xbe, 0x9a, 0x00, 0x05, 0x2b, 0xb0]),
+      Buffer.from([0x2b, 0x2d, 0x19, 0x04, 0xb8]), u2(makeParameterizedTypeMethodIndex),
+      Buffer.from([0xb0])
+    ]),
+    methods = methodsInfo(withReceiver, cp.offset + extraConstants.length),
+    parameterizeMethod = Buffer.concat([
+      u2(0),
+      u2(parameterizeNameIndex),
+      u2(parameterizeDescriptorIndex),
+      u2(2),
+      u2(codeNameIndex),
+      u4(12 + parameterizeCode.length),
+      u2(3),
+      u2(5),
+      u4(parameterizeCode.length),
+      parameterizeCode,
+      u2(0),
+      u2(0),
+      u2(signatureNameIndex),
+      u4(2),
+      u2(parameterizeSignatureIndex)
+    ]);
+
+  return Buffer.concat([
+    withReceiver.slice(0, methods.countOffset),
+    u2(methods.count + 1),
+    withReceiver.slice(methods.countOffset + 2, methods.endOffset),
+    parameterizeMethod,
+    withReceiver.slice(methods.endOffset)
+  ]);
+}
+
 function addStaticNoopModernOverlay(data: Buffer, name: string, descriptor: string,
     maxLocals: number, annotationDescriptor: string): Buffer {
   var cp = constantPoolEnd(data),
@@ -1892,6 +2180,12 @@ export class BootstrapClassLoader extends ClassLoader {
         }
         if (typeStr === 'Ljava/lang/Class;') {
           clsData = addJavaLangClassModernOverlays(clsData);
+        }
+        if (typeStr === 'Ljava/lang/reflect/Executable;') {
+          clsData = addJavaLangReflectExecutableReceiverModernOverlays(clsData, false);
+        }
+        if (typeStr === 'Ljava/lang/reflect/Constructor;') {
+          clsData = addJavaLangReflectExecutableReceiverModernOverlays(clsData, true);
         }
         if (typeStr === 'Ljava/lang/ClassLoader;') {
           clsData = addJavaLangClassLoaderModernOverlays(clsData);

@@ -1134,8 +1134,16 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `RuntimeVisibleTypeAnnotations` bytes for methods and constructors. Coverage
   includes annotated method return, nested generic argument, receiver,
   parameter, and throws types, constructor parameter and throws types, and
-  unannotated methods. Top-level constructor receiver nullability still differs
-  from Java 17 and is tracked separately.
+  unannotated methods.
+- `java.lang.reflect.Executable.getAnnotatedReceiverType()` now recursively
+  parameterizes generic declaring classes, including generic owners of inner
+  classes, while preserving receiver type-use annotations. The parsed
+  package-private `parameterize(Class<?>)` helper has Java 17-compatible
+  generic metadata. `Constructor.getAnnotatedReceiverType()` now returns an
+  enclosing receiver only for non-static member classes and returns `null` for
+  top-level, static-nested, local, and anonymous constructors. Coverage also
+  protects `InnerClasses`-based class modifiers and the Java 8 annotated-type
+  path adaptation needed by static nested receivers.
 - `java.lang.reflect.Array` now exposes selected generic and primitive accessor
   behavior: reference-array null/type checks, wrapper unboxing into primitive
   arrays, direct primitive array reads/writes, allowed widening conversions,
