@@ -1,5 +1,8 @@
 package java.lang;
 
+import java.lang.constant.ClassDesc;
+import java.util.Optional;
+
 final class DoppioClass {
   private DoppioClass() {
   }
@@ -17,4 +20,6 @@ final class DoppioClass {
   static native Class<?> componentType(Class<?> type);
 
   static native Class<?> arrayType(Class<?> type);
+
+  static native Optional<ClassDesc> describeConstable(Class<?> type);
 }

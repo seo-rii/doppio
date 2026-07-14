@@ -2796,71 +2796,6 @@ export class MethodReference implements IConstantPoolItem {
 	            }
 	          };
 	          method = <Method> syntheticMethod;
-	        } else if (syntheticCls.getInternalName() === 'Ljava/lang/Class;' &&
-	            this.signature === 'describeConstable()Ljava/util/Optional;') {
-	          syntheticMethod = {
-	            cls: syntheticCls,
-	            slot: -1,
-	            accessFlags: new util.Flags(util.FlagMasks.PUBLIC | util.FlagMasks.NATIVE),
-	            name: this.nameAndTypeInfo.name,
-	            rawDescriptor: this.nameAndTypeInfo.descriptor,
-	            attrs: [],
-	            signature: this.signature,
-	            fullSignature: syntheticFullSignature,
-	            parameterTypes: [],
-	            returnType: 'Ljava/util/Optional;',
-	            getParamWordSize: function(): number {
-	              return 0;
-	            },
-	            convertArgs: function(thread: JVMThread, params: any[]): any[] {
-	              return [thread, params[0]];
-	            },
-	            getNativeFunction: function(): Function {
-	              return function(thread: JVMThread, javaThis: JVMTypes.java_lang_Class): any {
-	                var descriptor = javaThis.$cls.getInternalName();
-	                thread.setStatus(ThreadStatus.ASYNC_WAITING);
-	                thread.getBsCl().initializeClass(thread, 'Ljava/lang/constant/ClassDesc;', (classDescCls: ReferenceClassData<JVMTypes.java_lang_Object>) => {
-	                  if (classDescCls === null) {
-	                    return;
-	                  }
-	                  var classDescCons = <any> classDescCls.getConstructor(thread);
-	                  classDescCons['java/lang/constant/ClassDesc/ofDescriptor(Ljava/lang/String;)Ljava/lang/constant/ClassDesc;'](thread, [util.initString(thread.getBsCl(), descriptor)], (descErr?: JVMTypes.java_lang_Throwable, desc?: JVMTypes.java_lang_Object) => {
-	                    if (descErr) {
-	                      thread.throwException(descErr);
-	                      return;
-	                    }
-	                    thread.getBsCl().initializeClass(thread, 'Ljava/util/Optional;', (optionalCls: ReferenceClassData<JVMTypes.java_lang_Object>) => {
-	                      if (optionalCls === null) {
-	                        return;
-	                      }
-	                      var optionalCons = <any> optionalCls.getConstructor(thread);
-	                      optionalCons['java/util/Optional/of(Ljava/lang/Object;)Ljava/util/Optional;'](thread, [desc], (optionalErr?: JVMTypes.java_lang_Throwable, rv?: JVMTypes.java_lang_Object) => {
-	                        if (optionalErr) {
-	                          thread.throwException(optionalErr);
-	                        } else {
-	                          thread.asyncReturn(rv);
-	                        }
-	                      });
-	                    });
-	                  });
-	                });
-	                return null;
-	              };
-	            },
-	            isSignaturePolymorphic: function(): boolean {
-	              return false;
-	            },
-	            isHidden: function(): boolean {
-	              return false;
-	            },
-	            isCallerSensitive: function(): boolean {
-	              return false;
-	            },
-	            getFullSignature: function(): string {
-	              return syntheticCls.getExternalName() + '.' + this.signature;
-	            }
-	          };
-	          method = <Method> syntheticMethod;
 		        } else if ((syntheticCls.getInternalName() === 'Ljava/lang/Boolean;' ||
 		            syntheticCls.getInternalName() === 'Ljava/lang/Byte;' ||
 		            syntheticCls.getInternalName() === 'Ljava/lang/Short;' ||
@@ -3618,8 +3553,7 @@ export class MethodReference implements IConstantPoolItem {
 	      };
 	    } else if ((this.fullSignature === 'java/lang/Class/getNestHost()Ljava/lang/Class;' ||
 	        this.fullSignature === 'java/lang/Class/getNestMembers()[Ljava/lang/Class;' ||
-	        this.fullSignature === 'java/lang/Class/isNestmateOf(Ljava/lang/Class;)Z' ||
-	        this.fullSignature === 'java/lang/Class/describeConstable()Ljava/util/Optional;') &&
+	        this.fullSignature === 'java/lang/Class/isNestmateOf(Ljava/lang/Class;)Z') &&
 	        typeof this.jsConstructor.prototype[this.fullSignature] !== 'function') {
 	      var syntheticClassMethod = this.method;
 	      this.jsConstructor.prototype[this.fullSignature] = this.jsConstructor.prototype[this.signature] = function(thread: JVMThread, args: any[], cb?: (e?: JVMTypes.java_lang_Throwable, rv?: any) => void): void {

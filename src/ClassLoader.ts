@@ -263,6 +263,14 @@ function addJavaLangClassModernOverlays(data: Buffer): Buffer {
     arrayTypeNameAndTypeIndex = cp.count + 50,
     arrayTypeMethodIndex = cp.count + 51,
     classSignatureIndex = cp.count + 52,
+    constableNameIndex = cp.count + 53,
+    constableClassIndex = cp.count + 54,
+    describeConstableNameIndex = cp.count + 55,
+    optionalDescriptorIndex = cp.count + 56,
+    describeConstableHelperDescriptorIndex = cp.count + 57,
+    describeConstableHelperNameAndTypeIndex = cp.count + 58,
+    describeConstableHelperMethodIndex = cp.count + 59,
+    describeConstableSignatureIndex = cp.count + 60,
     extraConstants = Buffer.concat([
       utf8Constant('getModule'),
       utf8Constant('()Ljava/lang/Module;'),
@@ -388,11 +396,27 @@ function addJavaLangClassModernOverlays(data: Buffer): Buffer {
         u2(classClassIndex),
         u2(arrayTypeNameAndTypeIndex)
       ]),
-      utf8Constant('<T:Ljava/lang/Object;>Ljava/lang/Object;Ljava/io/Serializable;Ljava/lang/reflect/GenericDeclaration;Ljava/lang/reflect/Type;Ljava/lang/reflect/AnnotatedElement;Ljava/lang/invoke/TypeDescriptor$OfField<Ljava/lang/Class<*>;>;')
+      utf8Constant('<T:Ljava/lang/Object;>Ljava/lang/Object;Ljava/io/Serializable;Ljava/lang/reflect/GenericDeclaration;Ljava/lang/reflect/Type;Ljava/lang/reflect/AnnotatedElement;Ljava/lang/invoke/TypeDescriptor$OfField<Ljava/lang/Class<*>;>;Ljava/lang/constant/Constable;'),
+      utf8Constant('java/lang/constant/Constable'),
+      Buffer.concat([Buffer.from([7]), u2(constableNameIndex)]),
+      utf8Constant('describeConstable'),
+      utf8Constant('()Ljava/util/Optional;'),
+      utf8Constant('(Ljava/lang/Class;)Ljava/util/Optional;'),
+      Buffer.concat([
+        Buffer.from([12]),
+        u2(describeConstableNameIndex),
+        u2(describeConstableHelperDescriptorIndex)
+      ]),
+      Buffer.concat([
+        Buffer.from([10]),
+        u2(helperClassIndex),
+        u2(describeConstableHelperNameAndTypeIndex)
+      ]),
+      utf8Constant('()Ljava/util/Optional<Ljava/lang/constant/ClassDesc;>;')
     ]),
     withConstants = Buffer.concat([
       data.slice(0, 8),
-      u2(cp.count + 53),
+      u2(cp.count + 61),
       data.slice(10, cp.offset),
       extraConstants,
       data.slice(cp.offset)
@@ -402,9 +426,10 @@ function addJavaLangClassModernOverlays(data: Buffer): Buffer {
     interfacesEndOffset = interfacesCountOffset + 2 + interfacesCount * 2,
     withInterface = Buffer.concat([
       withConstants.slice(0, interfacesCountOffset),
-      u2(interfacesCount + 1),
+      u2(interfacesCount + 2),
       withConstants.slice(interfacesCountOffset + 2, interfacesEndOffset),
       u2(ofFieldClassIndex),
+      u2(constableClassIndex),
       withConstants.slice(interfacesEndOffset)
     ]),
     methods = methodsInfo(withInterface, cp.offset + extraConstants.length),
@@ -615,11 +640,33 @@ function addJavaLangClassModernOverlays(data: Buffer): Buffer {
       arrayTypeBridgeCode,
       u2(0),
       u2(0)
+    ]),
+    describeConstableCode = Buffer.concat([
+      Buffer.from([0x2a, 0xb8]),
+      u2(describeConstableHelperMethodIndex),
+      Buffer.from([0xb0])
+    ]),
+    describeConstableMethod = Buffer.concat([
+      u2(0x0001),
+      u2(describeConstableNameIndex),
+      u2(optionalDescriptorIndex),
+      u2(2),
+      u2(codeNameIndex),
+      u4(12 + describeConstableCode.length),
+      u2(1),
+      u2(1),
+      u4(describeConstableCode.length),
+      describeConstableCode,
+      u2(0),
+      u2(0),
+      u2(signatureNameIndex),
+      u4(2),
+      u2(describeConstableSignatureIndex)
     ]);
 
   var withMethods = Buffer.concat([
     withInterface.slice(0, methods.countOffset),
-    u2(methods.count + 12),
+    u2(methods.count + 13),
     withInterface.slice(methods.countOffset + 2, methods.endOffset),
     getModuleMethod,
     getRecordComponentsMethod,
@@ -633,6 +680,7 @@ function addJavaLangClassModernOverlays(data: Buffer): Buffer {
     componentTypeBridgeMethod,
     arrayTypeMethod,
     arrayTypeBridgeMethod,
+    describeConstableMethod,
     withInterface.slice(methods.endOffset)
   ]),
     overlaidMethods = methodsInfo(withMethods, cp.offset + extraConstants.length),

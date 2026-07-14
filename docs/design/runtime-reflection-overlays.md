@@ -232,6 +232,39 @@ The Java 12 `Class` field-type descriptor overlay preserves its covariant API:
   Kotlin 2.4.0 with the full compiler classpath and 292 seconds for Scala
   2.13.18.
 
+The Java 12 `Class` constant-description overlay preserves the `Constable`
+contract as parsed metadata:
+
+- `ClassLoader.ts` appends `java.lang.constant.Constable` after
+  `TypeDescriptor.OfField` in the Java 8 bootstrap `Class` interface table and
+  adds the same raw interface to the class-level generic signature.
+- `describeConstable()` is injected as a public, non-native method with erased
+  descriptor `()Ljava/util/Optional;` and generic signature
+  `()Ljava/util/Optional<Ljava/lang/constant/ClassDesc;>;`. No bridge is needed
+  because the `Constable` declaration has the same erased return type.
+- Parsed bytecode passes the receiver to a package-private native
+  `DoppioClass` helper. The helper creates a `ClassDesc` from Doppio's canonical
+  internal descriptor and returns it through `Optional.of`, retaining the
+  existing ordinary, primitive, void, and array behavior.
+- The previous slot-less constant-pool fallback and native-frame trampoline
+  were removed. Direct calls, reflection slots, `Method.invoke`, interface
+  dispatch, `Lookup.unreflect`, and `Lookup.findVirtual` now resolve one method
+  with HotSpot-compatible modifiers, generic return type, and empty annotation,
+  parameter, exception, and method-type-parameter metadata.
+- `Java12ClassConstableReflection` compares those contracts with a native Java
+  17 oracle across ordinary, nested, local, anonymous, interface, enum,
+  annotation, JDK, primitive, void, reference-array, primitive-array, and user
+  array classes. It also resolves every produced descriptor back to the same
+  `Class` object and checks MethodHandle dispatch through both `Class` and
+  `Constable`.
+- HotSpot returns `Optional.empty()` for hidden classes and arrays whose
+  recursive element type is hidden. That path is intentionally deferred with
+  hidden-class definition and discovery; no such class object can currently be
+  created by Doppio.
+- The compiler-discovery gates passed locally on 2026-07-14 in 229 seconds for
+  Kotlin 2.4.0 with the full compiler classpath and 166 seconds for Scala
+  2.13.18.
+
 The Java 15 `Class.isHidden()` overlay is also a parsed native method:
 
 - `ClassLoader.ts` injects the exact public native `isHidden()` descriptor and

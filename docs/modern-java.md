@@ -1163,6 +1163,19 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   ordinary, interface, primitive, void, reference-array, primitive-array,
   multidimensional-array, and user-array classes, including the null-message
   `IllegalArgumentException` from `void.class.arrayType()`.
+- `java.lang.Class` also exposes the Java 12 `Constable` contract in both its
+  raw interface table and generic class signature. `describeConstable()` is a
+  parsed public, non-native method with the exact
+  `Optional<ClassDesc>` generic return type, so direct, `Constable` interface,
+  reflective, and MethodHandle dispatch all select the same method.
+- `Java12ClassConstableReflection` compares declared/public lookup and
+  enumeration, modifiers, generic and annotation metadata, interface
+  assignability, descriptor equality and resolution for ordinary, nested,
+  local, anonymous, interface, enum, annotation, JDK, primitive, void, and
+  array classes, plus `Lookup.unreflect` and `Lookup.findVirtual` through both
+  `Class` and `Constable`. Hidden classes and arrays whose element type is
+  hidden remain outside this surface because hidden-class definition is not
+  implemented.
 - `java.lang.Class.isHidden()` is a parsed public native Java 15 method, so
   direct calls, reflective lookup and enumeration, `Method.invoke`, and
   `Lookup.unreflect` share one implementation with HotSpot-compatible

@@ -738,6 +738,37 @@ export default function (): any {
       return null;
     }
 
+    public static 'describeConstable(Ljava/lang/Class;)Ljava/util/Optional;'(thread: JVMThread, type: JVMTypes.java_lang_Class): any {
+      var descriptor = type.$cls.getInternalName();
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      thread.getBsCl().initializeClass(thread, 'Ljava/lang/constant/ClassDesc;', (classDescCls: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+        if (classDescCls === null) {
+          return;
+        }
+        var classDescCons = <any> classDescCls.getConstructor(thread);
+        classDescCons['java/lang/constant/ClassDesc/ofDescriptor(Ljava/lang/String;)Ljava/lang/constant/ClassDesc;'](thread, [util.initString(thread.getBsCl(), descriptor)], (descErr?: JVMTypes.java_lang_Throwable, desc?: JVMTypes.java_lang_Object) => {
+          if (descErr) {
+            thread.throwException(descErr);
+            return;
+          }
+          thread.getBsCl().initializeClass(thread, 'Ljava/util/Optional;', (optionalCls: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+            if (optionalCls === null) {
+              return;
+            }
+            var optionalCons = <any> optionalCls.getConstructor(thread);
+            optionalCons['java/util/Optional/of(Ljava/lang/Object;)Ljava/util/Optional;'](thread, [desc], (optionalErr?: JVMTypes.java_lang_Throwable, rv?: JVMTypes.java_lang_Object) => {
+              if (optionalErr) {
+                thread.throwException(optionalErr);
+              } else {
+                thread.asyncReturn(rv);
+              }
+            });
+          });
+        });
+      });
+      return null;
+    }
+
   }
 
   class java_lang_ClassLoader$NativeLibrary {
