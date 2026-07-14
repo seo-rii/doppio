@@ -216,10 +216,11 @@ Two Java 8 compatibility details are handled before those algorithms run:
 - `Class.getModifiers()` reads the matching `InnerClasses` self-entry, where
   member `private`, `protected`, and `static` flags are stored, instead of only
   the top-level class access flags;
-- for a static member method receiver, the Java 9+ empty receiver type path is
-  translated to the one `INNER_TYPE` step expected by the Java 8
-  `AnnotatedTypeFactory`. Other annotation targets and non-empty paths remain
-  byte-for-byte unchanged.
+- the Java 8 `AnnotatedTypeFactory.addNesting(...)` implementation is replaced
+  with the Java 17 static-aware algorithm. A static nested class or
+  parameterized type now keeps the supplied base location instead of
+  recursively counting its owner as an `INNER_TYPE` step. Executable type
+  annotation bytes can therefore remain unchanged.
 
 `Java9ExecutableReceiverReflection` compares structured raw, owner, and actual
 type-argument identities; receiver annotations; constructor nullability;
@@ -232,6 +233,48 @@ remain focused regressions for the shared annotation-byte path.
 The full Java 9-26 compatibility suite passed locally on 2026-07-14 in 11
 minutes 2 seconds. The compiler-discovery gates then passed in 145 seconds for
 Kotlin 2.4.0 with the full compiler classpath and 98 seconds for Scala 2.13.18.
+
+### Annotated owner types
+
+Java 9 added `AnnotatedType.getAnnotatedOwnerType()` as a public default
+method and redeclared it as public abstract on `AnnotatedParameterizedType`,
+`AnnotatedArrayType`, `AnnotatedTypeVariable`, and `AnnotatedWildcardType`.
+The Java 8 bootstrap interfaces and all five
+`sun.reflect.annotation.AnnotatedTypeFactory` implementation classes predate
+that surface.
+
+`ClassLoader.ts` installs parsed overlays with Java 17-compatible metadata and
+dispatch:
+
+- `AnnotatedType` receives the default null body, while its four subinterfaces
+  receive exact abstract declarations;
+- the base and parameterized implementations compute raw `Class` and
+  `ParameterizedType` owners respectively, and the array, type-variable, and
+  wildcard implementations declare exact null-returning methods;
+- `TypeAnnotation.LocationInfo.popLocation(byte)` removes one trailing
+  `INNER_TYPE` path element without mutating the original location;
+- owner objects are constructed directly from the popped location and its
+  filtered annotations. This deliberately bypasses the Java 8 factory's
+  implicit `addNesting(...)` call, which would otherwise duplicate owner paths
+  at three or more nesting levels.
+
+The shared reflection byte source also now covers fields and class bounds:
+`Field.getTypeAnnotationBytes0()` and `Class.getRawTypeAnnotations()` return
+their parsed `RuntimeVisibleTypeAnnotations` payloads just as the existing
+executable native does.
+
+`Java9AnnotatedOwnerTypes` compares recursive annotated-type trees with
+HotSpot for parameterized, three-level, zero-argument, static, and raw member
+types, top-level types, arrays, type variables, and wildcards. It verifies
+owner and argument annotation placement, null owners, exact interface method
+flags/default metadata, and the declaring implementation class for all five
+runtime implementation kinds. Existing executable receiver, executable type
+annotation, parameterized type name, class constable, and record reflection
+fixtures remain focused regressions for the shared paths.
+
+The full Java 9-26 compatibility suite passed locally on 2026-07-14 in 18
+minutes 8 seconds. The compiler gates then passed in 412 seconds for Kotlin
+2.4.0 with the full compiler classpath and 303 seconds for Scala 2.13.18.
 
 ### Parameterized type names
 

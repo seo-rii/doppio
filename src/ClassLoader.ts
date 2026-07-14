@@ -573,6 +573,437 @@ function addJavaLangReflectAccessibleObjectModernOverlays(data: Buffer): Buffer 
   ]);
 }
 
+function addAnnotatedOwnerTypeModernOverlay(data: Buffer, typeStr: string): Buffer {
+  var cp = constantPoolEnd(data),
+    constants: Buffer[] = [],
+    nextIndex = cp.count;
+
+  function addConstant(constant: Buffer): number {
+    constants.push(constant);
+    return nextIndex++;
+  }
+
+  function addUtf8(value: string): number {
+    return addConstant(utf8Constant(value));
+  }
+
+  function addClass(name: string): number {
+    var nameIndex = addUtf8(name);
+    return addConstant(Buffer.concat([Buffer.from([7]), u2(nameIndex)]));
+  }
+
+  function addNameAndType(name: string, descriptor: string): number {
+    var nameIndex = addUtf8(name),
+      descriptorIndex = addUtf8(descriptor);
+    return addConstant(Buffer.concat([
+      Buffer.from([12]),
+      u2(nameIndex),
+      u2(descriptorIndex)
+    ]));
+  }
+
+  function addMemberRef(tag: number, ownerIndex: number, name: string,
+      descriptor: string): number {
+    var nameAndTypeIndex = addNameAndType(name, descriptor);
+    return addConstant(Buffer.concat([
+      Buffer.from([tag]),
+      u2(ownerIndex),
+      u2(nameAndTypeIndex)
+    ]));
+  }
+
+  var ownerNameIndex = addUtf8('getAnnotatedOwnerType'),
+    ownerDescriptorIndex = addUtf8('()Ljava/lang/reflect/AnnotatedType;'),
+    method: Buffer;
+
+  if (typeStr === 'Ljava/lang/reflect/AnnotatedType;') {
+    var interfaceCodeNameIndex = addUtf8('Code'),
+      interfaceCode = Buffer.from([0x01, 0xb0]);
+    method = Buffer.concat([
+      u2(0x0001),
+      u2(ownerNameIndex),
+      u2(ownerDescriptorIndex),
+      u2(1),
+      u2(interfaceCodeNameIndex),
+      u4(12 + interfaceCode.length),
+      u2(1),
+      u2(1),
+      u4(interfaceCode.length),
+      interfaceCode,
+      u2(0),
+      u2(0)
+    ]);
+  } else if (typeStr.indexOf('Ljava/lang/reflect/Annotated') === 0) {
+    method = Buffer.concat([
+      u2(0x0401),
+      u2(ownerNameIndex),
+      u2(ownerDescriptorIndex),
+      u2(0)
+    ]);
+  } else {
+    var codeNameIndex = addUtf8('Code');
+    if (typeStr ===
+        'Lsun/reflect/annotation/AnnotatedTypeFactory$AnnotatedArrayTypeImpl;' ||
+        typeStr ===
+        'Lsun/reflect/annotation/AnnotatedTypeFactory$AnnotatedTypeVariableImpl;' ||
+        typeStr ===
+        'Lsun/reflect/annotation/AnnotatedTypeFactory$AnnotatedWildcardTypeImpl;') {
+      var nullCode = Buffer.from([0x01, 0xb0]);
+      method = Buffer.concat([
+        u2(0x0001),
+        u2(ownerNameIndex),
+        u2(ownerDescriptorIndex),
+        u2(1),
+        u2(codeNameIndex),
+        u4(12 + nullCode.length),
+        u2(1),
+        u2(1),
+        u4(nullCode.length),
+        nullCode,
+        u2(0),
+        u2(0)
+      ]);
+    } else {
+      var baseImplClassIndex = addClass(
+          'sun/reflect/annotation/AnnotatedTypeFactory$AnnotatedTypeBaseImpl'),
+        parameterizedImplClassIndex = addClass(
+          'sun/reflect/annotation/AnnotatedTypeFactory$AnnotatedParameterizedTypeImpl'),
+        classClassIndex = addClass('java/lang/Class'),
+        parameterizedTypeClassIndex = addClass('java/lang/reflect/ParameterizedType'),
+        illegalStateExceptionClassIndex = addClass('java/lang/IllegalStateException'),
+        locationInfoClassIndex = addClass(
+          'sun/reflect/annotation/TypeAnnotation$LocationInfo'),
+        typeAnnotationClassIndex = addClass('sun/reflect/annotation/TypeAnnotation'),
+        cannotComputeOwnerStringIndex = addConstant(Buffer.concat([
+          Buffer.from([8]),
+          u2(addUtf8("Can't compute owner"))
+        ])),
+        getTypeMethodIndex = addMemberRef(
+          10, baseImplClassIndex, 'getType', '()Ljava/lang/reflect/Type;'),
+        getLocationMethodIndex = addMemberRef(
+          10, baseImplClassIndex, 'getLocation',
+          '()Lsun/reflect/annotation/TypeAnnotation$LocationInfo;'),
+        getTypeAnnotationsMethodIndex = addMemberRef(
+          10, baseImplClassIndex, 'getTypeAnnotations',
+          '()[Lsun/reflect/annotation/TypeAnnotation;'),
+        getDeclMethodIndex = addMemberRef(
+          10, baseImplClassIndex, 'getDecl', '()Ljava/lang/reflect/AnnotatedElement;'),
+        classGetDeclaringClassMethodIndex = addMemberRef(
+          10, classClassIndex, 'getDeclaringClass', '()Ljava/lang/Class;'),
+        parameterizedGetOwnerTypeMethodIndex = addMemberRef(
+          11, parameterizedTypeClassIndex, 'getOwnerType', '()Ljava/lang/reflect/Type;'),
+        popLocationMethodIndex = addMemberRef(
+          10, locationInfoClassIndex, 'popLocation',
+          '(B)Lsun/reflect/annotation/TypeAnnotation$LocationInfo;'),
+        filterMethodIndex = addMemberRef(
+          10, locationInfoClassIndex, 'filter',
+          '([Lsun/reflect/annotation/TypeAnnotation;)[Lsun/reflect/annotation/TypeAnnotation;'),
+        baseLocationFieldIndex = addMemberRef(
+          9, locationInfoClassIndex, 'BASE_LOCATION',
+          'Lsun/reflect/annotation/TypeAnnotation$LocationInfo;'),
+        baseConstructorIndex = addMemberRef(
+          10, baseImplClassIndex, '<init>',
+          '(Ljava/lang/reflect/Type;Lsun/reflect/annotation/TypeAnnotation$LocationInfo;[Lsun/reflect/annotation/TypeAnnotation;[Lsun/reflect/annotation/TypeAnnotation;Ljava/lang/reflect/AnnotatedElement;)V'),
+        parameterizedConstructorIndex = addMemberRef(
+          10, parameterizedImplClassIndex, '<init>',
+          '(Ljava/lang/reflect/ParameterizedType;Lsun/reflect/annotation/TypeAnnotation$LocationInfo;[Lsun/reflect/annotation/TypeAnnotation;[Lsun/reflect/annotation/TypeAnnotation;Ljava/lang/reflect/AnnotatedElement;)V'),
+        illegalStateConstructorIndex = addMemberRef(
+          10, illegalStateExceptionClassIndex, '<init>', '(Ljava/lang/String;)V'),
+        ownerCode: Buffer;
+
+      if (typeStr ===
+          'Lsun/reflect/annotation/AnnotatedTypeFactory$AnnotatedTypeBaseImpl;') {
+        ownerCode = Buffer.concat([
+          Buffer.from([0x2a, 0xb6]), u2(getTypeMethodIndex), Buffer.from([0x4c, 0x2b, 0xc1]),
+          u2(classClassIndex), Buffer.from([0x9a, 0x00, 0x0e, 0xbb]),
+          u2(illegalStateExceptionClassIndex), Buffer.from([0x59, 0x13]),
+          u2(cannotComputeOwnerStringIndex), Buffer.from([0xb7]),
+          u2(illegalStateConstructorIndex), Buffer.from([0xbf, 0x2b, 0xc0]),
+          u2(classClassIndex), Buffer.from([0xb6]), u2(classGetDeclaringClassMethodIndex),
+          Buffer.from([0x4d, 0x2c, 0xc7, 0x00, 0x05, 0x01, 0xb0, 0x2a, 0xb6]),
+          u2(getLocationMethodIndex), Buffer.from([0x04, 0xb6]), u2(popLocationMethodIndex),
+          Buffer.from([0x4e, 0x2d, 0xc7, 0x00, 0x14, 0xb2]), u2(baseLocationFieldIndex),
+          Buffer.from([0x4e, 0x03, 0xbd]), u2(typeAnnotationClassIndex),
+          Buffer.from([0x3a, 0x04, 0x19, 0x04, 0x3a, 0x05, 0xa7, 0x00, 0x11,
+            0x2a, 0xb6]), u2(getTypeAnnotationsMethodIndex),
+          Buffer.from([0x3a, 0x04, 0x2d, 0x19, 0x04, 0xb6]), u2(filterMethodIndex),
+          Buffer.from([0x3a, 0x05, 0xbb]), u2(baseImplClassIndex),
+          Buffer.from([0x59, 0x2c, 0x2d, 0x19, 0x05, 0x19, 0x04, 0x2a, 0xb6]),
+          u2(getDeclMethodIndex), Buffer.from([0xb7]), u2(baseConstructorIndex),
+          Buffer.from([0xb0])
+        ]);
+      } else {
+        ownerCode = Buffer.concat([
+          Buffer.from([0x2a, 0xb6]), u2(getTypeMethodIndex), Buffer.from([0xc0]),
+          u2(parameterizedTypeClassIndex), Buffer.from([0x4c, 0x2b, 0xb9]),
+          u2(parameterizedGetOwnerTypeMethodIndex), Buffer.from([0x01, 0x00, 0x4d,
+            0x2c, 0xc7, 0x00, 0x05, 0x01, 0xb0, 0x2a, 0xb6]),
+          u2(getLocationMethodIndex), Buffer.from([0x04, 0xb6]), u2(popLocationMethodIndex),
+          Buffer.from([0x4e, 0x2d, 0xc7, 0x00, 0x14, 0xb2]), u2(baseLocationFieldIndex),
+          Buffer.from([0x4e, 0x03, 0xbd]), u2(typeAnnotationClassIndex),
+          Buffer.from([0x3a, 0x04, 0x19, 0x04, 0x3a, 0x05, 0xa7, 0x00, 0x11,
+            0x2a, 0xb6]), u2(getTypeAnnotationsMethodIndex),
+          Buffer.from([0x3a, 0x04, 0x2d, 0x19, 0x04, 0xb6]), u2(filterMethodIndex),
+          Buffer.from([0x3a, 0x05, 0x2c, 0xc1]), u2(parameterizedTypeClassIndex),
+          Buffer.from([0x99, 0x00, 0x18, 0xbb]), u2(parameterizedImplClassIndex),
+          Buffer.from([0x59, 0x2c, 0xc0]), u2(parameterizedTypeClassIndex),
+          Buffer.from([0x2d, 0x19, 0x05, 0x19, 0x04, 0x2a, 0xb6]),
+          u2(getDeclMethodIndex), Buffer.from([0xb7]), u2(parameterizedConstructorIndex),
+          Buffer.from([0xb0, 0xbb]), u2(baseImplClassIndex),
+          Buffer.from([0x59, 0x2c, 0x2d, 0x19, 0x05, 0x19, 0x04, 0x2a, 0xb6]),
+          u2(getDeclMethodIndex), Buffer.from([0xb7]), u2(baseConstructorIndex),
+          Buffer.from([0xb0])
+        ]);
+      }
+
+      method = Buffer.concat([
+        u2(0x0001),
+        u2(ownerNameIndex),
+        u2(ownerDescriptorIndex),
+        u2(1),
+        u2(codeNameIndex),
+        u4(12 + ownerCode.length),
+        u2(7),
+        u2(6),
+        u4(ownerCode.length),
+        ownerCode,
+        u2(0),
+        u2(0)
+      ]);
+    }
+  }
+
+  var extraConstants = Buffer.concat(constants),
+    withConstants = Buffer.concat([
+      data.slice(0, 8),
+      u2(nextIndex),
+      data.slice(10, cp.offset),
+      extraConstants,
+      data.slice(cp.offset)
+    ]),
+    methods = methodsInfo(withConstants, cp.offset + extraConstants.length);
+
+  return Buffer.concat([
+    withConstants.slice(0, methods.countOffset),
+    u2(methods.count + 1),
+    withConstants.slice(methods.countOffset + 2, methods.endOffset),
+    method,
+    withConstants.slice(methods.endOffset)
+  ]);
+}
+
+function addTypeAnnotationLocationInfoModernOverlay(data: Buffer): Buffer {
+  var cp = constantPoolEnd(data),
+    constants: Buffer[] = [],
+    nextIndex = cp.count;
+
+  function addConstant(constant: Buffer): number {
+    constants.push(constant);
+    return nextIndex++;
+  }
+
+  function addUtf8(value: string): number {
+    return addConstant(utf8Constant(value));
+  }
+
+  function addClass(name: string): number {
+    var nameIndex = addUtf8(name);
+    return addConstant(Buffer.concat([Buffer.from([7]), u2(nameIndex)]));
+  }
+
+  function addNameAndType(name: string, descriptor: string): number {
+    var nameIndex = addUtf8(name),
+      descriptorIndex = addUtf8(descriptor);
+    return addConstant(Buffer.concat([
+      Buffer.from([12]),
+      u2(nameIndex),
+      u2(descriptorIndex)
+    ]));
+  }
+
+  function addMemberRef(tag: number, ownerIndex: number, name: string,
+      descriptor: string): number {
+    var nameAndTypeIndex = addNameAndType(name, descriptor);
+    return addConstant(Buffer.concat([
+      Buffer.from([tag]),
+      u2(ownerIndex),
+      u2(nameAndTypeIndex)
+    ]));
+  }
+
+  var codeNameIndex = addUtf8('Code'),
+    popNameIndex = addUtf8('popLocation'),
+    popDescriptorIndex = addUtf8(
+      '(B)Lsun/reflect/annotation/TypeAnnotation$LocationInfo;'),
+    locationInfoClassIndex = addClass(
+      'sun/reflect/annotation/TypeAnnotation$LocationInfo'),
+    locationClassIndex = addClass(
+      'sun/reflect/annotation/TypeAnnotation$LocationInfo$Location'),
+    systemClassIndex = addClass('java/lang/System'),
+    depthFieldIndex = addMemberRef(9, locationInfoClassIndex, 'depth', 'I'),
+    locationsFieldIndex = addMemberRef(
+      9, locationInfoClassIndex, 'locations',
+      '[Lsun/reflect/annotation/TypeAnnotation$LocationInfo$Location;'),
+    tagFieldIndex = addMemberRef(9, locationClassIndex, 'tag', 'B'),
+    arraycopyMethodIndex = addMemberRef(
+      10, systemClassIndex, 'arraycopy', '(Ljava/lang/Object;ILjava/lang/Object;II)V'),
+    constructorIndex = addMemberRef(
+      10, locationInfoClassIndex, '<init>',
+      '(I[Lsun/reflect/annotation/TypeAnnotation$LocationInfo$Location;)V'),
+    popCode = Buffer.concat([
+      Buffer.from([0x2a, 0xb4]), u2(depthFieldIndex),
+      Buffer.from([0x99, 0x00, 0x15, 0x2a, 0xb4]), u2(locationsFieldIndex),
+      Buffer.from([0x2a, 0xb4]), u2(depthFieldIndex),
+      Buffer.from([0x04, 0x64, 0x32, 0xb4]), u2(tagFieldIndex),
+      Buffer.from([0x1b, 0x9f, 0x00, 0x05, 0x01, 0xb0, 0x2a, 0xb4]),
+      u2(depthFieldIndex), Buffer.from([0x04, 0x64, 0xbd]), u2(locationClassIndex),
+      Buffer.from([0x4d, 0x2a, 0xb4]), u2(locationsFieldIndex),
+      Buffer.from([0x03, 0x2c, 0x03, 0x2a, 0xb4]), u2(depthFieldIndex),
+      Buffer.from([0x04, 0x64, 0xb8]), u2(arraycopyMethodIndex),
+      Buffer.from([0xbb]), u2(locationInfoClassIndex), Buffer.from([0x59, 0x2a, 0xb4]),
+      u2(depthFieldIndex), Buffer.from([0x04, 0x64, 0x2c, 0xb7]),
+      u2(constructorIndex), Buffer.from([0xb0])
+    ]),
+    method = Buffer.concat([
+      u2(0x0001),
+      u2(popNameIndex),
+      u2(popDescriptorIndex),
+      u2(1),
+      u2(codeNameIndex),
+      u4(12 + popCode.length),
+      u2(6),
+      u2(3),
+      u4(popCode.length),
+      popCode,
+      u2(0),
+      u2(0)
+    ]),
+    extraConstants = Buffer.concat(constants),
+    withConstants = Buffer.concat([
+      data.slice(0, 8),
+      u2(nextIndex),
+      data.slice(10, cp.offset),
+      extraConstants,
+      data.slice(cp.offset)
+    ]),
+    methods = methodsInfo(withConstants, cp.offset + extraConstants.length);
+
+  return Buffer.concat([
+    withConstants.slice(0, methods.countOffset),
+    u2(methods.count + 1),
+    withConstants.slice(methods.countOffset + 2, methods.endOffset),
+    method,
+    withConstants.slice(methods.endOffset)
+  ]);
+}
+
+function addAnnotatedTypeFactoryNestingModernOverlay(data: Buffer): Buffer {
+  var cp = constantPoolEnd(data),
+    constants: Buffer[] = [],
+    nextIndex = cp.count;
+
+  function addConstant(constant: Buffer): number {
+    constants.push(constant);
+    return nextIndex++;
+  }
+
+  function addUtf8(value: string): number {
+    return addConstant(utf8Constant(value));
+  }
+
+  function addClass(name: string): number {
+    var nameIndex = addUtf8(name);
+    return addConstant(Buffer.concat([Buffer.from([7]), u2(nameIndex)]));
+  }
+
+  function addNameAndType(name: string, descriptor: string): number {
+    var nameIndex = addUtf8(name),
+      descriptorIndex = addUtf8(descriptor);
+    return addConstant(Buffer.concat([
+      Buffer.from([12]),
+      u2(nameIndex),
+      u2(descriptorIndex)
+    ]));
+  }
+
+  function addMemberRef(tag: number, ownerIndex: number, name: string,
+      descriptor: string): number {
+    var nameAndTypeIndex = addNameAndType(name, descriptor);
+    return addConstant(Buffer.concat([
+      Buffer.from([tag]),
+      u2(ownerIndex),
+      u2(nameAndTypeIndex)
+    ]));
+  }
+
+  var codeNameIndex = addUtf8('Code'),
+    factoryClassIndex = addClass('sun/reflect/annotation/AnnotatedTypeFactory'),
+    classClassIndex = addClass('java/lang/Class'),
+    parameterizedTypeClassIndex = addClass('java/lang/reflect/ParameterizedType'),
+    modifierClassIndex = addClass('java/lang/reflect/Modifier'),
+    locationInfoClassIndex = addClass(
+      'sun/reflect/annotation/TypeAnnotation$LocationInfo'),
+    isArrayMethodIndex = addMemberRef(
+      10, factoryClassIndex, 'isArray', '(Ljava/lang/reflect/Type;)Z'),
+    addNestingMethodIndex = addMemberRef(
+      10, factoryClassIndex, 'addNesting',
+      '(Ljava/lang/reflect/Type;Lsun/reflect/annotation/TypeAnnotation$LocationInfo;)Lsun/reflect/annotation/TypeAnnotation$LocationInfo;'),
+    classGetEnclosingClassMethodIndex = addMemberRef(
+      10, classClassIndex, 'getEnclosingClass', '()Ljava/lang/Class;'),
+    classGetModifiersMethodIndex = addMemberRef(
+      10, classClassIndex, 'getModifiers', '()I'),
+    modifierIsStaticMethodIndex = addMemberRef(
+      10, modifierClassIndex, 'isStatic', '(I)Z'),
+    pushInnerMethodIndex = addMemberRef(
+      10, locationInfoClassIndex, 'pushInner',
+      '()Lsun/reflect/annotation/TypeAnnotation$LocationInfo;'),
+    getOwnerTypeMethodIndex = addMemberRef(
+      11, parameterizedTypeClassIndex, 'getOwnerType', '()Ljava/lang/reflect/Type;'),
+    getRawTypeMethodIndex = addMemberRef(
+      11, parameterizedTypeClassIndex, 'getRawType', '()Ljava/lang/reflect/Type;'),
+    nestingCode = Buffer.concat([
+      Buffer.from([0x2a, 0xb8]), u2(isArrayMethodIndex),
+      Buffer.from([0x99, 0x00, 0x05, 0x2b, 0xb0, 0x2a, 0xc1]), u2(classClassIndex),
+      Buffer.from([0x99, 0x00, 0x29, 0x2a, 0xc0]), u2(classClassIndex),
+      Buffer.from([0x4d, 0x2c, 0xb6]), u2(classGetEnclosingClassMethodIndex),
+      Buffer.from([0xc7, 0x00, 0x05, 0x2b, 0xb0, 0x2c, 0xb6]),
+      u2(classGetModifiersMethodIndex), Buffer.from([0xb8]), u2(modifierIsStaticMethodIndex),
+      Buffer.from([0x99, 0x00, 0x05, 0x2b, 0xb0, 0x2c, 0xb6]),
+      u2(classGetEnclosingClassMethodIndex), Buffer.from([0x2b, 0xb6]),
+      u2(pushInnerMethodIndex), Buffer.from([0xb8]), u2(addNestingMethodIndex),
+      Buffer.from([0xb0, 0x2a, 0xc1]), u2(parameterizedTypeClassIndex),
+      Buffer.from([0x99, 0x00, 0x41, 0x2a, 0xc0]), u2(parameterizedTypeClassIndex),
+      Buffer.from([0x4d, 0x2c, 0xb9]), u2(getOwnerTypeMethodIndex),
+      Buffer.from([0x01, 0x00, 0xc7, 0x00, 0x05, 0x2b, 0xb0, 0x2c, 0xb9]),
+      u2(getRawTypeMethodIndex), Buffer.from([0x01, 0x00, 0xc1]), u2(classClassIndex),
+      Buffer.from([0x99, 0x00, 0x17, 0x2c, 0xb9]), u2(getRawTypeMethodIndex),
+      Buffer.from([0x01, 0x00, 0xc0]), u2(classClassIndex), Buffer.from([0xb6]),
+      u2(classGetModifiersMethodIndex), Buffer.from([0xb8]), u2(modifierIsStaticMethodIndex),
+      Buffer.from([0x99, 0x00, 0x05, 0x2b, 0xb0, 0x2c, 0xb9]),
+      u2(getOwnerTypeMethodIndex), Buffer.from([0x01, 0x00, 0x2b, 0xb6]),
+      u2(pushInnerMethodIndex), Buffer.from([0xb8]), u2(addNestingMethodIndex),
+      Buffer.from([0xb0, 0x2b, 0xb0])
+    ]),
+    extraConstants = Buffer.concat(constants),
+    withConstants = Buffer.concat([
+      data.slice(0, 8),
+      u2(nextIndex),
+      data.slice(10, cp.offset),
+      extraConstants,
+      data.slice(cp.offset)
+    ]);
+
+  return replaceMethodCode(
+    withConstants,
+    cp.offset + extraConstants.length,
+    'addNesting',
+    '(Ljava/lang/reflect/Type;Lsun/reflect/annotation/TypeAnnotation$LocationInfo;)Lsun/reflect/annotation/TypeAnnotation$LocationInfo;',
+    codeNameIndex,
+    2,
+    3,
+    nestingCode);
+}
+
 function addParameterizedTypeImplModernOverlay(data: Buffer): Buffer {
   var cp = constantPoolEnd(data),
     constants: Buffer[] = [],
@@ -2526,6 +2957,19 @@ export class BootstrapClassLoader extends ClassLoader {
         }
         if (typeStr === 'Ljava/lang/reflect/AccessibleObject;') {
           clsData = addJavaLangReflectAccessibleObjectModernOverlays(clsData);
+        }
+        if ((typeStr.indexOf('Ljava/lang/reflect/Annotated') === 0 &&
+            typeStr !== 'Ljava/lang/reflect/AnnotatedElement;') ||
+            typeStr.indexOf(
+              'Lsun/reflect/annotation/AnnotatedTypeFactory$Annotated') === 0) {
+          clsData = addAnnotatedOwnerTypeModernOverlay(clsData, typeStr);
+        }
+        if (typeStr ===
+            'Lsun/reflect/annotation/TypeAnnotation$LocationInfo;') {
+          clsData = addTypeAnnotationLocationInfoModernOverlay(clsData);
+        }
+        if (typeStr === 'Lsun/reflect/annotation/AnnotatedTypeFactory;') {
+          clsData = addAnnotatedTypeFactoryNestingModernOverlay(clsData);
         }
         if (typeStr ===
             'Lsun/reflect/generics/reflectiveObjects/ParameterizedTypeImpl;') {
