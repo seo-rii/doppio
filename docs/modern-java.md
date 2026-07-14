@@ -1144,6 +1144,14 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   top-level, static-nested, local, and anonymous constructors. Coverage also
   protects `InnerClasses`-based class modifiers and the Java 8 annotated-type
   path adaptation needed by static nested receivers.
+- `sun.reflect.generics.reflectiveObjects.ParameterizedTypeImpl` now renders
+  Java 17-compatible nested type names without duplicating raw owners and uses
+  `$` between parameterized owners and inner types. Coverage compares exact
+  `getTypeName()`/`toString()` output and independent raw, owner, argument,
+  generic-array, and wildcard structure, including `Map.Entry` and
+  `TypeDescriptor.OfField<Class<?>>`. The complete Java 9-26 suite and the
+  Kotlin 2.4.0 full-classpath and Scala 2.13.18 compiler gates passed after
+  this overlay was added.
 - `java.lang.reflect.Array` now exposes selected generic and primitive accessor
   behavior: reference-array null/type checks, wrapper unboxing into primitive
   arrays, direct primitive array reads/writes, allowed widening conversions,

@@ -1,0 +1,34 @@
+top.kind=parameterized
+top.type-name=java.util.List<java.lang.String>
+top.to-string=java.util.List<java.lang.String>
+top.shape=parameterized(raw=class(java.util.List),owner=null,arguments=[class(java.lang.String)])
+staticNested.kind=parameterized
+staticNested.type-name=classes.modern_test.Java9ParameterizedTypeNames$Outer$StaticNested<java.lang.Long>
+staticNested.to-string=classes.modern_test.Java9ParameterizedTypeNames$Outer$StaticNested<java.lang.Long>
+staticNested.shape=parameterized(raw=class(classes.modern_test.Java9ParameterizedTypeNames$Outer$StaticNested),owner=class(classes.modern_test.Java9ParameterizedTypeNames$Outer),arguments=[class(java.lang.Long)])
+inner.kind=parameterized
+inner.type-name=classes.modern_test.Java9ParameterizedTypeNames$Outer<java.lang.String>$Inner<java.lang.Integer>
+inner.to-string=classes.modern_test.Java9ParameterizedTypeNames$Outer<java.lang.String>$Inner<java.lang.Integer>
+inner.shape=parameterized(raw=class(classes.modern_test.Java9ParameterizedTypeNames$Outer$Inner),owner=parameterized(raw=class(classes.modern_test.Java9ParameterizedTypeNames$Outer),owner=class(classes.modern_test.Java9ParameterizedTypeNames),arguments=[class(java.lang.String)]),arguments=[class(java.lang.Integer)])
+leaf.kind=parameterized
+leaf.type-name=classes.modern_test.Java9ParameterizedTypeNames$Outer<java.lang.String>$Leaf
+leaf.to-string=classes.modern_test.Java9ParameterizedTypeNames$Outer<java.lang.String>$Leaf
+leaf.shape=parameterized(raw=class(classes.modern_test.Java9ParameterizedTypeNames$Outer$Leaf),owner=parameterized(raw=class(classes.modern_test.Java9ParameterizedTypeNames$Outer),owner=class(classes.modern_test.Java9ParameterizedTypeNames),arguments=[class(java.lang.String)]),arguments=[])
+rawInner.kind=class
+rawInner.type-name=classes.modern_test.Java9ParameterizedTypeNames$Outer$Inner
+rawInner.to-string=class classes.modern_test.Java9ParameterizedTypeNames$Outer$Inner
+rawInner.shape=class(classes.modern_test.Java9ParameterizedTypeNames$Outer$Inner)
+jdkStaticNested.kind=parameterized
+jdkStaticNested.type-name=java.util.Map$Entry<java.lang.String, java.lang.Integer>
+jdkStaticNested.to-string=java.util.Map$Entry<java.lang.String, java.lang.Integer>
+jdkStaticNested.shape=parameterized(raw=class(java.util.Map$Entry),owner=class(java.util.Map),arguments=[class(java.lang.String),class(java.lang.Integer)])
+genericArray.kind=generic-array
+genericArray.type-name=classes.modern_test.Java9ParameterizedTypeNames$Outer<? extends java.lang.Number>$Inner<? super java.lang.Integer>[]
+genericArray.to-string=classes.modern_test.Java9ParameterizedTypeNames$Outer<? extends java.lang.Number>$Inner<? super java.lang.Integer>[]
+genericArray.shape=array(parameterized(raw=class(classes.modern_test.Java9ParameterizedTypeNames$Outer$Inner),owner=parameterized(raw=class(classes.modern_test.Java9ParameterizedTypeNames$Outer),owner=class(classes.modern_test.Java9ParameterizedTypeNames),arguments=[wildcard(upper=[class(java.lang.Number)],lower=[])]),arguments=[wildcard(upper=[class(java.lang.Object)],lower=[class(java.lang.Integer)])]))
+wildcardArray.kind=parameterized
+wildcardArray.type-name=java.util.List<? extends classes.modern_test.Java9ParameterizedTypeNames$Outer<java.lang.String>$Inner<java.lang.Integer>[]>
+wildcardArray.to-string=java.util.List<? extends classes.modern_test.Java9ParameterizedTypeNames$Outer<java.lang.String>$Inner<java.lang.Integer>[]>
+wildcardArray.shape=parameterized(raw=class(java.util.List),owner=null,arguments=[wildcard(upper=[array(parameterized(raw=class(classes.modern_test.Java9ParameterizedTypeNames$Outer$Inner),owner=parameterized(raw=class(classes.modern_test.Java9ParameterizedTypeNames$Outer),owner=class(classes.modern_test.Java9ParameterizedTypeNames),arguments=[class(java.lang.String)]),arguments=[class(java.lang.Integer)]))],lower=[])])
+implementation=sun.reflect.generics.reflectiveObjects.ParameterizedTypeImpl
+to-string-metadata=sun.reflect.generics.reflectiveObjects.ParameterizedTypeImpl:1:true:false:false:java.lang.String:0

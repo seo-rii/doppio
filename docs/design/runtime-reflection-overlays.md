@@ -233,6 +233,38 @@ The full Java 9-26 compatibility suite passed locally on 2026-07-14 in 11
 minutes 2 seconds. The compiler-discovery gates then passed in 145 seconds for
 Kotlin 2.4.0 with the full compiler classpath and 98 seconds for Scala 2.13.18.
 
+### Parameterized type names
+
+The Java 8 `ParameterizedTypeImpl.toString()` owner rendering predates the
+Java 9 `Type.getTypeName()` contract used by current reflection clients:
+
+- when the owner is a raw `Class`, Java 8 appends the owner's full name, a dot,
+  and then the nested raw type's full name, duplicating the owner;
+- when the owner is parameterized, Java 8 removes the repeated binary prefix
+  but still joins the nested name with a dot. Java 17 uses `$`, matching the
+  binary nested-class name.
+
+`ClassLoader.ts` replaces only the existing public, non-native
+`ParameterizedTypeImpl.toString(): String` `Code` attribute. The Java 17 body
+uses recursive `Type.getTypeName()`, `$`, `Class.getSimpleName()` for a raw
+owner, and `StringJoiner` for actual arguments. Fields, constructors,
+structured raw/owner/argument identity, equality, hashing, and all other method
+metadata remain the bundled implementation.
+
+`Java9ParameterizedTypeNames` compares exact `getTypeName()` and `toString()`
+output plus a separate structural representation for top-level parameterized
+types, static nested classes, parameterized inner owners, zero-argument inner
+types, raw inner classes, `Map.Entry`, generic arrays, upper/lower wildcards,
+and nested parameterized types inside wildcard arrays. It also protects the
+implementation method's exact declaring class, flags, return type, and arity.
+`Java12ClassConstableReflection` separately asserts the motivating
+`TypeDescriptor.OfField<Class<?>>` name through the injected generic `Class`
+interface.
+
+The full Java 9-26 compatibility suite passed locally on 2026-07-14 in 16
+minutes 27 seconds. The compiler gates then passed in 228 seconds for Kotlin
+2.4.0 with the full compiler classpath and 136 seconds for Scala 2.13.18.
+
 The Java 12 `Class.descriptorString()` overlay is a parsed ordinary method:
 
 - `ClassLoader.ts` injects the exact public, non-native descriptor into the

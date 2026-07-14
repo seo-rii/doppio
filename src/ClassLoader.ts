@@ -397,6 +397,167 @@ function addJavaLangReflectExecutableReceiverModernOverlays(data: Buffer,
   ]);
 }
 
+function addParameterizedTypeImplModernOverlay(data: Buffer): Buffer {
+  var cp = constantPoolEnd(data),
+    constants: Buffer[] = [],
+    nextIndex = cp.count;
+
+  function addConstant(constant: Buffer): number {
+    constants.push(constant);
+    return nextIndex++;
+  }
+
+  function addUtf8(value: string): number {
+    return addConstant(utf8Constant(value));
+  }
+
+  function addClass(name: string): number {
+    var nameIndex = addUtf8(name);
+    return addConstant(Buffer.concat([Buffer.from([7]), u2(nameIndex)]));
+  }
+
+  function addString(value: string): number {
+    var valueIndex = addUtf8(value);
+    return addConstant(Buffer.concat([Buffer.from([8]), u2(valueIndex)]));
+  }
+
+  function addNameAndType(name: string, descriptor: string): number {
+    var nameIndex = addUtf8(name),
+      descriptorIndex = addUtf8(descriptor);
+    return addConstant(Buffer.concat([
+      Buffer.from([12]),
+      u2(nameIndex),
+      u2(descriptorIndex)
+    ]));
+  }
+
+  function addMemberRef(tag: number, ownerIndex: number, name: string,
+      descriptor: string): number {
+    var nameAndTypeIndex = addNameAndType(name, descriptor);
+    return addConstant(Buffer.concat([
+      Buffer.from([tag]),
+      u2(ownerIndex),
+      u2(nameAndTypeIndex)
+    ]));
+  }
+
+  var codeNameIndex = addUtf8('Code'),
+    dollarStringIndex = addString('$'),
+    emptyStringIndex = addString(''),
+    separatorStringIndex = addString(', '),
+    prefixStringIndex = addString('<'),
+    suffixStringIndex = addString('>'),
+    parameterizedTypeImplClassIndex = addClass(
+      'sun/reflect/generics/reflectiveObjects/ParameterizedTypeImpl'),
+    stringBuilderClassIndex = addClass('java/lang/StringBuilder'),
+    typeClassIndex = addClass('java/lang/reflect/Type'),
+    classClassIndex = addClass('java/lang/Class'),
+    stringClassIndex = addClass('java/lang/String'),
+    stringJoinerClassIndex = addClass('java/util/StringJoiner'),
+    stringBuilderConstructorIndex = addMemberRef(
+      10, stringBuilderClassIndex, '<init>', '()V'),
+    ownerTypeFieldIndex = addMemberRef(
+      9, parameterizedTypeImplClassIndex, 'ownerType', 'Ljava/lang/reflect/Type;'),
+    typeNameMethodIndex = addMemberRef(
+      11, typeClassIndex, 'getTypeName', '()Ljava/lang/String;'),
+    stringBuilderAppendIndex = addMemberRef(
+      10, stringBuilderClassIndex, 'append',
+      '(Ljava/lang/String;)Ljava/lang/StringBuilder;'),
+    rawTypeFieldIndex = addMemberRef(
+      9, parameterizedTypeImplClassIndex, 'rawType', 'Ljava/lang/Class;'),
+    classGetNameMethodIndex = addMemberRef(
+      10, classClassIndex, 'getName', '()Ljava/lang/String;'),
+    stringBuilderToStringIndex = addMemberRef(
+      10, stringBuilderClassIndex, 'toString', '()Ljava/lang/String;'),
+    stringReplaceMethodIndex = addMemberRef(
+      10, stringClassIndex, 'replace',
+      '(Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Ljava/lang/String;'),
+    classGetSimpleNameMethodIndex = addMemberRef(
+      10, classClassIndex, 'getSimpleName', '()Ljava/lang/String;'),
+    actualTypeArgumentsFieldIndex = addMemberRef(
+      9, parameterizedTypeImplClassIndex, 'actualTypeArguments',
+      '[Ljava/lang/reflect/Type;'),
+    stringJoinerConstructorIndex = addMemberRef(
+      10, stringJoinerClassIndex, '<init>',
+      '(Ljava/lang/CharSequence;Ljava/lang/CharSequence;Ljava/lang/CharSequence;)V'),
+    stringJoinerSetEmptyValueIndex = addMemberRef(
+      10, stringJoinerClassIndex, 'setEmptyValue',
+      '(Ljava/lang/CharSequence;)Ljava/util/StringJoiner;'),
+    stringJoinerAddIndex = addMemberRef(
+      10, stringJoinerClassIndex, 'add',
+      '(Ljava/lang/CharSequence;)Ljava/util/StringJoiner;'),
+    stringJoinerToStringIndex = addMemberRef(
+      10, stringJoinerClassIndex, 'toString', '()Ljava/lang/String;');
+
+  if (dollarStringIndex > 255 || emptyStringIndex > 255 ||
+      separatorStringIndex > 255 || prefixStringIndex > 255 || suffixStringIndex > 255) {
+    throw new Error('ParameterizedTypeImpl string constants exceed ldc range');
+  }
+
+  var extraConstants = Buffer.concat(constants),
+    withConstants = Buffer.concat([
+      data.slice(0, 8),
+      u2(nextIndex),
+      data.slice(10, cp.offset),
+      extraConstants,
+      data.slice(cp.offset)
+    ]),
+    code = Buffer.concat([
+      Buffer.from([0xbb]), u2(stringBuilderClassIndex),
+      Buffer.from([0x59, 0xb7]), u2(stringBuilderConstructorIndex),
+      Buffer.from([0x4c, 0x2a, 0xb4]), u2(ownerTypeFieldIndex),
+      Buffer.from([0xc6, 0x00, 0x64, 0x2b, 0x2a, 0xb4]), u2(ownerTypeFieldIndex),
+      Buffer.from([0xb9]), u2(typeNameMethodIndex), Buffer.from([0x01, 0x00]),
+      Buffer.from([0xb6]), u2(stringBuilderAppendIndex),
+      Buffer.from([0x57, 0x2b, 0x12, dollarStringIndex, 0xb6]), u2(stringBuilderAppendIndex),
+      Buffer.from([0x57, 0x2a, 0xb4]), u2(ownerTypeFieldIndex),
+      Buffer.from([0xc1]), u2(parameterizedTypeImplClassIndex),
+      Buffer.from([0x99, 0x00, 0x36, 0x2b, 0x2a, 0xb4]), u2(rawTypeFieldIndex),
+      Buffer.from([0xb6]), u2(classGetNameMethodIndex),
+      Buffer.from([0xbb]), u2(stringBuilderClassIndex),
+      Buffer.from([0x59, 0xb7]), u2(stringBuilderConstructorIndex),
+      Buffer.from([0x2a, 0xb4]), u2(ownerTypeFieldIndex),
+      Buffer.from([0xc0]), u2(parameterizedTypeImplClassIndex),
+      Buffer.from([0xb4]), u2(rawTypeFieldIndex),
+      Buffer.from([0xb6]), u2(classGetNameMethodIndex),
+      Buffer.from([0xb6]), u2(stringBuilderAppendIndex),
+      Buffer.from([0x12, dollarStringIndex, 0xb6]), u2(stringBuilderAppendIndex),
+      Buffer.from([0xb6]), u2(stringBuilderToStringIndex),
+      Buffer.from([0x12, emptyStringIndex, 0xb6]), u2(stringReplaceMethodIndex),
+      Buffer.from([0xb6]), u2(stringBuilderAppendIndex),
+      Buffer.from([0x57, 0xa7, 0x00, 0x1e, 0x2b, 0x2a, 0xb4]), u2(rawTypeFieldIndex),
+      Buffer.from([0xb6]), u2(classGetSimpleNameMethodIndex),
+      Buffer.from([0xb6]), u2(stringBuilderAppendIndex),
+      Buffer.from([0x57, 0xa7, 0x00, 0x0f, 0x2b, 0x2a, 0xb4]), u2(rawTypeFieldIndex),
+      Buffer.from([0xb6]), u2(classGetNameMethodIndex),
+      Buffer.from([0xb6]), u2(stringBuilderAppendIndex),
+      Buffer.from([0x57, 0x2a, 0xb4]), u2(actualTypeArgumentsFieldIndex),
+      Buffer.from([0xc6, 0x00, 0x4c, 0xbb]), u2(stringJoinerClassIndex),
+      Buffer.from([0x59, 0x12, separatorStringIndex, 0x12, prefixStringIndex,
+        0x12, suffixStringIndex, 0xb7]), u2(stringJoinerConstructorIndex),
+      Buffer.from([0x4d, 0x2c, 0x12, emptyStringIndex, 0xb6]), u2(stringJoinerSetEmptyValueIndex),
+      Buffer.from([0x57, 0x2a, 0xb4]), u2(actualTypeArgumentsFieldIndex),
+      Buffer.from([0x4e, 0x2d, 0xbe, 0x36, 0x04, 0x03, 0x36, 0x05,
+        0x15, 0x05, 0x15, 0x04, 0xa2, 0x00, 0x1b, 0x2d, 0x15, 0x05,
+        0x32, 0x3a, 0x06, 0x2c, 0x19, 0x06, 0xb9]),
+      u2(typeNameMethodIndex), Buffer.from([0x01, 0x00, 0xb6]), u2(stringJoinerAddIndex),
+      Buffer.from([0x57, 0x84, 0x05, 0x01, 0xa7, 0xff, 0xe4, 0x2b, 0x2c, 0xb6]),
+      u2(stringJoinerToStringIndex), Buffer.from([0xb6]), u2(stringBuilderAppendIndex),
+      Buffer.from([0x57, 0x2b, 0xb6]), u2(stringBuilderToStringIndex),
+      Buffer.from([0xb0])
+    ]);
+
+  return replaceMethodCode(
+    withConstants,
+    cp.offset + extraConstants.length,
+    'toString',
+    '()Ljava/lang/String;',
+    codeNameIndex,
+    5,
+    7,
+    code);
+}
+
 function addStaticNoopModernOverlay(data: Buffer, name: string, descriptor: string,
     maxLocals: number, annotationDescriptor: string): Buffer {
   var cp = constantPoolEnd(data),
@@ -2186,6 +2347,10 @@ export class BootstrapClassLoader extends ClassLoader {
         }
         if (typeStr === 'Ljava/lang/reflect/Constructor;') {
           clsData = addJavaLangReflectExecutableReceiverModernOverlays(clsData, true);
+        }
+        if (typeStr ===
+            'Lsun/reflect/generics/reflectiveObjects/ParameterizedTypeImpl;') {
+          clsData = addParameterizedTypeImplModernOverlay(clsData);
         }
         if (typeStr === 'Ljava/lang/ClassLoader;') {
           clsData = addJavaLangClassLoaderModernOverlays(clsData);

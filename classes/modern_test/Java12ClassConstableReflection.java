@@ -6,8 +6,10 @@ import java.lang.constant.ConstantDesc;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.lang.invoke.TypeDescriptor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.Optional;
@@ -74,6 +76,17 @@ public class Java12ClassConstableReflection {
     System.out.println("raw-interfaces=" + interfaceNames(Class.class.getInterfaces()));
     System.out.println("generic-interface-count=" +
         Class.class.getGenericInterfaces().length);
+    Type fieldDescriptorInterface = null;
+    for (Type type : Class.class.getGenericInterfaces()) {
+      if (type instanceof ParameterizedType
+          && ((ParameterizedType) type).getRawType() == TypeDescriptor.OfField.class) {
+        fieldDescriptorInterface = type;
+      }
+    }
+    System.out.println("field-descriptor-type-name=" +
+        fieldDescriptorInterface.getTypeName());
+    System.out.println("field-descriptor-to-string=" +
+        fieldDescriptorInterface.toString());
     System.out.println("constable-assignable=" +
         Constable.class.isAssignableFrom(Class.class));
     System.out.println("class-is-constable=" + Constable.class.isInstance(String.class));
