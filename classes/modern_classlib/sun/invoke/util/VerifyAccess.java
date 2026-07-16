@@ -1,7 +1,9 @@
 package sun.invoke.util;
 
+import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Modifier;
+import java.util.Objects;
 
 public class VerifyAccess {
   private static final int UNCONDITIONAL_ALLOWED = 0x0020;
@@ -74,10 +76,23 @@ public class VerifyAccess {
     return isClassAccessible(refc, lookupClass, null, allowedModes);
   }
 
+  public static Class<?> accessClass(MethodHandles.Lookup lookup, Class<?> targetClass)
+      throws IllegalAccessException {
+    Objects.requireNonNull(targetClass);
+    if (!isClassAccessible(targetClass, lookup.lookupClass(), lookup.lookupModes())) {
+      throw new IllegalAccessException("access violation: " + targetClass);
+    }
+    return targetClass;
+  }
+
   public static boolean isClassAccessible(
       Class<?> refc, Class<?> lookupClass, Class<?> previousLookupClass, int allowedModes) {
     if (allowedModes == 0) {
       return false;
+    }
+
+    while (refc.isArray()) {
+      refc = refc.getComponentType();
     }
 
     int mods = getClassModifiers(refc);

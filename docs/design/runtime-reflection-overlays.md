@@ -211,6 +211,24 @@ The full Java 9-26 compatibility suite passed locally on 2026-07-15 in 22
 minutes 13 seconds. The compiler gates then passed in 382 seconds for Kotlin
 2.4.0 with the full compiler classpath and 292 seconds for Scala 2.13.18.
 
+The Java 9 `MethodHandles.Lookup.findClass(String)` and
+`accessClass(Class<?>)` methods follow the same parsed-overlay contract:
+
+- both methods are public, concrete, non-native, and non-synthetic, with exact
+  generic `Class<?>` signatures, checked-exception ordering, empty annotation
+  surfaces, and absent `MethodParameters` metadata;
+- `findClass` delegates to the package-private `DoppioMethodHandles` helper,
+  while `accessClass` delegates directly to `VerifyAccess`; direct calls,
+  reflection, `Method.invoke`, and `Lookup.unreflect` still share the same
+  parsed methods and slots;
+- `findClass` uses the lookup class's defining loader without initialization,
+  then applies `accessClass`; `accessClass` shares the modern `VerifyAccess`
+  class/module/package logic and recursively checks array component access;
+- `Java9LookupClassAccess` compares metadata, same/cross-package access,
+  reduced and public lookups, loader/module/protection-domain identity,
+  initialization timing, primitive/void/array/null/missing inputs, exception
+  ordering, reflection, and unreflected handles with HotSpot 17.
+
 ### Executable receiver types
 
 Java 9 changed executable receiver reflection beyond adding classfile syntax:

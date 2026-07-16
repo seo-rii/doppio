@@ -2456,18 +2456,58 @@ function addJavaLangInvokeMethodHandlesLookupModernOverlays(data: Buffer): Buffe
       addUtf8(overlay[0]),
       addUtf8(overlay[1])
     ]),
-    defineClassNameIndex = addUtf8('defineClass'),
-    defineClassDescriptorIndex = addUtf8('([B)Ljava/lang/Class;'),
     codeNameIndex = addUtf8('Code'),
     exceptionsNameIndex = addUtf8('Exceptions'),
     signatureNameIndex = addUtf8('Signature'),
-    defineClassSignatureIndex = addUtf8('([B)Ljava/lang/Class<*>;'),
-    illegalAccessExceptionClassIndex = addClass('java/lang/IllegalAccessException'),
     helperClassIndex = addClass('java/lang/invoke/DoppioMethodHandles'),
-    helperMethodIndex = addMethodRef(
-      helperClassIndex,
-      'defineClass',
-      '(Ljava/lang/invoke/MethodHandles$Lookup;[B)Ljava/lang/Class;'),
+    verifyAccessClassIndex = addClass('sun/invoke/util/VerifyAccess'),
+    illegalAccessExceptionClassIndex = addClass('java/lang/IllegalAccessException'),
+    classNotFoundExceptionClassIndex = addClass('java/lang/ClassNotFoundException'),
+    parsedOverlays: Array<{
+      name: string;
+      descriptor: string;
+      helperClassIndex: number;
+      helperDescriptor: string;
+      signature: string;
+      exceptionIndexes: number[];
+    }> = [
+      {
+        name: 'defineClass',
+        descriptor: '([B)Ljava/lang/Class;',
+        helperClassIndex: helperClassIndex,
+        helperDescriptor: '(Ljava/lang/invoke/MethodHandles$Lookup;[B)Ljava/lang/Class;',
+        signature: '([B)Ljava/lang/Class<*>;',
+        exceptionIndexes: [illegalAccessExceptionClassIndex]
+      },
+      {
+        name: 'findClass',
+        descriptor: '(Ljava/lang/String;)Ljava/lang/Class;',
+        helperClassIndex: helperClassIndex,
+        helperDescriptor: '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;)Ljava/lang/Class;',
+        signature: '(Ljava/lang/String;)Ljava/lang/Class<*>;',
+        exceptionIndexes: [classNotFoundExceptionClassIndex, illegalAccessExceptionClassIndex]
+      },
+      {
+        name: 'accessClass',
+        descriptor: '(Ljava/lang/Class;)Ljava/lang/Class;',
+        helperClassIndex: verifyAccessClassIndex,
+        helperDescriptor: '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/Class;)Ljava/lang/Class;',
+        signature: '(Ljava/lang/Class<*>;)Ljava/lang/Class<*>;',
+        exceptionIndexes: [illegalAccessExceptionClassIndex]
+      }
+    ],
+    parsedIndexes = parsedOverlays.map((overlay): {
+      nameIndex: number;
+      descriptorIndex: number;
+      signatureIndex: number;
+      helperMethodIndex: number;
+    } => ({
+      nameIndex: addUtf8(overlay.name),
+      descriptorIndex: addUtf8(overlay.descriptor),
+      signatureIndex: addUtf8(overlay.signature),
+      helperMethodIndex: addMethodRef(
+        overlay.helperClassIndex, overlay.name, overlay.helperDescriptor)
+    })),
     extraConstants = Buffer.concat(constants),
     withConstants = Buffer.concat([
       data.slice(0, 8),
@@ -2485,39 +2525,42 @@ function addJavaLangInvokeMethodHandlesLookupModernOverlays(data: Buffer): Buffe
         u2(0)
       ]);
     })),
-    code = Buffer.concat([
-      Buffer.from([0x2a, 0x2b, 0xb8]),
-      u2(helperMethodIndex),
-      Buffer.from([0xb0])
-    ]),
-    defineClassMethod = Buffer.concat([
-      u2(0x0001),
-      u2(defineClassNameIndex),
-      u2(defineClassDescriptorIndex),
-      u2(3),
-      u2(codeNameIndex),
-      u4(12 + code.length),
-      u2(2),
-      u2(2),
-      u4(code.length),
-      code,
-      u2(0),
-      u2(0),
-      u2(exceptionsNameIndex),
-      u4(4),
-      u2(1),
-      u2(illegalAccessExceptionClassIndex),
-      u2(signatureNameIndex),
-      u4(2),
-      u2(defineClassSignatureIndex)
-    ]);
+    parsedMethodData = Buffer.concat(parsedOverlays.map((overlay, index: number) => {
+      var indexes = parsedIndexes[index],
+        code = Buffer.concat([
+          Buffer.from([0x2a, 0x2b, 0xb8]),
+          u2(indexes.helperMethodIndex),
+          Buffer.from([0xb0])
+        ]);
+      return Buffer.concat([
+        u2(0x0001),
+        u2(indexes.nameIndex),
+        u2(indexes.descriptorIndex),
+        u2(3),
+        u2(codeNameIndex),
+        u4(12 + code.length),
+        u2(2),
+        u2(2),
+        u4(code.length),
+        code,
+        u2(0),
+        u2(0),
+        u2(exceptionsNameIndex),
+        u4(2 + overlay.exceptionIndexes.length * 2),
+        u2(overlay.exceptionIndexes.length),
+        Buffer.concat(overlay.exceptionIndexes.map((exceptionIndex: number) => u2(exceptionIndex))),
+        u2(signatureNameIndex),
+        u4(2),
+        u2(indexes.signatureIndex)
+      ]);
+    }));
 
   return Buffer.concat([
     withConstants.slice(0, methods.countOffset),
-    u2(methods.count + nativeOverlays.length + 1),
+    u2(methods.count + nativeOverlays.length + parsedOverlays.length),
     withConstants.slice(methods.countOffset + 2, methods.endOffset),
     nativeMethodData,
-    defineClassMethod,
+    parsedMethodData,
     withConstants.slice(methods.endOffset)
   ]);
 }

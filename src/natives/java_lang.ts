@@ -192,7 +192,16 @@ export default function (): any {
   class java_lang_Class {
 
     public static 'forName0(Ljava/lang/String;ZLjava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/Class;'(thread: JVMThread, jvmStr: JVMTypes.java_lang_String, initialize: number, jclo: JVMTypes.java_lang_ClassLoader, caller: JVMTypes.java_lang_Class): void {
-      var classname = util.int_classname(jvmStr.toString());
+      if (jvmStr === null) {
+        thread.throwNewException('Ljava/lang/NullPointerException;', '');
+        return;
+      }
+      var externalName = jvmStr.toString();
+      if (util.external2internal[externalName] !== void 0) {
+        thread.throwNewException('Ljava/lang/ClassNotFoundException;', externalName);
+        return;
+      }
+      var classname = util.int_classname(externalName);
       if (!util.verify_int_classname(classname)) {
         thread.throwNewException('Ljava/lang/ClassNotFoundException;', classname);
       } else {

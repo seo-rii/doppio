@@ -12,6 +12,13 @@ public final class DoppioMethodHandles {
   static native Class<?> defineClass(MethodHandles.Lookup lookup, byte[] bytes)
       throws IllegalAccessException;
 
+  static Class<?> findClass(MethodHandles.Lookup lookup, String targetName)
+      throws ClassNotFoundException, IllegalAccessException {
+    Class<?> targetClass = Class.forName(
+        targetName, false, lookup.lookupClass().getClassLoader());
+    return lookup.accessClass(targetClass);
+  }
+
   public static MethodHandle zero(Class<?> type) {
     Objects.requireNonNull(type);
     if (type == void.class) {

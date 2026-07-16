@@ -145,6 +145,35 @@ named-module package ownership. Doppio's modern runtime currently presents the
 tested unnamed-module model; those two surfaces remain separate compatibility
 work rather than implicit claims of this method.
 
+## Lookup Class Discovery And Access
+
+Java 9 added `Lookup.findClass(String)` and `Lookup.accessClass(Class<?>)` as
+the class-level counterparts to member lookup. Both are injected as ordinary
+parsed public methods with Java 17 descriptors, generic `Class<?>` metadata,
+declared checked exceptions, and concrete helper-delegating bytecode.
+
+The implementation keeps loading and access as separate ordered operations:
+
+1. `findClass` calls `Class.forName(name, false, lookupClassLoader)`. Null,
+   malformed, missing, and linkage failures therefore happen before lookup
+   access validation, and successful loading never initializes the class.
+2. The resulting class is passed to the same helper used by `accessClass`.
+   `VerifyAccess.isClassAccessible` applies public/module visibility or
+   same-defining-loader package visibility with the lookup's current modes.
+3. Array classes are recursively reduced to their ultimate component for the
+   access decision while the original array `Class` is returned. Primitive and
+   void classes remain valid `accessClass` inputs.
+4. `accessClass` returns the exact input identity and does not initialize it.
+   Active use through a method handle or ordinary bytecode remains responsible
+   for `<clinit>`.
+
+The tested scope is the unnamed-module model and the existing selected lookup
+mode implementation. SecurityManager checks, previous-lookup module edges,
+exact Java 9+ `MODULE`/`ORIGINAL` mode values, and named-module qualified-export
+matrices remain separate work. A scan of the cached Kotlin 2.4.0 and Scala
+2.13.18 artifacts found no direct calls to these two methods; this slice closes
+the low-risk Java 9 API gap rather than a current compiler startup blocker.
+
 ## Implemented Slices
 
 - Java 17 `MethodHandles.Lookup` has a public same-class fixture covering
