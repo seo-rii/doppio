@@ -17,6 +17,15 @@ public class Java17MethodHandlesLookupModes {
     print("drop-public", lookup.dropLookupMode(MethodHandles.Lookup.PUBLIC));
     print("drop-module-int", lookup.dropLookupMode(16));
     print("drop-unconditional-int", lookup.dropLookupMode(32));
+    System.out.println("public-string:" + publicLookup.toString());
+    System.out.println("lookup-string:" + lookup.toString());
+    System.out.println("package-string:" +
+        lookup.dropLookupMode(MethodHandles.Lookup.PRIVATE).toString());
+    System.out.println("private-string:" +
+        lookup.dropLookupMode(MethodHandles.Lookup.PROTECTED).toString());
+    System.out.println("public-mode-string:" + lookup.dropLookupMode(16).toString());
+    System.out.println("noaccess-string:" +
+        lookup.dropLookupMode(MethodHandles.Lookup.PUBLIC).toString());
     System.out.println(publicLookup.dropLookupMode(MethodHandles.Lookup.PRIVATE) == publicLookup);
     System.out.println(publicLookup.dropLookupMode(MethodHandles.Lookup.PUBLIC) == publicLookup);
 

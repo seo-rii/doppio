@@ -2531,6 +2531,9 @@ function addJavaLangInvokeMethodHandlesLookupModernOverlays(data: Buffer): Buffe
     lookupClassIndex = addClass('java/lang/invoke/MethodHandles$Lookup'),
     hasFullPrivilegeAccessMethodIndex = addMethodRef(
       lookupClassIndex, 'hasFullPrivilegeAccess', '()Z'),
+    lookupToStringMethodIndex = addMethodRef(
+      helperClassIndex, 'lookupToString',
+      '(Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/String;'),
     illegalAccessExceptionClassIndex = addClass('java/lang/IllegalAccessException'),
     classNotFoundExceptionClassIndex = addClass('java/lang/ClassNotFoundException'),
     parsedOverlays: Array<{
@@ -2626,7 +2629,21 @@ function addJavaLangInvokeMethodHandlesLookupModernOverlays(data: Buffer): Buffe
       hasPrivateAccessCode,
       0x0001,
       hasPrivateAccessAttributes),
-    methods = methodsInfo(withPrivateAccess, cp.offset + extraConstants.length),
+    lookupToStringCode = Buffer.concat([
+      Buffer.from([0x2a, 0xb8]),
+      u2(lookupToStringMethodIndex),
+      Buffer.from([0xb0])
+    ]),
+    withLookupToString = replaceMethodCode(
+      withPrivateAccess,
+      cp.offset + extraConstants.length,
+      'toString',
+      '()Ljava/lang/String;',
+      codeNameIndex,
+      1,
+      1,
+      lookupToStringCode),
+    methods = methodsInfo(withLookupToString, cp.offset + extraConstants.length),
     nativeMethodData = Buffer.concat(nativeIndexes.map((indexes: number[]) => {
       return Buffer.concat([
         u2(0x0101),
@@ -2666,12 +2683,12 @@ function addJavaLangInvokeMethodHandlesLookupModernOverlays(data: Buffer): Buffe
     }));
 
   return Buffer.concat([
-    withPrivateAccess.slice(0, methods.countOffset),
+    withLookupToString.slice(0, methods.countOffset),
     u2(methods.count + nativeOverlays.length + parsedOverlays.length),
-    withPrivateAccess.slice(methods.countOffset + 2, methods.endOffset),
+    withLookupToString.slice(methods.countOffset + 2, methods.endOffset),
     nativeMethodData,
     parsedMethodData,
-    withPrivateAccess.slice(methods.endOffset)
+    withLookupToString.slice(methods.endOffset)
   ]);
 }
 

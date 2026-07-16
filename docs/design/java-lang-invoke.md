@@ -209,6 +209,27 @@ The 2026-07-17 validation completed the full Java 9-26 runtime suite in 5
 minutes 34 seconds, Kotlin 2.4.0 MethodHandles compiler smoke in 215 seconds,
 and Scala 2.13.18 MethodHandles compiler smoke in 100 seconds.
 
+## Lookup String Diagnostics
+
+Java 9 distinguishes the singleton public lookup from an ordinary public-mode
+lookup in `Lookup.toString()`: `MethodHandles.publicLookup()` renders as
+`java.lang.Object/publicLookup`, not the Java 8
+`java.lang.Object/public`. Doppio replaces the existing parsed `toString()`
+body with a package-private helper call so all existing method references and
+reflection metadata remain unchanged.
+
+The helper checks public-lookup identity before interpreting the selected
+lookup modes. It preserves the existing full, private, package, public,
+no-access, and trusted forms for Doppio's Java 8-compatible mode model. Exact
+Java 9+ `MODULE`, `UNCONDITIONAL`, `ORIGINAL`, and previous-lookup-class string
+combinations remain part of the broader lookup-mode design rather than being
+inferred from mode bits that the runtime does not yet retain.
+
+The 2026-07-17 regression run completed the full Java 9-26 runtime suite in 4
+minutes 44 seconds, Kotlin 2.4.0 MethodHandles compiler smoke in 230 seconds,
+and Scala 2.13.18 MethodHandles compiler smoke in 99 seconds after this body
+replacement.
+
 ## Lookup Class Initialization
 
 Java 15 added `Lookup.ensureInitialized(Class<?>)`. The parsed public method

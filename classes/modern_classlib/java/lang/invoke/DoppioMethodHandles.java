@@ -32,6 +32,36 @@ public final class DoppioMethodHandles {
 
   private static native void ensureInitialized0(Class<?> targetClass);
 
+  static String lookupToString(MethodHandles.Lookup lookup) {
+    Class<?> lookupClass = lookup.lookupClass();
+    String lookupName = lookupClass.getName();
+    int lookupModes = lookup.lookupModes();
+    if (lookup == MethodHandles.publicLookup()) {
+      return lookupName + "/publicLookup";
+    }
+    if (lookupClass == Object.class &&
+        lookupModes == (MethodHandles.Lookup.PUBLIC | MethodHandles.Lookup.PRIVATE |
+            MethodHandles.Lookup.PROTECTED | MethodHandles.Lookup.PACKAGE)) {
+      return "/trusted";
+    }
+    switch (lookupModes) {
+      case 0:
+        return lookupName + "/noaccess";
+      case MethodHandles.Lookup.PUBLIC:
+        return lookupName + "/public";
+      case MethodHandles.Lookup.PUBLIC | MethodHandles.Lookup.PACKAGE:
+        return lookupName + "/package";
+      case MethodHandles.Lookup.PUBLIC | MethodHandles.Lookup.PRIVATE |
+          MethodHandles.Lookup.PACKAGE:
+        return lookupName + "/private";
+      case MethodHandles.Lookup.PUBLIC | MethodHandles.Lookup.PRIVATE |
+          MethodHandles.Lookup.PROTECTED | MethodHandles.Lookup.PACKAGE:
+        return lookupName;
+      default:
+        return lookupName + "/" + Integer.toHexString(lookupModes);
+    }
+  }
+
   public static MethodHandle zero(Class<?> type) {
     Objects.requireNonNull(type);
     if (type == void.class) {

@@ -1152,6 +1152,11 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   public, same-class, and `privateLookupIn` lookups plus `Method.invoke` and
   `Lookup.unreflect` with HotSpot 17. Previous-lookup and named-module privilege
   semantics remain part of the broader lookup-mode limitation.
+- `MethodHandles.publicLookup().toString()` now reports the Java 9+
+  `java.lang.Object/publicLookup` diagnostic form through the existing parsed
+  `Lookup.toString()` slot. Full, private, package, public-mode, and no-access
+  forms are regression-tested; module-bit and previous-lookup-class forms
+  remain unsupported.
 - `MethodHandles.Lookup.ensureInitialized(Class<?>)` is a parsed public,
   non-native Java 15 method with exact generic and checked-exception metadata.
   Coverage includes null/primitive/void/array validation, access rejection

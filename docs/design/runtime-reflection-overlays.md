@@ -247,6 +247,14 @@ an appended method:
 - `Java9LookupHasPrivateAccess` compares those metadata surfaces and direct,
   reflected, and unreflected full/reduced lookup behavior with HotSpot 17.
 
+The existing parsed `Lookup.toString()` method is also body-replaced rather
+than duplicated. Its one-load bytecode delegates to `DoppioMethodHandles` so
+the Java 9 public-lookup singleton renders with `/publicLookup`, while selected
+legacy full/private/package/public/noaccess and trusted forms remain stable.
+`Java17MethodHandlesLookupModes` compares the public singleton plus selected
+full/private/package/public/noaccess forms with HotSpot 17. Module-bit and
+previous-lookup rendering remain outside this selected overlay.
+
 The Java 15 `MethodHandles.Lookup.ensureInitialized(Class<?>)` overlay extends
 the same instance-method table:
 
