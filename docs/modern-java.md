@@ -1146,12 +1146,23 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
 - `MethodHandles.Lookup.hasPrivateAccess()` promotes the bootstrap class's
   existing private method slot to an ordinary public Java 9 API and delegates
   to `hasFullPrivilegeAccess()`. It carries Java 14's exact classfile and
-  runtime-visible deprecation metadata. The supporting `java.lang.Deprecated`
-  overlay supplies Java 9's abstract `since()` and `forRemoval()` elements with
-  empty-string and false defaults. Coverage compares full, dropped-private,
-  public, same-class, and `privateLookupIn` lookups plus `Method.invoke` and
-  `Lookup.unreflect` with HotSpot 17. Previous-lookup and named-module privilege
-  semantics remain part of the broader lookup-mode limitation.
+  runtime-visible deprecation metadata. The modern class-library
+  `java.lang.Deprecated` definition supplies Java 9's abstract `since()` and
+  `forRemoval()` elements with empty-string and false defaults. Coverage
+  compares full, dropped-private, public, same-class, and `privateLookupIn`
+  lookups plus `Method.invoke` and `Lookup.unreflect` with HotSpot 17.
+  Previous-lookup and named-module privilege semantics remain part of the
+  broader lookup-mode limitation.
+- Java 17 `java.lang.annotation.ElementType` and `java.lang.Deprecated`
+  metadata are implemented through complete modern class-library definitions
+  rather than method-only bytecode overlays. `ElementType` exposes the exact
+  twelve-value order through `MODULE` and `RECORD_COMPONENT`; `Deprecated`
+  exposes exact element defaults plus `Documented`, runtime retention, and the
+  Java 9+ target set including `MODULE`. `Java17DeprecatedMetadata` compares
+  enum fields, ordinals, clone behavior, `valueOf` failures,
+  `RECORD_COMPONENT` target materialization, method metadata, annotation
+  metadata, defaults, and an explicit annotation proxy with HotSpot 17.
+  Difficulty: low.
 - `MethodHandles.publicLookup().toString()` now reports the Java 9+
   `java.lang.Object/publicLookup` diagnostic form through the existing parsed
   `Lookup.toString()` slot. Exact `MODULE`, `UNCONDITIONAL`, and `ORIGINAL`

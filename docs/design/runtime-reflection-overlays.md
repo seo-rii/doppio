@@ -240,12 +240,22 @@ an appended method:
   modern `hasFullPrivilegeAccess()` slot;
 - the method carries both the classfile `Deprecated` attribute and the exact
   runtime-visible `@Deprecated(since = "14", forRemoval = false)` view;
-- `java.lang.Deprecated` itself receives Java 9's abstract `since()` and
-  `forRemoval()` elements with exact empty-string and false annotation defaults,
-  allowing the Java 8 reflection implementation to materialize modern
-  annotation proxies;
+- the modern class library replaces `java.lang.Deprecated` with a complete
+  annotation definition containing Java 9's abstract `since()` and
+  `forRemoval()` elements, exact defaults, and class-level annotations, allowing
+  the Java 8 reflection implementation to materialize modern annotation proxies;
 - `Java9LookupHasPrivateAccess` compares those metadata surfaces and direct,
   reflected, and unreflected full/reduced lookup behavior with HotSpot 17.
+
+`Deprecated` is intentionally not transformed in `ClassLoader.ts`. A
+method-only transformer could not add `ElementType.MODULE` to its `Target`
+annotation while the Java 8 `ElementType` enum remained loaded. Complete modern
+class-library definitions replace both classes together: `ElementType` supplies
+the Java 17 `MODULE` and `RECORD_COMPONENT` constants in their exact ordinal
+positions, and `Deprecated` carries the exact `Documented`, runtime-retention,
+and target annotations. `Java17DeprecatedMetadata` covers both public API and
+reflection shape, including a materialized `RECORD_COMPONENT` target, so future
+bootstrap packaging changes cannot silently restore the Java 8 definitions.
 
 The existing parsed `Lookup.toString()` method is also body-replaced rather
 than duplicated. Its one-load bytecode delegates to `DoppioMethodHandles` so

@@ -37,6 +37,10 @@ keeping Doppio's Java 8-era `java.lang.Class` implementation in place.
 - `RecordComponent.getAnnotation()`, `getAnnotations()`, and
   `getDeclaredAnnotations()` parse runtime-visible component annotations using
   the existing JDK annotation parser and the declaring record constant pool.
+- The modern `ElementType` definition exposes `RECORD_COMPONENT` at its exact
+  Java 17 ordinal. `Java17DeprecatedMetadata` resolves a runtime `Target`
+  annotation containing that value, preventing the Java 8 bootstrap enum from
+  silently replacing the modern definition.
 
 ## Required API Surface
 

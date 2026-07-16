@@ -195,10 +195,12 @@ The replacement follows the Java 17 contract:
    false.
 
 Reading that annotation also requires Java 9's additions to the annotation
-type itself. The bootstrap overlay adds abstract `Deprecated.since()` and
-`forRemoval()` elements with `AnnotationDefault` values `""` and `false`;
-otherwise a correctly encoded modern annotation fails when Java reflection
-builds its proxy against the Java 8 zero-method annotation interface.
+type itself. The modern class library replaces `java.lang.Deprecated` with a
+complete definition containing abstract `since()` and `forRemoval()` elements,
+`AnnotationDefault` values `""` and `false`, and its modern class-level
+annotations; otherwise a correctly encoded modern annotation fails when Java
+reflection builds its proxy against the Java 8 zero-method annotation
+interface.
 
 The focused fixture compares direct, reflective, and unreflected invocation,
 full and reduced lookup modes, `publicLookup()`, same-class `in`, and

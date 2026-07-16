@@ -1,0 +1,11 @@
+elements:TYPE,FIELD,METHOD,PARAMETER,CONSTRUCTOR,LOCAL_VARIABLE,ANNOTATION_TYPE,PACKAGE,TYPE_PARAMETER,TYPE_USE,MODULE,RECORD_COMPONENT
+enum-shape:true
+enum-copy:true
+enum-constants-copy:true
+new-elements:true:true:true:true
+value-of-failures:IllegalArgumentException:NullPointerException
+record-target:true
+deprecated-annotations:true
+deprecated-target:CONSTRUCTOR,FIELD,LOCAL_VARIABLE,METHOD,PACKAGE,MODULE,PARAMETER,TYPE
+deprecated-elements:true
+deprecated-explicit:17:true:true

@@ -1829,63 +1829,6 @@ function addJavaLangRuntimeModernOverlays(data: Buffer): Buffer {
   ]);
 }
 
-function addJavaLangDeprecatedModernOverlays(data: Buffer): Buffer {
-  var cp = constantPoolEnd(data),
-    sinceNameIndex = cp.count,
-    stringDescriptorIndex = cp.count + 1,
-    annotationDefaultNameIndex = cp.count + 2,
-    emptyStringIndex = cp.count + 3,
-    forRemovalNameIndex = cp.count + 4,
-    booleanDescriptorIndex = cp.count + 5,
-    falseIntegerIndex = cp.count + 6,
-    extraConstants = Buffer.concat([
-      utf8Constant('since'),
-      utf8Constant('()Ljava/lang/String;'),
-      utf8Constant('AnnotationDefault'),
-      utf8Constant(''),
-      utf8Constant('forRemoval'),
-      utf8Constant('()Z'),
-      Buffer.concat([Buffer.from([3]), u4(0)])
-    ]),
-    withConstants = Buffer.concat([
-      data.slice(0, 8),
-      u2(cp.count + 7),
-      data.slice(10, cp.offset),
-      extraConstants,
-      data.slice(cp.offset)
-    ]),
-    methods = methodsInfo(withConstants, cp.offset + extraConstants.length),
-    sinceMethod = Buffer.concat([
-      u2(0x0401),
-      u2(sinceNameIndex),
-      u2(stringDescriptorIndex),
-      u2(1),
-      u2(annotationDefaultNameIndex),
-      u4(3),
-      Buffer.from([0x73]),
-      u2(emptyStringIndex)
-    ]),
-    forRemovalMethod = Buffer.concat([
-      u2(0x0401),
-      u2(forRemovalNameIndex),
-      u2(booleanDescriptorIndex),
-      u2(1),
-      u2(annotationDefaultNameIndex),
-      u4(3),
-      Buffer.from([0x5a]),
-      u2(falseIntegerIndex)
-    ]);
-
-  return Buffer.concat([
-    withConstants.slice(0, methods.countOffset),
-    u2(methods.count + 2),
-    withConstants.slice(methods.countOffset + 2, methods.endOffset),
-    sinceMethod,
-    forRemovalMethod,
-    withConstants.slice(methods.endOffset)
-  ]);
-}
-
 function addJavaLangCharacterModernOverlays(data: Buffer): Buffer {
   var cp = constantPoolEnd(data),
     methodNameIndex = cp.count,
@@ -3295,9 +3238,6 @@ export class BootstrapClassLoader extends ClassLoader {
         }
         if (typeStr === 'Ljava/lang/Runtime;') {
           clsData = addJavaLangRuntimeModernOverlays(clsData);
-        }
-        if (typeStr === 'Ljava/lang/Deprecated;') {
-          clsData = addJavaLangDeprecatedModernOverlays(clsData);
         }
         if (typeStr === 'Ljava/lang/Character;') {
           clsData = addJavaLangCharacterModernOverlays(clsData);
