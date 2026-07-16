@@ -229,6 +229,24 @@ The Java 9 `MethodHandles.Lookup.findClass(String)` and
   initialization timing, primitive/void/array/null/missing inputs, exception
   ordering, reflection, and unreflected handles with HotSpot 17.
 
+`MethodHandles.Lookup.hasPrivateAccess()` is a replacement overlay rather than
+an appended method:
+
+- the Java 8 bootstrap class already has a private `hasPrivateAccess()Z` used
+  by its own lookup checks, so the transformer rewrites that method-info entry
+  in place and leaves all existing symbolic references valid;
+- the replacement is public, concrete, non-native, has no parameters,
+  exceptions, generic signature, or parameter metadata, and delegates to the
+  modern `hasFullPrivilegeAccess()` slot;
+- the method carries both the classfile `Deprecated` attribute and the exact
+  runtime-visible `@Deprecated(since = "14", forRemoval = false)` view;
+- `java.lang.Deprecated` itself receives Java 9's abstract `since()` and
+  `forRemoval()` elements with exact empty-string and false annotation defaults,
+  allowing the Java 8 reflection implementation to materialize modern
+  annotation proxies;
+- `Java9LookupHasPrivateAccess` compares those metadata surfaces and direct,
+  reflected, and unreflected full/reduced lookup behavior with HotSpot 17.
+
 The Java 15 `MethodHandles.Lookup.ensureInitialized(Class<?>)` overlay extends
 the same instance-method table:
 

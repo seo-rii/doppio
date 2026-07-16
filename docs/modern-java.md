@@ -1017,6 +1017,10 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   inaccessible array-component rejection, primitive/void/array/null/missing
   inputs, initialization delay, exception ordering, and direct/reflected/
   unreflected invocation,
+  selected `Lookup.hasPrivateAccess()` public/deprecated metadata and
+  full/reduced/public/private lookup behavior through direct, reflected, and
+  unreflected invocation, plus Java 9 `Deprecated.since()`/`forRemoval()`
+  annotation element defaults,
   selected `MethodHandle.asType` reference cast, return widening-to-`Object`,
   non-void return dropping-to-`void`, `void` return-to-`null` reference
   adaptation, primitive argument and return widening, primitive return boxing,
@@ -1139,6 +1143,15 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   now rejects primitive and void binary names before descriptor conversion.
   SecurityManager checks, previous-lookup module edges, exact modern lookup
   mode values, and named-module qualified exports remain unsupported.
+- `MethodHandles.Lookup.hasPrivateAccess()` promotes the bootstrap class's
+  existing private method slot to an ordinary public Java 9 API and delegates
+  to `hasFullPrivilegeAccess()`. It carries Java 14's exact classfile and
+  runtime-visible deprecation metadata. The supporting `java.lang.Deprecated`
+  overlay supplies Java 9's abstract `since()` and `forRemoval()` elements with
+  empty-string and false defaults. Coverage compares full, dropped-private,
+  public, same-class, and `privateLookupIn` lookups plus `Method.invoke` and
+  `Lookup.unreflect` with HotSpot 17. Previous-lookup and named-module privilege
+  semantics remain part of the broader lookup-mode limitation.
 - `MethodHandles.Lookup.ensureInitialized(Class<?>)` is a parsed public,
   non-native Java 15 method with exact generic and checked-exception metadata.
   Coverage includes null/primitive/void/array validation, access rejection

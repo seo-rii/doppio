@@ -1,0 +1,11 @@
+metadata:true:true
+deprecated-type:true
+direct:true
+same-class:true
+drop-private:false
+public:false
+private-lookup-in:true
+modes:true:false
+reflect:true:false
+unreflect:true:false
+handle-type:true:(Ljava/lang/invoke/MethodHandles$Lookup;)Z

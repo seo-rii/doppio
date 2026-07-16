@@ -174,6 +174,41 @@ matrices remain separate work. A scan of the cached Kotlin 2.4.0 and Scala
 2.13.18 artifacts found no direct calls to these two methods; this slice closes
 the low-risk Java 9 API gap rather than a current compiler startup blocker.
 
+## Lookup Private Access Probe
+
+Java 9 promoted the Java 8 bootstrap class's private
+`Lookup.hasPrivateAccess()` helper to a public API. The overlay must therefore
+replace that existing method-info entry instead of appending a duplicate with
+the same name and descriptor. Existing Java 8 call sites continue resolving
+the same slot after its access flag and body are modernized.
+
+The replacement follows the Java 17 contract:
+
+1. Keep descriptor `()Z`, an ordinary public concrete method, no parameters,
+   no checked exceptions, no generic signature, and no parameter metadata.
+2. Delegate to `hasFullPrivilegeAccess()`. This intentionally checks Doppio's
+   selected full-privilege lookup model rather than independently testing only
+   the legacy `PRIVATE` bit.
+3. Preserve both deprecation surfaces introduced in Java 14: the zero-length
+   `Deprecated` classfile attribute and a runtime-visible
+   `@Deprecated(since = "14")` annotation whose default `forRemoval` remains
+   false.
+
+Reading that annotation also requires Java 9's additions to the annotation
+type itself. The bootstrap overlay adds abstract `Deprecated.since()` and
+`forRemoval()` elements with `AnnotationDefault` values `""` and `false`;
+otherwise a correctly encoded modern annotation fails when Java reflection
+builds its proxy against the Java 8 zero-method annotation interface.
+
+The focused fixture compares direct, reflective, and unreflected invocation,
+full and reduced lookup modes, `publicLookup()`, same-class `in`, and
+`privateLookupIn` with HotSpot 17. Previous-lookup module edges and exact named
+module privilege semantics remain coupled to the broader lookup-mode work.
+
+The 2026-07-17 validation completed the full Java 9-26 runtime suite in 5
+minutes 34 seconds, Kotlin 2.4.0 MethodHandles compiler smoke in 215 seconds,
+and Scala 2.13.18 MethodHandles compiler smoke in 100 seconds.
+
 ## Lookup Class Initialization
 
 Java 15 added `Lookup.ensureInitialized(Class<?>)`. The parsed public method
