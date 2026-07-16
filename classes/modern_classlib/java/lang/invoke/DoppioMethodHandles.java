@@ -32,16 +32,17 @@ public final class DoppioMethodHandles {
 
   private static native void ensureInitialized0(Class<?> targetClass);
 
+  static native int lookupModes(MethodHandles.Lookup lookup);
+
   static String lookupToString(MethodHandles.Lookup lookup) {
     Class<?> lookupClass = lookup.lookupClass();
     String lookupName = lookupClass.getName();
-    int lookupModes = lookup.lookupModes();
+    int lookupModes = lookupModes(lookup);
     if (lookup == MethodHandles.publicLookup()) {
       return lookupName + "/publicLookup";
     }
     if (lookupClass == Object.class &&
-        lookupModes == (MethodHandles.Lookup.PUBLIC | MethodHandles.Lookup.PRIVATE |
-            MethodHandles.Lookup.PROTECTED | MethodHandles.Lookup.PACKAGE)) {
+        lookupModes == 95) {
       return "/trusted";
     }
     switch (lookupModes) {
@@ -49,13 +50,14 @@ public final class DoppioMethodHandles {
         return lookupName + "/noaccess";
       case MethodHandles.Lookup.PUBLIC:
         return lookupName + "/public";
-      case MethodHandles.Lookup.PUBLIC | MethodHandles.Lookup.PACKAGE:
+      case 17:
+        return lookupName + "/module";
+      case 25:
         return lookupName + "/package";
-      case MethodHandles.Lookup.PUBLIC | MethodHandles.Lookup.PRIVATE |
-          MethodHandles.Lookup.PACKAGE:
+      case 27:
         return lookupName + "/private";
-      case MethodHandles.Lookup.PUBLIC | MethodHandles.Lookup.PRIVATE |
-          MethodHandles.Lookup.PROTECTED | MethodHandles.Lookup.PACKAGE:
+      case 31:
+      case 95:
         return lookupName;
       default:
         return lookupName + "/" + Integer.toHexString(lookupModes);

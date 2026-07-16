@@ -1141,8 +1141,8 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   exception ordering, initialization delay, exact returned identity,
   `Method.invoke`, and `Lookup.unreflect`. Doppio's Java `Class.forName` bridge
   now rejects primitive and void binary names before descriptor conversion.
-  SecurityManager checks, previous-lookup module edges, exact modern lookup
-  mode values, and named-module qualified exports remain unsupported.
+  SecurityManager checks, previous-lookup module edges, cross-module mode
+  transitions, and named-module qualified exports remain unsupported.
 - `MethodHandles.Lookup.hasPrivateAccess()` promotes the bootstrap class's
   existing private method slot to an ordinary public Java 9 API and delegates
   to `hasFullPrivilegeAccess()`. It carries Java 14's exact classfile and
@@ -1154,9 +1154,11 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   semantics remain part of the broader lookup-mode limitation.
 - `MethodHandles.publicLookup().toString()` now reports the Java 9+
   `java.lang.Object/publicLookup` diagnostic form through the existing parsed
-  `Lookup.toString()` slot. Full, private, package, public-mode, and no-access
-  forms are regression-tested; module-bit and previous-lookup-class forms
-  remain unsupported.
+  `Lookup.toString()` slot. Exact `MODULE`, `UNCONDITIONAL`, and `ORIGINAL`
+  field metadata plus selected raw original/same/nested/private/public and all
+  single-mode drop values are covered. Full, private, package, module,
+  public-mode, and no-access strings are regression-tested; named-module and
+  previous-lookup-class transitions remain unsupported.
 - `MethodHandles.Lookup.ensureInitialized(Class<?>)` is a parsed public,
   non-native Java 15 method with exact generic and checked-exception metadata.
   Coverage includes null/primitive/void/array validation, access rejection

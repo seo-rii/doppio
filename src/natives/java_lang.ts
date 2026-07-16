@@ -2417,6 +2417,7 @@ export default function (): any {
       rv = new lookupCons(thread);
       rv['java/lang/invoke/MethodHandles$Lookup/lookupClass'] = targetClass;
       rv['java/lang/invoke/MethodHandles$Lookup/allowedModes'] = 0x000f;
+      (<any> rv)[LOOKUP_MODERN_MODES] = 0x001f;
       return rv;
     }
 
@@ -2608,12 +2609,41 @@ export default function (): any {
     LOOKUP_PRIVATE = 0x0002,
     LOOKUP_PROTECTED = 0x0004,
     LOOKUP_PACKAGE = 0x0008,
+    LOOKUP_MODULE = 0x0010,
+    LOOKUP_UNCONDITIONAL = 0x0020,
+    LOOKUP_ORIGINAL = 0x0040,
+    LOOKUP_MODERN_MODES = 'java/lang/invoke/MethodHandles$Lookup/doppioModernModes',
     lookupClassDefinitions: Array<{loader: ClassLoader; typeStr: string}> = [];
 
   class java_lang_invoke_MethodHandles$Lookup {
     public static getAllowedModes(lookup: JVMTypes.java_lang_invoke_MethodHandles$Lookup): number {
       var modes = lookup['java/lang/invoke/MethodHandles$Lookup/allowedModes'];
       return modes === -1 ? 0x000f : modes;
+    }
+
+    public static getModernModes(lookup: JVMTypes.java_lang_invoke_MethodHandles$Lookup): number {
+      var storedModes = (<any> lookup)[LOOKUP_MODERN_MODES],
+        legacyModes: number;
+      if (typeof storedModes === 'number') {
+        return storedModes;
+      }
+
+      legacyModes = java_lang_invoke_MethodHandles$Lookup.getAllowedModes(lookup);
+      if (java_lang_invoke_MethodHandles$Lookup.isPublicLookup(lookup, legacyModes)) {
+        return LOOKUP_UNCONDITIONAL;
+      }
+      switch (legacyModes) {
+        case 0x000f:
+          return 0x005f;
+        case 0x000b:
+          return 0x001f;
+        case 0x0009:
+          return 0x0019;
+        case LOOKUP_PUBLIC:
+          return LOOKUP_PUBLIC | LOOKUP_MODULE;
+        default:
+          return legacyModes;
+      }
     }
 
     private static isPublicLookup(lookup: JVMTypes.java_lang_invoke_MethodHandles$Lookup, modes: number): boolean {
@@ -2635,9 +2665,9 @@ export default function (): any {
       thread: JVMThread,
       javaThis: JVMTypes.java_lang_invoke_MethodHandles$Lookup
     ): number {
-      var modes = java_lang_invoke_MethodHandles$Lookup.getAllowedModes(javaThis);
+      var modes = java_lang_invoke_MethodHandles$Lookup.getModernModes(javaThis);
       return (modes & LOOKUP_PRIVATE) !== 0 &&
-        (modes & LOOKUP_PACKAGE) !== 0 ? 1 : 0;
+        (modes & LOOKUP_MODULE) !== 0 ? 1 : 0;
     }
 
     public static 'dropLookupMode(I)Ljava/lang/invoke/MethodHandles$Lookup;'(
@@ -2645,8 +2675,10 @@ export default function (): any {
       javaThis: JVMTypes.java_lang_invoke_MethodHandles$Lookup,
       modeToDrop: number
     ): JVMTypes.java_lang_invoke_MethodHandles$Lookup {
-      var modes = java_lang_invoke_MethodHandles$Lookup.getAllowedModes(javaThis),
-        newModes: number,
+      var legacyModes = java_lang_invoke_MethodHandles$Lookup.getAllowedModes(javaThis),
+        modernModes = java_lang_invoke_MethodHandles$Lookup.getModernModes(javaThis),
+        newModernModes: number,
+        newLegacyModes: number,
         lookupClass: ReferenceClassData<JVMTypes.java_lang_Object>,
         lookupCons: any,
         rv: JVMTypes.java_lang_invoke_MethodHandles$Lookup;
@@ -2657,49 +2689,62 @@ export default function (): any {
         return;
       }
 
-      if (java_lang_invoke_MethodHandles$Lookup.isPublicLookup(javaThis, modes)) {
+      if (java_lang_invoke_MethodHandles$Lookup.isPublicLookup(javaThis, legacyModes)) {
         return javaThis;
       }
 
       switch (modeToDrop) {
-        case 0x0001:
-          newModes = 0;
+        case LOOKUP_PUBLIC:
+          newModernModes = 0;
           break;
-        case 0x0002:
-          newModes = modes & ~(LOOKUP_PRIVATE | LOOKUP_PROTECTED);
+        case LOOKUP_PRIVATE:
+          newModernModes = modernModes &
+            ~(LOOKUP_PRIVATE | LOOKUP_PROTECTED | LOOKUP_ORIGINAL);
           break;
-        case 0x0004:
-          newModes = modes & ~LOOKUP_PROTECTED;
+        case LOOKUP_PROTECTED:
+        case LOOKUP_UNCONDITIONAL:
+        case LOOKUP_ORIGINAL:
+          newModernModes = modernModes &
+            ~(LOOKUP_PROTECTED | LOOKUP_UNCONDITIONAL | LOOKUP_ORIGINAL);
           break;
-        case 0x0008:
-          newModes = modes & ~(LOOKUP_PRIVATE | LOOKUP_PROTECTED | LOOKUP_PACKAGE);
+        case LOOKUP_PACKAGE:
+          newModernModes = modernModes &
+            ~(LOOKUP_PRIVATE | LOOKUP_PROTECTED | LOOKUP_PACKAGE |
+              LOOKUP_UNCONDITIONAL | LOOKUP_ORIGINAL);
           break;
-        case 0x0010:
-          newModes = modes & LOOKUP_PUBLIC;
-          break;
-        case 0x0020:
-        case 0x0040:
-          newModes = modes & ~LOOKUP_PROTECTED;
+        case LOOKUP_MODULE:
+          newModernModes = modernModes &
+            ~(LOOKUP_PRIVATE | LOOKUP_PROTECTED | LOOKUP_PACKAGE | LOOKUP_MODULE |
+              LOOKUP_UNCONDITIONAL | LOOKUP_ORIGINAL);
           break;
         default:
           thread.throwNewException('Ljava/lang/IllegalArgumentException;', 'mode is not a valid lookup mode');
           return;
       }
 
-      if (newModes === modes) {
+      if (newModernModes === modernModes) {
         return javaThis;
       }
 
+      newLegacyModes = newModernModes & 0x000f;
       lookupClass = <ReferenceClassData<JVMTypes.java_lang_Object>> javaThis.getClass();
       lookupCons = lookupClass.getConstructor(thread);
       rv = new lookupCons(thread);
       rv['java/lang/invoke/MethodHandles$Lookup/lookupClass'] = javaThis['java/lang/invoke/MethodHandles$Lookup/lookupClass'];
-      rv['java/lang/invoke/MethodHandles$Lookup/allowedModes'] = newModes;
+      rv['java/lang/invoke/MethodHandles$Lookup/allowedModes'] = newLegacyModes;
+      (<any> rv)[LOOKUP_MODERN_MODES] = newModernModes;
       return rv;
     }
   }
 
   class java_lang_invoke_DoppioMethodHandles {
+    public static 'lookupModes(Ljava/lang/invoke/MethodHandles$Lookup;)I'(
+      thread: JVMThread,
+      lookup: JVMTypes.java_lang_invoke_MethodHandles$Lookup
+    ): number {
+      return java_lang_invoke_MethodHandles$Lookup.getModernModes(lookup);
+    }
+
     public static 'ensureInitialized0(Ljava/lang/Class;)V'(
       thread: JVMThread,
       targetClass: JVMTypes.java_lang_Class

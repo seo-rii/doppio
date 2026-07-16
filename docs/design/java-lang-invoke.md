@@ -66,7 +66,7 @@ The fixture matrix tracks the covered smoke tests and the next fixtures to add:
 | Field lookup | Covered | `findStaticGetter`/`findStaticSetter` and `findGetter`/`findSetter` for selected reference and primitive fields | Getter result and setter side effect match the native JVM for public, package-private, and nestmate-private `String` fields plus public static/instance `int` and `long` fields; public final static/instance setter lookup fails with `IllegalAccessException` | `MethodHandleNatives` field offset/base plus `Unsafe` field access |
 | Constructor lookup | Covered | `findConstructor` for public, package-private, and nestmate-private constructors | Constructed receiver state and handle type match the native JVM; non-nestmate private lookup fails | `MethodHandleNatives.resolve` plus constructor bridge path |
 | Reflective unreflect lookup | Covered | `unreflect`, `unreflectSpecial`, `unreflectConstructor`, `unreflectGetter`, `unreflectSetter`, and `MethodHandles.reflectAs` for selected public members plus private non-nestmate and nestmate members | Public reflective method/constructor/field handles invoke, report native-compatible types, selected superclass and interface-default special handles dispatch non-virtually with native-compatible descriptors, and selected direct handles round-trip back to reflective members; private non-nestmate reflective members fail with `IllegalAccessException`; private nestmate method, constructor, and field unreflect succeeds | `sun.invoke.util.VerifyAccess` nestmate shim plus `MethodHandleNatives.init`, `MemberName` VM-target refresh, and `linkToSpecial` |
-| Private lookup factory | Partial | `MethodHandles.privateLookupIn` into a same-package target with private constructor, method, and field access, plus selected Java 9+ lookup-mode queries | Returned lookup reports the target class, retains Java 8 private/package lookup modes, accesses private static/instance methods and fields from the caller and a peer class, rejects public lookup plus primitive/array targets, returns null `previousLookupClass`, reports full-privilege access for full/private lookups, and supports selected `dropLookupMode` reductions | class-load native method injection plus `java/lang/invoke/MethodHandles` and `MethodHandles$Lookup` native overlays |
+| Private lookup factory | Partial | `MethodHandles.privateLookupIn` into a same-package target with private constructor, method, and field access, plus selected Java 9+ lookup-mode queries | Returned lookup reports the target class, exposes exact selected unnamed-module mode fields and raw values, accesses private static/instance methods and fields from the caller and a peer class, rejects public lookup plus primitive/array targets, returns null `previousLookupClass`, reports full-privilege access for full/private lookups, and supports exact selected `dropLookupMode` reductions | class-load native method injection plus `java/lang/invoke/MethodHandles` and `MethodHandles$Lookup` parsed/native overlays |
 | `asType` adaptation | Partial | Adapt public static and virtual method handles across selected reference and primitive signatures | Reference cast, return widening to `Object`, non-void return dropping to `void`, `void` return adaptation to `null` reference, primitive argument and return widening, primitive return boxing, unboxing, arity mismatch, and runtime cast failure match the native JVM | existing Java 8 method-handle adapter path |
 | Method-handle combinators | Partial | Compose same-class method handles with selected JDK combinators | `identity`, `constant`, `bindTo`, `insertArguments`, `dropArguments`, `filterArguments`, `filterReturnValue`, `permuteArguments`, `guardWithTest`, `catchException`, `exactInvoker`, `invoker`, `spreadInvoker`, `collectArguments`, zero-position and selected nonzero-position `foldArguments`, `explicitCastArguments`, `arrayElementGetter`, `arrayElementSetter`, `throwException`, selected `MethodHandle.asCollector`, `asSpreader`, `asVarargsCollector`, and `asFixedArity` adapter flows, plus Java 17 public overlays `zero`, `empty`, `arrayLength`, `arrayConstructor`, `dropArgumentsToMatch`, `dropReturn`, selected `tryFinally` including fixed-arity varargs target/cleanup normalization, `tableSwitch`, and `iteratedLoop` flows including `void` table-switch targets and no-arg explicit iterator loops, selected `whileLoop`/`doWhileLoop`/`countedLoop` non-void state plus void side-effect loops, fixed-arity component normalization for tested convenience-loop varargs shapes, and selected single-clause `loop` state flows produce native-compatible results and descriptor strings for the tested shapes | existing Java 8 method-handle adapter/combinator path plus class-load native overlay helpers |
 | Nominal method-handle descriptors | Partial | `MethodHandleDesc.resolveConstantDesc` and `DirectMethodHandleDesc.resolveConstantDesc` for public same-class and selected JDK-class static/virtual/special/interface-special methods, constructors, static/instance fields, and `asType` | Resolved handles invoke, report native-compatible types, mutate fields, and propagate missing-method failures | class-library shim delegating to `MethodHandles.Lookup` |
@@ -169,8 +169,8 @@ The implementation keeps loading and access as separate ordered operations:
 
 The tested scope is the unnamed-module model and the existing selected lookup
 mode implementation. SecurityManager checks, previous-lookup module edges,
-exact Java 9+ `MODULE`/`ORIGINAL` mode values, and named-module qualified-export
-matrices remain separate work. A scan of the cached Kotlin 2.4.0 and Scala
+cross-module mode transitions, and named-module qualified-export matrices
+remain separate work. A scan of the cached Kotlin 2.4.0 and Scala
 2.13.18 artifacts found no direct calls to these two methods; this slice closes
 the low-risk Java 9 API gap rather than a current compiler startup blocker.
 
@@ -219,11 +219,13 @@ body with a package-private helper call so all existing method references and
 reflection metadata remain unchanged.
 
 The helper checks public-lookup identity before interpreting the selected
-lookup modes. It preserves the existing full, private, package, public,
-no-access, and trusted forms for Doppio's Java 8-compatible mode model. Exact
-Java 9+ `MODULE`, `UNCONDITIONAL`, `ORIGINAL`, and previous-lookup-class string
-combinations remain part of the broader lookup-mode design rather than being
-inferred from mode bits that the runtime does not yet retain.
+lookup modes. It covers full, private, package, module, public, no-access, and
+trusted forms in the selected unnamed-module model. Previous-lookup-class and
+named-module teleporting forms remain part of the broader lookup-mode design.
+
+The exact selected mode representation, field metadata, transition table, and
+residual limitations are specified in
+`docs/design/methodhandles-lookup-modes.md`.
 
 The 2026-07-17 regression run completed the full Java 9-26 runtime suite in 4
 minutes 44 seconds, Kotlin 2.4.0 MethodHandles compiler smoke in 230 seconds,
@@ -291,12 +293,14 @@ seconds, and Scala MethodHandles smoke in 99 seconds.
   caller and peer lookup into a target class, private constructor, private
   static/instance method, private static/instance field access, public-lookup
   failure, and primitive/array target rejection. The same surface now covers
-  selected Java 9+ lookup-mode APIs: `previousLookupClass()` returns null for
-  the tested local lookups, `hasFullPrivilegeAccess()` distinguishes full and
-  reduced lookups, and `dropLookupMode(int)` supports selected
-  PUBLIC/PRIVATE/PROTECTED/PACKAGE reductions plus tested invalid-mode
-  failures. This is currently a minimal native overlay on the Java 8 `Lookup`
-  class rather than a complete Java 9+ lookup-mode implementation. Selected
+  selected Java 9+ lookup-mode APIs: `MODULE`, `UNCONDITIONAL`, and `ORIGINAL`
+  expose exact public constant metadata; `lookupModes()` reports exact values
+  for original, same/nested `in`, private, public, and reduced local lookups;
+  `previousLookupClass()` returns null for the tested local lookups;
+  `hasFullPrivilegeAccess()` distinguishes full and reduced lookups; and
+  `dropLookupMode(int)` covers all seven single mode values plus tested invalid
+  inputs. Named-module and previous-lookup transitions remain incomplete.
+  Selected
   `MethodHandle.asType` success paths are covered for
   reference casts, return widening to `Object`, non-void return dropping to
   `void`, `void` return adaptation to `null` reference, primitive argument and
@@ -460,12 +464,11 @@ seconds, and Scala MethodHandles smoke in 99 seconds.
 
 - Whether to emulate Java 17 `MethodHandles.Lookup` access modes exactly or map
   them onto Doppio's existing class/member access helpers first.
-- `MethodHandles.privateLookupIn` currently injects a native method into the
-  Java 8 `MethodHandles` class and grants Java 8 full private/package lookup
-  modes for accepted classpath targets. A small `MethodHandles$Lookup` overlay
-  now covers selected `previousLookupClass`, `hasFullPrivilegeAccess`, and
-  `dropLookupMode` behavior, but it does not yet expose exact Java 9+
-  `Lookup.MODULE`, `UNCONDITIONAL`, `ORIGINAL`, or raw `lookupModes()` parity.
+- `MethodHandles.privateLookupIn` and the `MethodHandles$Lookup` overlay now
+  expose selected exact Java 17 mode fields, raw values, privilege probes, and
+  drop transitions while retaining Java 8 low bits for existing access
+  bytecode. Named-module teleporting lookups, non-null previous lookup classes,
+  and cross-module `Lookup.in` transitions remain open.
 - Whether broad `MethodHandleDesc.resolveConstantDesc` should rely entirely on
   `Lookup` once access checks converge, or keep descriptor-specific guards for
   unsupported handle kinds and cross-package/protected receiver shapes.

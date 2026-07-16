@@ -250,10 +250,13 @@ an appended method:
 The existing parsed `Lookup.toString()` method is also body-replaced rather
 than duplicated. Its one-load bytecode delegates to `DoppioMethodHandles` so
 the Java 9 public-lookup singleton renders with `/publicLookup`, while selected
-legacy full/private/package/public/noaccess and trusted forms remain stable.
-`Java17MethodHandlesLookupModes` compares the public singleton plus selected
-full/private/package/public/noaccess forms with HotSpot 17. Module-bit and
-previous-lookup rendering remain outside this selected overlay.
+full/private/package/module/public/noaccess and trusted forms remain stable.
+The same transformer appends exact `MODULE`, `UNCONDITIONAL`, and `ORIGINAL`
+constant fields and body-replaces the existing parsed `lookupModes()` method
+with a narrow sidecar query. `Java17MethodHandlesLookupModes` compares field and
+method metadata, raw values, privilege probes, selected `in`/private/public
+lookups, every valid single-mode drop, and strings with HotSpot 17.
+Previous-lookup and named-module teleporting forms remain outside this overlay.
 
 The Java 15 `MethodHandles.Lookup.ensureInitialized(Class<?>)` overlay extends
 the same instance-method table:

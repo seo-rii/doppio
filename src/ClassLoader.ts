@@ -2526,6 +2526,14 @@ function addJavaLangInvokeMethodHandlesLookupModernOverlays(data: Buffer): Buffe
     deprecatedDescriptorIndex = addUtf8('Ljava/lang/Deprecated;'),
     sinceNameIndex = addUtf8('since'),
     sinceValueIndex = addUtf8('14'),
+    constantValueNameIndex = addUtf8('ConstantValue'),
+    integerDescriptorIndex = addUtf8('I'),
+    moduleFieldNameIndex = addUtf8('MODULE'),
+    unconditionalFieldNameIndex = addUtf8('UNCONDITIONAL'),
+    originalFieldNameIndex = addUtf8('ORIGINAL'),
+    moduleValueIndex = addConstant(Buffer.concat([Buffer.from([3]), u4(16)])),
+    unconditionalValueIndex = addConstant(Buffer.concat([Buffer.from([3]), u4(32)])),
+    originalValueIndex = addConstant(Buffer.concat([Buffer.from([3]), u4(64)])),
     helperClassIndex = addClass('java/lang/invoke/DoppioMethodHandles'),
     verifyAccessClassIndex = addClass('sun/invoke/util/VerifyAccess'),
     lookupClassIndex = addClass('java/lang/invoke/MethodHandles$Lookup'),
@@ -2534,6 +2542,9 @@ function addJavaLangInvokeMethodHandlesLookupModernOverlays(data: Buffer): Buffe
     lookupToStringMethodIndex = addMethodRef(
       helperClassIndex, 'lookupToString',
       '(Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/String;'),
+    lookupModesMethodIndex = addMethodRef(
+      helperClassIndex, 'lookupModes',
+      '(Ljava/lang/invoke/MethodHandles$Lookup;)I'),
     illegalAccessExceptionClassIndex = addClass('java/lang/IllegalAccessException'),
     classNotFoundExceptionClassIndex = addClass('java/lang/ClassNotFoundException'),
     parsedOverlays: Array<{
@@ -2596,6 +2607,40 @@ function addJavaLangInvokeMethodHandlesLookupModernOverlays(data: Buffer): Buffe
       data.slice(10, cp.offset),
       extraConstants,
       data.slice(cp.offset)
+    ]);
+
+  var modernModeFields: Array<{nameIndex: number; valueIndex: number}> = [
+      {nameIndex: moduleFieldNameIndex, valueIndex: moduleValueIndex},
+      {nameIndex: unconditionalFieldNameIndex, valueIndex: unconditionalValueIndex},
+      {nameIndex: originalFieldNameIndex, valueIndex: originalValueIndex}
+    ],
+    modernModeFieldData = Buffer.concat(modernModeFields.map((field): Buffer => {
+      return Buffer.concat([
+        u2(0x0019),
+        u2(field.nameIndex),
+        u2(integerDescriptorIndex),
+        u2(1),
+        u2(constantValueNameIndex),
+        u4(2),
+        u2(field.valueIndex)
+      ]);
+    })),
+    classBodyOffset = cp.offset + extraConstants.length,
+    interfacesCountOffset = classBodyOffset + 6,
+    interfacesCount = withConstants.readUInt16BE(interfacesCountOffset),
+    fieldsCountOffset = interfacesCountOffset + 2 + interfacesCount * 2,
+    fieldsCount = withConstants.readUInt16BE(fieldsCountOffset),
+    fieldsEndOffset = fieldsCountOffset + 2;
+  for (var fieldIndex = 0; fieldIndex < fieldsCount; fieldIndex++) {
+    fieldsEndOffset = skipMember(withConstants, fieldsEndOffset);
+  }
+
+  var withModeFields = Buffer.concat([
+      withConstants.slice(0, fieldsCountOffset),
+      u2(fieldsCount + modernModeFields.length),
+      withConstants.slice(fieldsCountOffset + 2, fieldsEndOffset),
+      modernModeFieldData,
+      withConstants.slice(fieldsEndOffset)
     ]),
     hasPrivateAccessCode = Buffer.concat([
       Buffer.from([0x2a, 0xb6]),
@@ -2619,7 +2664,7 @@ function addJavaLangInvokeMethodHandlesLookupModernOverlays(data: Buffer): Buffe
       ])
     ],
     withPrivateAccess = replaceMethodCode(
-      withConstants,
+      withModeFields,
       cp.offset + extraConstants.length,
       'hasPrivateAccess',
       '()Z',
@@ -2629,13 +2674,27 @@ function addJavaLangInvokeMethodHandlesLookupModernOverlays(data: Buffer): Buffe
       hasPrivateAccessCode,
       0x0001,
       hasPrivateAccessAttributes),
+    lookupModesCode = Buffer.concat([
+      Buffer.from([0x2a, 0xb8]),
+      u2(lookupModesMethodIndex),
+      Buffer.from([0xac])
+    ]),
+    withLookupModes = replaceMethodCode(
+      withPrivateAccess,
+      cp.offset + extraConstants.length,
+      'lookupModes',
+      '()I',
+      codeNameIndex,
+      1,
+      1,
+      lookupModesCode),
     lookupToStringCode = Buffer.concat([
       Buffer.from([0x2a, 0xb8]),
       u2(lookupToStringMethodIndex),
       Buffer.from([0xb0])
     ]),
     withLookupToString = replaceMethodCode(
-      withPrivateAccess,
+      withLookupModes,
       cp.offset + extraConstants.length,
       'toString',
       '()Ljava/lang/String;',
