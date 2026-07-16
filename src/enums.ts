@@ -11,7 +11,9 @@ export enum ClassState {
   RESOLVED,
   // This class, its super classes', and its interfaces have been downloaded,
   // parsed, and statically initialized.
-  INITIALIZED
+  INITIALIZED,
+  // Static initialization completed abruptly and must never be retried.
+  ERRONEOUS
 }
 
 /**

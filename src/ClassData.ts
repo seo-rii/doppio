@@ -492,7 +492,7 @@ export abstract class ClassData {
   public abstract tryToInitialize(): boolean;
 
   /**
-   * Set the state of this particular class to LOADED/RESOLVED/INITIALIZED.
+   * Set the state of this particular class.
    */
   public setState(state: ClassState): void {
     this.state = state;
@@ -1476,6 +1476,9 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
       // Already initialized.
       return true;
     }
+    if (this.getState() === ClassState.ERRONEOUS) {
+      return false;
+    }
 
     if (this.getState() === ClassState.RESOLVED || this.tryToResolve()) {
       // Ensure parent is initialized.
@@ -1569,12 +1572,31 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
         setImmediate(() => {
           cb(this);
         });
-      } else if (this.initLock.tryLock(thread, cb)) {
+      } else if (this.getState() === ClassState.ERRONEOUS) {
+        thread.throwNewException(
+          'Ljava/lang/NoClassDefFoundError;',
+          `Could not initialize class ${this.getExternalName()}`);
+        cb(null);
+      } else {
+        var ownsInitialization = false,
+          completion = (cdata: ClassData) => {
+            if (cdata === null && this.getState() === ClassState.ERRONEOUS && !ownsInitialization) {
+              thread.throwNewException(
+                'Ljava/lang/NoClassDefFoundError;',
+                `Could not initialize class ${this.getExternalName()}`);
+            }
+            cb(cdata);
+          };
+        ownsInitialization = this.initLock.tryLock(thread, completion);
+        if (!ownsInitialization) {
+          return;
+        }
         // Initialize the super class, and then this class.
         if (this.superClass != null) {
           this.superClass.initialize(thread, (cdata: ClassData) => {
             if (cdata == null) {
-              // Nothing to do. Initializing the super class failed.
+              // A class whose superclass initialization failed is erroneous too.
+              this.setState(ClassState.ERRONEOUS);
               this.initLock.unlock(null);
             } else {
               // Initialize myself.
@@ -1615,7 +1637,7 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
       cons['<clinit>()V'](thread, null, (e?: JVMTypes.java_lang_Throwable) => {
         if (e) {
           debug(`Initialization of class ${this.className} failed.`);
-          this.setState(ClassState.RESOLVED);
+          this.setState(ClassState.ERRONEOUS);
           /**
            * "The class or interface initialization method must have completed
            *  abruptly by throwing some exception E. If the class of E is not

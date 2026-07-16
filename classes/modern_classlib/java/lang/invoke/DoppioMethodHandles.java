@@ -19,6 +19,19 @@ public final class DoppioMethodHandles {
     return lookup.accessClass(targetClass);
   }
 
+  static Class<?> ensureInitialized(MethodHandles.Lookup lookup, Class<?> targetClass)
+      throws IllegalAccessException {
+    Objects.requireNonNull(targetClass);
+    if (targetClass.isPrimitive() || targetClass.isArray()) {
+      throw new IllegalArgumentException("not a class or interface: " + targetClass.getName());
+    }
+    lookup.accessClass(targetClass);
+    ensureInitialized0(targetClass);
+    return targetClass;
+  }
+
+  private static native void ensureInitialized0(Class<?> targetClass);
+
   public static MethodHandle zero(Class<?> type) {
     Objects.requireNonNull(type);
     if (type == void.class) {

@@ -229,6 +229,21 @@ The Java 9 `MethodHandles.Lookup.findClass(String)` and
   initialization timing, primitive/void/array/null/missing inputs, exception
   ordering, reflection, and unreflected handles with HotSpot 17.
 
+The Java 15 `MethodHandles.Lookup.ensureInitialized(Class<?>)` overlay extends
+the same instance-method table:
+
+- it is an ordinary public, concrete method with exact `Class<?>` parameter
+  and return signatures, one declared `IllegalAccessException`, empty
+  annotation surfaces, and absent `MethodParameters` metadata;
+- its two-load bytecode delegates to `DoppioMethodHandles.ensureInitialized`,
+  so direct invocation, `Method.invoke`, and `Lookup.unreflect` resolve one
+  parsed slot;
+- the Java helper owns null, primitive, void, array, and lookup-access ordering,
+  then calls a narrow native initialization bridge;
+- `Java15LookupEnsureInitialized` compares successful and abrupt class-state
+  transitions, superclass and interface behavior, repeated calls, and
+  concurrent waiters with HotSpot 17.
+
 ### Executable receiver types
 
 Java 9 changed executable receiver reflection beyond adding classfile syntax:

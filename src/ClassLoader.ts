@@ -2494,6 +2494,14 @@ function addJavaLangInvokeMethodHandlesLookupModernOverlays(data: Buffer): Buffe
         helperDescriptor: '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/Class;)Ljava/lang/Class;',
         signature: '(Ljava/lang/Class<*>;)Ljava/lang/Class<*>;',
         exceptionIndexes: [illegalAccessExceptionClassIndex]
+      },
+      {
+        name: 'ensureInitialized',
+        descriptor: '(Ljava/lang/Class;)Ljava/lang/Class;',
+        helperClassIndex: helperClassIndex,
+        helperDescriptor: '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/Class;)Ljava/lang/Class;',
+        signature: '(Ljava/lang/Class<*>;)Ljava/lang/Class<*>;',
+        exceptionIndexes: [illegalAccessExceptionClassIndex]
       }
     ],
     parsedIndexes = parsedOverlays.map((overlay): {

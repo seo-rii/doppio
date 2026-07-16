@@ -174,6 +174,40 @@ matrices remain separate work. A scan of the cached Kotlin 2.4.0 and Scala
 2.13.18 artifacts found no direct calls to these two methods; this slice closes
 the low-risk Java 9 API gap rather than a current compiler startup blocker.
 
+## Lookup Class Initialization
+
+Java 15 added `Lookup.ensureInitialized(Class<?>)`. The parsed public method
+delegates to `DoppioMethodHandles`, but initialization remains owned by the VM
+because it must coordinate class state, the initializing thread, waiters, and
+abrupt `<clinit>` completion.
+
+The implementation order is observable and follows HotSpot 17:
+
+1. Reject null with `NullPointerException`, then primitive, void, and array
+   classes with `IllegalArgumentException`.
+2. Apply the same `Lookup.accessClass` check used by Java 9 class access.
+   Rejected ordinary classes are not initialized.
+3. Initialize the exact class or interface and return the original `Class`
+   identity. A successful repeat is a no-op. Class initialization still
+   initializes the superclass before the subclass.
+4. Mark a class `ERRONEOUS` when its own initializer or superclass
+   initialization fails. The initiating thread receives the original `Error`
+   or a wrapped `ExceptionInInitializerError`; later callers and concurrent
+   waiters receive `NoClassDefFoundError` without retrying `<clinit>`.
+
+The focused fixture covers exact reflection metadata, validation and access
+ordering, class/interface initialization, superclass order, repeat identity,
+reflection and unreflected invocation, ordinary and `Error` failures,
+superclass failure propagation, and concurrent waiters. Initialization of
+superinterfaces that declare default methods, exact modern module lookup-mode
+semantics, named-module qualified exports, and SecurityManager checks remain
+separate compatibility work.
+
+The 2026-07-17 validation completed the full Java 9-26 suite in 6 minutes 22
+seconds, Kotlin 2.4.0 full-classpath compiler smoke in 81 seconds, Scala
+2.13.18 compiler smoke in 53 seconds, Kotlin MethodHandles smoke in 239
+seconds, and Scala MethodHandles smoke in 99 seconds.
+
 ## Implemented Slices
 
 - Java 17 `MethodHandles.Lookup` has a public same-class fixture covering

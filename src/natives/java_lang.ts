@@ -2700,6 +2700,18 @@ export default function (): any {
   }
 
   class java_lang_invoke_DoppioMethodHandles {
+    public static 'ensureInitialized0(Ljava/lang/Class;)V'(
+      thread: JVMThread,
+      targetClass: JVMTypes.java_lang_Class
+    ): void {
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      targetClass.$cls.initialize(thread, (cdata: ClassData) => {
+        if (cdata !== null) {
+          thread.asyncReturn();
+        }
+      }, true);
+    }
+
     public static 'defineClass(Ljava/lang/invoke/MethodHandles$Lookup;[B)Ljava/lang/Class;'(
       thread: JVMThread,
       lookup: JVMTypes.java_lang_invoke_MethodHandles$Lookup,
