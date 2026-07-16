@@ -1,0 +1,10 @@
+mappings:NANOSECONDS=NANOS,MICROSECONDS=MICROS,MILLISECONDS=MILLIS,SECONDS=SECONDS,MINUTES=MINUTES,HOURS=HOURS,DAYS=DAYS
+inverse:true
+unsupported-half:IllegalArgumentException:No TimeUnit equivalent for HalfDays
+unsupported-forever:IllegalArgumentException:No TimeUnit equivalent for Forever
+null:NullPointerException:chronoUnit
+metadata:true:true
+reflect:true:true
+reflect-failure:IllegalArgumentException:No TimeUnit equivalent for Weeks
+unreflect:true:true
+handle-types:true:true

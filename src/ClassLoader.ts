@@ -2324,6 +2324,112 @@ function addJavaLangMathModernOverlays(data: Buffer): Buffer {
   ]);
 }
 
+function addJavaUtilConcurrentTimeUnitModernOverlays(data: Buffer): Buffer {
+  var cp = constantPoolEnd(data),
+    overlays: Array<{
+      name: string;
+      descriptor: string;
+      helperDescriptor: string;
+      accessFlags: number;
+      codePrefix: number[];
+      returnOpcode: number;
+      maxStack: number;
+      maxLocals: number;
+    }> = [
+      {
+        name: 'toChronoUnit',
+        descriptor: '()Ljava/time/temporal/ChronoUnit;',
+        helperDescriptor: '(Ljava/util/concurrent/TimeUnit;)Ljava/time/temporal/ChronoUnit;',
+        accessFlags: 0x0001,
+        codePrefix: [0x2a],
+        returnOpcode: 0xb0,
+        maxStack: 1,
+        maxLocals: 1
+      },
+      {
+        name: 'of',
+        descriptor: '(Ljava/time/temporal/ChronoUnit;)Ljava/util/concurrent/TimeUnit;',
+        helperDescriptor: '(Ljava/time/temporal/ChronoUnit;)Ljava/util/concurrent/TimeUnit;',
+        accessFlags: 0x0009,
+        codePrefix: [0x2a],
+        returnOpcode: 0xb0,
+        maxStack: 1,
+        maxLocals: 1
+      },
+      {
+        name: 'convert',
+        descriptor: '(Ljava/time/Duration;)J',
+        helperDescriptor: '(Ljava/util/concurrent/TimeUnit;Ljava/time/Duration;)J',
+        accessFlags: 0x0001,
+        codePrefix: [0x2a, 0x2b],
+        returnOpcode: 0xad,
+        maxStack: 2,
+        maxLocals: 2
+      }
+    ],
+    helperNameIndex = cp.count,
+    helperClassIndex = cp.count + 1,
+    codeNameIndex = cp.count + 2,
+    extraConstants = Buffer.concat([
+      utf8Constant('java/util/concurrent/DoppioTimeUnit'),
+      Buffer.concat([Buffer.from([7]), u2(helperNameIndex)]),
+      utf8Constant('Code')
+    ].concat(overlays.reduce((constants: Buffer[], overlay, index: number) => {
+      var nameIndex = cp.count + 3 + index * 5,
+        descriptorIndex = nameIndex + 1,
+        helperDescriptorIndex = nameIndex + 2,
+        nameAndTypeIndex = nameIndex + 3;
+      constants.push(
+        utf8Constant(overlay.name),
+        utf8Constant(overlay.descriptor),
+        utf8Constant(overlay.helperDescriptor),
+        Buffer.concat([Buffer.from([12]), u2(nameIndex), u2(helperDescriptorIndex)]),
+        Buffer.concat([Buffer.from([10]), u2(helperClassIndex), u2(nameAndTypeIndex)])
+      );
+      return constants;
+    }, []))),
+    withConstants = Buffer.concat([
+      data.slice(0, 8),
+      u2(cp.count + 3 + overlays.length * 5),
+      data.slice(10, cp.offset),
+      extraConstants,
+      data.slice(cp.offset)
+    ]),
+    methods = methodsInfo(withConstants, cp.offset + extraConstants.length),
+    methodData = Buffer.concat(overlays.map((overlay, index: number) => {
+      var nameIndex = cp.count + 3 + index * 5,
+        descriptorIndex = nameIndex + 1,
+        helperMethodIndex = nameIndex + 4,
+        code = Buffer.concat([
+          Buffer.from(overlay.codePrefix.concat([0xb8])),
+          u2(helperMethodIndex),
+          Buffer.from([overlay.returnOpcode])
+        ]);
+      return Buffer.concat([
+        u2(overlay.accessFlags),
+        u2(nameIndex),
+        u2(descriptorIndex),
+        u2(1),
+        u2(codeNameIndex),
+        u4(12 + code.length),
+        u2(overlay.maxStack),
+        u2(overlay.maxLocals),
+        u4(code.length),
+        code,
+        u2(0),
+        u2(0)
+      ]);
+    }));
+
+  return Buffer.concat([
+    withConstants.slice(0, methods.countOffset),
+    u2(methods.count + overlays.length),
+    withConstants.slice(methods.countOffset + 2, methods.endOffset),
+    methodData,
+    withConstants.slice(methods.endOffset)
+  ]);
+}
+
 function addJavaLangInvokeMethodHandlesModernOverlays(data: Buffer): Buffer {
   var cp = constantPoolEnd(data),
     overlays = [
@@ -3244,6 +3350,9 @@ export class BootstrapClassLoader extends ClassLoader {
         }
         if (typeStr === 'Ljava/lang/Math;' || typeStr === 'Ljava/lang/StrictMath;') {
           clsData = addJavaLangMathModernOverlays(clsData);
+        }
+        if (typeStr === 'Ljava/util/concurrent/TimeUnit;') {
+          clsData = addJavaUtilConcurrentTimeUnitModernOverlays(clsData);
         }
         if (typeStr === 'Ljava/lang/invoke/MethodHandles;') {
           clsData = addJavaLangInvokeMethodHandlesModernOverlays(clsData);

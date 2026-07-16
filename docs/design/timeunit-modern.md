@@ -1,0 +1,66 @@
+# Modern TimeUnit Design
+
+## Status
+
+Implemented for the complete Java 9 `TimeUnit.toChronoUnit()` and
+`TimeUnit.of(ChronoUnit)` API surface and the Java 11
+`TimeUnit.convert(Duration)` overload. Difficulty: low.
+
+## Compatibility Boundary
+
+Doppio loads the Java 8 `java.util.concurrent.TimeUnit` enum from `rt.jar`.
+Replacing that enum would also replace its mature `convert(long, TimeUnit)`,
+timed wait, timed join, and sleep behavior used throughout the runtime and
+compiler smokes. The modern implementation therefore retains the original
+enum class and appends only three ordinary methods before classfile parsing:
+
+- `public ChronoUnit toChronoUnit()`;
+- `public static TimeUnit of(ChronoUnit)`;
+- `public long convert(Duration)`.
+
+Each method has a real parsed slot, exact descriptor, no checked exceptions or
+annotations, and delegates with a short `invokestatic` body to package-private
+`java.util.concurrent.DoppioTimeUnit`. Direct calls, reflection,
+`Method.invoke`, and `MethodHandles.Lookup.unreflect` consequently share the
+same method definitions.
+
+## ChronoUnit Mapping
+
+The mapping is one-to-one for nanoseconds, microseconds, milliseconds,
+seconds, minutes, hours, and days. `of` rejects null with the native
+`chronoUnit` message and rejects every unsupported `ChronoUnit` with
+`No TimeUnit equivalent for <unit>`. `toChronoUnit` treats an impossible
+unknown `TimeUnit` enum value as an assertion failure, matching the JDK's
+closed-enum assumption.
+
+## Duration Conversion
+
+`Duration` stores a signed seconds component and a non-negative nanosecond
+adjustment. The helper forms the exact mathematical total nanoseconds with
+`BigInteger`, divides by the target unit's nanosecond scale using truncation
+toward zero, and clamps values outside the signed 64-bit range to
+`Long.MIN_VALUE` or `Long.MAX_VALUE`. This preserves Java 11 behavior for:
+
+- positive and negative fractional durations;
+- sub-microsecond truncation;
+- exact seconds/minutes/hours/days conversion;
+- overflow saturation for both signs;
+- the `Long.MIN_VALUE` seconds boundary with a positive nanosecond adjustment.
+
+The arbitrary-precision intermediate is intentionally local to this overload;
+legacy scalar conversions continue using the original Java 8 implementation.
+
+## Test Gates
+
+`Java9TimeUnitChrono` compares all seven bidirectional mappings, null and
+unsupported-unit failures, exact reflection metadata, reflective invocation,
+and unreflected handle types and results with HotSpot 17.
+
+`Java11TimeUnitDuration` compares all seven target units across zero,
+sub-microsecond, positive and negative fractional, maximum, minimum, and
+minimum-with-fraction durations. It also covers null failure, exact method
+metadata, reflection, and unreflected invocation.
+
+Kotlin and Scala compiler-specific direct source probes remain a separate gate
+so this runtime implementation can land atomically before compiler smoke
+coverage is expanded.

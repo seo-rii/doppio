@@ -113,6 +113,20 @@ rule while delegating nontrivial string construction:
 - The complete compiler gates passed locally on 2026-07-13 in 97 seconds for
   Kotlin 2.4.0 and 58 seconds for Scala 2.13.18.
 
+The Java 9/11 `TimeUnit` overlay appends three ordinary methods without
+replacing the Java 8 enum or its existing timing behavior:
+
+- `toChronoUnit()`, `of(ChronoUnit)`, and `convert(Duration)` delegate to the
+  package-private `DoppioTimeUnit` helper;
+- all three methods are direct-call and reflection-visible with exact parsed
+  descriptors, modifiers, and empty checked-exception/annotation metadata;
+- duration conversion uses an exact arbitrary-precision nanosecond
+  intermediate, truncates toward zero, and saturates to the signed `long`
+  range before returning.
+
+The mapping, conversion, metadata, reflection, and MethodHandle test boundary
+is documented in `docs/design/timeunit-modern.md`.
+
 The Java 9 `ClassLoader.getPlatformClassLoader()` overlay adds the first
 caller-sensitive parsed method:
 

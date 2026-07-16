@@ -35,6 +35,13 @@ run.
 | 25 | 69 | current LTS class-file and library surface | Partial: simple class-file container plus runnable print fixture | Very high |
 | 26 | 70 | current feature-release class-file and library surface | Partial: simple class-file container plus runnable print fixture | Very high |
 
+Java 9/11 `TimeUnit` note: `toChronoUnit()`, `of(ChronoUnit)`, and
+`convert(Duration)` are implemented as ordinary parsed methods on the retained
+Java 8 enum. Coverage includes every supported unit mapping, exact method
+metadata, unsupported/null failures, reflection and unreflected handles, plus
+positive/negative fractional duration truncation and signed `long` saturation.
+Difficulty: low.
+
 Java 17 `java.lang.invoke` note: the compatibility row above now also includes
 selected `MethodHandles.tryFinally` support including fixed-arity normalization
 for varargs target and cleanup handles, selected
@@ -1191,6 +1198,14 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   including exact equality for numeric prerelease spellings,
   ignore-optional variants, and numeric prerelease comparison, selected invalid
   input validation, and `feature`/`interim`/`update`/`patch`.
+- `java.util.concurrent.TimeUnit.toChronoUnit()` and static
+  `TimeUnit.of(ChronoUnit)` are parsed Java 9 methods with exact seven-unit
+  bidirectional mappings and native-compatible null/unsupported-unit failures.
+  `TimeUnit.convert(Duration)` is a parsed Java 11 overload covering exact
+  positive/negative truncation toward zero and overflow saturation for all
+  seven target units. Both fixtures verify exact metadata, `Method.invoke`,
+  and `Lookup.unreflect`; the existing Java 8 enum timing methods remain
+  untouched. See `docs/design/timeunit-modern.md`.
 - `java.lang.StackTraceElement` now exposes selected Java 9 metadata
   constructor and accessor behavior for class-loader name, module name, and
   module version while preserving the existing class/method/file/line fields,
