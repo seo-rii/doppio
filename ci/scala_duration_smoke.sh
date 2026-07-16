@@ -51,12 +51,32 @@ if [ -z "$jline_jar" ]; then
 fi
 
 compiler_cp="$compiler_jar:$library_jar:$reflect_jar:$diff_utils_jar:$jline_jar"
+modern_boot_jar="$repo_root/vendor/java_home/lib/doppio.jar"
+runtime_boot_jar="$repo_root/vendor/java_home/lib/rt.jar"
 out_dir="$work_dir/out"
+compiler_boot_dir="$work_dir/compiler-boot"
 source_cp="$library_jar"
 runtime_cp="$out_dir:$library_jar"
 
-rm -rf "$out_dir"
-mkdir -p "$out_dir"
+if [ ! -f "$modern_boot_jar" ] || [ ! -f "$runtime_boot_jar" ]; then
+  echo "Doppio compiler boot classpath is incomplete; build the release CLI first." >&2
+  exit 1
+fi
+
+host_java_home="${JAVA_HOME:-$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")}"
+java_base_jmod="$host_java_home/jmods/java.base.jmod"
+if [ ! -f "$java_base_jmod" ]; then
+  echo "Java 17 java.base.jmod is required for the TimeUnit compiler overlay." >&2
+  exit 1
+fi
+
+rm -rf "$out_dir" "$compiler_boot_dir"
+mkdir -p "$out_dir" "$compiler_boot_dir"
+(
+  cd "$compiler_boot_dir"
+  jar xf "$java_base_jmod" classes/java/util/concurrent/TimeUnit.class
+)
+compiler_boot_cp="$compiler_boot_dir/classes:$modern_boot_jar:$runtime_boot_jar"
 
 compile_timeout="${SCALA_DURATION_SMOKE_COMPILE_TIMEOUT_SECONDS:-420}"
 run_timeout="${SCALA_DURATION_SMOKE_RUN_TIMEOUT_SECONDS:-60}"
@@ -69,6 +89,7 @@ timeout -k "${kill_after}s" -s INT "${compile_timeout}s" \
   "-Xresponsiveness:$responsiveness" \
   -cp "$compiler_cp" \
   scala.tools.nsc.Main \
+  -javabootclasspath "$compiler_boot_cp" \
   -classpath "$source_cp" \
   -d "$out_dir" \
   "$source_dir"/*.scala
@@ -77,7 +98,21 @@ compile_end="$(date +%s)"
 test -f "$out_dir/ScalaDurationHello.class"
 test -f "$out_dir/ScalaDurationSmoke.class"
 
-expected_output="3250|0,500,1500,1250|-1000,0,1500,3000|1|2.0|1250|2250|3|true:false:true"
+duration_javap="$(javap -classpath "$out_dir" -c -p 'ScalaDurationSmoke$')"
+if ! grep -Eq 'invokevirtual[[:space:]]+#[0-9]+[[:space:]]+// Method java/util/concurrent/TimeUnit\.toChronoUnit:\(\)Ljava/time/temporal/ChronoUnit;' <<<"$duration_javap"; then
+  echo "Missing direct invokevirtual TimeUnit.toChronoUnit reference." >&2
+  exit 1
+fi
+if ! grep -Eq 'invokestatic[[:space:]]+#[0-9]+[[:space:]]+// Method java/util/concurrent/TimeUnit\.of:\(Ljava/time/temporal/ChronoUnit;\)Ljava/util/concurrent/TimeUnit;' <<<"$duration_javap"; then
+  echo "Missing direct invokestatic TimeUnit.of reference." >&2
+  exit 1
+fi
+if ! grep -Eq 'invokevirtual[[:space:]]+#[0-9]+[[:space:]]+// Method java/util/concurrent/TimeUnit\.convert:\(Ljava/time/Duration;\)J' <<<"$duration_javap"; then
+  echo "Missing direct invokevirtual TimeUnit.convert(Duration) reference." >&2
+  exit 1
+fi
+
+expected_output="3250|0,500,1500,1250|-1000,0,1500,3000|1|2.0|1250|2250|3|true:false:true|MILLIS|HOURS|2345|-2345"
 
 native_output="$(java -cp "$runtime_cp" ScalaDurationHello)"
 if [ "$native_output" != "$expected_output" ]; then

@@ -1,3 +1,6 @@
+import java.time.Duration as JavaDuration
+import java.time.temporal.ChronoUnit
+import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.nanoseconds
@@ -17,6 +20,11 @@ fun durationSummary(): String {
   val coerced = 5.seconds.coerceIn(1.seconds, 3.seconds).inWholeSeconds
   val flags = listOf(base.isFinite(), Duration.INFINITE.isInfinite(), (-Duration.INFINITE).isInfinite())
     .joinToString(":") { it.toString() }
+  val modernTimeUnits = listOf(
+    TimeUnit.MILLISECONDS.toChronoUnit().name,
+    TimeUnit.of(ChronoUnit.SECONDS).name,
+    TimeUnit.SECONDS.convert(JavaDuration.ofSeconds(-2, 500_000_000)).toString(),
+  ).joinToString(":")
   return base.inWholeMilliseconds.toString() + "|" +
     parts + "|" +
     sorted + "|" +
@@ -25,5 +33,6 @@ fun durationSummary(): String {
     parsed + "|" +
     scaled + "|" +
     coerced + "|" +
-    flags
+    flags + "|" +
+    modernTimeUnits
 }

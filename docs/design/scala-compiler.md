@@ -115,7 +115,8 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
   checking modern runtime overlays;
 - a focused Scala duration smoke covering `scala.concurrent.duration` finite
   duration arithmetic, scanning, sorting, parsing, scaling, clamping, and
-  infinite-duration metadata;
+  infinite-duration metadata, plus direct modern `TimeUnit`/`ChronoUnit`
+  interop;
 - a focused Scala diagnostic smoke covering single-line and multiline
   type-mismatch source positions plus missing-member diagnostics;
 - string interpolation and a plain `main` entry point.
@@ -263,9 +264,17 @@ The Scala duration coverage now lives in `classes/scala_duration_smoke` and
 runs through `ci/scala_duration_smoke.sh`. It covers finite duration
 arithmetic, scan/sort paths, string parsing, scaling, clamping, and
 finite/infinite metadata while keeping the main Scala compiler smoke smaller.
+It also directly calls `TimeUnit.toChronoUnit()`, `TimeUnit.of(ChronoUnit)`,
+and `TimeUnit.convert(java.time.Duration)`, including negative fractional
+duration truncation. The compiler boot classpath puts a compile-only Java 17
+`TimeUnit` metadata overlay and the generated `doppio.jar` before the Java 8
+`rt.jar`; `javap` guards require the resulting `invokevirtual` and
+`invokestatic` references.
 A local 2026-06-30 validation completed the focused Scala duration smoke in 81
 seconds and the remaining main Scala compiler smoke in 353 seconds using Scala
 2.13.18.
+A 2026-07-17 validation of the direct modern `TimeUnit` coverage completed in
+89 seconds using Scala 2.13.18.
 The Scala StackWalker coverage now lives in `classes/scala_stackwalker_smoke`
 and runs through `ci/scala_stackwalker_smoke.sh`. It checks retained
 class-reference frame descriptor and `MethodType` metadata plus the no-retain

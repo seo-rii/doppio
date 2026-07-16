@@ -1,3 +1,6 @@
+import java.time.{Duration => JavaDuration}
+import java.time.temporal.ChronoUnit
+import java.util.concurrent.TimeUnit
 import scala.concurrent.duration._
 
 object ScalaDurationSmoke {
@@ -16,6 +19,10 @@ object ScalaDurationSmoke {
     val scaled = (750.millis * 3).toMillis
     val clamped = List(5.seconds, 3.seconds).min.toSeconds
     val flags = List(base.isFinite, Duration.Inf.isFinite, Duration.MinusInf < Duration.Zero).mkString(":")
-    s"${base.toMillis}|$timeline|$sorted|${Duration.fromNanos(1500).toMicros}|$ratio|$parsed|$scaled|$clamped|$flags"
+    val chronoUnit = TimeUnit.MILLISECONDS.toChronoUnit().name()
+    val timeUnit = TimeUnit.of(ChronoUnit.HOURS).name()
+    val converted = TimeUnit.MILLISECONDS.convert(JavaDuration.ofSeconds(2, 345678901))
+    val negativeFraction = TimeUnit.MILLISECONDS.convert(JavaDuration.ofSeconds(-3, 654321099))
+    s"${base.toMillis}|$timeline|$sorted|${Duration.fromNanos(1500).toMicros}|$ratio|$parsed|$scaled|$clamped|$flags|$chronoUnit|$timeUnit|$converted|$negativeFraction"
   }
 }

@@ -7,6 +7,7 @@ cache_dir="${KOTLIN_SMOKE_CACHE_DIR:-"$repo_root/build/kotlin-smoke-cache"}"
 work_dir="${KOTLIN_DURATION_SMOKE_WORK_DIR:-"$repo_root/build/kotlin-duration-smoke"}"
 compiler_jar="${KOTLIN_COMPILER_JAR:-}"
 stdlib_jar="${KOTLIN_STDLIB_JAR:-}"
+jdk_home="${KOTLIN_DURATION_SMOKE_JDK_HOME:-}"
 
 if [ -z "$compiler_jar" ]; then
   dist_dir="$cache_dir/kotlin-compiler-$version"
@@ -40,6 +41,19 @@ if [ -z "$stdlib_jar" ] || [ ! -f "$stdlib_jar" ]; then
   exit 1
 fi
 
+if [ -z "$jdk_home" ]; then
+  javap_path="$(command -v javap || true)"
+  if [ -z "$javap_path" ]; then
+    echo "javap not found; set KOTLIN_DURATION_SMOKE_JDK_HOME to a JDK 11+ installation." >&2
+    exit 1
+  fi
+  jdk_home="$(dirname "$(dirname "$(readlink -f "$javap_path")")")"
+fi
+if [ ! -d "$jdk_home" ]; then
+  echo "Kotlin duration smoke JDK home not found: $jdk_home" >&2
+  exit 1
+fi
+
 runner="$repo_root/build/release-cli/console/runner.js"
 source_dir="$repo_root/classes/kotlin_duration_smoke"
 out_dir="$work_dir/out"
@@ -58,6 +72,7 @@ timeout -s INT "${compile_timeout}s" \
   -cp "$compiler_jar" \
   org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
   -no-reflect \
+  -jdk-home "$jdk_home" \
   -d "$out_dir" \
   "$source_dir"/*.kt
 compile_end="$(date +%s)"
@@ -66,8 +81,22 @@ test -f "$out_dir/KotlinDurationHelloKt.class"
 test -f "$out_dir/DurationSmokeKt.class"
 test -f "$out_dir/META-INF/main.kotlin_module"
 
+duration_javap="$(javap -classpath "$out_dir" -c -p DurationSmokeKt)"
+if ! grep -Eq 'invokevirtual +#[0-9]+ +// Method java/util/concurrent/TimeUnit\.toChronoUnit:\(\)Ljava/time/temporal/ChronoUnit;' <<<"$duration_javap"; then
+  echo "Expected a direct invokevirtual TimeUnit.toChronoUnit reference." >&2
+  exit 1
+fi
+if ! grep -Eq 'invokestatic +#[0-9]+ +// Method java/util/concurrent/TimeUnit\.of:\(Ljava/time/temporal/ChronoUnit;\)Ljava/util/concurrent/TimeUnit;' <<<"$duration_javap"; then
+  echo "Expected a direct invokestatic TimeUnit.of reference." >&2
+  exit 1
+fi
+if ! grep -Eq 'invokevirtual +#[0-9]+ +// Method java/util/concurrent/TimeUnit\.convert:\(Ljava/time/Duration;\)J' <<<"$duration_javap"; then
+  echo "Expected a direct invokevirtual TimeUnit.convert(Duration) reference." >&2
+  exit 1
+fi
+
 runtime_cp="$out_dir:$stdlib_jar"
-expected_output="${KOTLIN_DURATION_SMOKE_EXPECTED_OUTPUT:-"3250|0,500,1500,1250|-1000,0,1500,3000|1|2.0|1250|2250|3|true:true:true"}"
+expected_output="${KOTLIN_DURATION_SMOKE_EXPECTED_OUTPUT:-"3250|0,500,1500,1250|-1000,0,1500,3000|1|2.0|1250|2250|3|true:true:true|MILLIS:SECONDS:-1"}"
 
 native_output="$(java -cp "$runtime_cp" KotlinDurationHelloKt)"
 if [ "$native_output" != "$expected_output" ]; then

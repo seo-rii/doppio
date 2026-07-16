@@ -804,10 +804,18 @@ Current verified checks:
   in 85 seconds and a follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 343 seconds. Both the host JVM and Doppio
   printed
-  `3250|0,500,1500,1250|-1000,0,1500,3000|1|2.0|1250|2250|3|true:true:true`.
+  `3250|0,500,1500,1250|-1000,0,1500,3000|1|2.0|1250|2250|3|true:true:true|MILLIS:SECONDS:-1`.
   It covers Kotlin `Duration` value-class arithmetic, `runningFold`,
   sorting/comparison, nanosecond-to-microsecond conversion, duration division,
-  ISO parsing, scaling, range coercion, and finite/infinite checks.
+  ISO parsing, scaling, range coercion, and finite/infinite checks. Direct
+  Kotlin source calls also cover `TimeUnit.toChronoUnit()`,
+  `TimeUnit.of(ChronoUnit)`, and `TimeUnit.convert(java.time.Duration)`, with
+  negative fractional duration truncation toward zero. `javap` guards require
+  the corresponding direct `invokevirtual`, `invokestatic`, and
+  `invokevirtual` references. The Doppio-hosted compiler uses a compile-only
+  JDK 11+ `-jdk-home` for these statically resolved methods, while the generated
+  bytecode runs against Doppio's parsed bootstrap overlay. A 2026-07-17
+  validation of this direct modern `TimeUnit` coverage completed in 99 seconds.
 - A focused Kotlin I/O smoke now lives in `classes/kotlin_io_smoke` and runs
   through `ci/kotlin_io_smoke.sh`, comparing the generated output on both the
   host JVM and Doppio. The split local validation completed the focused smoke
