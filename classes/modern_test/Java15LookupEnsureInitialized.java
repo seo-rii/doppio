@@ -1,5 +1,6 @@
 package classes.modern_test;
 
+import classes.modern_test.lookup_init.Java15LookupEnsureInitializedTarget;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Method;
@@ -84,8 +85,7 @@ public class Java15LookupEnsureInitialized {
     System.out.println("arrays:" + arraysRejected);
 
     ClassLoader loader = Java15LookupEnsureInitialized.class.getClassLoader();
-    String inaccessibleName =
-        "classes.modern_test.lookup_init.Java15LookupEnsureInitializedTarget$PackageTarget";
+    String inaccessibleName = Java15LookupEnsureInitializedTarget.class.getName() + "$PackageTarget";
     System.clearProperty("doppio.lookup.ensure.inaccessible");
     Class<?> inaccessible = Class.forName(inaccessibleName, false, loader);
     try {
