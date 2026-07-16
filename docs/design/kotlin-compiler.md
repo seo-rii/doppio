@@ -292,8 +292,12 @@ Current verified checks:
   `StackWalker.getCallerClass()`, and `StackWalker.forEach(...)` callback
   traversal, plus `ProcessHandle.current()` /
   `ProcessHandle.of(pid)` metadata, plus selected `ProcessHandle.Info`
-  optional metadata and display shape. A local 2026-07-11 validation completed
-  the focused smoke with retained StackWalker traversal in 294 seconds.
+  optional metadata and display shape. The source also directly references the
+  Java 9/16 `ElementType.MODULE` and `RECORD_COMPONENT` constants and checks
+  their exact names and ordinals, plus Java 9 `Deprecated` reflection metadata,
+  element types and defaults, runtime retention, and its target list including
+  `MODULE`. A local 2026-07-17 validation completed the expanded focused smoke
+  in 140 seconds.
 - `ci/check_kotlin_modern_source_guards.mjs` blocks Kotlin smoke sources from
   adding direct calls that have already exhausted local Doppio-hosted compiler
   budgets, including `Runtime.version`, selected `Optional` Java 9 methods,

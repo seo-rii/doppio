@@ -108,7 +108,9 @@ The first source fixture covers a deliberately small Scala 2.13 slice:
   plus Java 9/10 `List`/`Set`/`Map` factory and copy APIs and Java 11
   `Optional.isEmpty()` / no-arg `Optional.orElseThrow()`, plus Java 9
   `ProcessHandle.current()` / `ProcessHandle.of(pid)` metadata and selected
-  `ProcessHandle.Info` optional metadata,
+  `ProcessHandle.Info` optional metadata, plus direct Scala references to
+  `ElementType.MODULE` / `RECORD_COMPONENT` and modern `Deprecated` reflection
+  metadata, defaults, retention, and target values,
   keeping the Scala 2.13 compile classpath on the Java 8 boot surface while
   checking modern runtime overlays;
 - a focused Scala duration smoke covering `scala.concurrent.duration` finite
@@ -233,7 +235,10 @@ with an unmodifiable-result check, plus reflection-backed Java 9 `List.of`,
 source calls to no-arg `Optional.orElseThrow()` for present and empty values,
 plus Java 9 `ProcessHandle.current()` and
 `ProcessHandle.of(pid)` metadata plus selected `ProcessHandle.Info` optionals
-and display shape, while keeping the main Scala compiler smoke smaller.
+and display shape, plus direct source-level `ElementType.MODULE` and
+`ElementType.RECORD_COMPONENT` name/ordinal checks and modern `Deprecated`
+annotation shape, element defaults, runtime retention, and exact target order
+including `MODULE`, while keeping the main Scala compiler smoke smaller.
 The focused compiler invocation puts the generated `doppio.jar` before the
 Java 8 `rt.jar` on scalac's explicit Java boot classpath. This uses scalac's
 `-javabootclasspath` option rather than its separate Scala `-bootclasspath`
@@ -245,6 +250,8 @@ A local 2026-07-11 validation completed the focused Scala modern interop smoke
 in 184 seconds using Scala 2.13.18.
 A 2026-07-13 validation with the explicit Java boot classpath and direct
 `Optional.orElseThrow()` source calls completed in 156 seconds.
+A 2026-07-17 validation with direct modern annotation references completed in
+97 seconds using Scala 2.13.18.
 `ci/check_scala_modern_source_guards.mjs` blocks Scala smoke sources from
 adding direct calls that have already exhausted or nearly exhausted local
 Doppio-hosted compiler budgets, including `Runtime.version`,

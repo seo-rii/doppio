@@ -1,5 +1,6 @@
 import java.time.{Clock, Duration, Instant, ZoneId}
-import java.lang.reflect.InvocationTargetException
+import java.lang.annotation.{Documented, ElementType, Retention, RetentionPolicy, Target}
+import java.lang.reflect.{InvocationTargetException, Modifier}
 import java.util.AbstractMap
 import java.util.stream.Stream
 
@@ -141,6 +142,34 @@ object ScalaModernJavaInteropSmoke {
     val infoString = currentInfo.toString
     val infoStringShape = infoString.startsWith("[") && infoString.contains("cmd: ") && infoString.endsWith("]")
 
+    val moduleElement = ElementType.MODULE
+    val recordComponentElement = ElementType.RECORD_COMPONENT
+    val deprecatedClass = classOf[java.lang.Deprecated]
+    val deprecatedSince = deprecatedClass.getDeclaredMethod("since")
+    val deprecatedForRemoval = deprecatedClass.getDeclaredMethod("forRemoval")
+    val deprecatedTarget = deprecatedClass.getDeclaredAnnotation(classOf[Target])
+    val deprecatedRetention = deprecatedClass.getDeclaredAnnotation(classOf[Retention])
+    val deprecatedMetadata =
+      deprecatedClass.isAnnotation &&
+        deprecatedClass.getDeclaredMethods.length == 2 &&
+        deprecatedClass.getDeclaredAnnotations.length == 3 &&
+        deprecatedClass.isAnnotationPresent(classOf[Documented]) &&
+        deprecatedRetention != null && deprecatedRetention.value() == RetentionPolicy.RUNTIME &&
+        deprecatedTarget != null &&
+        deprecatedSince.getModifiers == (Modifier.PUBLIC | Modifier.ABSTRACT) &&
+        deprecatedSince.getReturnType == classOf[String] &&
+        deprecatedSince.getParameterTypes.length == 0 &&
+        deprecatedSince.getExceptionTypes.length == 0 &&
+        deprecatedSince.getDeclaredAnnotations.length == 0 &&
+        deprecatedSince.getDefaultValue == "" &&
+        deprecatedForRemoval.getModifiers == (Modifier.PUBLIC | Modifier.ABSTRACT) &&
+        deprecatedForRemoval.getReturnType == java.lang.Boolean.TYPE &&
+        deprecatedForRemoval.getParameterTypes.length == 0 &&
+        deprecatedForRemoval.getExceptionTypes.length == 0 &&
+        deprecatedForRemoval.getDeclaredAnnotations.length == 0 &&
+        deprecatedForRemoval.getDefaultValue == java.lang.Boolean.FALSE
+    val deprecatedTargetNames = deprecatedTarget.value().map(_.name()).mkString(",")
+
     s"$formatted|$upperText|${parsed.length}:${hexClass.getMethod("formatHex", classOf[Array[Byte]]).invoke(hex, parsed)}:$digit|" +
       s"$fixedValue:$fixedMillis:$offsetValue:${classOf[Clock].isInstance(zoned)}|" +
       s"${randomFactoryClass.getMethod("name").invoke(randomFactory)}:$nextInt:$nextLong|" +
@@ -149,6 +178,8 @@ object ScalaModernJavaInteropSmoke {
       s"${entryCopy.getKey}:${entryCopy.getValue}:$entryCopyMutation|" +
       s"${java.lang.String.join("", listOf)}:$listMutation:$duplicateSet:${mapOf.get("b")}:$mapMutation:${java.lang.String.join("", copiedList)}:" +
       s"$optionalText:$optionalIsEmpty:$optionalFailure:${currentPid > 0}:$currentProcessAlive:${currentProcessByPid.isPresent}:" +
-      s"$commandPresent:$commandLinePresent:$argumentsPresent:$startInstantPresent:$cpuDurationPresent:$infoStringShape"
+      s"$commandPresent:$commandLinePresent:$argumentsPresent:$startInstantPresent:$cpuDurationPresent:$infoStringShape|" +
+      s"${moduleElement.name()}:${moduleElement.ordinal()}:${recordComponentElement.name()}:${recordComponentElement.ordinal()}|" +
+      s"$deprecatedMetadata:${deprecatedSince.getDefaultValue}:${deprecatedForRemoval.getDefaultValue}:$deprecatedTargetNames"
   }
 }

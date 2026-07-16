@@ -86,14 +86,22 @@ compile_end="$(date +%s)"
 test -f "$out_dir/ScalaModernInteropHello.class"
 test -f "$out_dir/ScalaModernJavaInteropSmoke.class"
 
-optional_javap="$(javap -classpath "$out_dir" -c -p 'ScalaModernJavaInteropSmoke$')"
-optional_call_count="$(grep -Fc 'java/util/Optional.orElseThrow:()Ljava/lang/Object;' <<<"$optional_javap" || true)"
+interop_javap="$(javap -classpath "$out_dir" -c -p 'ScalaModernJavaInteropSmoke$')"
+optional_call_count="$(grep -Fc 'java/util/Optional.orElseThrow:()Ljava/lang/Object;' <<<"$interop_javap" || true)"
 if [ "$optional_call_count" -ne 2 ]; then
   echo "Expected two direct Optional.orElseThrow calls, found $optional_call_count." >&2
   exit 1
 fi
+if ! grep -Fq 'java/lang/annotation/ElementType.MODULE:Ljava/lang/annotation/ElementType;' <<<"$interop_javap"; then
+  echo "Expected a direct ElementType.MODULE field reference." >&2
+  exit 1
+fi
+if ! grep -Fq 'java/lang/annotation/ElementType.RECORD_COMPONENT:Ljava/lang/annotation/ElementType;' <<<"$interop_javap"; then
+  echo "Expected a direct ElementType.RECORD_COMPONENT field reference." >&2
+  exit 1
+fi
 
-expected_output="0f10ff|0A0B|2:cafe:15|2020-01-02T03:04:05Z:1577934245000:2020-01-02T03:04:07Z:true|Random:82:376|SplittableRandom:true:88:574|QRS:uoe|entry:value:uoe|jk:uoe:iae:2:uoe:jk:opt:true:nse:true:true:true:true:true:true:true:true:true"
+expected_output="0f10ff|0A0B|2:cafe:15|2020-01-02T03:04:05Z:1577934245000:2020-01-02T03:04:07Z:true|Random:82:376|SplittableRandom:true:88:574|QRS:uoe|entry:value:uoe|jk:uoe:iae:2:uoe:jk:opt:true:nse:true:true:true:true:true:true:true:true:true|MODULE:10:RECORD_COMPONENT:11|true::false:CONSTRUCTOR,FIELD,LOCAL_VARIABLE,METHOD,PACKAGE,MODULE,PARAMETER,TYPE"
 
 native_output="$(java -cp "$runtime_cp" ScalaModernInteropHello)"
 if [ "$native_output" != "$expected_output" ]; then

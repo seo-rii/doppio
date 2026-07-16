@@ -2,6 +2,11 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
+import java.lang.annotation.Documented
+import java.lang.annotation.ElementType
+import java.lang.annotation.Retention
+import java.lang.annotation.Target
+import java.lang.reflect.Modifier
 import java.util.AbstractMap
 import java.util.function.Consumer
 import java.util.function.Function
@@ -147,6 +152,24 @@ fun modernJavaInteropSummary(): String {
   val cpuDurationPresent = (processInfoClass.getMethod("totalCpuDuration").invoke(currentInfo) as java.util.Optional<*>).isPresent
   val infoString = currentInfo.toString()
   val infoStringShape = infoString.startsWith("[") && infoString.contains("cmd: ") && infoString.endsWith("]")
+  val modernElementTypes = listOf(ElementType.MODULE, ElementType.RECORD_COMPONENT)
+    .joinToString(",") { elementType -> "${elementType.name}:${elementType.ordinal}" }
+  val deprecatedClass = java.lang.Deprecated::class.java
+  val deprecatedTarget = deprecatedClass.getDeclaredAnnotation(Target::class.java)
+  val deprecatedRetention = deprecatedClass.getDeclaredAnnotation(Retention::class.java)
+  val deprecatedSince = deprecatedClass.getDeclaredMethod("since")
+  val deprecatedForRemoval = deprecatedClass.getDeclaredMethod("forRemoval")
+  val deprecatedElementsExact = deprecatedClass.declaredMethods.size == 2 &&
+      deprecatedSince.modifiers == (Modifier.PUBLIC or Modifier.ABSTRACT) &&
+      deprecatedSince.returnType == String::class.java &&
+      deprecatedForRemoval.modifiers == (Modifier.PUBLIC or Modifier.ABSTRACT) &&
+      deprecatedForRemoval.returnType == Boolean::class.javaPrimitiveType
+  val deprecatedSummary = "${deprecatedClass.simpleName}:${deprecatedClass.isAnnotation}:" +
+      "${deprecatedClass.declaredAnnotations.size}:${deprecatedClass.isAnnotationPresent(Documented::class.java)}:" +
+      "${deprecatedRetention.value}:$deprecatedElementsExact:" +
+      "${deprecatedSince.name}:${deprecatedSince.returnType.simpleName}=${deprecatedSince.defaultValue}:" +
+      "${deprecatedForRemoval.name}:${deprecatedForRemoval.returnType.simpleName}=${deprecatedForRemoval.defaultValue}:" +
+      deprecatedTarget.value.joinToString(",") { elementType -> elementType.name }
 
   return "$formatted|$upperText|${parsed.size}:${hexClass.getMethod("formatHex", ByteArray::class.java).invoke(hex, parsed)}:$digit|" +
       "$fixedValue:$fixedMillis:$offsetValue:${Clock::class.java.isInstance(zoned)}|" +
@@ -158,5 +181,6 @@ fun modernJavaInteropSummary(): String {
       "${copyMap["y"]}:$copyMapMutation:$optionalValue:${optionalEmpty.isEmpty}:$optionalFailure:" +
       "$stackHasSmokeFrame:$callerClassMatches:$forEachSawSummary:$forEachSawHelloMain:" +
       "${currentPid > 0}:$currentProcessAlive:${currentProcessByPid.isPresent}:" +
-      "$commandPresent:$commandLinePresent:$argumentsPresent:$startInstantPresent:$cpuDurationPresent:$infoStringShape"
+      "$commandPresent:$commandLinePresent:$argumentsPresent:$startInstantPresent:$cpuDurationPresent:$infoStringShape|" +
+      "$modernElementTypes|$deprecatedSummary"
 }
