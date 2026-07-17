@@ -3089,6 +3089,78 @@ class ClassLocks {
   }
 }
 
+export function applyModernBootstrapOverlays(typeStr: string, data: Buffer): Buffer {
+  if (typeStr === 'Ljava/lang/Thread;') {
+    data = addStaticNoopModernOverlay(data, 'onSpinWait', '()V', 0,
+      'Ljdk/internal/vm/annotation/IntrinsicCandidate;');
+  }
+  if (typeStr === 'Ljava/lang/ref/Reference;') {
+    data = addStaticNoopModernOverlay(data, 'reachabilityFence', '(Ljava/lang/Object;)V', 1,
+      'Ljdk/internal/vm/annotation/ForceInline;');
+  }
+  if (typeStr === 'Ljava/lang/Class;') {
+    data = addJavaLangClassModernOverlays(data);
+  }
+  if (typeStr === 'Ljava/lang/reflect/Executable;') {
+    data = addJavaLangReflectExecutableReceiverModernOverlays(data, false);
+  }
+  if (typeStr === 'Ljava/lang/reflect/Constructor;') {
+    data = addJavaLangReflectExecutableReceiverModernOverlays(data, true);
+  }
+  if (typeStr === 'Ljava/lang/reflect/AccessibleObject;') {
+    data = addJavaLangReflectAccessibleObjectModernOverlays(data);
+  }
+  if ((typeStr.indexOf('Ljava/lang/reflect/Annotated') === 0 &&
+      typeStr !== 'Ljava/lang/reflect/AnnotatedElement;') ||
+      typeStr.indexOf('Lsun/reflect/annotation/AnnotatedTypeFactory$Annotated') === 0) {
+    data = addAnnotatedOwnerTypeModernOverlay(data, typeStr);
+  }
+  if (typeStr === 'Lsun/reflect/annotation/TypeAnnotation$LocationInfo;') {
+    data = addTypeAnnotationLocationInfoModernOverlay(data);
+  }
+  if (typeStr === 'Lsun/reflect/annotation/AnnotatedTypeFactory;') {
+    data = addAnnotatedTypeFactoryNestingModernOverlay(data);
+  }
+  if (typeStr === 'Lsun/reflect/generics/reflectiveObjects/ParameterizedTypeImpl;') {
+    data = addParameterizedTypeImplModernOverlay(data);
+  }
+  if (typeStr === 'Ljava/lang/ClassLoader;') {
+    data = addJavaLangClassLoaderModernOverlays(data);
+    data = addJavaLangClassLoaderPackageModernOverlays(data);
+  }
+  if (typeStr === 'Ljava/lang/System;') {
+    data = addJavaLangSystemModernOverlays(data);
+  }
+  if (typeStr === 'Ljava/lang/Runtime;') {
+    data = addJavaLangRuntimeModernOverlays(data);
+  }
+  if (typeStr === 'Ljava/lang/Character;') {
+    data = addJavaLangCharacterModernOverlays(data);
+  }
+  if (typeStr === 'Ljava/lang/Math;' || typeStr === 'Ljava/lang/StrictMath;') {
+    data = addJavaLangMathModernOverlays(data);
+  }
+  if (typeStr === 'Ljava/util/concurrent/TimeUnit;') {
+    data = addJavaUtilConcurrentTimeUnitModernOverlays(data);
+  }
+  if (typeStr === 'Ljava/time/Duration;') {
+    data = addJavaTimeDurationModernOverlays(data);
+  }
+  if (typeStr === 'Ljava/lang/invoke/MethodHandles;') {
+    data = addJavaLangInvokeMethodHandlesModernOverlays(data);
+  }
+  if (typeStr === 'Ljava/lang/invoke/MethodHandle;') {
+    data = addJavaLangInvokeMethodHandleModernOverlays(data);
+  }
+  if (typeStr === 'Ljava/lang/invoke/MethodHandles$Lookup;') {
+    data = addJavaLangInvokeMethodHandlesLookupModernOverlays(data);
+  }
+  if (typeStr === 'Ljava/nio/MappedByteBuffer;') {
+    data = addJavaNioMappedByteBufferModernOverlays(data);
+  }
+  return data;
+}
+
 /**
  * Base classloader class. Contains common class resolution and instantiation
  * logic.
@@ -3506,77 +3578,7 @@ export class BootstrapClassLoader extends ClassLoader {
       });
     }, (pItem?: IClasspathItem) => {
       if (pItem) {
-        if (typeStr === 'Ljava/lang/Thread;') {
-          clsData = addStaticNoopModernOverlay(clsData, 'onSpinWait', '()V', 0,
-            'Ljdk/internal/vm/annotation/IntrinsicCandidate;');
-        }
-        if (typeStr === 'Ljava/lang/ref/Reference;') {
-          clsData = addStaticNoopModernOverlay(clsData, 'reachabilityFence', '(Ljava/lang/Object;)V', 1,
-            'Ljdk/internal/vm/annotation/ForceInline;');
-        }
-        if (typeStr === 'Ljava/lang/Class;') {
-          clsData = addJavaLangClassModernOverlays(clsData);
-        }
-        if (typeStr === 'Ljava/lang/reflect/Executable;') {
-          clsData = addJavaLangReflectExecutableReceiverModernOverlays(clsData, false);
-        }
-        if (typeStr === 'Ljava/lang/reflect/Constructor;') {
-          clsData = addJavaLangReflectExecutableReceiverModernOverlays(clsData, true);
-        }
-        if (typeStr === 'Ljava/lang/reflect/AccessibleObject;') {
-          clsData = addJavaLangReflectAccessibleObjectModernOverlays(clsData);
-        }
-        if ((typeStr.indexOf('Ljava/lang/reflect/Annotated') === 0 &&
-            typeStr !== 'Ljava/lang/reflect/AnnotatedElement;') ||
-            typeStr.indexOf(
-              'Lsun/reflect/annotation/AnnotatedTypeFactory$Annotated') === 0) {
-          clsData = addAnnotatedOwnerTypeModernOverlay(clsData, typeStr);
-        }
-        if (typeStr ===
-            'Lsun/reflect/annotation/TypeAnnotation$LocationInfo;') {
-          clsData = addTypeAnnotationLocationInfoModernOverlay(clsData);
-        }
-        if (typeStr === 'Lsun/reflect/annotation/AnnotatedTypeFactory;') {
-          clsData = addAnnotatedTypeFactoryNestingModernOverlay(clsData);
-        }
-        if (typeStr ===
-            'Lsun/reflect/generics/reflectiveObjects/ParameterizedTypeImpl;') {
-          clsData = addParameterizedTypeImplModernOverlay(clsData);
-        }
-        if (typeStr === 'Ljava/lang/ClassLoader;') {
-          clsData = addJavaLangClassLoaderModernOverlays(clsData);
-          clsData = addJavaLangClassLoaderPackageModernOverlays(clsData);
-        }
-        if (typeStr === 'Ljava/lang/System;') {
-          clsData = addJavaLangSystemModernOverlays(clsData);
-        }
-        if (typeStr === 'Ljava/lang/Runtime;') {
-          clsData = addJavaLangRuntimeModernOverlays(clsData);
-        }
-        if (typeStr === 'Ljava/lang/Character;') {
-          clsData = addJavaLangCharacterModernOverlays(clsData);
-        }
-        if (typeStr === 'Ljava/lang/Math;' || typeStr === 'Ljava/lang/StrictMath;') {
-          clsData = addJavaLangMathModernOverlays(clsData);
-        }
-        if (typeStr === 'Ljava/util/concurrent/TimeUnit;') {
-          clsData = addJavaUtilConcurrentTimeUnitModernOverlays(clsData);
-        }
-        if (typeStr === 'Ljava/time/Duration;') {
-          clsData = addJavaTimeDurationModernOverlays(clsData);
-        }
-        if (typeStr === 'Ljava/lang/invoke/MethodHandles;') {
-          clsData = addJavaLangInvokeMethodHandlesModernOverlays(clsData);
-        }
-        if (typeStr === 'Ljava/lang/invoke/MethodHandle;') {
-          clsData = addJavaLangInvokeMethodHandleModernOverlays(clsData);
-        }
-        if (typeStr === 'Ljava/lang/invoke/MethodHandles$Lookup;') {
-          clsData = addJavaLangInvokeMethodHandlesLookupModernOverlays(clsData);
-        }
-        if (typeStr === 'Ljava/nio/MappedByteBuffer;') {
-          clsData = addJavaNioMappedByteBufferModernOverlays(clsData);
-        }
+        clsData = applyModernBootstrapOverlays(typeStr, clsData);
         let cls = this.defineClass(thread, typeStr, clsData, null);
         if (cls !== null) {
           this._registerLoadedClass(clsFilePath, pItem);
