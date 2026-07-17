@@ -7,7 +7,6 @@ cache_dir="${KOTLIN_SMOKE_CACHE_DIR:-"$repo_root/build/kotlin-smoke-cache"}"
 work_dir="${KOTLIN_DURATION_SMOKE_WORK_DIR:-"$repo_root/build/kotlin-duration-smoke"}"
 compiler_jar="${KOTLIN_COMPILER_JAR:-}"
 stdlib_jar="${KOTLIN_STDLIB_JAR:-}"
-jdk_home="${KOTLIN_DURATION_SMOKE_JDK_HOME:-}"
 
 if [ -z "$compiler_jar" ]; then
   dist_dir="$cache_dir/kotlin-compiler-$version"
@@ -41,22 +40,18 @@ if [ -z "$stdlib_jar" ] || [ ! -f "$stdlib_jar" ]; then
   exit 1
 fi
 
-if [ -z "$jdk_home" ]; then
-  javap_path="$(command -v javap || true)"
-  if [ -z "$javap_path" ]; then
-    echo "javap not found; set KOTLIN_DURATION_SMOKE_JDK_HOME to a JDK 11+ installation." >&2
-    exit 1
-  fi
-  jdk_home="$(dirname "$(dirname "$(readlink -f "$javap_path")")")"
-fi
-if [ ! -d "$jdk_home" ]; then
-  echo "Kotlin duration smoke JDK home not found: $jdk_home" >&2
-  exit 1
-fi
-
 runner="$repo_root/build/release-cli/console/runner.js"
 source_dir="$repo_root/classes/kotlin_duration_smoke"
 out_dir="$work_dir/out"
+modern_overlay_jar="$repo_root/build/modern-bootstrap-overlay/modern-bootstrap.jar"
+modern_boot_jar="$repo_root/vendor/java_home/lib/doppio.jar"
+runtime_boot_jar="$repo_root/vendor/java_home/lib/rt.jar"
+compiler_target_cp="$modern_overlay_jar:$modern_boot_jar:$runtime_boot_jar:$stdlib_jar"
+
+if [ ! -f "$modern_overlay_jar" ] || [ ! -f "$modern_boot_jar" ] || [ ! -f "$runtime_boot_jar" ]; then
+  echo "Doppio compiler bootstrap classpath is incomplete; build the modern release CLI first." >&2
+  exit 1
+fi
 
 rm -rf "$out_dir"
 mkdir -p "$out_dir"
@@ -72,7 +67,8 @@ timeout -s INT "${compile_timeout}s" \
   -cp "$compiler_jar" \
   org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
   -no-reflect \
-  -jdk-home "$jdk_home" \
+  -no-jdk \
+  -classpath "$compiler_target_cp" \
   -d "$out_dir" \
   "$source_dir"/*.kt
 compile_end="$(date +%s)"

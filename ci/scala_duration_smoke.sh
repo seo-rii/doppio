@@ -53,32 +53,19 @@ fi
 compiler_cp="$compiler_jar:$library_jar:$reflect_jar:$diff_utils_jar:$jline_jar"
 modern_boot_jar="$repo_root/vendor/java_home/lib/doppio.jar"
 runtime_boot_jar="$repo_root/vendor/java_home/lib/rt.jar"
+modern_overlay_jar="$repo_root/build/modern-bootstrap-overlay/modern-bootstrap.jar"
 out_dir="$work_dir/out"
-compiler_boot_dir="$work_dir/compiler-boot"
 source_cp="$library_jar"
 runtime_cp="$out_dir:$library_jar"
+compiler_boot_cp="$modern_overlay_jar:$modern_boot_jar:$runtime_boot_jar"
 
-if [ ! -f "$modern_boot_jar" ] || [ ! -f "$runtime_boot_jar" ]; then
+if [ ! -f "$modern_overlay_jar" ] || [ ! -f "$modern_boot_jar" ] || [ ! -f "$runtime_boot_jar" ]; then
   echo "Doppio compiler boot classpath is incomplete; build the release CLI first." >&2
   exit 1
 fi
 
-host_java_home="${JAVA_HOME:-$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")}"
-java_base_jmod="$host_java_home/jmods/java.base.jmod"
-if [ ! -f "$java_base_jmod" ]; then
-  echo "Java 17 java.base.jmod is required for the compiler bootstrap overlays." >&2
-  exit 1
-fi
-
-rm -rf "$out_dir" "$compiler_boot_dir"
-mkdir -p "$out_dir" "$compiler_boot_dir"
-(
-  cd "$compiler_boot_dir"
-  jar xf "$java_base_jmod" \
-    classes/java/time/Duration.class \
-    classes/java/util/concurrent/TimeUnit.class
-)
-compiler_boot_cp="$compiler_boot_dir/classes:$modern_boot_jar:$runtime_boot_jar"
+rm -rf "$out_dir"
+mkdir -p "$out_dir"
 
 compile_timeout="${SCALA_DURATION_SMOKE_COMPILE_TIMEOUT_SECONDS:-420}"
 run_timeout="${SCALA_DURATION_SMOKE_RUN_TIMEOUT_SECONDS:-60}"

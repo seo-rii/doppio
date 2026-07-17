@@ -49,8 +49,16 @@ Java 9 name before the public overload is appended, preserving legacy duration
 arithmetic. Coverage includes normalized negative parts, exact decimal
 division, signed `long` boundaries and overflow, metadata, reflection, and
 unreflected handles. Focused Kotlin 2.4.0 and Scala 2.13.18 smokes also guard
-all eight direct-call descriptors and compare host/Doppio output. Difficulty:
-medium.
+all eight direct-call descriptors and compare host/Doppio output using only the
+generated Doppio compiler bootstrap overlay. Difficulty: medium.
+
+Compiler bootstrap note: `modern-ci-release-cli` generates a deterministic
+compiler-only JAR containing the 31 Java 8 bootstrap classes changed by the
+shared parsed-overlay dispatch. Kotlin and Scala put this artifact before
+`doppio.jar` and `rt.jar` for source analysis, eliminating host JDK metadata
+from the focused modern duration gates without changing Doppio's runtime
+bootstrap path. CI compares two forced-generation SHA-256 values and the exact
+class-only entry contract. See `docs/design/compiler-bootstrap-overlay.md`.
 
 Java 17 `java.lang.invoke` note: the compatibility row above now also includes
 selected `MethodHandles.tryFinally` support including fixed-arity normalization
@@ -1224,7 +1232,8 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   invocation. Existing Java 8 `multipliedBy(long)` and `dividedBy(long)` remain
   under regression after the private helper rename. Kotlin and Scala duration
   smokes compile and inspect direct calls to all eight methods before comparing
-  runtime output. See `docs/design/duration-modern.md`.
+  runtime output against the compiler-only Doppio bootstrap overlay, without
+  host JDK class metadata. See `docs/design/duration-modern.md`.
 - `java.lang.StackTraceElement` now exposes selected Java 9 metadata
   constructor and accessor behavior for class-loader name, module name, and
   module version while preserving the existing class/method/file/line fields,
