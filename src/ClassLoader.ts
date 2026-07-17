@@ -2430,6 +2430,214 @@ function addJavaUtilConcurrentTimeUnitModernOverlays(data: Buffer): Buffer {
   ]);
 }
 
+function addJavaTimeDurationModernOverlays(data: Buffer): Buffer {
+  var legacyCp = constantPoolEnd(data),
+    constantOffset = 10,
+    legacyNameStart = -1,
+    legacyNameEnd = -1,
+    constantLength: number,
+    constantTag: number;
+
+  for (var constantIndex = 1; constantIndex < legacyCp.count; constantIndex++) {
+    var constantStart = constantOffset;
+    constantTag = data.readUInt8(constantOffset++);
+    switch (constantTag) {
+      case 1:
+        constantLength = data.readUInt16BE(constantOffset);
+        if (data.toString('utf8', constantOffset + 2,
+            constantOffset + 2 + constantLength) === 'toSeconds') {
+          if (legacyNameStart !== -1) {
+            throw new Error('Duplicate legacy Duration.toSeconds UTF-8 constant');
+          }
+          legacyNameStart = constantStart;
+          legacyNameEnd = constantOffset + 2 + constantLength;
+        }
+        constantOffset += 2 + constantLength;
+        break;
+      case 3:
+      case 4:
+      case 9:
+      case 10:
+      case 11:
+      case 12:
+      case 17:
+      case 18:
+        constantOffset += 4;
+        break;
+      case 5:
+      case 6:
+        constantOffset += 8;
+        constantIndex++;
+        break;
+      case 7:
+      case 8:
+      case 16:
+      case 19:
+      case 20:
+        constantOffset += 2;
+        break;
+      case 15:
+        constantOffset += 3;
+        break;
+      default:
+        throw new Error('Unknown constant-pool tag ' + constantTag);
+    }
+  }
+  if (legacyNameStart === -1) {
+    throw new Error('Missing legacy Duration.toSeconds UTF-8 constant');
+  }
+  data = Buffer.concat([
+    data.slice(0, legacyNameStart),
+    utf8Constant('toBigDecimalSeconds'),
+    data.slice(legacyNameEnd)
+  ]);
+
+  var cp = constantPoolEnd(data),
+    overlays: Array<{
+      name: string;
+      descriptor: string;
+      helperDescriptor: string;
+      returnOpcode: number;
+      maxStack: number;
+      maxLocals: number;
+      codePrefix: number[];
+    }> = [
+      {
+        name: 'dividedBy',
+        descriptor: '(Ljava/time/Duration;)J',
+        helperDescriptor: '(Ljava/time/Duration;Ljava/time/Duration;)J',
+        returnOpcode: 0xad,
+        maxStack: 2,
+        maxLocals: 2,
+        codePrefix: [0x2a, 0x2b]
+      },
+      {
+        name: 'toSeconds',
+        descriptor: '()J',
+        helperDescriptor: '(Ljava/time/Duration;)J',
+        returnOpcode: 0xad,
+        maxStack: 2,
+        maxLocals: 1,
+        codePrefix: [0x2a]
+      },
+      {
+        name: 'toDaysPart',
+        descriptor: '()J',
+        helperDescriptor: '(Ljava/time/Duration;)J',
+        returnOpcode: 0xad,
+        maxStack: 2,
+        maxLocals: 1,
+        codePrefix: [0x2a]
+      },
+      {
+        name: 'toHoursPart',
+        descriptor: '()I',
+        helperDescriptor: '(Ljava/time/Duration;)I',
+        returnOpcode: 0xac,
+        maxStack: 1,
+        maxLocals: 1,
+        codePrefix: [0x2a]
+      },
+      {
+        name: 'toMinutesPart',
+        descriptor: '()I',
+        helperDescriptor: '(Ljava/time/Duration;)I',
+        returnOpcode: 0xac,
+        maxStack: 1,
+        maxLocals: 1,
+        codePrefix: [0x2a]
+      },
+      {
+        name: 'toSecondsPart',
+        descriptor: '()I',
+        helperDescriptor: '(Ljava/time/Duration;)I',
+        returnOpcode: 0xac,
+        maxStack: 1,
+        maxLocals: 1,
+        codePrefix: [0x2a]
+      },
+      {
+        name: 'toMillisPart',
+        descriptor: '()I',
+        helperDescriptor: '(Ljava/time/Duration;)I',
+        returnOpcode: 0xac,
+        maxStack: 1,
+        maxLocals: 1,
+        codePrefix: [0x2a]
+      },
+      {
+        name: 'toNanosPart',
+        descriptor: '()I',
+        helperDescriptor: '(Ljava/time/Duration;)I',
+        returnOpcode: 0xac,
+        maxStack: 1,
+        maxLocals: 1,
+        codePrefix: [0x2a]
+      }
+    ],
+    helperNameIndex = cp.count,
+    helperClassIndex = cp.count + 1,
+    codeNameIndex = cp.count + 2,
+    extraConstants = Buffer.concat([
+      utf8Constant('java/time/DoppioDuration'),
+      Buffer.concat([Buffer.from([7]), u2(helperNameIndex)]),
+      utf8Constant('Code')
+    ].concat(overlays.reduce((constants: Buffer[], overlay, index: number) => {
+      var nameIndex = cp.count + 3 + index * 5,
+        descriptorIndex = nameIndex + 1,
+        helperDescriptorIndex = nameIndex + 2,
+        nameAndTypeIndex = nameIndex + 3;
+      constants.push(
+        utf8Constant(overlay.name),
+        utf8Constant(overlay.descriptor),
+        utf8Constant(overlay.helperDescriptor),
+        Buffer.concat([Buffer.from([12]), u2(nameIndex), u2(helperDescriptorIndex)]),
+        Buffer.concat([Buffer.from([10]), u2(helperClassIndex), u2(nameAndTypeIndex)])
+      );
+      return constants;
+    }, []))),
+    withConstants = Buffer.concat([
+      data.slice(0, 8),
+      u2(cp.count + 3 + overlays.length * 5),
+      data.slice(10, cp.offset),
+      extraConstants,
+      data.slice(cp.offset)
+    ]),
+    methods = methodsInfo(withConstants, cp.offset + extraConstants.length),
+    methodData = Buffer.concat(overlays.map((overlay, index: number) => {
+      var nameIndex = cp.count + 3 + index * 5,
+        descriptorIndex = nameIndex + 1,
+        helperMethodIndex = nameIndex + 4,
+        code = Buffer.concat([
+          Buffer.from(overlay.codePrefix.concat([0xb8])),
+          u2(helperMethodIndex),
+          Buffer.from([overlay.returnOpcode])
+        ]);
+      return Buffer.concat([
+        u2(0x0001),
+        u2(nameIndex),
+        u2(descriptorIndex),
+        u2(1),
+        u2(codeNameIndex),
+        u4(12 + code.length),
+        u2(overlay.maxStack),
+        u2(overlay.maxLocals),
+        u4(code.length),
+        code,
+        u2(0),
+        u2(0)
+      ]);
+    }));
+
+  return Buffer.concat([
+    withConstants.slice(0, methods.countOffset),
+    u2(methods.count + overlays.length),
+    withConstants.slice(methods.countOffset + 2, methods.endOffset),
+    methodData,
+    withConstants.slice(methods.endOffset)
+  ]);
+}
+
 function addJavaLangInvokeMethodHandlesModernOverlays(data: Buffer): Buffer {
   var cp = constantPoolEnd(data),
     overlays = [
@@ -3353,6 +3561,9 @@ export class BootstrapClassLoader extends ClassLoader {
         }
         if (typeStr === 'Ljava/util/concurrent/TimeUnit;') {
           clsData = addJavaUtilConcurrentTimeUnitModernOverlays(clsData);
+        }
+        if (typeStr === 'Ljava/time/Duration;') {
+          clsData = addJavaTimeDurationModernOverlays(clsData);
         }
         if (typeStr === 'Ljava/lang/invoke/MethodHandles;') {
           clsData = addJavaLangInvokeMethodHandlesModernOverlays(clsData);

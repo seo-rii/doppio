@@ -127,6 +127,22 @@ replacing the Java 8 enum or its existing timing behavior:
 The mapping, conversion, metadata, reflection, and MethodHandle test boundary
 is documented in `docs/design/timeunit-modern.md`.
 
+The Java 9 `Duration` overlay handles a private/public name collision before
+appending its eight methods:
+
+- the Java 8 private `toSeconds(): BigDecimal` UTF-8 constant is renamed to
+  `toBigDecimalSeconds`, preserving its constant-pool index and the existing
+  scalar multiplication and division call sites;
+- parsed public `dividedBy(Duration)`, `toSeconds()`, and six part accessors
+  delegate to package-private `DoppioDuration` with exact decimal division and
+  normalized signed-part semantics;
+- `Java9DurationModern` compares boundary arithmetic, legacy arithmetic,
+  method-table uniqueness, exact metadata, reflection, exception causes, and
+  selected unreflected handles with HotSpot 17.
+
+The transformation and test boundary are documented in
+`docs/design/duration-modern.md`.
+
 The Java 9 `ClassLoader.getPlatformClassLoader()` overlay adds the first
 caller-sensitive parsed method:
 

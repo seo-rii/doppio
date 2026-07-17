@@ -42,6 +42,14 @@ metadata, unsupported/null failures, reflection and unreflected handles, plus
 positive/negative fractional duration truncation and signed `long` saturation.
 Difficulty: low.
 
+Java 9 `Duration` note: `dividedBy(Duration)`, `toSeconds()`, and all six part
+accessors are implemented as ordinary parsed methods on the retained Java 8
+class. The Java 8 private `toSeconds(): BigDecimal` helper is renamed to its
+Java 9 name before the public overload is appended, preserving legacy duration
+arithmetic. Coverage includes normalized negative parts, exact decimal
+division, signed `long` boundaries and overflow, metadata, reflection, and
+unreflected handles. Difficulty: medium.
+
 Java 17 `java.lang.invoke` note: the compatibility row above now also includes
 selected `MethodHandles.tryFinally` support including fixed-arity normalization
 for varargs target and cleanup handles, selected
@@ -1206,6 +1214,14 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   seven target units. Both fixtures verify exact metadata, `Method.invoke`,
   and `Lookup.unreflect`; the existing Java 8 enum timing methods remain
   untouched. See `docs/design/timeunit-modern.md`.
+- `java.time.Duration.dividedBy(Duration)`, `toSeconds()`, and the six part
+  accessors are parsed Java 9 methods with exact metadata. Coverage includes
+  zero, positive, normalized negative, fractional, and extreme part values;
+  exact decimal division and truncation toward zero; null, zero-divisor, and
+  signed overflow failures; reflection; and selected `Lookup.unreflect`
+  invocation. Existing Java 8 `multipliedBy(long)` and `dividedBy(long)` remain
+  under regression after the private helper rename. See
+  `docs/design/duration-modern.md`.
 - `java.lang.StackTraceElement` now exposes selected Java 9 metadata
   constructor and accessor behavior for class-loader name, module name, and
   module version while preserving the existing class/method/file/line fields,
