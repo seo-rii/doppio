@@ -1173,6 +1173,7 @@ export function setup(grunt: IGrunt) {
       'newer:javac',
       'javac_modern_classlib',
       'generate_doppio_jar',
+      'generate_modern_bootstrap_overlay',
       'includes:default',
       'make_build_dir:release-cli',
       'newer:ice-cream:release-cli',

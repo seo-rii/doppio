@@ -59,6 +59,9 @@ jobs:
         timeout-minutes: 20
         run: ./node_modules/.bin/grunt --stack modern-ci-release-cli --grunt-ignore-compile-errors
 
+      - name: Verify compiler bootstrap overlay
+        run: ./ci/modern_bootstrap_overlay_smoke.sh
+
       - name: Run modern Java compatibility tests
         run: ./node_modules/.bin/grunt --stack test-modern-java-runtime --grunt-ignore-compile-errors
 

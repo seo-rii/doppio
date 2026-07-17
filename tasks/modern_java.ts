@@ -3,6 +3,7 @@ import os = require('os');
 import fs = require('fs');
 import async = require('async');
 import path = require('path');
+import crypto = require('crypto');
 
 function shellEscape(str: string): string {
   return "'" + str.replace(/'/g, "'\\''") + "'";
@@ -4871,6 +4872,136 @@ function modernJava(grunt: IGrunt) {
         }
         compileSpecialFiles();
       });
+  });
+
+  grunt.registerTask('generate_modern_bootstrap_overlay',
+      'Generate compiler-facing bootstrap classes with the runtime overlay transformer.', function() {
+    var runtimeJar = 'vendor/java_home/lib/rt.jar',
+      workDir = 'build/modern-bootstrap-overlay',
+      baseDir = path.join(workDir, 'base'),
+      outDir = path.join(workDir, 'out'),
+      artifact = path.join(workDir, 'modern-bootstrap.jar'),
+      inputHashPath = path.join(workDir, 'input.sha256'),
+      artifactHashPath = path.join(workDir, 'artifact.sha256'),
+      compiledTransformer = path.resolve('build/dev-cli/src/ClassLoader.js'),
+      inputs = [runtimeJar, 'src/ClassLoader.ts', 'tasks/modern_java.ts', compiledTransformer],
+      force = process.env.DOPPIO_FORCE_MODERN_BOOTSTRAP_OVERLAY === '1';
+    if (!fs.existsSync(compiledTransformer)) {
+      grunt.fail.fatal('Compiled bootstrap overlay transformer is missing: ' + compiledTransformer);
+    }
+
+    var inputHasher = crypto.createHash('sha256');
+    inputHasher.update('doppio-modern-bootstrap-overlay-v1\0');
+    inputHasher.update('timestamp=2000-01-01T00:00:00Z\0manifest=none\0ordering=lexical\0');
+    inputs.forEach(function(input: string): void {
+      inputHasher.update(input + '\0');
+      inputHasher.update(fs.readFileSync(input));
+    });
+    var inputHash = inputHasher.digest('hex');
+    if (!force && fs.existsSync(artifact) && fs.existsSync(inputHashPath) &&
+        fs.existsSync(artifactHashPath)) {
+      var cachedInputHash = fs.readFileSync(inputHashPath, 'utf8').trim(),
+        cachedArtifactHash = fs.readFileSync(artifactHashPath, 'utf8').trim(),
+        currentArtifactHash = crypto.createHash('sha256')
+          .update(fs.readFileSync(artifact)).digest('hex');
+      if (cachedInputHash === inputHash && cachedArtifactHash === currentArtifactHash) {
+        grunt.log.ok('Compiler bootstrap overlay content hashes are up-to-date.');
+        return;
+      }
+    }
+
+    if (fs.existsSync(workDir)) {
+      grunt.file.delete(workDir, {force: true});
+    }
+    grunt.file.mkdir(baseDir);
+    grunt.file.mkdir(outDir);
+
+    var jarTool = path.join(
+        path.dirname(grunt.config('build.javac')),
+        os.platform() === 'win32' ? 'jar.exe' : 'jar'),
+      extraction = child_process.spawnSync(
+        jarTool, ['xf', path.resolve(runtimeJar)], {cwd: baseDir, encoding: 'utf8'});
+    if (extraction.status !== 0) {
+      grunt.fail.fatal('Unable to extract runtime bootstrap classes:\n' +
+        extraction.stdout + extraction.stderr);
+    }
+
+    var transformer: {
+        applyModernBootstrapOverlays: (typeStr: string, data: Buffer) => Buffer;
+      } = require(compiledTransformer),
+      classFiles: string[] = grunt.file.expand(
+        {cwd: baseDir, filter: 'isFile'}, ['**/*.class']),
+      transformedClasses: string[] = [];
+    classFiles.forEach(function(relativePath: string): void {
+      var inputPath = path.join(baseDir, relativePath),
+        input = fs.readFileSync(inputPath),
+        typeStr = 'L' + relativePath.slice(0, -'.class'.length).replace(/\\/g, '/') + ';',
+        transformed = transformer.applyModernBootstrapOverlays(typeStr, input);
+      if (!transformed.equals(input)) {
+        var outputPath = path.join(outDir, relativePath);
+        grunt.file.mkdir(path.dirname(outputPath));
+        fs.writeFileSync(outputPath, transformed);
+        transformedClasses.push(relativePath.replace(/\\/g, '/'));
+      }
+    });
+
+    transformedClasses.sort();
+    var expectedTransformedClasses = [
+      'java/lang/Character.class',
+      'java/lang/Class.class',
+      'java/lang/ClassLoader.class',
+      'java/lang/Math.class',
+      'java/lang/Runtime.class',
+      'java/lang/StrictMath.class',
+      'java/lang/System.class',
+      'java/lang/Thread.class',
+      'java/lang/invoke/MethodHandle.class',
+      'java/lang/invoke/MethodHandles$Lookup.class',
+      'java/lang/invoke/MethodHandles.class',
+      'java/lang/ref/Reference.class',
+      'java/lang/reflect/AccessibleObject.class',
+      'java/lang/reflect/AnnotatedArrayType.class',
+      'java/lang/reflect/AnnotatedParameterizedType.class',
+      'java/lang/reflect/AnnotatedType.class',
+      'java/lang/reflect/AnnotatedTypeVariable.class',
+      'java/lang/reflect/AnnotatedWildcardType.class',
+      'java/lang/reflect/Constructor.class',
+      'java/lang/reflect/Executable.class',
+      'java/nio/MappedByteBuffer.class',
+      'java/time/Duration.class',
+      'java/util/concurrent/TimeUnit.class',
+      'sun/reflect/annotation/AnnotatedTypeFactory$AnnotatedArrayTypeImpl.class',
+      'sun/reflect/annotation/AnnotatedTypeFactory$AnnotatedParameterizedTypeImpl.class',
+      'sun/reflect/annotation/AnnotatedTypeFactory$AnnotatedTypeBaseImpl.class',
+      'sun/reflect/annotation/AnnotatedTypeFactory$AnnotatedTypeVariableImpl.class',
+      'sun/reflect/annotation/AnnotatedTypeFactory$AnnotatedWildcardTypeImpl.class',
+      'sun/reflect/annotation/AnnotatedTypeFactory.class',
+      'sun/reflect/annotation/TypeAnnotation$LocationInfo.class',
+      'sun/reflect/generics/reflectiveObjects/ParameterizedTypeImpl.class'
+    ];
+    if (JSON.stringify(transformedClasses) !== JSON.stringify(expectedTransformedClasses)) {
+      grunt.fail.fatal('Unexpected compiler bootstrap overlay class set.\nExpected:\n' +
+        expectedTransformedClasses.join('\n') + '\nActual:\n' + transformedClasses.join('\n'));
+    }
+
+    var packagingArgs = [
+      '--create',
+      '--file', path.resolve(artifact),
+      '--date=2000-01-01T00:00:00Z',
+      '--no-manifest'
+    ].concat(transformedClasses),
+      packaging = child_process.spawnSync(
+        jarTool, packagingArgs, {cwd: outDir, encoding: 'utf8'});
+    if (packaging.status !== 0) {
+      grunt.fail.fatal('Unable to package compiler bootstrap overlay:\n' +
+        packaging.stdout + packaging.stderr);
+    }
+    var artifactHash = crypto.createHash('sha256')
+      .update(fs.readFileSync(artifact)).digest('hex');
+    fs.writeFileSync(inputHashPath, inputHash + '\n');
+    fs.writeFileSync(artifactHashPath, artifactHash + '\n');
+    grunt.log.ok('Generated ' + artifact + ' with ' +
+      transformedClasses.length + ' transformed bootstrap classes (' + artifactHash + ').');
   });
 
   grunt.registerTask('javac_modern_multirelease_jar', 'Compile a Java 9 multi-release JAR fixture.', function() {

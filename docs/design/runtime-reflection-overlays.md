@@ -143,6 +143,21 @@ appending its eight methods:
 The transformation and test boundary are documented in
 `docs/design/duration-modern.md`.
 
+The runtime and compiler classfile views now share one dispatch:
+
+- `applyModernBootstrapOverlays(typeStr, data)` owns all parsed-overlay class
+  selection and ordering used by `BootstrapClassLoader`;
+- `generate_modern_bootstrap_overlay` applies that same function to every
+  class in the pinned Java 8 `rt.jar` and packages the exact 31 changed classes
+  into a deterministic compiler-only JAR;
+- Kotlin and Scala source analysis put that JAR before `doppio.jar` and
+  `rt.jar`, while generated programs continue using the ordinary Java 8
+  runtime classes and one runtime transformation pass.
+
+The artifact, hash cache, exact entry gate, non-idempotence boundary, and CI
+determinism smoke are documented in
+`docs/design/compiler-bootstrap-overlay.md`.
+
 The Java 9 `ClassLoader.getPlatformClassLoader()` overlay adds the first
 caller-sensitive parsed method:
 
