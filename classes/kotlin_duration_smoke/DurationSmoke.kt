@@ -25,6 +25,17 @@ fun durationSummary(): String {
     TimeUnit.of(ChronoUnit.SECONDS).name,
     TimeUnit.SECONDS.convert(JavaDuration.ofSeconds(-2, 500_000_000)).toString(),
   ).joinToString(":")
+  val modernDuration = JavaDuration.ofSeconds(-183_846, 321_098_766)
+  val modernDurationParts = listOf(
+    JavaDuration.ofSeconds(9).dividedBy(JavaDuration.ofSeconds(2)),
+    modernDuration.toSeconds(),
+    modernDuration.toDaysPart(),
+    modernDuration.toHoursPart(),
+    modernDuration.toMinutesPart(),
+    modernDuration.toSecondsPart(),
+    modernDuration.toMillisPart(),
+    modernDuration.toNanosPart(),
+  ).joinToString(":")
   return base.inWholeMilliseconds.toString() + "|" +
     parts + "|" +
     sorted + "|" +
@@ -34,5 +45,6 @@ fun durationSummary(): String {
     scaled + "|" +
     coerced + "|" +
     flags + "|" +
-    modernTimeUnits
+    modernTimeUnits + "|" +
+    modernDurationParts
 }

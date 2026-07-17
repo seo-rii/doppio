@@ -48,7 +48,9 @@ class. The Java 8 private `toSeconds(): BigDecimal` helper is renamed to its
 Java 9 name before the public overload is appended, preserving legacy duration
 arithmetic. Coverage includes normalized negative parts, exact decimal
 division, signed `long` boundaries and overflow, metadata, reflection, and
-unreflected handles. Difficulty: medium.
+unreflected handles. Focused Kotlin 2.4.0 and Scala 2.13.18 smokes also guard
+all eight direct-call descriptors and compare host/Doppio output. Difficulty:
+medium.
 
 Java 17 `java.lang.invoke` note: the compatibility row above now also includes
 selected `MethodHandles.tryFinally` support including fixed-arity normalization
@@ -1220,8 +1222,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   exact decimal division and truncation toward zero; null, zero-divisor, and
   signed overflow failures; reflection; and selected `Lookup.unreflect`
   invocation. Existing Java 8 `multipliedBy(long)` and `dividedBy(long)` remain
-  under regression after the private helper rename. See
-  `docs/design/duration-modern.md`.
+  under regression after the private helper rename. Kotlin and Scala duration
+  smokes compile and inspect direct calls to all eight methods before comparing
+  runtime output. See `docs/design/duration-modern.md`.
 - `java.lang.StackTraceElement` now exposes selected Java 9 metadata
   constructor and accessor behavior for class-loader name, module name, and
   module version while preserving the existing class/method/file/line fields,

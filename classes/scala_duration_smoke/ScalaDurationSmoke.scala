@@ -23,6 +23,17 @@ object ScalaDurationSmoke {
     val timeUnit = TimeUnit.of(ChronoUnit.HOURS).name()
     val converted = TimeUnit.MILLISECONDS.convert(JavaDuration.ofSeconds(2, 345678901))
     val negativeFraction = TimeUnit.MILLISECONDS.convert(JavaDuration.ofSeconds(-3, 654321099))
-    s"${base.toMillis}|$timeline|$sorted|${Duration.fromNanos(1500).toMicros}|$ratio|$parsed|$scaled|$clamped|$flags|$chronoUnit|$timeUnit|$converted|$negativeFraction"
+    val modernDuration = JavaDuration.ofSeconds(-183846, 321098766)
+    val modernDurationParts = List(
+      JavaDuration.ofSeconds(9).dividedBy(JavaDuration.ofSeconds(2)),
+      modernDuration.toSeconds(),
+      modernDuration.toDaysPart(),
+      modernDuration.toHoursPart(),
+      modernDuration.toMinutesPart(),
+      modernDuration.toSecondsPart(),
+      modernDuration.toMillisPart(),
+      modernDuration.toNanosPart()
+    ).mkString(":")
+    s"${base.toMillis}|$timeline|$sorted|${Duration.fromNanos(1500).toMicros}|$ratio|$parsed|$scaled|$clamped|$flags|$chronoUnit|$timeUnit|$converted|$negativeFraction|$modernDurationParts"
   }
 }

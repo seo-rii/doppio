@@ -104,12 +104,14 @@ The fixture compares exact descriptors and modifiers for all eight methods,
 declared-method counts, empty exception and annotation metadata, reflective
 results and exception causes, and selected unreflected handle types and
 results. The full Java 9-26 suite passed locally on 2026-07-17 in 6 minutes 40
-seconds. The existing Kotlin and Scala duration compiler smokes passed in 111
-and 78 seconds respectively.
+seconds. The focused Kotlin 2.4.0 and Scala 2.13.18 duration smokes compile
+direct calls to all eight methods, assert every emitted `invokevirtual`
+descriptor with `javap`, and compare host and Doppio output. They passed
+locally in 136 and 96 seconds respectively.
 
 Parsed overlays exist only after Doppio loads and transforms the Java 8
 `rt.jar`, so static compiler classpath inspection cannot discover them in the
 original `rt.jar` or generated `doppio.jar`. Until the compiler-facing
-bootstrap artifact tracked by `RISK_REGISTER.md` is available, direct compiler
-interop checks require compile-only JDK 11+/17 method metadata; their generated
-bytecode must still run against Doppio's parsed overlay.
+bootstrap artifact tracked by `RISK_REGISTER.md` is available, these compiler
+interop checks use compile-only JDK 11+/17 method metadata; their generated
+bytecode still runs against Doppio's parsed overlay.

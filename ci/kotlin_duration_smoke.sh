@@ -94,9 +94,27 @@ if ! grep -Eq 'invokevirtual +#[0-9]+ +// Method java/util/concurrent/TimeUnit\.
   echo "Expected a direct invokevirtual TimeUnit.convert(Duration) reference." >&2
   exit 1
 fi
+duration_method_refs=(
+  'dividedBy|\(Ljava/time/Duration;\)J'
+  'toSeconds|\(\)J'
+  'toDaysPart|\(\)J'
+  'toHoursPart|\(\)I'
+  'toMinutesPart|\(\)I'
+  'toSecondsPart|\(\)I'
+  'toMillisPart|\(\)I'
+  'toNanosPart|\(\)I'
+)
+for method_ref in "${duration_method_refs[@]}"; do
+  method_name="${method_ref%%|*}"
+  method_descriptor="${method_ref#*|}"
+  if ! grep -Eq "invokevirtual[[:space:]]+#[0-9]+[[:space:]]+// Method java/time/Duration\.${method_name}:${method_descriptor}" <<<"$duration_javap"; then
+    echo "Expected a direct invokevirtual Duration.${method_name} reference." >&2
+    exit 1
+  fi
+done
 
 runtime_cp="$out_dir:$stdlib_jar"
-expected_output="${KOTLIN_DURATION_SMOKE_EXPECTED_OUTPUT:-"3250|0,500,1500,1250|-1000,0,1500,3000|1|2.0|1250|2250|3|true:true:true|MILLIS:SECONDS:-1"}"
+expected_output="${KOTLIN_DURATION_SMOKE_EXPECTED_OUTPUT:-"3250|0,500,1500,1250|-1000,0,1500,3000|1|2.0|1250|2250|3|true:true:true|MILLIS:SECONDS:-1|4:-183846:-2:-3:-4:-6:321:321098766"}"
 
 native_output="$(java -cp "$runtime_cp" KotlinDurationHelloKt)"
 if [ "$native_output" != "$expected_output" ]; then

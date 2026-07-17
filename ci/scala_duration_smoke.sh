@@ -66,7 +66,7 @@ fi
 host_java_home="${JAVA_HOME:-$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")}"
 java_base_jmod="$host_java_home/jmods/java.base.jmod"
 if [ ! -f "$java_base_jmod" ]; then
-  echo "Java 17 java.base.jmod is required for the TimeUnit compiler overlay." >&2
+  echo "Java 17 java.base.jmod is required for the compiler bootstrap overlays." >&2
   exit 1
 fi
 
@@ -74,7 +74,9 @@ rm -rf "$out_dir" "$compiler_boot_dir"
 mkdir -p "$out_dir" "$compiler_boot_dir"
 (
   cd "$compiler_boot_dir"
-  jar xf "$java_base_jmod" classes/java/util/concurrent/TimeUnit.class
+  jar xf "$java_base_jmod" \
+    classes/java/time/Duration.class \
+    classes/java/util/concurrent/TimeUnit.class
 )
 compiler_boot_cp="$compiler_boot_dir/classes:$modern_boot_jar:$runtime_boot_jar"
 
@@ -111,8 +113,26 @@ if ! grep -Eq 'invokevirtual[[:space:]]+#[0-9]+[[:space:]]+// Method java/util/c
   echo "Missing direct invokevirtual TimeUnit.convert(Duration) reference." >&2
   exit 1
 fi
+duration_method_refs=(
+  'dividedBy|\(Ljava/time/Duration;\)J'
+  'toSeconds|\(\)J'
+  'toDaysPart|\(\)J'
+  'toHoursPart|\(\)I'
+  'toMinutesPart|\(\)I'
+  'toSecondsPart|\(\)I'
+  'toMillisPart|\(\)I'
+  'toNanosPart|\(\)I'
+)
+for method_ref in "${duration_method_refs[@]}"; do
+  method_name="${method_ref%%|*}"
+  method_descriptor="${method_ref#*|}"
+  if ! grep -Eq "invokevirtual[[:space:]]+#[0-9]+[[:space:]]+// Method java/time/Duration\.${method_name}:${method_descriptor}" <<<"$duration_javap"; then
+    echo "Missing direct invokevirtual Duration.${method_name} reference." >&2
+    exit 1
+  fi
+done
 
-expected_output="3250|0,500,1500,1250|-1000,0,1500,3000|1|2.0|1250|2250|3|true:false:true|MILLIS|HOURS|2345|-2345"
+expected_output="3250|0,500,1500,1250|-1000,0,1500,3000|1|2.0|1250|2250|3|true:false:true|MILLIS|HOURS|2345|-2345|4:-183846:-2:-3:-4:-6:321:321098766"
 
 native_output="$(java -cp "$runtime_cp" ScalaDurationHello)"
 if [ "$native_output" != "$expected_output" ]; then
