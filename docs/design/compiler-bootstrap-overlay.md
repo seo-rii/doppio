@@ -151,11 +151,12 @@ a manifest or directory entries. `--date=2000-01-01T00:00:00Z` fixes every
 entry timestamp. The CI determinism smoke verifies the resulting archive bytes
 instead of assuming the tool invocation is reproducible.
 
-At least `java/time/Duration.class` and
-`java/util/concurrent/TimeUnit.class` are required outputs because the focused
-compiler smokes depend on their direct modern methods. More generally, a test
-records the complete 31-class expected changed-entry set for the pinned Java 8
-baseline; changing that set requires an intentional parsed-overlay review.
+At least `java/lang/Runtime.class`, `java/time/Duration.class`, and
+`java/util/concurrent/TimeUnit.class` are required outputs because the broad
+and focused compiler smokes depend on their direct modern methods. More
+generally, a test records the complete 31-class expected changed-entry set for
+the pinned Java 8 baseline; changing that set requires an intentional
+parsed-overlay review.
 
 ## Rebuild And Hash Gate
 
@@ -170,9 +171,9 @@ again.
 `ci/modern_bootstrap_overlay_smoke.sh` performs two independent forced clean
 generations and compares the final JAR SHA-256 values. It then checks the stored
 artifact hash, exact 31-entry count, canonical class-only names, and required
-`Duration` and `TimeUnit` entries. The generator itself compares the complete
-sorted 31-class set before packaging, so an added, removed, or unexpectedly
-unchanged parsed overlay requires an intentional contract update.
+`Runtime`, `Duration`, and `TimeUnit` entries. The generator itself compares the
+complete sorted 31-class set before packaging, so an added, removed, or
+unexpectedly unchanged parsed overlay requires an intentional contract update.
 
 A same-input hash mismatch fails CI and reports both hashes. The task must not
 silently bless a newly nondeterministic output.

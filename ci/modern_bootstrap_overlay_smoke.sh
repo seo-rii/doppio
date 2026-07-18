@@ -38,6 +38,7 @@ for entry in "${entries[@]}"; do
   fi
 done
 for required_entry in \
+    java/lang/Runtime.class \
     java/time/Duration.class \
     java/util/concurrent/TimeUnit.class; do
   required_found=false
