@@ -21,6 +21,16 @@ function requireWorkflowIndex(label, index) {
   return index;
 }
 
+const jobTimeoutMatch = workflow.match(/^ {4}timeout-minutes:\s*(\d+)\s*$/m);
+if (!jobTimeoutMatch) {
+  fail('Modern Java workflow must set timeout-minutes on the test job.');
+}
+
+const jobTimeoutMinutes = Number(jobTimeoutMatch[1]);
+if (!Number.isInteger(jobTimeoutMinutes) || jobTimeoutMinutes < 120 || jobTimeoutMinutes > 180) {
+  fail('Modern Java workflow test job timeout must be between 120 and 180 minutes.');
+}
+
 const expectedScripts = fs
   .readdirSync(ciDir)
   .filter((name) => smokeScriptPattern.test(name))

@@ -9,6 +9,10 @@ const checkerPath = path.join(path.dirname(__filename), 'check_modern_java_workf
 
 function writeFixture(root, workflowText, options = {}) {
   const includeBootstrapStep = options.includeBootstrapStep !== false;
+  const includeJobTimeout = options.includeJobTimeout !== false;
+  if (includeJobTimeout && !/^ {4}timeout-minutes:/m.test(workflowText)) {
+    workflowText = workflowText.replace('  test:\n', '  test:\n    timeout-minutes: 120\n');
+  }
   if (includeBootstrapStep && !workflowText.includes('- name: Verify compiler bootstrap overlay')) {
     workflowText = workflowText.replace(
       '      - name: Run modern Java compatibility tests',
@@ -61,6 +65,36 @@ jobs:
   const completeResult = runChecker(complete.ciDir, complete.workflowPath);
   if (completeResult.status !== 0) {
     throw new Error(`expected complete workflow to pass:\n${completeResult.stderr}`);
+  }
+
+  const completeWorkflow = fs.readFileSync(complete.workflowPath, 'utf8');
+  const shortJobTimeout = writeFixture(
+    root,
+    completeWorkflow.replace('    timeout-minutes: 120\n', '    timeout-minutes: 90\n')
+  );
+  const shortJobTimeoutResult = runChecker(shortJobTimeout.ciDir, shortJobTimeout.workflowPath);
+  if (
+    shortJobTimeoutResult.status === 0 ||
+    !shortJobTimeoutResult.stderr.includes('between 120 and 180 minutes')
+  ) {
+    throw new Error(
+      `expected short test job timeout to fail:\n${shortJobTimeoutResult.stdout}\n${shortJobTimeoutResult.stderr}`
+    );
+  }
+
+  const missingJobTimeout = writeFixture(
+    root,
+    completeWorkflow.replace('    timeout-minutes: 120\n', ''),
+    { includeJobTimeout: false }
+  );
+  const missingJobTimeoutResult = runChecker(missingJobTimeout.ciDir, missingJobTimeout.workflowPath);
+  if (
+    missingJobTimeoutResult.status === 0 ||
+    !missingJobTimeoutResult.stderr.includes('timeout-minutes on the test job')
+  ) {
+    throw new Error(
+      `expected missing test job timeout to fail:\n${missingJobTimeoutResult.stdout}\n${missingJobTimeoutResult.stderr}`
+    );
   }
 
   const missingBootstrapOverlay = writeFixture(
