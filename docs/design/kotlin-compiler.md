@@ -447,8 +447,9 @@ Current verified checks:
   tracking risk.
 - A focused Kotlin `@JvmInline value class` smoke now lives in
   `classes/kotlin_value_class_smoke` and runs through
-  `ci/kotlin_value_class_smoke.sh`. A focused local run completed in 79
-  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_value_class_smoke.sh`. An initial focused local run completed in 79
+  seconds, and a 2026-07-18 strict-bootstrap compile completed in 145 seconds.
+  A follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 212 seconds. Both the host JVM and Doppio
   printed `v1,v4,v7:22:box4:v7:none|v11:a`. It covers a value class
   implementing `Comparable` and a custom interface, plus operator dispatch,
@@ -457,8 +458,9 @@ Current verified checks:
   `box-impl`/`unbox-impl`/`equals-impl`/`hashCode-impl` methods.
 - A focused Kotlin reified-generic and array-lowering smoke now lives in
   `classes/kotlin_reified_array_smoke` and runs through
-  `ci/kotlin_reified_array_smoke.sh`. A focused local run completed in 79
-  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_reified_array_smoke.sh`. An initial focused local run completed in
+  79 seconds, and a 2026-07-18 strict-bootstrap compile completed in 149
+  seconds. A follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 220 seconds. Both the host JVM and Doppio
   printed
   `String:3:a|bb|ccc:Number:2:1|2:i[3,1,4,9,1,5]=23:zamm|zbbmm:1-4-9:2345:String:int`.
@@ -571,8 +573,9 @@ Current verified checks:
   `tableswitch`, string `lookupswitch`, and subjectless range branch lowering.
 - A focused Kotlin inline control-flow smoke now lives in
   `classes/kotlin_inline_control_smoke` and runs through
-  `ci/kotlin_inline_control_smoke.sh`. A focused local run completed in 81
-  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_inline_control_smoke.sh`. An initial focused local run completed in
+  81 seconds, and a 2026-07-18 strict-bootstrap compile completed in 182
+  seconds. A follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 170 seconds. Both the host JVM and Doppio
   printed `enter>body>exit:ok:c10:34:stop3`. The focused script verifies
   inline `try/finally` `InlineMarker.finallyStart`/`finallyEnd`, non-local
@@ -699,8 +702,9 @@ Current verified checks:
   and anonymous interface metadata on both the host JVM and Doppio.
 - A focused Kotlin delegation/bridge smoke now lives in
   `classes/kotlin_delegation_bridge_smoke` and runs through
-  `ci/kotlin_delegation_bridge_smoke.sh`. A focused local run completed in 74
-  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_delegation_bridge_smoke.sh`. An initial focused local run completed
+  in 74 seconds, and a 2026-07-18 strict-bootstrap compile completed in 205
+  seconds. A follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 214 seconds. Both the host JVM and Doppio
   printed
   `text:7|text:5|5x|text:6|z!|az!|apply:Object:Object,describe:String:CharSequence,describe:String:Object|apply:Object:Object,describe:String:Object|echo:Object:Object,read:Object:`.
