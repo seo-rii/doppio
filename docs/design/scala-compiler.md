@@ -390,7 +390,9 @@ by `LambdaMetafactory`, and checks debug/source metadata plus Scala-specific
 Scala core smoke in 154 seconds and the remaining main Scala compiler smoke in
 68 seconds using Scala 2.13.18. The main smoke now keeps the full compiler
 classpath stress while compiling only a minimal `Hello` program that prints
-`scala`.
+`scala`. The core smoke now passes Doppio's ordered compiler bootstrap overlay
+to `-javabootclasspath`; a local 2026-07-18 strict-bootstrap compile completed
+in 159 seconds with the same classfile and runtime checks.
 
 `ci/scala_diagnostic_smoke.sh` runs Doppio-hosted scalac on an intentionally
 invalid source set and checks the nonzero exit status plus diagnostic source

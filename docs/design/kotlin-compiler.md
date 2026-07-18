@@ -342,6 +342,8 @@ Current verified checks:
   parameter names, interface `DefaultImpls`, `InnerClasses`, and
   `kotlin.Metadata`. This focused bytecode smoke uses the minimal compiler
   classpath; full-classpath stress remains covered by `ci/kotlin_smoke.sh`.
+  It now uses Doppio's ordered compiler bootstrap metadata with `-no-jdk`; a
+  local 2026-07-18 strict-bootstrap compile completed in 140 seconds.
 - A focused Kotlin basic-construct smoke now lives in
   `classes/kotlin_basic_construct_smoke` and runs through
   `ci/kotlin_basic_construct_smoke.sh`. It compiles and runs a data class,
@@ -964,8 +966,9 @@ Current verified checks:
   seconds.
 - A focused Kotlin bytecode-runtime smoke now lives in
   `classes/kotlin_bytecode_runtime_smoke` and runs through
-  `ci/kotlin_bytecode_runtime_smoke.sh`. A focused local run completed in 135
-  seconds. Both the host JVM and Doppio printed
+  `ci/kotlin_bytecode_runtime_smoke.sh`. It now uses Doppio's ordered compiler
+  bootstrap metadata with `-no-jdk`; a local 2026-07-18 strict-bootstrap
+  compile completed in 139 seconds. Both the host JVM and Doppio printed
   `try>catch>finally:boom:8:true:body/close:x3:10:12:4:sync:BytecodeSmoke.kt:true`.
   This covers Kotlin lowering for `try`/`catch`/`finally`, `Closeable.use`
   including close-failure suppressed-exception preservation, destructuring via
