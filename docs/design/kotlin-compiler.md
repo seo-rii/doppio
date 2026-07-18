@@ -25,8 +25,13 @@ node --no-deprecation build/release-cli/console/runner.js \
   `class Foo`, `fun main() {}`, and `fun main() { println("hi") }`; the
   generated `HelloKt` class runs on both the host JVM and Doppio. The remaining
   Kotlin compiler work is now broader throughput and coverage hardening:
-  repeated variance checks, more language constructs, and the full
-  `kotlinc/lib/*.jar` classpath stress case.
+  repeated variance checks and more language constructs.
+- The CI main compiler smoke now separates the full `kotlinc/lib/*.jar`
+  compiler runtime classpath from its target bootstrap metadata. It passes
+  `-no-jdk` and analyzes source against the generated
+  `modern-bootstrap.jar`, `doppio.jar`, Java 8 `rt.jar`, and Kotlin stdlib,
+  without a host `-jdk-home`. A local 2026-07-18 full-classpath run compiled
+  and executed `Hello.kt` in 91 seconds.
 - `-Xint` does not solve the one-file compile hang, so JIT overhead is not the
   sole blocker.
 - The CLI now exposes Doppio's scheduler quantum as

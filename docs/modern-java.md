@@ -56,10 +56,10 @@ Compiler bootstrap note: `modern-ci-release-cli` generates a deterministic
 compiler-only JAR containing the 31 Java 8 bootstrap classes changed by the
 shared parsed-overlay dispatch. Kotlin and Scala put this artifact before
 `doppio.jar` and `rt.jar` for source analysis, eliminating host JDK metadata
-from both the broad modern interop and focused duration gates without changing
-Doppio's runtime bootstrap path. The broad gates compile and bytecode-check a
-direct `Runtime.version()` call, while CI also compares two forced-generation
-SHA-256 values and the exact class-only entry contract. See
+from the main compiler, broad modern interop, and focused duration gates
+without changing Doppio's runtime bootstrap path. The broad gates compile and
+bytecode-check a direct `Runtime.version()` call, while CI also compares two
+forced-generation SHA-256 values and the exact class-only entry contract. See
 `docs/design/compiler-bootstrap-overlay.md`.
 
 Java 17 `java.lang.invoke` note: the compatibility row above now also includes
@@ -247,7 +247,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
 
 - Target: Kotlin compiler 2.4.0.
 - Current Doppio state: `K2JVMCompiler -version` exits with status 0, and the
-  minimal `Hello.kt` compiler smoke now compiles and runs.
+  `Hello.kt` compiler smoke compiles and runs with the full compiler classpath
+  while target metadata comes only from Doppio's compiler bootstrap overlay,
+  modern class library, Java 8 runtime, and Kotlin stdlib.
 - Empty Kotlin source, `class Foo`, `fun main() {}`, and
   `fun main() { println("hi") }` now compile under Doppio with the minimal
   `kotlin-compiler.jar` classpath; the generated `HelloKt` class prints `hi`
@@ -466,8 +468,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
 - Current Doppio state: `ci/scala_smoke.sh` downloads `scala-compiler`,
   `scala-library`, `scala-reflect`, `java-diff-utils`, and JLine from Maven
   Central, runs `scala.tools.nsc.Main` under Doppio, and compiles
-  `classes/scala_smoke/*.scala`; the generated `Hello` class now prints the
-  expected output on both the host JVM and Doppio.
+  `classes/scala_smoke/*.scala` against the Doppio-owned compiler bootstrap
+  overlay; the generated `Hello` class prints the expected output on both the
+  host JVM and Doppio.
 - The fixture covers a small Scala 2.13 source slice with sealed traits, case
   objects, a sealed ADT with case classes, guarded pattern matching, a generic
   case class, trait default method, anonymous class, closures, collection

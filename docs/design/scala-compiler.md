@@ -17,10 +17,17 @@ both the host JVM and Doppio.
 node --max-old-space-size=4096 --no-deprecation build/release-cli/console/runner.js \
   -cp "$SCALA_COMPILER_CLASSPATH" \
   scala.tools.nsc.Main \
+  -javabootclasspath "$DOPPIO_COMPILER_BOOTSTRAP_CLASSPATH" \
   -classpath "$SCALA_LIBRARY_JAR" \
   -d "$OUT_DIR" \
   classes/scala_smoke/*.scala
 ```
+
+The main smoke's compiler boot classpath is the generated
+`modern-bootstrap.jar`, followed by `doppio.jar` and Java 8 `rt.jar`. The Scala
+library remains on the ordinary source classpath. This keeps target bootstrap
+metadata Doppio-owned while the compiler itself runs from its Maven
+dependencies. A local 2026-07-18 compile-and-run completed in 72 seconds.
 
 ## Initial Smoke Scope
 
