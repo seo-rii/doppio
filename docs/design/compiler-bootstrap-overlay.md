@@ -35,8 +35,9 @@ JDK's API surface.
 - Make clean rebuilds byte-for-byte deterministic and gate stale artifacts by
   content hash rather than modification time.
 - Put the generated JAR before `doppio.jar` and `rt.jar` for Kotlin and Scala
-  source analysis, including the main compiler and broad modern interop
-  suites, without adding it to Doppio's runtime bootstrap classpath.
+  source analysis, including the main compiler, broad modern interop, and
+  focused modern API suites, without adding it to Doppio's runtime bootstrap
+  classpath.
 
 This artifact is not a replacement JDK, a general Java 17 API signature JAR, or
 a second implementation of modern methods.
@@ -151,8 +152,9 @@ a manifest or directory entries. `--date=2000-01-01T00:00:00Z` fixes every
 entry timestamp. The CI determinism smoke verifies the resulting archive bytes
 instead of assuming the tool invocation is reproducible.
 
-At least `java/lang/Runtime.class`, `java/time/Duration.class`, and
-`java/util/concurrent/TimeUnit.class` are required outputs because the broad
+At least `java/lang/Runtime.class`, the three transformed
+`java/lang/invoke/MethodHandle*` consumer classes, `java/time/Duration.class`,
+and `java/util/concurrent/TimeUnit.class` are required outputs because the broad
 and focused compiler smokes depend on their direct modern methods. More
 generally, a test records the complete 31-class expected changed-entry set for
 the pinned Java 8 baseline; changing that set requires an intentional
@@ -171,9 +173,10 @@ again.
 `ci/modern_bootstrap_overlay_smoke.sh` performs two independent forced clean
 generations and compares the final JAR SHA-256 values. It then checks the stored
 artifact hash, exact 31-entry count, canonical class-only names, and required
-`Runtime`, `Duration`, and `TimeUnit` entries. The generator itself compares the
-complete sorted 31-class set before packaging, so an added, removed, or
-unexpectedly unchanged parsed overlay requires an intentional contract update.
+`Runtime`, `MethodHandle`, `MethodHandles`, `MethodHandles$Lookup`, `Duration`,
+and `TimeUnit` entries. The generator itself compares the complete sorted
+31-class set before packaging, so an added, removed, or unexpectedly unchanged
+parsed overlay requires an intentional contract update.
 
 A same-input hash mismatch fails CI and reports both hashes. The task must not
 silently bless a newly nondeterministic output.
@@ -187,10 +190,11 @@ compiler. Both compiler families use this precedence:
 modern-bootstrap.jar : doppio.jar : rt.jar
 ```
 
-Kotlin's main compiler, modern interop, and focused duration smokes pass
-`-no-jdk` and add those three JARs, in that order, to the compiler's explicit
-target classpath along with the fixture's Kotlin dependencies. They do not pass
-a host `-jdk-home`. Scala's matching smokes pass the same ordered trio to
+Kotlin's main compiler, modern interop, duration, MethodHandles, and record
+smokes pass `-no-jdk` and add those three JARs, in that order, to the compiler's
+explicit target classpath along with the fixture's Kotlin dependencies. They do
+not pass a host `-jdk-home`. Scala's main compiler, modern interop, duration,
+MethodHandles, record, and StackWalker smokes pass the same ordered trio to
 `-javabootclasspath`; their ordinary `-classpath` continues to contain the
 Scala library and fixture dependencies.
 
@@ -201,13 +205,13 @@ host Java 9+ class metadata as a fallback. Host `java` and `javap` may still run
 the generated fixture and inspect its bytecode for native comparison; they are
 not metadata inputs to the Doppio-hosted compilation.
 
-`ci/check_compiler_bootstrap_consumers.mjs` statically protects the main,
-modern interop, and duration consumers for both compiler families. It requires
-the exact ordered classpath variables and compiler flags, rejects missing
-consumer scripts, and rejects adding `modern-bootstrap.jar` to a declared
-runtime classpath. Its unit test covers reordered paths, missing Kotlin and
-Scala flags, missing target/boot classpath arguments, runtime contamination,
-and a missing consumer.
+`ci/check_compiler_bootstrap_consumers.mjs` statically protects all 11 migrated
+compiler consumers. It requires the exact ordered classpath variables and
+compiler flags, including the Kotlin record support-class suffix, rejects
+missing consumer scripts, and rejects adding `modern-bootstrap.jar` to a
+declared runtime classpath. Its unit test covers reordered paths, a missing
+record support path, missing Kotlin and Scala flags, missing target/boot
+classpath arguments, runtime contamination, and a missing consumer.
 
 `doppio.jar` follows the overlay because transformed signatures can reference
 modern shim, helper, or marker types supplied there. Java 8 `rt.jar` remains
@@ -277,13 +281,12 @@ The implemented gates are:
    clean run has the same SHA-256.
 3. Re-running the task with unchanged content is a verified hash-cache hit;
    changing `rt.jar`, the transformer, or archive settings forces a rebuild.
-4. Kotlin main compiler, modern interop, and duration smokes use `-no-jdk` with
+4. Five Kotlin compiler smokes use `-no-jdk` with
    `modern-bootstrap.jar:doppio.jar:rt.jar` precedence and no host JDK metadata.
-5. Scala main compiler, modern interop, and duration smokes use the same
-   precedence through `-javabootclasspath` and no extracted host
-   `java.base.jmod` classes.
+5. Six Scala compiler smokes use the same precedence through
+   `-javabootclasspath` and no extracted host `java.base.jmod` classes.
 6. The tested compiler bootstrap consumer checker locks the ordered paths,
-   compiler flags, consumer inventory, and runtime exclusion for all six
+   compiler flags, consumer inventory, and runtime exclusion for all 11
    migrated smoke scripts.
 7. The broad Kotlin and Scala modern interop smokes compile a direct
    `Runtime.version()` call and guard its `invokestatic` bytecode, while the
@@ -301,4 +304,9 @@ compiler smokes all passed. On 2026-07-18, the broad modern interop smokes also
 passed with the compiler-only classpaths and proved that `Runtime.version()` is
 resolved from this generated overlay rather than host JDK metadata. The main
 Kotlin full-classpath and Scala compiler smokes passed with the same target
-metadata isolation in 91 and 72 seconds, respectively.
+metadata isolation in 91 and 72 seconds, respectively. The focused Kotlin
+MethodHandles and record smokes passed in 688 and 163 seconds; the focused
+Scala MethodHandles, record, and StackWalker smokes passed in 137, 91, and 97
+seconds. The Kotlin MethodHandles budget is 900 seconds with a 30-second forced
+termination bound because a 600-second strict-metadata run timed out before a
+successful 688-second retry.
