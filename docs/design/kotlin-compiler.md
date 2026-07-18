@@ -474,7 +474,9 @@ Current verified checks:
 - A focused Kotlin annotation-metadata smoke now lives in
   `classes/kotlin_annotation_metadata_smoke` and runs through
   `ci/kotlin_annotation_metadata_smoke.sh`. A focused local run completed in 87
-  seconds and a follow-up run through the remaining full-classpath
+  seconds, and a 2026-07-18 strict-bootstrap compile completed in 135 seconds.
+  Its default compile budget is 480 seconds with a 30-second forced termination
+  bound. A follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 211 seconds. Both the host JVM and Doppio
   printed
   `class-a,class-b|class:HIGH:AnnotationMetadataOwner:1,2,3|ctor-a,ctor-b|ctor:LOW:String:4,5|field-a,field-b|field:LOW:int:6|method-a,method-b|method:LOW:long:7,8|arg-a,arg-b|arg:LOW:double:9|kt3`.
@@ -750,7 +752,9 @@ Current verified checks:
 - A focused Kotlin control-flow smoke now lives in
   `classes/kotlin_control_flow_smoke` and runs through
   `ci/kotlin_control_flow_smoke.sh`. A focused local run completed in 100
-  seconds and a follow-up run through the remaining full-classpath
+  seconds, and a 2026-07-18 strict-bootstrap compile completed in 203 seconds.
+  Its default compile budget is 480 seconds with a 30-second forced termination
+  bound. A follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 235 seconds. Both the host JVM and Doppio
   printed
   `16|1:2:2,1:4:4,2:1:2,2:2:4,2:3:6,2:4:8,3:2:6#6|p357|q46|ok1:neg1:For input string: "x":ok7|2:ccc|zero,finally1,small2,finally2,catch:odd3,finally3,even4,finally4,neg-1,finally5`.
@@ -777,7 +781,9 @@ Current verified checks:
 - A focused Kotlin collection-builder smoke now lives in
   `classes/kotlin_collection_builder_smoke` and runs through
   `ci/kotlin_collection_builder_smoke.sh`. A focused local run completed in 89
-  seconds and a follow-up run through the remaining full-classpath
+  seconds, and a 2026-07-18 strict-bootstrap compile completed in 145 seconds.
+  Its default compile budget is 480 seconds with a 30-second forced termination
+  bound. A follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 277 seconds. Both the host JVM and Doppio
   printed
   `24678|k0=4,k1=16,k2=36,k3=49,k4=64|e=20,o=7|12,21,8|24|67|8|678/24|2:4;4:6;6:7|abc|22,44,66,77,88|1:3:7:13:20:28|71|2,1,0,9`.
@@ -805,7 +811,9 @@ Current verified checks:
 - A focused Kotlin Result/exception smoke now lives in
   `classes/kotlin_result_exception_smoke` and runs through
   `ci/kotlin_result_exception_smoke.sh`. A focused local run completed in 103
-  seconds and a follow-up run through the remaining full-classpath
+  seconds, and a 2026-07-18 strict-bootstrap compile completed in 164 seconds.
+  Its default compile budget is 480 seconds with a 30-second forced termination
+  bound. A follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 336 seconds. Both the host JVM and Doppio
   printed
   `44|12|IllegalStateException/99/77|0=ok44,1=errIllegalStateException:again,2=errUnsupportedOperationException:manual|6:body>recover:inner>finally|IllegalArgumentException:root|two|enter:a>ok:a>mapped:44>enter:b>fail:b:ResultSmokeException:boom>recover:boom>enter:c>ok:c>recoverCatching:bad4>else:again`.

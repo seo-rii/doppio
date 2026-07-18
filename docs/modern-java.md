@@ -58,11 +58,12 @@ shared parsed-overlay dispatch. Kotlin and Scala put this artifact before
 `doppio.jar` and `rt.jar` for source analysis, eliminating host JDK metadata
 from the main compiler, broad modern interop, duration, diagnostic, Kotlin
 bytecode, focused lowering, shape/reflection, proxy, receiver lambda/sequence,
+annotation metadata, collection builders, control flow, Result/exception,
 Scala core, MethodHandles, record, and StackWalker gates without changing
 Doppio's runtime bootstrap path. The broad gates compile and bytecode-check a
 direct `Runtime.version()` call, while CI also compares two forced-generation
 SHA-256 values and the exact class-only entry contract. A tested consumer
-checker locks the 28 migrated Kotlin/Scala smoke scripts to the ordered
+checker locks the 32 migrated Kotlin/Scala smoke scripts to the ordered
 compiler-only paths and rejects runtime overlay contamination. See
 `docs/design/compiler-bootstrap-overlay.md`.
 
