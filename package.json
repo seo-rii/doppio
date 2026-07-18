@@ -92,6 +92,8 @@
     "ci:check-pages-workflow:test": "node ci/check_pages_workflow_test.mjs",
     "ci:check-modern-java-workflow": "node ci/check_modern_java_workflow.mjs",
     "ci:check-modern-java-workflow:test": "node ci/check_modern_java_workflow_test.mjs",
+    "ci:check-compiler-bootstrap-consumers": "node ci/check_compiler_bootstrap_consumers.mjs",
+    "ci:check-compiler-bootstrap-consumers:test": "node ci/check_compiler_bootstrap_consumers_test.mjs",
     "ci:check-kotlin-modern-source-guards": "node ci/check_kotlin_modern_source_guards.mjs",
     "ci:check-kotlin-modern-source-guards:test": "node ci/check_kotlin_modern_source_guards_test.mjs",
     "ci:check-scala-modern-source-guards": "node ci/check_scala_modern_source_guards.mjs",

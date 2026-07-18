@@ -309,6 +309,43 @@ jobs:
     );
   }
 
+  const missingBootstrapConsumerCheck = writeFixture(root, `
+jobs:
+  test:
+    steps:
+      - name: Check compiler smoke workflow coverage
+        run: |
+          yarn ci:check-modern-java-workflow:test
+          yarn ci:check-modern-java-workflow
+          yarn ci:check-kotlin-modern-source-guards:test
+          yarn ci:check-kotlin-modern-source-guards
+          yarn ci:check-scala-modern-source-guards:test
+          yarn ci:check-scala-modern-source-guards
+      - name: Build release CLI runner
+        timeout-minutes: 20
+        run: ./node_modules/.bin/grunt --stack modern-ci-release-cli --grunt-ignore-compile-errors
+      - name: Run modern Java compatibility tests
+        run: ./node_modules/.bin/grunt --stack test-modern-java-runtime --grunt-ignore-compile-errors
+      - name: Run core array compatibility smoke
+        run: |
+          ./node_modules/.bin/grunt --stack modern-ci-array-runout --grunt-ignore-compile-errors
+          node build/release-cli/console/test_runner.js classes/test/ArrayOps --makefile
+      - run: ./ci/kotlin_alpha_smoke.sh
+      - run: ./ci/scala_beta_smoke.sh
+`);
+  const missingBootstrapConsumerCheckResult = runChecker(
+    missingBootstrapConsumerCheck.ciDir,
+    missingBootstrapConsumerCheck.workflowPath
+  );
+  if (
+    missingBootstrapConsumerCheckResult.status === 0 ||
+    !missingBootstrapConsumerCheckResult.stderr.includes('compiler bootstrap consumer checker')
+  ) {
+    throw new Error(
+      `expected missing compiler bootstrap consumer check to fail:\n${missingBootstrapConsumerCheckResult.stdout}\n${missingBootstrapConsumerCheckResult.stderr}`
+    );
+  }
+
   const compilerSmokeBeforeBuild = writeFixture(root, `
 jobs:
   test:

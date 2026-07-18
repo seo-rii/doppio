@@ -50,6 +50,8 @@ jobs:
         run: |
           yarn ci:check-modern-java-workflow:test
           yarn ci:check-modern-java-workflow
+          yarn ci:check-compiler-bootstrap-consumers:test
+          yarn ci:check-compiler-bootstrap-consumers
           yarn ci:check-kotlin-modern-source-guards:test
           yarn ci:check-kotlin-modern-source-guards
           yarn ci:check-scala-modern-source-guards:test
