@@ -36,6 +36,42 @@ fun summary(): String {
     throw new Error(`expected safe fixture to pass:\n${completeResult.stdout}\n${completeResult.stderr}`);
   }
 
+  writeSource(root, 'classes/kotlin_modern_java_interop_smoke/ModernJavaInteropSmoke.kt', `
+fun modernJavaInteropSummary(): Int = Runtime.version().feature()
+`);
+  const runtimeFeatureResult = runChecker(root);
+  if (runtimeFeatureResult.status !== 0) {
+    throw new Error(`expected guarded Runtime.version fixture to pass:\n${runtimeFeatureResult.stdout}\n${runtimeFeatureResult.stderr}`);
+  }
+
+  writeSource(root, 'classes/kotlin_modern_java_interop_smoke/ModernJavaInteropSmoke.kt', `
+fun modernJavaInteropSummary(): String = Runtime.version().toString()
+`);
+  const incompleteRuntimeFeatureResult = runChecker(root);
+  if (
+    incompleteRuntimeFeatureResult.status === 0 ||
+    !incompleteRuntimeFeatureResult.stderr.includes('Runtime.version().feature() fixture requirement')
+  ) {
+    throw new Error(
+      `expected incomplete Runtime.version fixture to fail:\n${incompleteRuntimeFeatureResult.stdout}\n${incompleteRuntimeFeatureResult.stderr}`,
+    );
+  }
+
+  fs.rmSync(path.join(root, 'classes', 'kotlin_modern_java_interop_smoke'), { recursive: true, force: true });
+  writeSource(root, 'classes/kotlin_bad_runtime_smoke/BadRuntimeSmoke.kt', `
+fun bad(): Int = Runtime.version().feature()
+`);
+  const misplacedRuntimeFeatureResult = runChecker(root);
+  if (
+    misplacedRuntimeFeatureResult.status === 0 ||
+    !misplacedRuntimeFeatureResult.stderr.includes('Runtime.version direct call')
+  ) {
+    throw new Error(
+      `expected misplaced Runtime.version fixture to fail:\n${misplacedRuntimeFeatureResult.stdout}\n${misplacedRuntimeFeatureResult.stderr}`,
+    );
+  }
+
+  fs.rmSync(path.join(root, 'classes', 'kotlin_bad_runtime_smoke'), { recursive: true, force: true });
   writeSource(root, 'classes/kotlin_bad_optional_smoke/BadOptionalSmoke.kt', `
 fun bad(optionalValue: java.util.Optional<String>): Long {
   optionalValue.ifPresentOrElse({ }, { })

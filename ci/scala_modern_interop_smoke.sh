@@ -51,14 +51,15 @@ if [ -z "$jline_jar" ]; then
 fi
 
 compiler_cp="$compiler_jar:$library_jar:$reflect_jar:$diff_utils_jar:$jline_jar"
+modern_overlay_jar="$repo_root/build/modern-bootstrap-overlay/modern-bootstrap.jar"
 modern_boot_jar="$repo_root/vendor/java_home/lib/doppio.jar"
 runtime_boot_jar="$repo_root/vendor/java_home/lib/rt.jar"
-compiler_boot_cp="$modern_boot_jar:$runtime_boot_jar"
+compiler_boot_cp="$modern_overlay_jar:$modern_boot_jar:$runtime_boot_jar"
 out_dir="$work_dir/out"
 source_cp="$library_jar"
 runtime_cp="$out_dir:$library_jar"
 
-if [ ! -f "$modern_boot_jar" ] || [ ! -f "$runtime_boot_jar" ]; then
+if [ ! -f "$modern_overlay_jar" ] || [ ! -f "$modern_boot_jar" ] || [ ! -f "$runtime_boot_jar" ]; then
   echo "Doppio compiler boot classpath is incomplete; build the release CLI first." >&2
   exit 1
 fi
@@ -100,8 +101,16 @@ if ! grep -Fq 'java/lang/annotation/ElementType.RECORD_COMPONENT:Ljava/lang/anno
   echo "Expected a direct ElementType.RECORD_COMPONENT field reference." >&2
   exit 1
 fi
+if ! grep -Eq 'invokestatic[[:space:]]+#[0-9]+[[:space:]]+// Method java/lang/Runtime\.version:\(\)Ljava/lang/Runtime\$Version;' <<<"$interop_javap"; then
+  echo "Expected a direct invokestatic Runtime.version reference." >&2
+  exit 1
+fi
+if ! grep -Eq 'invokevirtual[[:space:]]+#[0-9]+[[:space:]]+// Method java/lang/Runtime\$Version\.feature:\(\)I' <<<"$interop_javap"; then
+  echo "Expected a direct invokevirtual Runtime.Version.feature reference." >&2
+  exit 1
+fi
 
-expected_output="0f10ff|0A0B|2:cafe:15|2020-01-02T03:04:05Z:1577934245000:2020-01-02T03:04:07Z:true|Random:82:376|SplittableRandom:true:88:574|QRS:uoe|entry:value:uoe|jk:uoe:iae:2:uoe:jk:opt:true:nse:true:true:true:true:true:true:true:true:true|MODULE:10:RECORD_COMPONENT:11|true::false:CONSTRUCTOR,FIELD,LOCAL_VARIABLE,METHOD,PACKAGE,MODULE,PARAMETER,TYPE"
+expected_output="0f10ff|0A0B|2:cafe:15|2020-01-02T03:04:05Z:1577934245000:2020-01-02T03:04:07Z:true|Random:82:376|SplittableRandom:true:88:574|QRS:uoe|entry:value:uoe|jk:uoe:iae:2:uoe:jk:opt:true:nse:true:true:true:true:true:true:true:true:true|17|MODULE:10:RECORD_COMPONENT:11|true::false:CONSTRUCTOR,FIELD,LOCAL_VARIABLE,METHOD,PACKAGE,MODULE,PARAMETER,TYPE"
 
 native_output="$(java -cp "$runtime_cp" ScalaModernInteropHello)"
 if [ "$native_output" != "$expected_output" ]; then

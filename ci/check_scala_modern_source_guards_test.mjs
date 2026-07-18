@@ -35,6 +35,48 @@ object SafeSmoke {
     throw new Error(`expected safe fixture to pass:\n${completeResult.stdout}\n${completeResult.stderr}`);
   }
 
+  writeSource(root, 'classes/scala_modern_interop_smoke/ScalaModernJavaInteropSmoke.scala', `
+object ScalaModernJavaInteropSmoke {
+  def exercise(): Int = Runtime.version().feature()
+}
+`);
+  const runtimeFeatureResult = runChecker(root);
+  if (runtimeFeatureResult.status !== 0) {
+    throw new Error(`expected guarded Runtime.version fixture to pass:\n${runtimeFeatureResult.stdout}\n${runtimeFeatureResult.stderr}`);
+  }
+
+  writeSource(root, 'classes/scala_modern_interop_smoke/ScalaModernJavaInteropSmoke.scala', `
+object ScalaModernJavaInteropSmoke {
+  def exercise(): String = Runtime.version().toString
+}
+`);
+  const incompleteRuntimeFeatureResult = runChecker(root);
+  if (
+    incompleteRuntimeFeatureResult.status === 0 ||
+    !incompleteRuntimeFeatureResult.stderr.includes('Runtime.version().feature() fixture requirement')
+  ) {
+    throw new Error(
+      `expected incomplete Runtime.version fixture to fail:\n${incompleteRuntimeFeatureResult.stdout}\n${incompleteRuntimeFeatureResult.stderr}`,
+    );
+  }
+
+  fs.rmSync(path.join(root, 'classes', 'scala_modern_interop_smoke'), { recursive: true, force: true });
+  writeSource(root, 'classes/scala_bad_runtime_version_smoke/BadRuntimeVersionSmoke.scala', `
+object BadRuntimeVersionSmoke {
+  def exercise(): Int = Runtime.version().feature()
+}
+`);
+  const misplacedRuntimeFeatureResult = runChecker(root);
+  if (
+    misplacedRuntimeFeatureResult.status === 0 ||
+    !misplacedRuntimeFeatureResult.stderr.includes('Runtime.version direct call')
+  ) {
+    throw new Error(
+      `expected misplaced Runtime.version fixture to fail:\n${misplacedRuntimeFeatureResult.stdout}\n${misplacedRuntimeFeatureResult.stderr}`,
+    );
+  }
+
+  fs.rmSync(path.join(root, 'classes', 'scala_bad_runtime_version_smoke'), { recursive: true, force: true });
   writeSource(root, 'classes/scala_bad_runtime_smoke/BadRuntimeSmoke.scala', `
 object BadRuntimeSmoke {
   def summary(): String = Runtime.Version.parse("17").toString

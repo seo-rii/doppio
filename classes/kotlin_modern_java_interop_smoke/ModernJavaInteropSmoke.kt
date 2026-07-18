@@ -13,6 +13,7 @@ import java.util.function.Function
 import java.util.stream.Stream
 
 fun modernJavaInteropSummary(): String {
+  val runtimeFeature = Runtime.version().feature()
   val hexClass = Class.forName("java.util.HexFormat")
   val hex = hexClass.getMethod("of").invoke(null)
   val upper = hexClass.getMethod("withUpperCase").invoke(hex)
@@ -182,5 +183,5 @@ fun modernJavaInteropSummary(): String {
       "$stackHasSmokeFrame:$callerClassMatches:$forEachSawSummary:$forEachSawHelloMain:" +
       "${currentPid > 0}:$currentProcessAlive:${currentProcessByPid.isPresent}:" +
       "$commandPresent:$commandLinePresent:$argumentsPresent:$startInstantPresent:$cpuDurationPresent:$infoStringShape|" +
-      "$modernElementTypes|$deprecatedSummary"
+      "$runtimeFeature|$modernElementTypes|$deprecatedSummary"
 }

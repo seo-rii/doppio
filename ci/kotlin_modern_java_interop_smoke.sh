@@ -43,21 +43,33 @@ fi
 runner="$repo_root/build/release-cli/console/runner.js"
 source_dir="$repo_root/classes/kotlin_modern_java_interop_smoke"
 out_dir="$work_dir/out"
+modern_overlay_jar="$repo_root/build/modern-bootstrap-overlay/modern-bootstrap.jar"
+modern_boot_jar="$repo_root/vendor/java_home/lib/doppio.jar"
+runtime_boot_jar="$repo_root/vendor/java_home/lib/rt.jar"
+compiler_target_cp="$modern_overlay_jar:$modern_boot_jar:$runtime_boot_jar:$stdlib_jar"
+
+if [ ! -f "$modern_overlay_jar" ] || [ ! -f "$modern_boot_jar" ] || [ ! -f "$runtime_boot_jar" ]; then
+  echo "Doppio compiler bootstrap classpath is incomplete; build the modern release CLI first." >&2
+  exit 1
+fi
 
 rm -rf "$out_dir"
 mkdir -p "$out_dir"
 
-compile_timeout="${KOTLIN_MODERN_JAVA_INTEROP_SMOKE_COMPILE_TIMEOUT_SECONDS:-360}"
+compile_timeout="${KOTLIN_MODERN_JAVA_INTEROP_SMOKE_COMPILE_TIMEOUT_SECONDS:-600}"
 run_timeout="${KOTLIN_MODERN_JAVA_INTEROP_SMOKE_RUN_TIMEOUT_SECONDS:-60}"
+kill_after="${KOTLIN_MODERN_JAVA_INTEROP_SMOKE_KILL_AFTER_SECONDS:-30}"
 responsiveness="${DOPPIO_KOTLIN_RESPONSIVENESS:-100000}"
 
 compile_start="$(date +%s)"
-timeout -s INT "${compile_timeout}s" \
+timeout -k "${kill_after}s" -s INT "${compile_timeout}s" \
   node --max-old-space-size=4096 --no-deprecation "$runner" \
   "-Xresponsiveness:$responsiveness" \
   -cp "$compiler_jar" \
   org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
   -no-reflect \
+  -no-jdk \
+  -classpath "$compiler_target_cp" \
   -d "$out_dir" \
   "$source_dir"/*.kt
 compile_end="$(date +%s)"
@@ -75,9 +87,17 @@ if ! grep -Fq 'java/lang/annotation/ElementType.RECORD_COMPONENT:Ljava/lang/anno
   echo "Expected a direct ElementType.RECORD_COMPONENT field reference." >&2
   exit 1
 fi
+if ! grep -Eq 'invokestatic +#[0-9]+ +// Method java/lang/Runtime\.version:\(\)Ljava/lang/Runtime\$Version;' <<<"$interop_javap"; then
+  echo "Expected a direct invokestatic Runtime.version reference." >&2
+  exit 1
+fi
+if ! grep -Eq 'invokevirtual +#[0-9]+ +// Method java/lang/Runtime\$Version\.feature:\(\)I' <<<"$interop_javap"; then
+  echo "Expected a direct invokevirtual Runtime.Version.feature reference." >&2
+  exit 1
+fi
 
 runtime_cp="$out_dir:$stdlib_jar"
-expected_output="${KOTLIN_MODERN_JAVA_INTEROP_SMOKE_EXPECTED_OUTPUT:-"0f10ff|0A0B|2:cafe:15|2020-01-02T03:04:05Z:1577934245000:2020-01-02T03:04:07Z:true|Random:82:376|SplittableRandom:true:88:574|QRS:uoe|entry:value:uoe|mn:uoe:2:true:true:5:uoe:opt:true:nse:true:true:true:true:true:true:true:true:true:true:true:true:true|MODULE:10,RECORD_COMPONENT:11|Deprecated:true:3:true:RUNTIME:true:since:String=:forRemoval:boolean=false:CONSTRUCTOR,FIELD,LOCAL_VARIABLE,METHOD,PACKAGE,MODULE,PARAMETER,TYPE"}"
+expected_output="${KOTLIN_MODERN_JAVA_INTEROP_SMOKE_EXPECTED_OUTPUT:-"0f10ff|0A0B|2:cafe:15|2020-01-02T03:04:05Z:1577934245000:2020-01-02T03:04:07Z:true|Random:82:376|SplittableRandom:true:88:574|QRS:uoe|entry:value:uoe|mn:uoe:2:true:true:5:uoe:opt:true:nse:true:true:true:true:true:true:true:true:true:true:true:true:true|17|MODULE:10,RECORD_COMPONENT:11|Deprecated:true:3:true:RUNTIME:true:since:String=:forRemoval:boolean=false:CONSTRUCTOR,FIELD,LOCAL_VARIABLE,METHOD,PACKAGE,MODULE,PARAMETER,TYPE"}"
 
 native_output="$(java -cp "$runtime_cp" KotlinModernJavaInteropHelloKt)"
 if [ "$native_output" != "$expected_output" ]; then
@@ -85,7 +105,7 @@ if [ "$native_output" != "$expected_output" ]; then
   exit 1
 fi
 
-doppio_output="$(timeout -s INT "${run_timeout}s" node --no-deprecation "$runner" -cp "$runtime_cp" KotlinModernJavaInteropHelloKt)"
+doppio_output="$(timeout -k "${kill_after}s" -s INT "${run_timeout}s" node --no-deprecation "$runner" -cp "$runtime_cp" KotlinModernJavaInteropHelloKt)"
 if [ "$doppio_output" != "$expected_output" ]; then
   echo "Unexpected Doppio output: $doppio_output" >&2
   exit 1

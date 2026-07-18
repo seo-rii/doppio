@@ -5,13 +5,11 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(__filename), '..');
 const sourceRoot = process.env.SCALA_MODERN_SOURCE_GUARD_ROOT || path.join(repoRoot, 'classes');
+const runtimeVersionFixture = 'scala_modern_interop_smoke/ScalaModernJavaInteropSmoke.scala';
+const runtimeVersionCallPattern = /\b(?:java\.lang\.)?Runtime\s*\.\s*version\s*\(\s*\)/g;
+const runtimeFeatureCallPattern = /\b(?:java\.lang\.)?Runtime\s*\.\s*version\s*\(\s*\)\s*\.\s*feature\s*\(\s*\)/g;
 
 const bannedPatterns = [
-  {
-    label: 'Runtime.version direct call',
-    pattern: /\b(?:java\.lang\.)?Runtime\s*\.\s*version\s*\(/,
-    guidance: 'Use the runtime reflection overlay design before exposing Runtime.version to Scala source.',
-  },
   {
     label: 'Runtime.Version.parse direct call',
     pattern: /\b(?:java\.lang\.)?Runtime\s*\.\s*Version\s*\.\s*parse\s*\(/,
@@ -64,6 +62,32 @@ const sourcePaths = listScalaSmokeSources(sourceRoot);
 for (const sourcePath of sourcePaths) {
   const content = fs.readFileSync(sourcePath, 'utf8');
   const lines = content.split(/\r?\n/);
+  const relativeSourcePath = path.relative(sourceRoot, sourcePath).split(path.sep).join('/').replace(/^classes\//, '');
+  const runtimeVersionCalls = content.match(runtimeVersionCallPattern) || [];
+  const runtimeFeatureCalls = content.match(runtimeFeatureCallPattern) || [];
+
+  if (relativeSourcePath === runtimeVersionFixture) {
+    if (runtimeVersionCalls.length !== 1 || runtimeFeatureCalls.length !== 1) {
+      violations.push({
+        sourcePath,
+        line: 1,
+        label: 'Runtime.version().feature() fixture requirement',
+        guidance: 'Keep exactly one direct Runtime.version().feature() call in the Scala modern Java interop fixture.',
+      });
+    }
+  } else if (runtimeVersionCalls.length > 0) {
+    for (let index = 0; index < lines.length; index++) {
+      if (/\b(?:java\.lang\.)?Runtime\s*\.\s*version\s*\(\s*\)/.test(lines[index])) {
+        violations.push({
+          sourcePath,
+          line: index + 1,
+          label: 'Runtime.version direct call',
+          guidance: 'Keep direct Runtime.version coverage in the Scala modern Java interop fixture.',
+        });
+      }
+    }
+  }
+
   for (const bannedPattern of bannedPatterns) {
     for (let index = 0; index < lines.length; index++) {
       if (bannedPattern.pattern.test(lines[index])) {
@@ -79,12 +103,12 @@ for (const sourcePath of sourcePaths) {
 }
 
 if (violations.length > 0) {
-  console.error('Scala smoke sources contain timeout-sensitive direct modern Java calls:');
+  console.error('Scala smoke sources violate modern Java direct-call requirements:');
   for (const violation of violations) {
     console.error(`  - ${path.relative(repoRoot, violation.sourcePath)}:${violation.line}: ${violation.label}`);
     console.error(`    ${violation.guidance}`);
   }
-  fail('Move this coverage to a Java fixture or reflection-backed Scala smoke before adding it to CI.');
+  fail('Fix the guarded call shape or move unsupported direct coverage out of Scala smoke sources.');
 }
 
 console.log(`Scala modern source guard checked ${sourcePaths.length} Scala smoke source files.`);

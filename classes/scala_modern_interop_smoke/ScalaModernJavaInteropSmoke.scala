@@ -6,6 +6,7 @@ import java.util.stream.Stream
 
 object ScalaModernJavaInteropSmoke {
   def exercise(): String = {
+    val runtimeFeature = Runtime.version().feature()
     val hexClass = Class.forName("java.util.HexFormat")
     val hex = hexClass.getMethod("of").invoke(null)
     val upper = hexClass.getMethod("withUpperCase").invoke(hex)
@@ -179,7 +180,7 @@ object ScalaModernJavaInteropSmoke {
       s"${java.lang.String.join("", listOf)}:$listMutation:$duplicateSet:${mapOf.get("b")}:$mapMutation:${java.lang.String.join("", copiedList)}:" +
       s"$optionalText:$optionalIsEmpty:$optionalFailure:${currentPid > 0}:$currentProcessAlive:${currentProcessByPid.isPresent}:" +
       s"$commandPresent:$commandLinePresent:$argumentsPresent:$startInstantPresent:$cpuDurationPresent:$infoStringShape|" +
-      s"${moduleElement.name()}:${moduleElement.ordinal()}:${recordComponentElement.name()}:${recordComponentElement.ordinal()}|" +
+      s"$runtimeFeature|${moduleElement.name()}:${moduleElement.ordinal()}:${recordComponentElement.name()}:${recordComponentElement.ordinal()}|" +
       s"$deprecatedMetadata:${deprecatedSince.getDefaultValue}:${deprecatedForRemoval.getDefaultValue}:$deprecatedTargetNames"
   }
 }
