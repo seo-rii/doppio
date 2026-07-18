@@ -400,8 +400,10 @@ Current verified checks:
   compile variance in the main full-classpath smoke.
 - A focused Kotlin read-only delegated-property smoke now lives in
   `classes/kotlin_readonly_delegate_smoke` and runs through
-  `ci/kotlin_readonly_delegate_smoke.sh`. A focused local run completed in 96
-  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_readonly_delegate_smoke.sh`. An initial focused local run completed
+  in 96 seconds, and a 2026-07-18 strict-bootstrap compile completed in 296
+  seconds. Its default compile budget is 480 seconds with a 30-second forced
+  termination bound. A follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 124 seconds. Both the host JVM and Doppio
   printed `delegate:answer:DelegatedOwner|local:local:top`. It covers custom
   delegated properties backed by `kotlin.reflect.KProperty` metadata for both
@@ -564,8 +566,10 @@ Current verified checks:
   The complete focused compile and runtime comparison passed in 291 seconds.
 - A focused Kotlin enum/string `when` lowering smoke now lives in
   `classes/kotlin_when_mapping_smoke` and runs through
-  `ci/kotlin_when_mapping_smoke.sh`. A focused local run completed in 96
-  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_when_mapping_smoke.sh`. An initial focused local run completed in
+  96 seconds, and a 2026-07-18 strict-bootstrap compile completed in 275
+  seconds. Its default compile budget is 480 seconds with a 30-second forced
+  termination bound. A follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 261 seconds. Both the host JVM and Doppio
   printed `1357:nilpe:14:10,30,-1,40:neg|zero|small|big`. The focused script
   verifies the generated `$WhenMappings` class while covering static
@@ -675,8 +679,10 @@ Current verified checks:
   `zip`, `joinToString`, and `fold`.
 - A focused Kotlin annotation reflection smoke now lives in
   `classes/kotlin_annotation_reflection_smoke` and runs through
-  `ci/kotlin_annotation_reflection_smoke.sh`. A focused local run completed in
-  96 seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_annotation_reflection_smoke.sh`. An initial focused local run
+  completed in 96 seconds, and a 2026-07-18 strict-bootstrap compile completed
+  in 356 seconds. Its default compile budget is 480 seconds with a 30-second
+  forced termination bound. A follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 167 seconds. Both the host JVM and Doppio
   printed `class:field:getter:ctor,_:method:arg:kt3`. It verifies runtime
   annotation retention on classes, fields, property getters, constructor
@@ -684,8 +690,10 @@ Current verified checks:
   Kotlin output compiled using `-java-parameters`.
 - A focused Kotlin captured-class shape smoke now lives in
   `classes/kotlin_capture_shape_smoke` and runs through
-  `ci/kotlin_capture_shape_smoke.sh`. A focused local run completed in 97
-  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_capture_shape_smoke.sh`. An initial focused local run completed in
+  97 seconds, and a 2026-07-18 strict-bootstrap compile completed in 258
+  seconds. Its default compile budget is 480 seconds with a 30-second forced
+  termination bound. A follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 186 seconds. Both the host JVM and Doppio
   printed `234:yx:true:11:45|89:yx:true:8:5`. `javap` verified captured
   local-class fields, anonymous `Runnable` object
