@@ -61,6 +61,15 @@ fi
 runner="$repo_root/build/release-cli/console/runner.js"
 out_dir="$work_dir/out"
 source_file="$work_dir/BytecodeSmoke.kt"
+modern_overlay_jar="$repo_root/build/modern-bootstrap-overlay/modern-bootstrap.jar"
+modern_boot_jar="$repo_root/vendor/java_home/lib/doppio.jar"
+runtime_boot_jar="$repo_root/vendor/java_home/lib/rt.jar"
+compiler_target_cp="$modern_overlay_jar:$modern_boot_jar:$runtime_boot_jar:$stdlib_jar"
+
+if [ ! -f "$modern_overlay_jar" ] || [ ! -f "$modern_boot_jar" ] || [ ! -f "$runtime_boot_jar" ]; then
+  echo "Doppio compiler bootstrap classpath is incomplete; build the modern release CLI first." >&2
+  exit 1
+fi
 
 rm -rf "$work_dir"
 mkdir -p "$out_dir"
@@ -171,15 +180,18 @@ KOTLIN_BYTECODE_SOURCE
 
 compile_timeout="${KOTLIN_BYTECODE_SMOKE_COMPILE_TIMEOUT_SECONDS:-600}"
 run_timeout="${KOTLIN_BYTECODE_SMOKE_RUN_TIMEOUT_SECONDS:-60}"
+kill_after="${KOTLIN_BYTECODE_SMOKE_KILL_AFTER_SECONDS:-30}"
 responsiveness="${DOPPIO_KOTLIN_RESPONSIVENESS:-100000}"
 
 compile_start="$(date +%s)"
-timeout -s INT "${compile_timeout}s" \
+timeout -k "${kill_after}s" -s INT "${compile_timeout}s" \
   node --max-old-space-size=4096 --no-deprecation "$runner" \
   "-Xresponsiveness:$responsiveness" \
   -cp "$compiler_cp" \
   org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
   -no-reflect \
+  -no-jdk \
+  -classpath "$compiler_target_cp" \
   -java-parameters \
   -d "$out_dir" \
   "$source_file"
@@ -247,7 +259,7 @@ if [ "$native_output" != "$expected_output" ]; then
   exit 1
 fi
 
-doppio_output="$(timeout -s INT "${run_timeout}s" node --no-deprecation "$runner" -cp "$runtime_cp" BytecodeSmokeKt)"
+doppio_output="$(timeout -k "${kill_after}s" -s INT "${run_timeout}s" node --no-deprecation "$runner" -cp "$runtime_cp" BytecodeSmokeKt)"
 if [ "$doppio_output" != "$expected_output" ]; then
   echo "Unexpected Doppio output: $doppio_output" >&2
   exit 1
