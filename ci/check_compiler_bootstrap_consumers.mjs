@@ -17,6 +17,10 @@ const kotlinConsumers = new Map([
   ['kotlin_reified_array_smoke.sh', '$stdlib_jar'],
   ['kotlin_inline_control_smoke.sh', '$stdlib_jar'],
   ['kotlin_delegation_bridge_smoke.sh', '$stdlib_jar'],
+  ['kotlin_readonly_delegate_smoke.sh', '$stdlib_jar'],
+  ['kotlin_when_mapping_smoke.sh', '$stdlib_jar'],
+  ['kotlin_annotation_reflection_smoke.sh', '$stdlib_jar'],
+  ['kotlin_capture_shape_smoke.sh', '$stdlib_jar'],
   ['kotlin_methodhandle_smoke.sh', '$stdlib_jar'],
   ['kotlin_record_smoke.sh', '$stdlib_jar:$support_dir'],
 ]);

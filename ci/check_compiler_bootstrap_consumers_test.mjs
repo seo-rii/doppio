@@ -17,6 +17,10 @@ const kotlinConsumers = new Map([
   ['kotlin_reified_array_smoke.sh', '$stdlib_jar'],
   ['kotlin_inline_control_smoke.sh', '$stdlib_jar'],
   ['kotlin_delegation_bridge_smoke.sh', '$stdlib_jar'],
+  ['kotlin_readonly_delegate_smoke.sh', '$stdlib_jar'],
+  ['kotlin_when_mapping_smoke.sh', '$stdlib_jar'],
+  ['kotlin_annotation_reflection_smoke.sh', '$stdlib_jar'],
+  ['kotlin_capture_shape_smoke.sh', '$stdlib_jar'],
   ['kotlin_methodhandle_smoke.sh', '$stdlib_jar'],
   ['kotlin_record_smoke.sh', '$stdlib_jar:$support_dir'],
 ]);
@@ -89,7 +93,7 @@ try {
   if (completeResult.status !== 0) {
     throw new Error(`expected complete consumers to pass:\n${completeResult.stdout}\n${completeResult.stderr}`);
   }
-  if (!completeResult.stdout.includes('validated 12 Kotlin and 8 Scala smokes')) {
+  if (!completeResult.stdout.includes('validated 16 Kotlin and 8 Scala smokes')) {
     throw new Error(`expected expanded compiler bootstrap inventory:\n${completeResult.stdout}`);
   }
 
