@@ -25,6 +25,10 @@ const kotlinConsumers = new Map([
   ['kotlin_sequence_builder_smoke.sh', '$stdlib_jar'],
   ['kotlin_reflection_shape_smoke.sh', '$stdlib_jar'],
   ['kotlin_receiver_lambda_smoke.sh', '$stdlib_jar'],
+  ['kotlin_annotation_metadata_smoke.sh', '$stdlib_jar'],
+  ['kotlin_collection_builder_smoke.sh', '$stdlib_jar'],
+  ['kotlin_control_flow_smoke.sh', '$stdlib_jar'],
+  ['kotlin_result_exception_smoke.sh', '$stdlib_jar'],
   ['kotlin_methodhandle_smoke.sh', '$stdlib_jar'],
   ['kotlin_record_smoke.sh', '$stdlib_jar:$support_dir'],
 ]);
