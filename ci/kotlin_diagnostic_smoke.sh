@@ -6,6 +6,7 @@ version="${KOTLIN_COMPILER_VERSION:-2.4.0}"
 cache_dir="${KOTLIN_SMOKE_CACHE_DIR:-"$repo_root/build/kotlin-smoke-cache"}"
 work_dir="${KOTLIN_DIAGNOSTIC_SMOKE_WORK_DIR:-"$repo_root/build/kotlin-diagnostic-smoke"}"
 compiler_jar="${KOTLIN_COMPILER_JAR:-}"
+stdlib_jar="${KOTLIN_STDLIB_JAR:-}"
 
 if [ -z "$compiler_jar" ]; then
   dist_dir="$cache_dir/kotlin-compiler-$version"
@@ -28,10 +29,30 @@ if [ ! -f "$compiler_jar" ]; then
   exit 1
 fi
 
+if [ -z "$stdlib_jar" ]; then
+  candidate_stdlib_jar="$(dirname "$compiler_jar")/kotlin-stdlib.jar"
+  if [ -f "$candidate_stdlib_jar" ]; then
+    stdlib_jar="$candidate_stdlib_jar"
+  fi
+fi
+if [ -z "$stdlib_jar" ] || [ ! -f "$stdlib_jar" ]; then
+  echo "Kotlin stdlib jar not found; set KOTLIN_STDLIB_JAR or use the kotlin-compiler package layout." >&2
+  exit 1
+fi
+
 runner="$repo_root/build/release-cli/console/runner.js"
 out_dir="$work_dir/out"
 source_file="$work_dir/DiagnosticSmoke.kt"
 log_file="$work_dir/diagnostic.log"
+modern_overlay_jar="$repo_root/build/modern-bootstrap-overlay/modern-bootstrap.jar"
+modern_boot_jar="$repo_root/vendor/java_home/lib/doppio.jar"
+runtime_boot_jar="$repo_root/vendor/java_home/lib/rt.jar"
+compiler_target_cp="$modern_overlay_jar:$modern_boot_jar:$runtime_boot_jar:$stdlib_jar"
+
+if [ ! -f "$modern_overlay_jar" ] || [ ! -f "$modern_boot_jar" ] || [ ! -f "$runtime_boot_jar" ]; then
+  echo "Doppio compiler bootstrap classpath is incomplete; build the modern release CLI first." >&2
+  exit 1
+fi
 
 rm -rf "$work_dir"
 mkdir -p "$out_dir"
@@ -45,15 +66,18 @@ fun main() {
 KOTLIN_DIAGNOSTIC_SOURCE
 
 compile_timeout="${KOTLIN_DIAGNOSTIC_SMOKE_COMPILE_TIMEOUT_SECONDS:-300}"
+kill_after="${KOTLIN_DIAGNOSTIC_SMOKE_KILL_AFTER_SECONDS:-30}"
 responsiveness="${DOPPIO_KOTLIN_RESPONSIVENESS:-100000}"
 
 set +e
-timeout -s INT "${compile_timeout}s" \
+timeout -k "${kill_after}s" -s INT "${compile_timeout}s" \
   node --max-old-space-size=4096 --no-deprecation "$runner" \
   "-Xresponsiveness:$responsiveness" \
   -cp "$compiler_jar" \
   org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
   -no-reflect \
+  -no-jdk \
+  -classpath "$compiler_target_cp" \
   -d "$out_dir" \
   "$source_file" > "$log_file" 2>&1
 status="$?"

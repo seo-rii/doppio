@@ -10,6 +10,7 @@ const kotlinConsumers = new Map([
   ['kotlin_smoke.sh', '$stdlib_jar'],
   ['kotlin_modern_java_interop_smoke.sh', '$stdlib_jar'],
   ['kotlin_duration_smoke.sh', '$stdlib_jar'],
+  ['kotlin_diagnostic_smoke.sh', '$stdlib_jar'],
   ['kotlin_methodhandle_smoke.sh', '$stdlib_jar'],
   ['kotlin_record_smoke.sh', '$stdlib_jar:$support_dir'],
 ]);
@@ -17,6 +18,7 @@ const scalaConsumers = [
   'scala_smoke.sh',
   'scala_modern_interop_smoke.sh',
   'scala_duration_smoke.sh',
+  'scala_diagnostic_smoke.sh',
   'scala_methodhandle_smoke.sh',
   'scala_record_smoke.sh',
   'scala_stackwalker_smoke.sh',

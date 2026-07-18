@@ -50,11 +50,20 @@ if [ -z "$jline_jar" ]; then
 fi
 
 compiler_cp="$compiler_jar:$library_jar:$reflect_jar:$diff_utils_jar:$jline_jar"
+modern_overlay_jar="$repo_root/build/modern-bootstrap-overlay/modern-bootstrap.jar"
+modern_boot_jar="$repo_root/vendor/java_home/lib/doppio.jar"
+runtime_boot_jar="$repo_root/vendor/java_home/lib/rt.jar"
+compiler_boot_cp="$modern_overlay_jar:$modern_boot_jar:$runtime_boot_jar"
 source_cp="$library_jar:$reflect_jar"
 out_dir="$work_dir/out"
 source_file="$work_dir/DiagnosticSmoke.scala"
 missing_member_source_file="$work_dir/MissingMemberSmoke.scala"
 log_file="$work_dir/diagnostic.log"
+
+if [ ! -f "$modern_overlay_jar" ] || [ ! -f "$modern_boot_jar" ] || [ ! -f "$runtime_boot_jar" ]; then
+  echo "Doppio compiler boot classpath is incomplete; build the modern release CLI first." >&2
+  exit 1
+fi
 
 rm -rf "$work_dir"
 mkdir -p "$out_dir"
@@ -72,14 +81,16 @@ object MissingMemberSmoke {
 SCALA_MISSING_MEMBER_SOURCE
 
 compile_timeout="${SCALA_DIAGNOSTIC_SMOKE_COMPILE_TIMEOUT_SECONDS:-300}"
+kill_after="${SCALA_DIAGNOSTIC_SMOKE_KILL_AFTER_SECONDS:-30}"
 responsiveness="${DOPPIO_SCALA_RESPONSIVENESS:-100000}"
 
 set +e
-timeout -s INT "${compile_timeout}s" \
+timeout -k "${kill_after}s" -s INT "${compile_timeout}s" \
   node --max-old-space-size=4096 --no-deprecation "$runner" \
   "-Xresponsiveness:$responsiveness" \
   -cp "$compiler_cp" \
   scala.tools.nsc.Main \
+  -javabootclasspath "$compiler_boot_cp" \
   -classpath "$source_cp" \
   -d "$out_dir" \
   "$source_file" \
