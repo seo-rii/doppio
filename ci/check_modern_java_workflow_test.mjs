@@ -7,7 +7,17 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const checkerPath = path.join(path.dirname(__filename), 'check_modern_java_workflow.mjs');
 
-function writeFixture(root, workflowText) {
+function writeFixture(root, workflowText, options = {}) {
+  const includeBootstrapStep = options.includeBootstrapStep !== false;
+  if (includeBootstrapStep && !workflowText.includes('- name: Verify compiler bootstrap overlay')) {
+    workflowText = workflowText.replace(
+      '      - name: Run modern Java compatibility tests',
+      '      - name: Verify compiler bootstrap overlay\n' +
+        '        run: ./ci/modern_bootstrap_overlay_smoke.sh\n' +
+        '      - name: Run modern Java compatibility tests'
+    );
+  }
+
   const ciDir = path.join(root, 'ci');
   fs.mkdirSync(ciDir, { recursive: true });
   fs.writeFileSync(path.join(ciDir, 'kotlin_alpha_smoke.sh'), '#!/usr/bin/env bash\n');
@@ -51,6 +61,67 @@ jobs:
   const completeResult = runChecker(complete.ciDir, complete.workflowPath);
   if (completeResult.status !== 0) {
     throw new Error(`expected complete workflow to pass:\n${completeResult.stderr}`);
+  }
+
+  const missingBootstrapOverlay = writeFixture(
+    root,
+    `
+jobs:
+  test:
+    steps:
+      - name: Build release CLI runner
+        timeout-minutes: 20
+        run: ./node_modules/.bin/grunt --stack modern-ci-release-cli --grunt-ignore-compile-errors
+      - name: Run modern Java compatibility tests
+        run: ./node_modules/.bin/grunt --stack test-modern-java-runtime --grunt-ignore-compile-errors
+      - name: Run core array compatibility smoke
+        run: |
+          ./node_modules/.bin/grunt --stack modern-ci-array-runout --grunt-ignore-compile-errors
+          node build/release-cli/console/test_runner.js classes/test/ArrayOps --makefile
+      - run: ./ci/kotlin_alpha_smoke.sh
+      - run: ./ci/scala_beta_smoke.sh
+`,
+    { includeBootstrapStep: false }
+  );
+  const missingBootstrapOverlayResult = runChecker(
+    missingBootstrapOverlay.ciDir,
+    missingBootstrapOverlay.workflowPath
+  );
+  if (
+    missingBootstrapOverlayResult.status === 0 ||
+    !missingBootstrapOverlayResult.stderr.includes('compiler bootstrap overlay smoke')
+  ) {
+    throw new Error(
+      `expected missing compiler bootstrap overlay smoke to fail:\n${missingBootstrapOverlayResult.stdout}\n${missingBootstrapOverlayResult.stderr}`
+    );
+  }
+
+  const lateBootstrapOverlay = writeFixture(root, `
+jobs:
+  test:
+    steps:
+      - name: Build release CLI runner
+        timeout-minutes: 20
+        run: ./node_modules/.bin/grunt --stack modern-ci-release-cli --grunt-ignore-compile-errors
+      - name: Run modern Java compatibility tests
+        run: ./node_modules/.bin/grunt --stack test-modern-java-runtime --grunt-ignore-compile-errors
+      - name: Verify compiler bootstrap overlay
+        run: ./ci/modern_bootstrap_overlay_smoke.sh
+      - name: Run core array compatibility smoke
+        run: |
+          ./node_modules/.bin/grunt --stack modern-ci-array-runout --grunt-ignore-compile-errors
+          node build/release-cli/console/test_runner.js classes/test/ArrayOps --makefile
+      - run: ./ci/kotlin_alpha_smoke.sh
+      - run: ./ci/scala_beta_smoke.sh
+`);
+  const lateBootstrapOverlayResult = runChecker(lateBootstrapOverlay.ciDir, lateBootstrapOverlay.workflowPath);
+  if (
+    lateBootstrapOverlayResult.status === 0 ||
+    !lateBootstrapOverlayResult.stderr.includes('before modern Java compatibility tests')
+  ) {
+    throw new Error(
+      `expected late compiler bootstrap overlay smoke to fail:\n${lateBootstrapOverlayResult.stdout}\n${lateBootstrapOverlayResult.stderr}`
+    );
   }
 
   const missing = writeFixture(root, `

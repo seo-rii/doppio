@@ -70,6 +70,14 @@ if (!/grunt\s+--stack\s+modern-ci-release-cli\b/.test(releaseRunnerBody)) {
   fail('Modern Java workflow must build the release CLI runner with modern-ci-release-cli.');
 }
 
+const bootstrapOverlayStep = workflow.match(
+  /- name:\s*Verify compiler bootstrap overlay\n(?<body>(?:\s{8}[^\n]*\n)*)/
+);
+const bootstrapOverlayBody = bootstrapOverlayStep?.groups?.body || '';
+if (!/\.\/ci\/modern_bootstrap_overlay_smoke\.sh\b/.test(bootstrapOverlayBody)) {
+  fail('Modern Java workflow must run the compiler bootstrap overlay smoke after building the release CLI runner.');
+}
+
 const modernJavaRuntimeStep = workflow.match(/- name:\s*Run modern Java compatibility tests\n(?<body>(?:\s{8}[^\n]*\n)*)/);
 const modernJavaRuntimeBody = modernJavaRuntimeStep?.groups?.body || '';
 if (!/grunt\s+--stack\s+test-modern-java-runtime\b/.test(modernJavaRuntimeBody)) {
@@ -108,6 +116,10 @@ if (compilerCoverageStep) {
 }
 
 const releaseRunnerIndex = requireWorkflowIndex('the Build release CLI runner step', workflow.indexOf('- name: Build release CLI runner'));
+const bootstrapOverlayIndex = requireWorkflowIndex(
+  'the Verify compiler bootstrap overlay step',
+  workflow.indexOf('- name: Verify compiler bootstrap overlay')
+);
 const modernJavaRuntimeIndex = requireWorkflowIndex(
   'the Run modern Java compatibility tests step',
   workflow.indexOf('- name: Run modern Java compatibility tests')
@@ -120,8 +132,11 @@ const firstCompilerSmokeIndex = Math.min(
   ...[...workflow.matchAll(/\.\/ci\/(?:kotlin|scala)[A-Za-z0-9_./-]*_smoke\.sh\b/g)].map((match) => match.index)
 );
 
-if (releaseRunnerIndex > modernJavaRuntimeIndex) {
-  fail('Modern Java workflow must build the release CLI runner before modern Java compatibility tests.');
+if (releaseRunnerIndex > bootstrapOverlayIndex) {
+  fail('Modern Java workflow must build the release CLI runner before verifying the compiler bootstrap overlay.');
+}
+if (bootstrapOverlayIndex > modernJavaRuntimeIndex) {
+  fail('Modern Java workflow must verify the compiler bootstrap overlay before modern Java compatibility tests.');
 }
 if (modernJavaRuntimeIndex > coreArrayIndex) {
   fail('Modern Java workflow must run modern Java compatibility tests before the core array smoke.');
