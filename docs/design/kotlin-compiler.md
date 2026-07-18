@@ -324,7 +324,9 @@ Current verified checks:
   Doppio-hosted `K2JVMCompiler` compiles an intentionally invalid source file,
   exits with status 1, reports the expected initializer type-mismatch and
   unresolved-reference diagnostics with source positions and carets, and leaves
-  the output directory empty.
+  the output directory empty. It passes `-no-jdk` and analyzes the source
+  against Doppio's ordered compiler bootstrap overlay instead of host JDK
+  metadata; a local 2026-07-18 strict-bootstrap run completed in 103 seconds.
 - The CI smoke now compiles multiple Kotlin files covering a data class,
   annotation class, interface default implementation, generic class, default
   arguments, string templates, and a lambda. Runtime execution includes

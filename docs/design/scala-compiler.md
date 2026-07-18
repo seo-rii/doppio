@@ -396,8 +396,9 @@ classpath stress while compiling only a minimal `Hello` program that prints
 invalid source set and checks the nonzero exit status plus diagnostic source
 filenames, line numbers, single-line and multiline type-mismatch
 found/required types, missing-member error kind, source lines, caret positions,
-and multi-error count. A local 2026-07-10 validation completed the focused
-Scala diagnostic smoke using Scala 2.13.18.
+and multi-error count. It passes Doppio's ordered compiler bootstrap overlay to
+`-javabootclasspath` instead of using host JDK metadata. A local 2026-07-18
+strict-bootstrap validation completed in 42 seconds using Scala 2.13.18.
 
 `ci/scala_record_smoke.sh` compiles a Java 17 record support class with the
 host JDK, then runs Doppio-hosted scalac on a focused Scala interop source that
