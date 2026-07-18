@@ -598,7 +598,9 @@ Current verified checks:
   including the synthetic method's unnamed fallback parameter.
 - A dynamic-proxy/reflection smoke is now split into
   `classes/kotlin_proxy_smoke` and run through `ci/kotlin_proxy_smoke.sh`. A
-  focused local run completed in 73 seconds and a follow-up run through the
+  focused local run completed in 73 seconds, and a 2026-07-18 strict-bootstrap
+  compile completed in 121 seconds. Its default compile budget is 480 seconds
+  with a 30-second forced termination bound. A follow-up run through the
   remaining full-classpath `ci/kotlin_smoke.sh` completed in 395 seconds; both
   the host JVM and Doppio printed
   `iface/transform/value|dyn|KT5|XY3|cba|null|ProxyReflectionService(dyn)|321|true|true|true|transform:2,getLabel:0,transform:2,maybe:1,maybe:1,toString:0,hashCode:0,equals:1`.
@@ -701,8 +703,10 @@ Current verified checks:
   `access$mix` / `access$getSecret$p` synthetic accessors.
 - A focused Kotlin reflection-shape smoke now lives in
   `classes/kotlin_reflection_shape_smoke` and runs through
-  `ci/kotlin_reflection_shape_smoke.sh`. A focused local run completed in 80
-  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_reflection_shape_smoke.sh`. An initial focused local run completed
+  in 80 seconds, and a 2026-07-18 strict-bootstrap compile completed in 211
+  seconds. Its default compile budget is 480 seconds with a 30-second forced
+  termination bound. A follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 396 seconds. It reflects Kotlin nested,
   inner, companion, method-local, companion-local, and anonymous classes
   through Java `Class` metadata, checking declared classes,
@@ -733,8 +737,10 @@ Current verified checks:
   inlined `sortedBy` comparator class.
 - A focused Kotlin receiver-lambda smoke now lives in
   `classes/kotlin_receiver_lambda_smoke` and runs through
-  `ci/kotlin_receiver_lambda_smoke.sh`. A focused local run completed in 83
-  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_receiver_lambda_smoke.sh`. An initial focused local run completed
+  in 83 seconds, and a 2026-07-18 strict-bootstrap compile completed in 351
+  seconds. Its default compile budget is 480 seconds with a 30-second forced
+  termination bound. A follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 230 seconds. Both the host JVM and Doppio
   printed `s|[a]|kn|<GO>|x1|(xy)|{q}|ad|text`. The smoke script now asserts
   with `javap -v` that the generated classfile contains `InvokeDynamic`
@@ -783,8 +789,10 @@ Current verified checks:
   `kotlin.Metadata`.
 - A focused Kotlin sequence-builder smoke now lives in
   `classes/kotlin_sequence_builder_smoke` and runs through
-  `ci/kotlin_sequence_builder_smoke.sh`. A focused local run completed in 78
-  seconds and a follow-up run through the remaining full-classpath
+  `ci/kotlin_sequence_builder_smoke.sh`. An initial focused local run completed
+  in 78 seconds, and a 2026-07-18 strict-bootstrap compile completed in 173
+  seconds. Its default compile budget is 480 seconds with a 30-second forced
+  termination bound. A follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 290 seconds. Both the host JVM and Doppio
   printed
   `1:2|start>after1|0=3,1=8,2=10|start>after1>start>after1>afterAll>done|abcd|789/IllegalStateException|3,6,12,24|xyyzzz:23`.
