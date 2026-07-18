@@ -6,23 +6,28 @@ import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const checkerPath = path.join(path.dirname(__filename), 'check_compiler_bootstrap_consumers.mjs');
-const kotlinConsumers = [
-  'kotlin_smoke.sh',
-  'kotlin_modern_java_interop_smoke.sh',
-  'kotlin_duration_smoke.sh',
-];
+const kotlinConsumers = new Map([
+  ['kotlin_smoke.sh', '$stdlib_jar'],
+  ['kotlin_modern_java_interop_smoke.sh', '$stdlib_jar'],
+  ['kotlin_duration_smoke.sh', '$stdlib_jar'],
+  ['kotlin_methodhandle_smoke.sh', '$stdlib_jar'],
+  ['kotlin_record_smoke.sh', '$stdlib_jar:$support_dir'],
+]);
 const scalaConsumers = [
   'scala_smoke.sh',
   'scala_modern_interop_smoke.sh',
   'scala_duration_smoke.sh',
+  'scala_methodhandle_smoke.sh',
+  'scala_record_smoke.sh',
+  'scala_stackwalker_smoke.sh',
 ];
 
-function kotlinFixture(runtimeClasspath = 'runtime_cp="$out_dir:$stdlib_jar"') {
+function kotlinFixture(targetSuffix = '$stdlib_jar', runtimeClasspath = 'runtime_cp="$out_dir:$stdlib_jar"') {
   return `#!/usr/bin/env bash
 modern_overlay_jar="$repo_root/build/modern-bootstrap-overlay/modern-bootstrap.jar"
 modern_boot_jar="$repo_root/vendor/java_home/lib/doppio.jar"
 runtime_boot_jar="$repo_root/vendor/java_home/lib/rt.jar"
-compiler_target_cp="$modern_overlay_jar:$modern_boot_jar:$runtime_boot_jar:$stdlib_jar"
+compiler_target_cp="$modern_overlay_jar:$modern_boot_jar:$runtime_boot_jar:${targetSuffix}"
 org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \\
   -no-jdk \\
   -classpath "$compiler_target_cp" \\
@@ -46,8 +51,8 @@ ${runtimeClasspath}
 
 function writeConsumers(ciDir) {
   fs.mkdirSync(ciDir, { recursive: true });
-  for (const scriptName of kotlinConsumers) {
-    fs.writeFileSync(path.join(ciDir, scriptName), kotlinFixture());
+  for (const [scriptName, targetSuffix] of kotlinConsumers) {
+    fs.writeFileSync(path.join(ciDir, scriptName), kotlinFixture(targetSuffix));
   }
   for (const scriptName of scalaConsumers) {
     fs.writeFileSync(path.join(ciDir, scriptName), scalaFixture());
@@ -84,6 +89,13 @@ try {
     )
   );
   expectFailure(runChecker(ciDir), 'ordered Kotlin compiler target classpath', 'reordered Kotlin bootstrap');
+
+  writeConsumers(ciDir);
+  fs.writeFileSync(
+    path.join(ciDir, 'kotlin_record_smoke.sh'),
+    kotlinFixture('$stdlib_jar')
+  );
+  expectFailure(runChecker(ciDir), 'ordered Kotlin compiler target classpath', 'missing Kotlin record support path');
 
   writeConsumers(ciDir);
   fs.writeFileSync(path.join(ciDir, 'kotlin_duration_smoke.sh'), kotlinFixture().replace('  -no-jdk \\\n', ''));

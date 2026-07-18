@@ -39,6 +39,9 @@ for entry in "${entries[@]}"; do
 done
 for required_entry in \
     java/lang/Runtime.class \
+    java/lang/invoke/MethodHandle.class \
+    java/lang/invoke/MethodHandles.class \
+    'java/lang/invoke/MethodHandles$Lookup.class' \
     java/time/Duration.class \
     java/util/concurrent/TimeUnit.class; do
   required_found=false

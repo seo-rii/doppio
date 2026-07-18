@@ -6,15 +6,20 @@ const __filename = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(__filename), '..');
 const ciDir = process.env.COMPILER_BOOTSTRAP_CONSUMER_CI_DIR || path.join(repoRoot, 'ci');
 
-const kotlinConsumers = [
-  'kotlin_smoke.sh',
-  'kotlin_modern_java_interop_smoke.sh',
-  'kotlin_duration_smoke.sh',
-];
+const kotlinConsumers = new Map([
+  ['kotlin_smoke.sh', '$stdlib_jar'],
+  ['kotlin_modern_java_interop_smoke.sh', '$stdlib_jar'],
+  ['kotlin_duration_smoke.sh', '$stdlib_jar'],
+  ['kotlin_methodhandle_smoke.sh', '$stdlib_jar'],
+  ['kotlin_record_smoke.sh', '$stdlib_jar:$support_dir'],
+]);
 const scalaConsumers = [
   'scala_smoke.sh',
   'scala_modern_interop_smoke.sh',
   'scala_duration_smoke.sh',
+  'scala_methodhandle_smoke.sh',
+  'scala_record_smoke.sh',
+  'scala_stackwalker_smoke.sh',
 ];
 
 function fail(message) {
@@ -49,10 +54,12 @@ function checkCommon(scriptName, content) {
   }
 }
 
-for (const scriptName of kotlinConsumers) {
+for (const [scriptName, targetSuffix] of kotlinConsumers) {
   const content = readConsumer(scriptName);
   checkCommon(scriptName, content);
-  if (!content.includes('compiler_target_cp="$modern_overlay_jar:$modern_boot_jar:$runtime_boot_jar:$stdlib_jar"')) {
+  const expectedTargetClasspath =
+    `compiler_target_cp="$modern_overlay_jar:$modern_boot_jar:$runtime_boot_jar:${targetSuffix}"`;
+  if (!content.includes(expectedTargetClasspath)) {
     fail(`ci/${scriptName} must keep the ordered Kotlin compiler target classpath.`);
   }
   if (!/^[ \t]*-no-jdk[ \t]*\\?[ \t]*$/m.test(content)) {
@@ -75,5 +82,5 @@ for (const scriptName of scalaConsumers) {
 }
 
 console.log(
-  `Compiler bootstrap consumer checker validated ${kotlinConsumers.length} Kotlin and ${scalaConsumers.length} Scala smokes.`
+  `Compiler bootstrap consumer checker validated ${kotlinConsumers.size} Kotlin and ${scalaConsumers.length} Scala smokes.`
 );

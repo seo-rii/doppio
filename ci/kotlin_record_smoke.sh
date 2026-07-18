@@ -45,6 +45,15 @@ source_file="$repo_root/classes/kotlin_record_smoke/RecordSmoke.kt"
 support_source="$repo_root/classes/kotlin_record_smoke/RecordSmokeSupport.java"
 support_dir="$work_dir/support"
 out_dir="$work_dir/out"
+modern_overlay_jar="$repo_root/build/modern-bootstrap-overlay/modern-bootstrap.jar"
+modern_boot_jar="$repo_root/vendor/java_home/lib/doppio.jar"
+runtime_boot_jar="$repo_root/vendor/java_home/lib/rt.jar"
+compiler_target_cp="$modern_overlay_jar:$modern_boot_jar:$runtime_boot_jar:$stdlib_jar:$support_dir"
+
+if [ ! -f "$modern_overlay_jar" ] || [ ! -f "$modern_boot_jar" ] || [ ! -f "$runtime_boot_jar" ]; then
+  echo "Doppio compiler bootstrap classpath is incomplete; build the modern release CLI first." >&2
+  exit 1
+fi
 
 test -f "$repo_root/classes/modern_classlib/out/java/lang/Record.class"
 
@@ -54,18 +63,20 @@ javac --release 17 -d "$support_dir" "$support_source"
 
 compile_timeout="${KOTLIN_RECORD_SMOKE_COMPILE_TIMEOUT_SECONDS:-360}"
 run_timeout="${KOTLIN_RECORD_SMOKE_RUN_TIMEOUT_SECONDS:-60}"
+kill_after="${KOTLIN_RECORD_SMOKE_KILL_AFTER_SECONDS:-30}"
 responsiveness="${DOPPIO_KOTLIN_RESPONSIVENESS:-100000}"
 
 compile_start="$(date +%s)"
-timeout -s INT "${compile_timeout}s" \
+timeout -k "${kill_after}s" -s INT "${compile_timeout}s" \
   node --max-old-space-size=4096 --no-deprecation "$runner" \
   "-Xresponsiveness:$responsiveness" \
   -cp "$compiler_jar" \
   org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
   -no-reflect \
+  -no-jdk \
   -java-parameters \
   -jvm-target 17 \
-  -classpath "$support_dir" \
+  -classpath "$compiler_target_cp" \
   -d "$out_dir" \
   "$source_file"
 compile_end="$(date +%s)"
@@ -89,7 +100,7 @@ if [ "$native_output" != "$expected_output" ]; then
   exit 1
 fi
 
-doppio_output="$(timeout -s INT "${run_timeout}s" node --no-deprecation "$runner" -cp "$runtime_cp" RecordSmokeKt)"
+doppio_output="$(timeout -k "${kill_after}s" -s INT "${run_timeout}s" node --no-deprecation "$runner" -cp "$runtime_cp" RecordSmokeKt)"
 if [ "$doppio_output" != "$expected_output" ]; then
   echo "Unexpected Doppio output: $doppio_output" >&2
   exit 1

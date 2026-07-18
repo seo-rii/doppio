@@ -51,8 +51,17 @@ if [ -z "$jline_jar" ]; then
 fi
 
 compiler_cp="$compiler_jar:$library_jar:$reflect_jar:$diff_utils_jar:$jline_jar"
+modern_overlay_jar="$repo_root/build/modern-bootstrap-overlay/modern-bootstrap.jar"
+modern_boot_jar="$repo_root/vendor/java_home/lib/doppio.jar"
+runtime_boot_jar="$repo_root/vendor/java_home/lib/rt.jar"
+compiler_boot_cp="$modern_overlay_jar:$modern_boot_jar:$runtime_boot_jar"
 support_dir="$work_dir/support"
 out_dir="$work_dir/out"
+
+if [ ! -f "$modern_overlay_jar" ] || [ ! -f "$modern_boot_jar" ] || [ ! -f "$runtime_boot_jar" ]; then
+  echo "Doppio compiler boot classpath is incomplete; build the modern release CLI first." >&2
+  exit 1
+fi
 
 test -f "$repo_root/classes/modern_classlib/out/java/lang/Record.class"
 
@@ -62,14 +71,16 @@ javac --release 17 -d "$support_dir" "$source_dir"/*.java
 
 compile_timeout="${SCALA_RECORD_SMOKE_COMPILE_TIMEOUT_SECONDS:-420}"
 run_timeout="${SCALA_RECORD_SMOKE_RUN_TIMEOUT_SECONDS:-60}"
+kill_after="${SCALA_RECORD_SMOKE_KILL_AFTER_SECONDS:-30}"
 responsiveness="${DOPPIO_SCALA_RESPONSIVENESS:-100000}"
 
 compile_start="$(date +%s)"
-timeout -s INT "${compile_timeout}s" \
+timeout -k "${kill_after}s" -s INT "${compile_timeout}s" \
   node --max-old-space-size=4096 --no-deprecation "$runner" \
   "-Xresponsiveness:$responsiveness" \
   -cp "$compiler_cp" \
   scala.tools.nsc.Main \
+  -javabootclasspath "$compiler_boot_cp" \
   -classpath "$support_dir:$library_jar:$reflect_jar" \
   -d "$out_dir" \
   "$source_dir"/*.scala
@@ -94,7 +105,7 @@ if [ "$native_output" != "$expected_output" ]; then
   exit 1
 fi
 
-doppio_output="$(timeout -s INT "${run_timeout}s" node --no-deprecation "$runner" -cp "$runtime_cp" ScalaRecordInteropSmoke)"
+doppio_output="$(timeout -k "${kill_after}s" -s INT "${run_timeout}s" node --no-deprecation "$runner" -cp "$runtime_cp" ScalaRecordInteropSmoke)"
 if [ "$doppio_output" != "$expected_output" ]; then
   echo "Unexpected Doppio output: $doppio_output" >&2
   exit 1
