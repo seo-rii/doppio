@@ -56,9 +56,11 @@ Compiler bootstrap note: `modern-ci-release-cli` generates a deterministic
 compiler-only JAR containing the 31 Java 8 bootstrap classes changed by the
 shared parsed-overlay dispatch. Kotlin and Scala put this artifact before
 `doppio.jar` and `rt.jar` for source analysis, eliminating host JDK metadata
-from the focused modern duration gates without changing Doppio's runtime
-bootstrap path. CI compares two forced-generation SHA-256 values and the exact
-class-only entry contract. See `docs/design/compiler-bootstrap-overlay.md`.
+from both the broad modern interop and focused duration gates without changing
+Doppio's runtime bootstrap path. The broad gates compile and bytecode-check a
+direct `Runtime.version()` call, while CI also compares two forced-generation
+SHA-256 values and the exact class-only entry contract. See
+`docs/design/compiler-bootstrap-overlay.md`.
 
 Java 17 `java.lang.invoke` note: the compatibility row above now also includes
 selected `MethodHandles.tryFinally` support including fixed-arity normalization
@@ -160,8 +162,9 @@ Java 17 compiler interop note: the Kotlin compiler smoke and focused Scala
 modern interop smoke now also exercise selected Java 17 class-library overlays
 from generated Kotlin/Scala bytecode via reflection, covering `HexFormat`,
 `InstantSource`, and seeded `RandomGeneratorFactory` lookup/output for
-`Random` and `SplittableRandom` providers while keeping their compile-time boot
-classpath compatible with the Java 8-era Doppio surface. They also cover Java
+`Random` and `SplittableRandom` providers while keeping compile-time bootstrap
+metadata limited to Doppio's transformed Java 8 classes and modern class
+library. They also cover Java
 16 `Stream.toList()` from generated compiler output, directly from Kotlin
 source and through the same reflection-backed runtime overlay path for Scala,
 verifying the returned list is unmodifiable. The same compiler interop slice

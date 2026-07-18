@@ -35,7 +35,8 @@ JDK's API surface.
 - Make clean rebuilds byte-for-byte deterministic and gate stale artifacts by
   content hash rather than modification time.
 - Put the generated JAR before `doppio.jar` and `rt.jar` for Kotlin and Scala
-  source analysis without adding it to Doppio's runtime bootstrap classpath.
+  source analysis, including the broad modern interop suites, without adding
+  it to Doppio's runtime bootstrap classpath.
 
 This artifact is not a replacement JDK, a general Java 17 API signature JAR, or
 a second implementation of modern methods.
@@ -185,11 +186,12 @@ compiler. Both compiler families use this precedence:
 modern-bootstrap.jar : doppio.jar : rt.jar
 ```
 
-Kotlin passes `-no-jdk` and adds those three JARs, in that order, to the
-compiler's explicit classpath along with the fixture's Kotlin dependencies.
-It no longer passes a host `-jdk-home`. Scala passes the same ordered trio to
-`-javabootclasspath`; its ordinary `-classpath` continues to contain the Scala
-library and fixture dependencies.
+Kotlin's modern interop and focused duration smokes pass `-no-jdk` and add
+those three JARs, in that order, to the compiler's explicit classpath along
+with the fixture's Kotlin dependencies. They do not pass a host `-jdk-home`.
+Scala's matching smokes pass the same ordered trio to `-javabootclasspath`;
+their ordinary `-classpath` continues to contain the Scala library and fixture
+dependencies.
 
 The smoke scripts must reject a missing generated artifact and make the order
 visible in one variable rather than assembling it at multiple call sites. They
@@ -266,18 +268,22 @@ The implemented gates are:
    clean run has the same SHA-256.
 3. Re-running the task with unchanged content is a verified hash-cache hit;
    changing `rt.jar`, the transformer, or archive settings forces a rebuild.
-4. Kotlin compiler smokes use `-no-jdk` with
+4. Kotlin modern interop and duration smokes use `-no-jdk` with
    `modern-bootstrap.jar:doppio.jar:rt.jar` precedence and no host JDK metadata.
-5. Scala compiler smokes use the same precedence through
+5. Scala modern interop and duration smokes use the same precedence through
    `-javabootclasspath` and no extracted host `java.base.jmod` classes.
-6. Focused Kotlin and Scala `Duration`/`TimeUnit` smokes compile direct method
-   references, pass their `javap` descriptor guards, and run on both HotSpot
-   and the ordinary single-transform Doppio runtime.
+6. The broad Kotlin and Scala modern interop smokes compile a direct
+   `Runtime.version()` call and guard its `invokestatic` bytecode, while the
+   focused `Duration`/`TimeUnit` smokes guard all of their direct modern method
+   descriptors. Every fixture runs on both HotSpot and the ordinary
+   single-transform Doppio runtime.
 7. Runtime configuration and release listings contain no reference to
    `modern-bootstrap.jar`.
 
 On 2026-07-17, two forced clean generations produced the identical SHA-256
 `3e94e87c322788a4d04f9d634796d02d74c9652365a6835b2b95c8fb86c874b4`.
 The hash-cache hit, 31-entry archive check, TypeScript 6.0.3 and 7.0.1 RC
-checks, full Java 9-26 runtime suite, and focused Kotlin 2.4.0 and Scala 2.13.18
-compiler smokes all passed.
+checks, full Java 9-26 runtime suite, and Kotlin 2.4.0 and Scala 2.13.18
+compiler smokes all passed. On 2026-07-18, the broad modern interop smokes also
+passed with the compiler-only classpaths and proved that `Runtime.version()` is
+resolved from this generated overlay rather than host JDK metadata.
