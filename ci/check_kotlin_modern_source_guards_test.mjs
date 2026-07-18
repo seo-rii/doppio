@@ -71,6 +71,21 @@ fun bad(): Int = Runtime.version().feature()
     );
   }
 
+  writeSource(root, 'classes/kotlin_bad_runtime_smoke/BadRuntimeSmoke.kt', `
+fun bad(): Int = Runtime
+  .version()
+  .feature()
+`);
+  const multilineRuntimeFeatureResult = runChecker(root);
+  if (
+    multilineRuntimeFeatureResult.status === 0 ||
+    !multilineRuntimeFeatureResult.stderr.includes('Runtime.version direct call')
+  ) {
+    throw new Error(
+      `expected multiline Runtime.version fixture to fail:\n${multilineRuntimeFeatureResult.stdout}\n${multilineRuntimeFeatureResult.stderr}`,
+    );
+  }
+
   fs.rmSync(path.join(root, 'classes', 'kotlin_bad_runtime_smoke'), { recursive: true, force: true });
   writeSource(root, 'classes/kotlin_bad_optional_smoke/BadOptionalSmoke.kt', `
 fun bad(optionalValue: java.util.Optional<String>): Long {

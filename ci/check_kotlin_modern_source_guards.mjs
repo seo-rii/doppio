@@ -78,11 +78,11 @@ for (const sourcePath of sourcePaths) {
   const content = fs.readFileSync(sourcePath, 'utf8');
   const lines = content.split(/\r?\n/);
   const relativeSourcePath = path.relative(sourceRoot, sourcePath).split(path.sep).join('/').replace(/^classes\//, '');
-  const runtimeVersionCalls = content.match(runtimeVersionCallPattern) || [];
-  const runtimeFeatureCalls = content.match(runtimeFeatureCallPattern) || [];
+  const runtimeVersionMatches = [...content.matchAll(runtimeVersionCallPattern)];
+  const runtimeFeatureMatches = [...content.matchAll(runtimeFeatureCallPattern)];
 
   if (relativeSourcePath === runtimeVersionFixture) {
-    if (runtimeVersionCalls.length !== 1 || runtimeFeatureCalls.length !== 1) {
+    if (runtimeVersionMatches.length !== 1 || runtimeFeatureMatches.length !== 1) {
       violations.push({
         sourcePath,
         line: 1,
@@ -90,16 +90,14 @@ for (const sourcePath of sourcePaths) {
         guidance: 'Keep exactly one direct Runtime.version().feature() call in the Kotlin modern Java interop fixture.',
       });
     }
-  } else if (runtimeVersionCalls.length > 0) {
-    for (let index = 0; index < lines.length; index++) {
-      if (/\bRuntime\s*\.\s*version\s*\(\s*\)/.test(lines[index])) {
-        violations.push({
-          sourcePath,
-          line: index + 1,
-          label: 'Runtime.version direct call',
-          guidance: 'Keep direct Runtime.version coverage in the Kotlin modern Java interop fixture.',
-        });
-      }
+  } else {
+    for (const match of runtimeVersionMatches) {
+      violations.push({
+        sourcePath,
+        line: content.slice(0, match.index).split(/\r?\n/).length,
+        label: 'Runtime.version direct call',
+        guidance: 'Keep direct Runtime.version coverage in the Kotlin modern Java interop fixture.',
+      });
     }
   }
 

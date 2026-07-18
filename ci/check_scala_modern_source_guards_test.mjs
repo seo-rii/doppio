@@ -76,6 +76,23 @@ object BadRuntimeVersionSmoke {
     );
   }
 
+  writeSource(root, 'classes/scala_bad_runtime_version_smoke/BadRuntimeVersionSmoke.scala', `
+object BadRuntimeVersionSmoke {
+  def exercise(): Int = Runtime
+    .version()
+    .feature()
+}
+`);
+  const multilineRuntimeFeatureResult = runChecker(root);
+  if (
+    multilineRuntimeFeatureResult.status === 0 ||
+    !multilineRuntimeFeatureResult.stderr.includes('Runtime.version direct call')
+  ) {
+    throw new Error(
+      `expected multiline Runtime.version fixture to fail:\n${multilineRuntimeFeatureResult.stdout}\n${multilineRuntimeFeatureResult.stderr}`,
+    );
+  }
+
   fs.rmSync(path.join(root, 'classes', 'scala_bad_runtime_version_smoke'), { recursive: true, force: true });
   writeSource(root, 'classes/scala_bad_runtime_smoke/BadRuntimeSmoke.scala', `
 object BadRuntimeSmoke {
