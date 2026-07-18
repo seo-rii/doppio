@@ -201,6 +201,14 @@ host Java 9+ class metadata as a fallback. Host `java` and `javap` may still run
 the generated fixture and inspect its bytecode for native comparison; they are
 not metadata inputs to the Doppio-hosted compilation.
 
+`ci/check_compiler_bootstrap_consumers.mjs` statically protects the main,
+modern interop, and duration consumers for both compiler families. It requires
+the exact ordered classpath variables and compiler flags, rejects missing
+consumer scripts, and rejects adding `modern-bootstrap.jar` to a declared
+runtime classpath. Its unit test covers reordered paths, missing Kotlin and
+Scala flags, missing target/boot classpath arguments, runtime contamination,
+and a missing consumer.
+
 `doppio.jar` follows the overlay because transformed signatures can reference
 modern shim, helper, or marker types supplied there. Java 8 `rt.jar` remains
 last and supplies every unchanged bootstrap class.
@@ -274,12 +282,15 @@ The implemented gates are:
 5. Scala main compiler, modern interop, and duration smokes use the same
    precedence through `-javabootclasspath` and no extracted host
    `java.base.jmod` classes.
-6. The broad Kotlin and Scala modern interop smokes compile a direct
+6. The tested compiler bootstrap consumer checker locks the ordered paths,
+   compiler flags, consumer inventory, and runtime exclusion for all six
+   migrated smoke scripts.
+7. The broad Kotlin and Scala modern interop smokes compile a direct
    `Runtime.version()` call and guard its `invokestatic` bytecode, while the
    focused `Duration`/`TimeUnit` smokes guard all of their direct modern method
    descriptors. Every fixture runs on both HotSpot and the ordinary
    single-transform Doppio runtime.
-7. Runtime configuration and release listings contain no reference to
+8. Runtime configuration and release listings contain no reference to
    `modern-bootstrap.jar`.
 
 On 2026-07-17, two forced clean generations produced the identical SHA-256

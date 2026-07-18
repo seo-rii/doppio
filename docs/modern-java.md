@@ -59,7 +59,9 @@ shared parsed-overlay dispatch. Kotlin and Scala put this artifact before
 from the main compiler, broad modern interop, and focused duration gates
 without changing Doppio's runtime bootstrap path. The broad gates compile and
 bytecode-check a direct `Runtime.version()` call, while CI also compares two
-forced-generation SHA-256 values and the exact class-only entry contract. See
+forced-generation SHA-256 values and the exact class-only entry contract. A
+tested consumer checker locks the six migrated Kotlin/Scala smoke scripts to
+the ordered compiler-only paths and rejects runtime overlay contamination. See
 `docs/design/compiler-bootstrap-overlay.md`.
 
 Java 17 `java.lang.invoke` note: the compatibility row above now also includes
