@@ -33,6 +33,10 @@ const kotlinConsumers = new Map([
   ['kotlin_multifile_facade_smoke.sh', '$stdlib_jar'],
   ['kotlin_sam_smoke.sh', '$stdlib_jar'],
   ['kotlin_extension_variance_smoke.sh', '$stdlib_jar'],
+  ['kotlin_completable_future_smoke.sh', '$stdlib_jar'],
+  ['kotlin_concurrency_smoke.sh', '$stdlib_jar'],
+  ['kotlin_unsigned_smoke.sh', '$stdlib_jar'],
+  ['kotlin_text_regex_smoke.sh', '$stdlib_jar'],
   ['kotlin_methodhandle_smoke.sh', '$stdlib_jar'],
   ['kotlin_record_smoke.sh', '$stdlib_jar:$support_dir'],
 ]);
