@@ -834,7 +834,9 @@ Current verified checks:
 - A focused Kotlin text/regex smoke now lives in
   `classes/kotlin_text_regex_smoke` and runs through
   `ci/kotlin_text_regex_smoke.sh`. A focused local run completed in 114 seconds
-  and a follow-up run through the remaining full-classpath
+  and a 2026-07-19 strict-bootstrap compile completed in 258 seconds. Its
+  default compile budget is 480 seconds with a 30-second forced termination
+  bound. A follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 352 seconds. Both the host JVM and Doppio
   printed
   `0:a:2:0-2,1:bb:25:5-9,2:c:457:12-16|A:1; BB:32; C:654; bad=x|first b=2|a|bb|c|0:5:a,1:6:b,2:5:g|KT/42|true|KOTin`.
@@ -904,7 +906,10 @@ Current verified checks:
 - A focused Kotlin concurrency smoke now lives in
   `classes/kotlin_concurrency_smoke` and runs through
   `ci/kotlin_concurrency_smoke.sh`. A focused local run completed in 85 seconds
-  and a follow-up run through the remaining full-classpath
+  and a 2026-07-19 strict-bootstrap compile completed in 370 seconds. Its
+  previous 360-second default would have expired, so the default compile budget
+  is 480 seconds with a 30-second forced termination bound. A follow-up run
+  through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 368 seconds. Both the host JVM and Doppio
   printed
   `a=123,b=12,c=89|true|true:y:Y11|abc:false:true:1|main:11/worker:3/main:11/main:11|locked:3:hold:1:true|k=1,z=12|11`.
@@ -965,7 +970,9 @@ Current verified checks:
   Both the host JVM and Doppio print
   `3:4:0fa0ff:2,9,18446744073709551615:4294967295,4:wrap:true:true`.
   A local 2026-06-30 validation completed the focused unsigned smoke in 92
-  seconds and the remaining full-classpath Kotlin compiler smoke in 527
+  seconds, and a 2026-07-19 strict-bootstrap compile completed in 170 seconds.
+  Its default compile budget is 480 seconds with a 30-second forced termination
+  bound. The remaining full-classpath Kotlin compiler smoke completed in 527
   seconds.
 - A focused Kotlin source-level `CompletableFuture` smoke now lives in
   `classes/kotlin_completable_future_smoke` and runs through
@@ -974,8 +981,10 @@ Current verified checks:
   `thenApply`, `thenCompose`, `handle`, `thenCombine`, `applyToEither`,
   `allOf`, `join`, and timed `get`. Both the host JVM and Doppio print
   `KT2!:5:l`. A local 2026-06-30 validation completed the focused
-  CompletableFuture smoke in 74 seconds and the remaining full-classpath
-  Kotlin compiler smoke in 404 seconds.
+  CompletableFuture smoke in 74 seconds, and a 2026-07-19 strict-bootstrap
+  compile completed in 207 seconds. Its default compile budget is 480 seconds
+  with a 30-second forced termination bound. The remaining full-classpath
+  Kotlin compiler smoke completed in 404 seconds.
 - `CompletableFuture` subclass methodrefs now reach Doppio's Java 9/12 helper
   methods, and selected subclass hooks use receiver `newIncompleteFuture()` and
   `defaultExecutor()` for copy and exceptional async recovery paths. Coverage
