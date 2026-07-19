@@ -379,14 +379,18 @@ Current verified checks:
   facade and part class names, and verifies cross-file top-level function,
   default-argument, private-helper bridge, and Java reflection lookup behavior
   on both the host JVM and Doppio. A local 2026-07-11 validation completed the
-  focused smoke in 112 seconds.
+  focused smoke in 112 seconds, and a 2026-07-19 strict-bootstrap compile
+  completed in 163 seconds. Its default compile budget is 480 seconds with a
+  30-second forced termination bound.
 - A focused Kotlin SAM smoke now lives in `classes/kotlin_sam_smoke` and runs
   through `ci/kotlin_sam_smoke.sh`. It compiles Kotlin `fun interface` adapters
   and Java SAM conversions for `Runnable`, `Comparator`, `Supplier`,
   `IntUnaryOperator`, `Predicate`, and `Callable`, then checks the generated
   `SamSmokeKt` class with `javap -v` for `InvokeDynamic`,
   `LambdaMetafactory`, and the expected SAM descriptors before comparing host
-  JVM and Doppio output.
+  JVM and Doppio output. A 2026-07-19 strict-bootstrap compile completed in 178
+  seconds. Its default compile budget is 480 seconds with a 30-second forced
+  termination bound.
 - A no-suspension `suspend` function, suspend lambda, `Continuation`,
   `kotlin.coroutines.startCoroutine`, synchronous and delayed
   `suspendCoroutine` resume, resume-time exception propagation, Java
@@ -728,7 +732,9 @@ Current verified checks:
 - A focused Kotlin extension/typealias/variance smoke now lives in
   `classes/kotlin_extension_variance_smoke` and runs through
   `ci/kotlin_extension_variance_smoke.sh`. A focused local run completed in 112
-  seconds and a follow-up run through the remaining full-classpath
+  seconds, and a 2026-07-19 strict-bootstrap compile completed in 260 seconds.
+  Its default compile budget is 480 seconds with a 30-second forced termination
+  bound. A follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 217 seconds. Both the host JVM and Doppio
   printed
   `5/1/5:1|5|3|p0:b:1,p1:aa:2|kt:2|ktxy|1,2|kt:2|xy:2|n:Integer,s:String,z:null`.
@@ -768,7 +774,9 @@ Current verified checks:
 - A focused Kotlin initialization/delegate smoke now lives in
   `classes/kotlin_initialization_delegate_smoke` and runs through
   `ci/kotlin_initialization_delegate_smoke.sh`. A focused local run completed
-  in 77 seconds and a follow-up run through the remaining full-classpath
+  in 77 seconds, and a 2026-07-19 strict-bootstrap compile completed in 175
+  seconds. Its default compile budget is 480 seconds with a 30-second forced
+  termination bound. A follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 277 seconds. Both the host JVM and Doppio
   printed
   `false/true|KT:5:1|KT:5:1|kt|2/9/6|companion>observed:start->kt>guarded:2?1>guarded:2?9>lazy>nested`.
