@@ -259,11 +259,27 @@ release can dispatch physical close. `nio_fd_lease_test.cjs` deterministically
 holds a channel `fstat` callback, closes the descriptor, rejects premature
 same-number registration, and verifies exception-initiation-before-host-close
 dispatch ordering.
-`FileChannelImpl` map/transfer operations, `UnixCopyFile`, and raw
-descriptor-backed `UnixNativeDispatcher` operations remain outside this first
-channel lease wave. Mapped buffers also retain the separate persistent
-descriptor-lifetime risk tracked in `BUG-016`; the broader host-operation
-boundary therefore remains mitigated rather than fully resolved in `BUG-015`.
+`FileChannelImpl.transferTo0` and `UnixCopyFile.transfer` now acquire source and
+destination leases as one operation, release them in reverse order, and stop
+before dispatching the next stage when either generation closes. Raw
+descriptor-backed `UnixNativeDispatcher` stat, owner/mode/time update, read,
+and write calls likewise retain one lease across every host callback and
+append/sync tail. Unix failures claim completion before asynchronously
+initializing `UnixException`; the converted exception is thrown, or an
+exception-class initialization failure already installed on the VM thread is
+preserved, before the lease releases and permits physical close.
+`nio_fd_operation_lease_test.cjs`
+deterministically covers both dual-descriptor acquisition rollbacks,
+transfer/copy read and write-tail close races, host-error precedence, delayed
+two-class Unix exception conversion, single/paired synchronous VM completion
+throws, both exception-class initialization failures, raw Unix operation close
+races, and successful scratch-buffer reads.
+`FileChannelImpl.map0` still needs the
+persistent mapped-resource ownership tracked in `BUG-016`, and the injected
+BrowserFS close fixtures still do not exercise a genuinely asynchronous browser
+backend. The broader
+host-operation boundary therefore remains mitigated rather than fully resolved
+in `BUG-015`.
 Native lock/release support and channel `EINTR`/`EAGAIN` translation to NIO
 `IOStatus` values remain outside this boundary coverage.
 
