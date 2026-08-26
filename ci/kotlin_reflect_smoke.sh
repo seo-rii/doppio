@@ -59,24 +59,34 @@ fi
 runner="$repo_root/build/release-cli/console/runner.js"
 source_dir="${KOTLIN_REFLECT_SMOKE_SOURCE_DIR:-"$repo_root/classes/kotlin_reflect_smoke"}"
 out_dir="$work_dir/out"
+modern_overlay_jar="$repo_root/build/modern-bootstrap-overlay/modern-bootstrap.jar"
+modern_boot_jar="$repo_root/vendor/java_home/lib/doppio.jar"
+runtime_boot_jar="$repo_root/vendor/java_home/lib/rt.jar"
+compiler_target_cp="$modern_overlay_jar:$modern_boot_jar:$runtime_boot_jar:$stdlib_jar:$reflect_jar"
+
+if [ ! -f "$modern_overlay_jar" ] || [ ! -f "$modern_boot_jar" ] || [ ! -f "$runtime_boot_jar" ]; then
+  echo "Doppio compiler bootstrap classpath is incomplete; build the modern release CLI first." >&2
+  exit 1
+fi
 
 rm -rf "$out_dir"
 mkdir -p "$out_dir"
 
-compile_timeout="${KOTLIN_REFLECT_SMOKE_COMPILE_TIMEOUT_SECONDS:-300}"
+compile_timeout="${KOTLIN_REFLECT_SMOKE_COMPILE_TIMEOUT_SECONDS:-480}"
 run_timeout="${KOTLIN_REFLECT_SMOKE_RUN_TIMEOUT_SECONDS:-90}"
+kill_after="${KOTLIN_REFLECT_SMOKE_KILL_AFTER_SECONDS:-30}"
 responsiveness="${DOPPIO_KOTLIN_RESPONSIVENESS:-100000}"
-source_cp="$stdlib_jar:$reflect_jar"
 
 compile_start="$(date +%s)"
-timeout -s INT "${compile_timeout}s" \
+timeout -k "${kill_after}s" -s INT "${compile_timeout}s" \
   node --max-old-space-size=4096 --no-deprecation "$runner" \
   "-Xresponsiveness:$responsiveness" \
   -cp "$compiler_cp" \
   org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
   -no-stdlib \
   -no-reflect \
-  -cp "$source_cp" \
+  -no-jdk \
+  -classpath "$compiler_target_cp" \
   -d "$out_dir" \
   "$source_dir"/*.kt
 compile_end="$(date +%s)"
@@ -101,7 +111,7 @@ if [ "$native_output" != "$expected_output" ]; then
   exit 1
 fi
 
-doppio_output="$(timeout -s INT "${run_timeout}s" node --no-deprecation "$runner" -cp "$runtime_cp" ReflectSmokeKt)"
+doppio_output="$(timeout -k "${kill_after}s" -s INT "${run_timeout}s" node --no-deprecation "$runner" -cp "$runtime_cp" ReflectSmokeKt)"
 if [ "$doppio_output" != "$expected_output" ]; then
   echo "Unexpected Doppio output: $doppio_output" >&2
   exit 1

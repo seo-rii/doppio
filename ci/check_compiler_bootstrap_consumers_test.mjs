@@ -37,6 +37,24 @@ const kotlinConsumers = new Map([
   ['kotlin_concurrency_smoke.sh', '$stdlib_jar'],
   ['kotlin_unsigned_smoke.sh', '$stdlib_jar'],
   ['kotlin_text_regex_smoke.sh', '$stdlib_jar'],
+  ['kotlin_basic_construct_smoke.sh', '$stdlib_jar'],
+  ['kotlin_advanced_construct_smoke.sh', '$stdlib_jar'],
+  ['kotlin_local_interop_smoke.sh', '$stdlib_jar'],
+  ['kotlin_modern_construct_smoke.sh', '$stdlib_jar'],
+  ['kotlin_default_synthetic_smoke.sh', '$stdlib_jar'],
+  ['kotlin_jvm_default_smoke.sh', '$stdlib_jar'],
+  ['kotlin_indy_concat_smoke.sh', '$stdlib_jar'],
+  ['kotlin_jvm_interop_smoke.sh', '$stdlib_jar'],
+  ['kotlin_contract_smoke.sh', '$stdlib_jar'],
+  ['kotlin_enum_smoke.sh', '$stdlib_jar'],
+  ['kotlin_mutable_delegate_smoke.sh', '$stdlib_jar'],
+  ['kotlin_reference_sequence_smoke.sh', '$stdlib_jar'],
+  ['kotlin_coroutine_smoke.sh', '$stdlib_jar'],
+  ['kotlin_suspend_smoke.sh', '$stdlib_jar'],
+  ['kotlin_suspend_control_smoke.sh', '$stdlib_jar'],
+  ['kotlin_suspend_inline_smoke.sh', '$stdlib_jar'],
+  ['kotlin_io_smoke.sh', '$stdlib_jar'],
+  ['kotlin_reflect_smoke.sh', '$stdlib_jar:$reflect_jar'],
   ['kotlin_methodhandle_smoke.sh', '$stdlib_jar'],
   ['kotlin_record_smoke.sh', '$stdlib_jar:$support_dir'],
 ]);
@@ -109,7 +127,7 @@ try {
   if (completeResult.status !== 0) {
     throw new Error(`expected complete consumers to pass:\n${completeResult.stdout}\n${completeResult.stderr}`);
   }
-  if (!completeResult.stdout.includes('validated 32 Kotlin and 8 Scala smokes')) {
+  if (!completeResult.stdout.includes('validated 50 Kotlin and 8 Scala smokes')) {
     throw new Error(`expected expanded compiler bootstrap inventory:\n${completeResult.stdout}`);
   }
 
@@ -128,6 +146,13 @@ try {
     kotlinFixture('$stdlib_jar')
   );
   expectFailure(runChecker(ciDir), 'ordered Kotlin compiler target classpath', 'missing Kotlin record support path');
+
+  writeConsumers(ciDir);
+  fs.writeFileSync(
+    path.join(ciDir, 'kotlin_reflect_smoke.sh'),
+    kotlinFixture('$stdlib_jar')
+  );
+  expectFailure(runChecker(ciDir), 'ordered Kotlin compiler target classpath', 'missing Kotlin reflect path');
 
   writeConsumers(ciDir);
   fs.writeFileSync(path.join(ciDir, 'kotlin_duration_smoke.sh'), kotlinFixture().replace('  -no-jdk \\\n', ''));
