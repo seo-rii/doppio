@@ -9,6 +9,8 @@ after-range-force:aZRSYf
 range-overflow:IndexOutOfBoundsException
 range-negative-index:IndexOutOfBoundsException
 range-negative-length:IndexOutOfBoundsException
+force-after-close-same:true
+after-force-after-close:QZRSYf
 readonly-loaded-call:true
 readonly-load-same:true
 readonly-bytes:ZRS

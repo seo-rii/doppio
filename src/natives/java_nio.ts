@@ -7,15 +7,25 @@ import logging = Doppio.Debug.Logging;
 import Long = Doppio.VM.Long;
 import ClassData = Doppio.VM.ClassFile.ClassData;
 import ThreadStatus = Doppio.VM.Enums.ThreadStatus;
+import FDState = Doppio.VM.FDState;
+import {FDRetention} from '../fd_state';
 
 export interface MappedByteBufferMapping {
-  fd: number;
   position: number;
   length: number;
   writable: boolean;
+  retention: FDRetention;
+  pendingOperations: number;
+  unmapping: boolean;
+  dispose: () => void;
 }
 
-export const mappedByteBufferMappings: { [address: number]: MappedByteBufferMapping } = {};
+export interface MappedByteBufferMappingTable {
+  [address: number]: MappedByteBufferMapping;
+}
+
+export const mappedByteBufferMappings =
+  new WeakMap<object, MappedByteBufferMappingTable>();
 
 export default function (): any {
   function forceMappedRange(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor, addressArg: Long, lenArg: Long, returnValue?: JVMTypes.java_lang_Object): boolean {
@@ -24,15 +34,20 @@ export default function (): any {
     }
 
     const address = addressArg.toNumber(),
-      len = lenArg.toNumber();
+      len = lenArg.toNumber(),
+      heap = thread.getJVM().getHeap(),
+      mappingTable = mappedByteBufferMappings.get(heap);
     let mapping: MappedByteBufferMapping = null,
       baseAddress = 0;
 
-    for (const key in mappedByteBufferMappings) {
-      if (mappedByteBufferMappings.hasOwnProperty(key)) {
+    if (mappingTable !== undefined) {
+      for (const key in mappingTable) {
+        if (!mappingTable.hasOwnProperty(key)) {
+          continue;
+        }
         const candidateBase = parseInt(key, 10),
-          candidate = mappedByteBufferMappings[candidateBase];
-        if (address >= candidateBase && address <= candidateBase + candidate.length) {
+          candidate = mappingTable[candidateBase];
+        if (address >= candidateBase && address < candidateBase + candidate.length) {
           mapping = candidate;
           baseAddress = candidateBase;
           break;
@@ -40,12 +55,16 @@ export default function (): any {
       }
     }
 
-    if (mapping === null || !mapping.writable) {
+    if (mapping === null || mapping.unmapping) {
+      thread.throwNewException("Ljava/io/IOException;", "Mapped buffer is no longer available");
+      return false;
+    }
+    if (!mapping.writable) {
       return true;
     }
 
-    const fd = mapping.fd;
-    if (fd === -1) {
+    const lease = FDState.acquireRetainedOperation(mapping.retention);
+    if (lease === null) {
       thread.throwNewException("Ljava/io/IOException;", "Bad file descriptor");
       return false;
     }
@@ -53,26 +72,131 @@ export default function (): any {
     const offset = address - baseAddress,
       writeLen = Math.min(len, Math.max(0, mapping.length - offset));
     if (writeLen <= 0) {
+      FDState.releaseOperation(lease);
       return true;
     }
 
-    const buf = thread.getJVM().getHeap().get_buffer(address, writeLen);
+    mapping.pendingOperations++;
+    let finished = false;
+    const finish = (action: () => void): void => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      let actionError: any = null,
+        actionFailed = false,
+        cleanupError: any = null;
+      try {
+        action();
+      } catch (err) {
+        actionFailed = true;
+        actionError = err;
+      }
+      try {
+        FDState.releaseOperation(lease);
+      } catch (err) {
+        cleanupError = err;
+      }
+      mapping.pendingOperations--;
+      if (mapping.pendingOperations < 0) {
+        cleanupError = cleanupError || new Error('Mapped-buffer operation underflow.');
+      } else if (mapping.unmapping && mapping.pendingOperations === 0) {
+        try {
+          mapping.dispose();
+        } catch (err) {
+          cleanupError = cleanupError || err;
+        }
+      }
+      if (actionFailed) {
+        throw actionError;
+      }
+      if (cleanupError !== null) {
+        throw cleanupError;
+      }
+    };
+    const fail = (prefix: string, err: NodeJS.ErrnoException): void => {
+      finish(() => thread.throwNewException(
+        "Ljava/io/IOException;",
+        prefix + (err !== null && err !== undefined &&
+          typeof err.message === 'string' ? err.message : String(err))
+      ));
+    };
+    let buf: Buffer;
+    try {
+      buf = heap.get_buffer(address, writeLen);
+    } catch (err) {
+      fail('Error accessing mapped buffer: ', <NodeJS.ErrnoException> err);
+      return false;
+    }
+    let written = 0;
     thread.setStatus(ThreadStatus.ASYNC_WAITING);
-    fs.write(fd, buf, 0, writeLen, mapping.position + offset, (writeErr) => {
-      if (writeErr) {
-        thread.throwNewException("Ljava/io/IOException;", 'Error forcing mapped buffer: ' + writeErr.message);
-      } else {
-        fs.fsync(fd, (syncErr) => {
+    const syncAndReturn = (): void => {
+      let callbackHandled = false;
+      try {
+        fs.fsync(lease.fd, (syncErr) => {
+          if (callbackHandled) {
+            return;
+          }
+          callbackHandled = true;
           if (syncErr) {
-            thread.throwNewException("Ljava/io/IOException;", 'Error syncing mapped buffer: ' + syncErr.message);
-          } else if (returnValue !== undefined) {
-            thread.asyncReturn(returnValue);
+            fail('Error syncing mapped buffer: ', syncErr);
           } else {
-            thread.asyncReturn();
+            finish(() => {
+              if (returnValue !== undefined) {
+                thread.asyncReturn(returnValue);
+              } else {
+                thread.asyncReturn();
+              }
+            });
           }
         });
+      } catch (err) {
+        if (finished) {
+          throw err;
+        }
+        fail('Error syncing mapped buffer: ', <NodeJS.ErrnoException> err);
       }
-    });
+    };
+    const writeNext = (): void => {
+      if (written === writeLen) {
+        syncAndReturn();
+        return;
+      }
+      const remaining = writeLen - written;
+      let callbackHandled = false;
+      try {
+        fs.write(
+          lease.fd,
+          buf,
+          written,
+          remaining,
+          mapping.position + offset + written,
+          (writeErr, numBytes) => {
+            if (callbackHandled) {
+              return;
+            }
+            callbackHandled = true;
+            if (writeErr) {
+              fail('Error forcing mapped buffer: ', writeErr);
+            } else if (numBytes <= 0 || numBytes > remaining) {
+              const progressErr = <NodeJS.ErrnoException>
+                new Error('Unable to make progress while forcing mapped buffer.');
+              progressErr.code = 'EIO';
+              fail('Error forcing mapped buffer: ', progressErr);
+            } else {
+              written += numBytes;
+              writeNext();
+            }
+          }
+        );
+      } catch (err) {
+        if (finished) {
+          throw err;
+        }
+        fail('Error forcing mapped buffer: ', <NodeJS.ErrnoException> err);
+      }
+    };
+    writeNext();
     return false;
   }
 

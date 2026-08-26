@@ -5765,6 +5765,28 @@ function modernJava(grunt: IGrunt) {
     );
   });
 
+  grunt.registerTask('unit_test_mapped_buffer_fd_lifetime', 'Retain writable mapping descriptors through force and unmap.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      testPath = path.resolve('ci/mapped_buffer_fd_lifetime_test.cjs'),
+      expected = 'mapped-buffer-fd-lifetime:10:ok\n';
+    child_process.execFile(
+      process.execPath,
+      ['--no-deprecation', testPath],
+      function(err?: any, stdout?: string, stderr?: string): void {
+        var actual = stdout + stderr;
+        if (err || actual !== expected) {
+          grunt.fail.fatal(
+            'Mapped-buffer descriptor-lifetime output does not match.\nDoppio:\n' + actual +
+            '\nExpected:\n' + expected
+          );
+          return;
+        }
+        grunt.log.ok('Writable mappings retain their host descriptor until force and unmap finish.');
+        done();
+      }
+    );
+  });
+
   grunt.registerMultiTask('parse_classfile_modern', 'Parse modern class-file fixtures with Doppio.', function() {
     var ReferenceClassData = require('../build/release-cli/src/ClassData').ReferenceClassData,
       options: {

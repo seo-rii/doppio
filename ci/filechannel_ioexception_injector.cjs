@@ -66,7 +66,7 @@ FDState.requestClose = function(fd) {
 };
 
 Heap.prototype.malloc = function(size) {
-  if (operationsMode && mapReadFailureInjected && size === 4097 &&
+  if (operationsMode && mapReadFailureInjected && size === 4098 &&
       mapMallocFailures < 2) {
     mapMallocFailures += 1;
     throw 'out of memory';

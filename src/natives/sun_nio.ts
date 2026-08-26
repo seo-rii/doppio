@@ -10,8 +10,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as BrowserFS from 'browserfs';
 import FDState = Doppio.VM.FDState;
-import {FDCloseInfo, FDOperationLease} from '../fd_state';
-import { mappedByteBufferMappings } from './java_nio';
+import {FDCloseInfo, FDOperationLease, FDRetention} from '../fd_state';
+import {
+  mappedByteBufferMappings,
+  MappedByteBufferMapping,
+  MappedByteBufferMappingTable
+} from './java_nio';
 let BFSUtils = BrowserFS.BFSRequire('bfs_utils');
 
 interface IOVec {
@@ -720,6 +724,17 @@ export default function (): any {
   function closeFileDescriptor(
       fd: number,
       cb: (err?: NodeJS.ErrnoException) => void): void {
+    let logicalCompleted = false;
+    const completeLogicalClose = (err?: NodeJS.ErrnoException): void => {
+      if (logicalCompleted) {
+        if (err) {
+          logging.error('Deferred mapped-descriptor close failed.', err);
+        }
+        return;
+      }
+      logicalCompleted = true;
+      cb(err);
+    };
     const requested = FDState.requestClose(fd, (closeInfo: FDCloseInfo) => {
       if (util.are_in_browser() && closeInfo.unlinked) {
         const browserFs = typeof (<any> fs).getFSModule === 'function' ?
@@ -728,7 +743,7 @@ export default function (): any {
           const unavailableError = <NodeJS.ErrnoException>
             new Error('Unable to discard an unlinked BrowserFS descriptor.');
           unavailableError.code = 'EIO';
-          cb(unavailableError);
+          completeLogicalClose(unavailableError);
           return;
         }
         try {
@@ -737,20 +752,27 @@ export default function (): any {
           // discard only descriptors that unlink0 explicitly marked.
           browserFs.closeFd(fd);
         } catch (closeErr) {
-          cb(<NodeJS.ErrnoException> closeErr);
+          completeLogicalClose(<NodeJS.ErrnoException> closeErr);
           return;
         }
-        cb();
+        completeLogicalClose();
         return;
       }
+      let closeCallbackStarted = false;
       try {
-        fs.close(fd, (err?: NodeJS.ErrnoException) => cb(err));
+        fs.close(fd, (err?: NodeJS.ErrnoException) => {
+          closeCallbackStarted = true;
+          completeLogicalClose(err);
+        });
       } catch (closeErr) {
-        cb(<NodeJS.ErrnoException> closeErr);
+        if (closeCallbackStarted) {
+          throw closeErr;
+        }
+        completeLogicalClose(<NodeJS.ErrnoException> closeErr);
       }
-    });
+    }, () => completeLogicalClose());
     if (!requested) {
-      cb();
+      completeLogicalClose();
     }
   }
 
@@ -763,32 +785,198 @@ export default function (): any {
         position = positionArg.toNumber(),
         len = lenArg.toNumber(),
         heap = thread.getJVM().getHeap(),
-        pageSize = 4096;
-      let baseAddr: number;
-      try {
-        baseAddr = heap.malloc((len === 0 ? 1 : len) + pageSize - 1);
-      } catch (allocationErr) {
+        pageSize = 4096,
+        lease = fd === -1 ? null : FDState.acquireOperation(fd);
+      if (lease === null) {
         thread.throwNewException(
-          'Ljava/lang/OutOfMemoryError;',
-          typeof allocationErr === 'string' ? allocationErr : String(allocationErr)
+          'Ljava/io/IOException;',
+          fd === -1 ? 'Bad file descriptor' : 'Stream Closed'
         );
         return;
       }
-      const addr = Math.ceil(baseAddr / pageSize) * pageSize,
-        buf = heap.get_buffer(addr, len);
-      sun_nio_ch_FileChannelImpl.mappedBases[addr] = baseAddr;
-      mappedByteBufferMappings[addr] = { fd: fd, position: position, length: len, writable: prot === 1 };
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.read(fd, buf, 0, len, position, (err) => {
-        if (err) {
-          delete sun_nio_ch_FileChannelImpl.mappedBases[addr];
-          delete mappedByteBufferMappings[addr];
-          heap.free(baseAddr);
-          throwChannelIOException(thread, err);
-        } else {
-          thread.asyncReturn(Long.fromNumber(addr), null);
+      const writable = prot === 1;
+      let retention: FDRetention = writable && len > 0 ? FDState.retain(fd) : null;
+      if (writable && len > 0 && retention === null) {
+        FDState.releaseOperation(lease);
+        thread.throwNewException('Ljava/io/IOException;', 'Stream Closed');
+        return;
+      }
+      let baseAddr: number = 0,
+        addr: number = 0,
+        buf: Buffer = null,
+        allocated = false,
+        addressReady = false,
+        disposed = false,
+        finished = false,
+        installedMapping: MappedByteBufferMapping = null;
+      const dispose = (): void => {
+        if (disposed) {
+          return;
         }
-      });
+        disposed = true;
+        if (addressReady) {
+          delete sun_nio_ch_FileChannelImpl.mappedBases[addr];
+          const mappingTable = mappedByteBufferMappings.get(heap);
+          if (mappingTable !== undefined && mappingTable[addr] === installedMapping) {
+            delete mappingTable[addr];
+            if (Object.keys(mappingTable).length === 0) {
+              mappedByteBufferMappings.delete(heap);
+            }
+          }
+        }
+        let cleanupError: any = null;
+        if (allocated) {
+          try {
+            heap.free(baseAddr);
+          } catch (err) {
+            cleanupError = err;
+          }
+        }
+        try {
+          FDState.releaseRetention(retention);
+        } catch (err) {
+          cleanupError = cleanupError || err;
+        }
+        if (cleanupError !== null) {
+          throw cleanupError;
+        }
+      };
+      const finish = (keepMapping: boolean, action: () => void): void => {
+        if (finished) {
+          return;
+        }
+        finished = true;
+        let actionError: any = null,
+          actionFailed = false,
+          cleanupError: any = null,
+          actionCompleted = false;
+        try {
+          action();
+          actionCompleted = true;
+        } catch (err) {
+          actionFailed = true;
+          actionError = err;
+        }
+        if (!keepMapping || !actionCompleted) {
+          try {
+            dispose();
+          } catch (err) {
+            cleanupError = err;
+          }
+        }
+        try {
+          FDState.releaseOperation(lease);
+        } catch (err) {
+          cleanupError = cleanupError || err;
+        }
+        if (actionFailed) {
+          throw actionError;
+        }
+        if (cleanupError !== null) {
+          throw cleanupError;
+        }
+      };
+      try {
+        baseAddr = heap.malloc((len === 0 ? 1 : len) + pageSize);
+        allocated = true;
+        addr = Math.max(pageSize, Math.ceil(baseAddr / pageSize) * pageSize);
+        addressReady = true;
+        buf = heap.get_buffer(addr, len);
+        buf.fill(0);
+      } catch (allocationErr) {
+        finish(false, () => thread.throwNewException(
+            'Ljava/lang/OutOfMemoryError;',
+            typeof allocationErr === 'string' ? allocationErr : String(allocationErr)
+          ));
+        return;
+      }
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      let bytesRead = 0;
+      const succeed = (): void => {
+        if (!FDState.isCurrent(fd, lease.generation)) {
+          finish(false, () => thread.throwNewException(
+            'Ljava/io/IOException;',
+            'Stream Closed'
+          ));
+          return;
+        }
+        try {
+          let mappingTable = mappedByteBufferMappings.get(heap);
+          if (mappingTable === undefined) {
+            mappingTable = <MappedByteBufferMappingTable> {};
+            mappedByteBufferMappings.set(heap, mappingTable);
+          }
+          sun_nio_ch_FileChannelImpl.mappedBases[addr] = baseAddr;
+          installedMapping = {
+            position: position,
+            length: len,
+            writable: writable,
+            retention: retention,
+            pendingOperations: 0,
+            unmapping: false,
+            dispose: dispose
+          };
+          mappingTable[addr] = installedMapping;
+          finish(true, () => thread.asyncReturn(Long.fromNumber(addr), null));
+        } catch (err) {
+          if (finished) {
+            throw err;
+          }
+          finish(false, () => {
+            throw err;
+          });
+        }
+      };
+      const readNext = (): void => {
+        if (bytesRead === len) {
+          succeed();
+          return;
+        }
+        const remaining = len - bytesRead;
+        let callbackHandled = false;
+        try {
+          fs.read(
+            fd,
+            buf,
+            bytesRead,
+            remaining,
+            position + bytesRead,
+            (err, count) => {
+              if (callbackHandled) {
+                return;
+              }
+              callbackHandled = true;
+              if (err) {
+                finish(false, () => throwChannelIOException(thread, err));
+              } else if (!FDState.isCurrent(fd, lease.generation)) {
+                finish(false, () => thread.throwNewException(
+                  'Ljava/io/IOException;',
+                  'Stream Closed'
+                ));
+              } else if (count === 0) {
+                succeed();
+              } else if (typeof count !== 'number' || count < 0 || count > remaining) {
+                const invalidRead = <NodeJS.ErrnoException>
+                  new Error('Invalid host read length while mapping a file.');
+                invalidRead.code = 'EIO';
+                finish(false, () => throwChannelIOException(thread, invalidRead));
+              } else {
+                bytesRead += count;
+                readNext();
+              }
+            }
+          );
+        } catch (err) {
+          if (finished) {
+            throw err;
+          }
+          finish(false, () => throwChannelIOException(
+            thread,
+            <NodeJS.ErrnoException> err
+          ));
+        }
+      };
+      readNext();
     }
 
     public static 'map0(IJJ)J'(thread: JVMThread, javaThis: JVMTypes.sun_nio_ch_FileChannelImpl, arg0: number, arg1: Long, arg2: Long): void {
@@ -802,10 +990,21 @@ export default function (): any {
     public static 'unmap0(JJ)I'(thread: JVMThread, arg0: Long, arg1: Long): number {
       if (!arg0.isZero()) {
         const addr = arg0.toNumber(),
-          baseAddr = sun_nio_ch_FileChannelImpl.mappedBases[addr] || addr;
-        delete sun_nio_ch_FileChannelImpl.mappedBases[addr];
-        delete mappedByteBufferMappings[addr];
-        thread.getJVM().getHeap().free(baseAddr);
+          heap = thread.getJVM().getHeap(),
+          mappingTable = mappedByteBufferMappings.get(heap),
+          mapping = mappingTable === undefined ? undefined : mappingTable[addr];
+        if (mapping !== undefined) {
+          if (!mapping.unmapping) {
+            mapping.unmapping = true;
+            if (mapping.pendingOperations === 0) {
+              mapping.dispose();
+            }
+          }
+        } else if (sun_nio_ch_FileChannelImpl.mappedBases[addr] !== undefined) {
+          const baseAddr = sun_nio_ch_FileChannelImpl.mappedBases[addr];
+          delete sun_nio_ch_FileChannelImpl.mappedBases[addr];
+          thread.getJVM().getHeap().free(baseAddr);
+        }
       }
       return 0;
     }

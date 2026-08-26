@@ -63,6 +63,15 @@ public class Java17MappedByteBuffer {
       }
     }
 
+    MappedByteBuffer afterClose;
+    try (FileChannel channel = FileChannel.open(
+        path, StandardOpenOption.READ, StandardOpenOption.WRITE)) {
+      afterClose = channel.map(FileChannel.MapMode.READ_WRITE, 0, 6);
+    }
+    afterClose.put(0, (byte) 'Q');
+    System.out.println("force-after-close-same:" + (afterClose.force() == afterClose));
+    System.out.println("after-force-after-close:" + read(path));
+
     try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ)) {
       MappedByteBuffer readOnly = channel.map(FileChannel.MapMode.READ_ONLY, 1, 3);
       boolean loaded = readOnly.isLoaded();

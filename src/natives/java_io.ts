@@ -92,9 +92,25 @@ export default function (): any {
       return;
     }
     // Logical close is immediate, while host close waits for every operation
-    // that already owns this descriptor generation to finish.
+    // that already owns this descriptor generation and every writable mapping
+    // retention to finish.
     fdObj['java/io/FileDescriptor/fd'] = -1;
     thread.setStatus(ThreadStatus.ASYNC_WAITING);
+    let logicalCompleted = false;
+    const completeLogicalClose = (err?: NodeJS.ErrnoException): void => {
+      if (logicalCompleted) {
+        if (err) {
+          logging.error('Deferred mapped-descriptor close failed.', err);
+        }
+        return;
+      }
+      logicalCompleted = true;
+      if (err) {
+        throwNodeError(thread, err);
+      } else {
+        thread.asyncReturn();
+      }
+    };
     const requested = FDState.requestClose(fd, (closeInfo: FDCloseInfo) => {
       if (util.are_in_browser() && closeInfo.unlinked) {
         const browserFs = typeof (<any> fs).getFSModule === 'function' ?
@@ -103,32 +119,33 @@ export default function (): any {
           const unavailableError = <NodeJS.ErrnoException>
             new Error('Unable to discard an unlinked BrowserFS descriptor.');
           unavailableError.code = 'EIO';
-          throwNodeError(thread, unavailableError);
+          completeLogicalClose(unavailableError);
           return;
         }
         try {
           browserFs.closeFd(fd);
         } catch (closeErr) {
-          throwNodeError(thread, <NodeJS.ErrnoException> closeErr);
+          completeLogicalClose(<NodeJS.ErrnoException> closeErr);
           return;
         }
-        thread.asyncReturn();
+        completeLogicalClose();
         return;
       }
+      let closeCallbackStarted = false;
       try {
         fs.close(fd, (err?: NodeJS.ErrnoException) => {
-          if (err) {
-            throwNodeError(thread, err);
-          } else {
-            thread.asyncReturn();
-          }
+          closeCallbackStarted = true;
+          completeLogicalClose(err);
         });
       } catch (closeErr) {
-        throwNodeError(thread, <NodeJS.ErrnoException> closeErr);
+        if (closeCallbackStarted) {
+          throw closeErr;
+        }
+        completeLogicalClose(<NodeJS.ErrnoException> closeErr);
       }
-    });
+    }, () => completeLogicalClose());
     if (!requested) {
-      thread.asyncReturn();
+      completeLogicalClose();
     }
   }
 
