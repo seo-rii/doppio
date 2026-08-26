@@ -14,6 +14,9 @@
 *.tar.gz
 /node_modules
 /build
+/classes/modern_classlib/out
+/classes/modern_multirelease/out
+/classes/modern_multirelease/java9-mr.jar
 .DS_store
 # Command-line tools
 /doppio
