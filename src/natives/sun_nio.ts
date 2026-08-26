@@ -7,14 +7,28 @@ import util = Doppio.VM.Util;
 import Long = Doppio.VM.Long;
 import ThreadStatus = Doppio.VM.Enums.ThreadStatus;
 import * as fs from 'fs';
+import * as path from 'path';
 import * as BrowserFS from 'browserfs';
 import FDState = Doppio.VM.FDState;
+import {FDCloseInfo} from '../fd_state';
 import { mappedByteBufferMappings } from './java_nio';
 let BFSUtils = BrowserFS.BFSRequire('bfs_utils');
 
 interface IOVec {
   base: number;
   len: number;
+}
+
+interface UnixOpenFlags {
+  read: boolean;
+  write: boolean;
+  append: boolean;
+  create: boolean;
+  createNew: boolean;
+  truncate: boolean;
+  sync: boolean;
+  dataSync: boolean;
+  noFollow: boolean;
 }
 
 interface MountEntry {
@@ -29,6 +43,26 @@ interface MountTable {
   entries: MountEntry[];
   pos: number;
 }
+
+interface BrowserFsIdentity {
+  dev: number;
+  ino: number;
+}
+
+interface BrowserFsLocation {
+  fs: any;
+  path: string;
+}
+
+interface BrowserFsBackendIdentity {
+  dev: number;
+  inodes: Map<string, number>;
+}
+
+const browserFsBackends = new WeakMap<object, BrowserFsBackendIdentity>();
+const browserFsOpenFiles = new WeakMap<object, BrowserFsIdentity>();
+let nextBrowserFsDevice = 1;
+let nextBrowserFsInode = 1;
 
 function readIOVecs(thread: JVMThread, address: Long, len: number): IOVec[] {
   const heap = thread.getJVM().getHeap(),
@@ -48,6 +82,250 @@ function readIOVecs(thread: JVMThread, address: Long, len: number): IOVec[] {
 }
 
 export default function (): any {
+  function getBrowserFsModule(): any {
+    return typeof (<any> fs).getFSModule === 'function' ? (<any> fs).getFSModule() : null;
+  }
+
+  function getBrowserFsIdentity(backend: any, backendPath: string): BrowserFsIdentity {
+    if (backend === null || (typeof backend !== 'object' && typeof backend !== 'function')) {
+      return null;
+    }
+
+    let backendIdentity = browserFsBackends.get(backend);
+    if (backendIdentity === undefined) {
+      backendIdentity = { dev: nextBrowserFsDevice++, inodes: new Map<string, number>() };
+      browserFsBackends.set(backend, backendIdentity);
+    }
+
+    let inodeKey = `path:${backendPath}`;
+    try {
+      // BrowserFS key-value backends keep a stable internal inode across a
+      // rename even though their public Stats objects hard-code dev/ino to 0.
+      if (backend.store !== undefined && typeof backend.store.beginTransaction === 'function' &&
+          typeof backend._findINode === 'function' && backend._findINode.length === 3) {
+        const transaction = backend.store.beginTransaction('readonly'),
+          metadataNodeId = backend._findINode(
+            transaction,
+            path.dirname(backendPath),
+            path.basename(backendPath)
+          );
+        if (metadataNodeId !== null && metadataNodeId !== undefined) {
+          inodeKey = `inode:${String(metadataNodeId)}`;
+        }
+      }
+    } catch (err) {
+      // Other BrowserFS backends do not expose synchronous inode metadata. The
+      // path fallback is stable for the read-only backends used by the site.
+    }
+
+    let ino = backendIdentity.inodes.get(inodeKey);
+    if (ino === undefined) {
+      ino = nextBrowserFsInode++;
+      backendIdentity.inodes.set(inodeKey, ino);
+    }
+    return { dev: backendIdentity.dev, ino: ino };
+  }
+
+  function getBrowserFsLocation(pathString: string): BrowserFsLocation {
+    const fsModule = getBrowserFsModule(),
+      root = fsModule !== null && typeof fsModule.getRootFS === 'function' ? fsModule.getRootFS() : null;
+    if (root === null) {
+      return null;
+    }
+
+    const normalizedPath = path.resolve(pathString),
+      resolved = typeof root._getFs === 'function' ? root._getFs(normalizedPath) :
+        { fs: root, path: normalizedPath };
+    return { fs: resolved.fs, path: resolved.path };
+  }
+
+  function getBrowserFsPathIdentity(pathString: string): BrowserFsIdentity {
+    const resolved = getBrowserFsLocation(pathString);
+    return resolved === null ? null : getBrowserFsIdentity(resolved.fs, resolved.path);
+  }
+
+  function getBrowserFsFile(fd: number): any {
+    const fsModule = getBrowserFsModule();
+    if (fsModule === null || typeof fsModule.fd2file !== 'function') {
+      return null;
+    }
+
+    try {
+      return fsModule.fd2file(fd);
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function getBrowserFsFdIdentity(fd: number): BrowserFsIdentity {
+    const file = getBrowserFsFile(fd);
+    if (file === null) {
+      return null;
+    }
+
+    try {
+      let identity = browserFsOpenFiles.get(file);
+      if (identity === undefined) {
+        identity = getBrowserFsIdentity(
+          file._fs,
+          typeof file.getPath === 'function' ? file.getPath() : file._path
+        );
+        if (identity !== null) {
+          browserFsOpenFiles.set(file, identity);
+        }
+      }
+      return identity;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function syncBrowserFsFile(
+      thread: JVMThread,
+      file: any,
+      cb: () => void): void {
+    file._dirty = true;
+    file.sync((err?: NodeJS.ErrnoException) => {
+      if (err) {
+        throwUnixException(thread, err);
+      } else {
+        cb();
+      }
+    });
+  }
+
+  function finishWrite(
+      thread: JVMThread,
+      fd: number,
+      numBytes: number,
+      advancePosition: boolean,
+      cb: (numBytes: number) => void,
+      errorCb: (err: NodeJS.ErrnoException, committedBytes: number) => void): void {
+    const fail = (err: NodeJS.ErrnoException): void => {
+      errorCb(err, numBytes);
+    };
+    const syncAndReturn = (): void => {
+      const syncMode = FDState.getSyncMode(fd);
+      if (syncMode === 2 && typeof (<any> fs).fdatasync === 'function') {
+        (<any> fs).fdatasync(fd, (err?: NodeJS.ErrnoException) => {
+          if (err) {
+            fail(err);
+          } else {
+            cb(numBytes);
+          }
+        });
+      } else if (syncMode !== 0) {
+        fs.fsync(fd, (err?: NodeJS.ErrnoException) => {
+          if (err) {
+            fail(err);
+          } else {
+            cb(numBytes);
+          }
+        });
+      } else {
+        cb(numBytes);
+      }
+    };
+
+    if (FDState.isAppend(fd)) {
+      // Preserve at least this operation's progress even if the authoritative
+      // post-append stat or sync fails. A successful stat also incorporates
+      // growth from other append descriptors.
+      FDState.incrementPos(fd, numBytes);
+      fs.fstat(fd, (err, stats) => {
+        if (err) {
+          fail(err);
+        } else {
+          FDState.setPos(fd, stats.size);
+          syncAndReturn();
+        }
+      });
+    } else {
+      if (advancePosition) {
+        FDState.incrementPos(fd, numBytes);
+      }
+      syncAndReturn();
+    }
+  }
+
+  function writeBuffer(
+      thread: JVMThread,
+      fd: number,
+      data: Buffer,
+      offset: number,
+      length: number,
+      position: number,
+      advancePosition: boolean,
+      appendAtEnd: boolean,
+      cb: (numBytes: number) => void,
+      errorCb: (err: NodeJS.ErrnoException, committedBytes: number) => void): void {
+    const append = FDState.isAppend(fd);
+    const fail = (err: NodeJS.ErrnoException, committedBytes: number = 0): void => {
+      errorCb(err, committedBytes);
+    };
+    const writeAt = (writePosition: number | null): void => {
+      fs.write(fd, data, offset, length, writePosition, (err, numBytes) => {
+        if (err) {
+          fail(err);
+        } else {
+          finishWrite(thread, fd, numBytes, advancePosition, cb, errorCb);
+        }
+      });
+    };
+
+    if (append && util.are_in_browser()) {
+      fs.fstat(fd, (err, stats) => {
+        if (err) {
+          fail(err);
+        } else {
+          FDState.setPos(fd, stats.size);
+          writeAt(stats.size);
+        }
+      });
+    } else if (append && appendAtEnd) {
+      writeAt(null);
+    } else {
+      writeAt(position);
+    }
+  }
+
+  function closeFileDescriptor(
+      fd: number,
+      cb: (err?: NodeJS.ErrnoException) => void): void {
+    const requested = FDState.requestClose(fd, (closeInfo: FDCloseInfo) => {
+      if (util.are_in_browser() && closeInfo.unlinked) {
+        const browserFs = typeof (<any> fs).getFSModule === 'function' ?
+          (<any> fs).getFSModule() : null;
+        if (browserFs === null || typeof browserFs.closeFd !== 'function') {
+          const unavailableError = <NodeJS.ErrnoException>
+            new Error('Unable to discard an unlinked BrowserFS descriptor.');
+          unavailableError.code = 'EIO';
+          cb(unavailableError);
+          return;
+        }
+        try {
+          // BrowserFS flushes dirty handles by path, but a POSIX descriptor
+          // remains valid after unlink. The file is already unreachable, so
+          // discard only descriptors that unlink0 explicitly marked.
+          browserFs.closeFd(fd);
+        } catch (closeErr) {
+          cb(<NodeJS.ErrnoException> closeErr);
+          return;
+        }
+        cb();
+        return;
+      }
+      try {
+        fs.close(fd, (err?: NodeJS.ErrnoException) => cb(err));
+      } catch (closeErr) {
+        cb(<NodeJS.ErrnoException> closeErr);
+      }
+    });
+    if (!requested) {
+      cb();
+    }
+  }
+
   class sun_nio_ch_FileChannelImpl {
     private static mappedBases: { [address: number]: number } = {};
 
@@ -57,9 +335,18 @@ export default function (): any {
         position = positionArg.toNumber(),
         len = lenArg.toNumber(),
         heap = thread.getJVM().getHeap(),
-        pageSize = 4096,
-        baseAddr = heap.malloc((len === 0 ? 1 : len) + pageSize - 1),
-        addr = Math.ceil(baseAddr / pageSize) * pageSize,
+        pageSize = 4096;
+      let baseAddr: number;
+      try {
+        baseAddr = heap.malloc((len === 0 ? 1 : len) + pageSize - 1);
+      } catch (allocationErr) {
+        thread.throwNewException(
+          'Ljava/lang/OutOfMemoryError;',
+          typeof allocationErr === 'string' ? allocationErr : String(allocationErr)
+        );
+        return;
+      }
+      const addr = Math.ceil(baseAddr / pageSize) * pageSize,
         buf = heap.get_buffer(addr, len);
       sun_nio_ch_FileChannelImpl.mappedBases[addr] = baseAddr;
       mappedByteBufferMappings[addr] = { fd: fd, position: position, length: len, writable: prot === 1 };
@@ -69,7 +356,7 @@ export default function (): any {
           delete sun_nio_ch_FileChannelImpl.mappedBases[addr];
           delete mappedByteBufferMappings[addr];
           heap.free(baseAddr);
-          throwNodeError(thread, err);
+          throwChannelIOException(thread, err);
         } else {
           thread.asyncReturn(Long.fromNumber(addr), null);
         }
@@ -110,18 +397,22 @@ export default function (): any {
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
       fs.read(srcFd, data, 0, len, position.toNumber(), (readErr, bytesRead) => {
         if (readErr) {
-          throwNodeError(thread, readErr);
+          throwChannelIOException(thread, readErr);
         } else if (bytesRead === 0) {
           thread.asyncReturn(Long.ZERO, null);
         } else {
-          fs.write(dstFd, data, 0, bytesRead, FDState.getPos(dstFd), (writeErr, bytesWritten) => {
-            if (writeErr) {
-              throwNodeError(thread, writeErr);
-            } else {
-              FDState.incrementPos(dstFd, bytesWritten);
-              thread.asyncReturn(Long.fromNumber(bytesWritten), null);
-            }
-          });
+          writeBuffer(
+            thread,
+            dstFd,
+            data,
+            0,
+            bytesRead,
+            FDState.getPos(dstFd),
+            true,
+            true,
+            (bytesWritten) => thread.asyncReturn(Long.fromNumber(bytesWritten), null),
+            (writeErr) => throwChannelIOException(thread, writeErr)
+          );
         }
       });
     }
@@ -228,6 +519,74 @@ export default function (): any {
     }
   }
 
+  class sun_nio_fs_UnixCopyFile {
+    public static 'transfer(IIJ)V'(
+        thread: JVMThread,
+        dstFd: number,
+        srcFd: number,
+        cancelAddress: Long): void {
+      const buffer = Buffer.alloc(8192);
+
+      const copyNext = (): void => {
+        fs.read(
+          srcFd,
+          buffer,
+          0,
+          buffer.length,
+          FDState.getPos(srcFd),
+          (readErr, bytesRead) => {
+            if (readErr) {
+              throwUnixException(thread, readErr);
+              return;
+            }
+            if (bytesRead === 0) {
+              thread.asyncReturn();
+              return;
+            }
+            FDState.incrementPos(srcFd, bytesRead);
+
+            let written = 0;
+            const writeNext = (): void => {
+              writeBuffer(
+                thread,
+                dstFd,
+                buffer,
+                written,
+                bytesRead - written,
+                FDState.getPos(dstFd),
+                true,
+                false,
+                (bytesWritten) => {
+                  if (bytesWritten === 0) {
+                    const noProgress = <NodeJS.ErrnoException>
+                      new Error('Unable to make progress while copying a file.');
+                    noProgress.code = 'EIO';
+                    throwUnixException(thread, noProgress);
+                    return;
+                  }
+                  written += bytesWritten;
+                  if (written < bytesRead) {
+                    writeNext();
+                  } else {
+                    copyNext();
+                  }
+                },
+                (writeErr) => throwUnixException(thread, writeErr)
+              );
+            };
+            writeNext();
+          }
+        );
+      };
+
+      // OpenJDK uses cancelAddress to observe interrupt-driven cancellation.
+      // Doppio currently has no native-thread signal path, so preserve the
+      // complete transfer while keeping the native signature compatible.
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      copyNext();
+    }
+  }
+
   class sun_nio_ch_FileDispatcherImpl {
 
     public static 'init()V'(thread: JVMThread): void {
@@ -242,7 +601,7 @@ export default function (): any {
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
       fs.read(fd, buf, 0, len, FDState.getPos(fd), (err, bytesRead) => {
         if (err) {
-          thread.throwNewException("Ljava/io/IOException;", 'Error reading file: ' + err);
+          throwChannelIOException(thread, err);
         } else {
           FDState.incrementPos(fd, bytesRead);
           // Return -1 if we reached the end of the file.
@@ -258,7 +617,7 @@ export default function (): any {
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
       fs.read(fd, buf, 0, len, position.toNumber(), (err, bytesRead) => {
         if (err) {
-          thread.throwNewException("Ljava/io/IOException;", 'Error reading file: ' + err);
+          throwChannelIOException(thread, err);
         } else {
           thread.asyncReturn(bytesRead === 0 && len !== 0 ? -1 : bytesRead);
         }
@@ -268,7 +627,10 @@ export default function (): any {
     public static 'readv0(Ljava/io/FileDescriptor;JI)J'(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor, address: Long, len: number): void {
       const fd = fdObj["java/io/FileDescriptor/fd"],
         heap = thread.getJVM().getHeap(),
-        vecs = readIOVecs(thread, address, len);
+        vecs = readIOVecs(thread, address, len),
+        buffers = vecs.map((vec) => heap.get_buffer(vec.base, vec.len)),
+        requestedBytes = vecs.reduce((total, vec) => total + vec.len, 0),
+        nativeReadv = !util.are_in_browser() ? (<any> fs).readv : null;
       let total = 0,
         index = 0;
 
@@ -278,25 +640,54 @@ export default function (): any {
         return;
       }
 
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      if (typeof nativeReadv === 'function') {
+        nativeReadv.call(
+          fs,
+          fd,
+          buffers,
+          FDState.getPos(fd),
+          (err: NodeJS.ErrnoException, bytesRead: number) => {
+            if (err) {
+              throwChannelIOException(thread, err);
+            } else {
+              FDState.incrementPos(fd, bytesRead);
+              thread.asyncReturn(
+                Long.fromNumber(bytesRead === 0 && requestedBytes > 0 ? -1 : bytesRead),
+                null
+              );
+            }
+          }
+        );
+        return;
+      }
+
       const readNext = (): void => {
         if (index >= vecs.length) {
-          FDState.incrementPos(fd, total);
           thread.asyncReturn(Long.fromNumber(total), null);
           return;
         }
 
         const vec = vecs[index],
-          buf = heap.get_buffer(vec.base, vec.len);
-        fs.read(fd, buf, 0, vec.len, FDState.getPos(fd) + total, (err, bytesRead) => {
+          buf = buffers[index];
+        if (vec.len === 0) {
+          index++;
+          readNext();
+          return;
+        }
+        fs.read(fd, buf, 0, vec.len, FDState.getPos(fd), (err, bytesRead) => {
           if (err) {
-            throwNodeError(thread, err);
+            if (total > 0) {
+              thread.asyncReturn(Long.fromNumber(total), null);
+            } else {
+              throwChannelIOException(thread, err);
+            }
           } else if (bytesRead === 0) {
-            FDState.incrementPos(fd, total);
             thread.asyncReturn(Long.fromNumber(total === 0 ? -1 : total), null);
           } else {
             total += bytesRead;
+            FDState.incrementPos(fd, bytesRead);
             if (bytesRead < vec.len) {
-              FDState.incrementPos(fd, total);
               thread.asyncReturn(Long.fromNumber(total), null);
             } else {
               index++;
@@ -306,7 +697,6 @@ export default function (): any {
         });
       };
 
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
       readNext();
     }
 
@@ -316,9 +706,18 @@ export default function (): any {
 
     public static 'close0(Ljava/io/FileDescriptor;)V'(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor): void {
       const fd = fdObj["java/io/FileDescriptor/fd"];
-      sun_nio_ch_FileDispatcherImpl['closeIntFD(I)V'](thread, fd);
-      FDState.close(fd);
+      if (fd === -1) {
+        return;
+      }
       fdObj["java/io/FileDescriptor/fd"] = -1;
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      closeFileDescriptor(fd, (err) => {
+        if (err) {
+          throwChannelIOException(thread, err);
+        } else {
+          thread.asyncReturn();
+        }
+      });
     }
 
     public static 'size0(Ljava/io/FileDescriptor;)J'(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor): void {
@@ -326,7 +725,7 @@ export default function (): any {
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
       fs.fstat(fd, (err, stats) => {
         if (err) {
-          throwNodeError(thread, err);
+          throwChannelIOException(thread, err);
         } else {
           thread.asyncReturn(Long.fromNumber(stats.size), null);
         }
@@ -338,7 +737,7 @@ export default function (): any {
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
       fs.ftruncate(fd, size.toNumber(), (err) => {
         if (err) {
-          throwNodeError(thread, err);
+          throwChannelIOException(thread, err);
         } else {
           // For some reason, this expects a return value.
           // Give it the success status code.
@@ -356,7 +755,7 @@ export default function (): any {
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
       fs.fsync(fd, (err) => {
         if (err) {
-          throwNodeError(thread, err);
+          throwChannelIOException(thread, err);
         } else {
           thread.asyncReturn(0);
         }
@@ -365,11 +764,10 @@ export default function (): any {
 
     public static 'closeIntFD(I)V'(thread: JVMThread, fd: number): void {
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.close(fd, (err) => {
+      closeFileDescriptor(fd, (err) => {
         if (err) {
-          throwNodeError(thread, err);
+          throwChannelIOException(thread, err);
         } else {
-          FDState.close(fd);
           thread.asyncReturn();
         }
       });
@@ -380,14 +778,18 @@ export default function (): any {
       const heap = thread.getJVM().getHeap();
       const data = heap.get_buffer(addr.toNumber(), len);
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.write(fd, data, 0, len, FDState.getPos(fd), (err, numBytes) => {
-        if (err) {
-          throwNodeError(thread, err);
-        } else {
-          FDState.incrementPos(fd, numBytes);
-          thread.asyncReturn(numBytes);
-        }
-      });
+      writeBuffer(
+        thread,
+        fd,
+        data,
+        0,
+        len,
+        FDState.getPos(fd),
+        true,
+        true,
+        (numBytes) => thread.asyncReturn(numBytes),
+        (err) => throwChannelIOException(thread, err)
+      );
     }
 
     public static 'pwrite0(Ljava/io/FileDescriptor;JIJ)I'(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor, addr: Long, len: number, position: Long): void {
@@ -395,19 +797,26 @@ export default function (): any {
       const heap = thread.getJVM().getHeap();
       const data = heap.get_buffer(addr.toNumber(), len);
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.write(fd, data, 0, len, position.toNumber(), (err, numBytes) => {
-        if (err) {
-          throwNodeError(thread, err);
-        } else {
-          thread.asyncReturn(numBytes);
-        }
-      });
+      writeBuffer(
+        thread,
+        fd,
+        data,
+        0,
+        len,
+        position.toNumber(),
+        false,
+        false,
+        (numBytes) => thread.asyncReturn(numBytes),
+        (err) => throwChannelIOException(thread, err)
+      );
     }
 
     public static 'writev0(Ljava/io/FileDescriptor;JI)J'(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor, address: Long, len: number): void {
       const fd = fdObj["java/io/FileDescriptor/fd"],
         heap = thread.getJVM().getHeap(),
-        vecs = readIOVecs(thread, address, len);
+        vecs = readIOVecs(thread, address, len),
+        buffers = vecs.map((vec) => heap.get_buffer(vec.base, vec.len)),
+        nativeWritev = !util.are_in_browser() ? (<any> fs).writev : null;
       let total = 0,
         index = 0;
 
@@ -417,32 +826,68 @@ export default function (): any {
         return;
       }
 
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      if (typeof nativeWritev === 'function') {
+        nativeWritev.call(
+          fs,
+          fd,
+          buffers,
+          FDState.isAppend(fd) ? null : FDState.getPos(fd),
+          (err: NodeJS.ErrnoException, numBytes: number) => {
+            if (err) {
+              throwChannelIOException(thread, err);
+            } else {
+              finishWrite(
+                thread,
+                fd,
+                numBytes,
+                true,
+                (written) => thread.asyncReturn(Long.fromNumber(written), null),
+                (writeErr) => throwChannelIOException(thread, writeErr)
+              );
+            }
+          }
+        );
+        return;
+      }
+
       const writeNext = (): void => {
         if (index >= vecs.length) {
-          FDState.incrementPos(fd, total);
           thread.asyncReturn(Long.fromNumber(total), null);
           return;
         }
 
         const vec = vecs[index],
-          data = heap.get_buffer(vec.base, vec.len);
-        fs.write(fd, data, 0, vec.len, FDState.getPos(fd) + total, (err, numBytes) => {
-          if (err) {
-            throwNodeError(thread, err);
-          } else {
+          data = buffers[index];
+        writeBuffer(
+          thread,
+          fd,
+          data,
+          0,
+          vec.len,
+          FDState.getPos(fd),
+          true,
+          true,
+          (numBytes) => {
             total += numBytes;
             if (numBytes < vec.len) {
-              FDState.incrementPos(fd, total);
               thread.asyncReturn(Long.fromNumber(total), null);
             } else {
               index++;
               writeNext();
             }
+          },
+          (err, committedBytes) => {
+            total += committedBytes;
+            if (committedBytes === 0 && total > 0) {
+              thread.asyncReturn(Long.fromNumber(total), null);
+            } else {
+              throwChannelIOException(thread, err);
+            }
           }
-        });
+        );
       };
 
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
       writeNext();
     }
 
@@ -526,44 +971,33 @@ export default function (): any {
 
   function convertError(thread: JVMThread, err: NodeJS.ErrnoException, cb: (err: JVMTypes.java_lang_Exception) => void): void {
     thread.setStatus(ThreadStatus.ASYNC_WAITING);
-    if (err.code === 'ENOENT') {
-      thread.getBsCl().initializeClass(thread, 'Ljava/nio/file/NoSuchFileException;', (noSuchFileException) => {
-        const cons = (<ReferenceClassData<JVMTypes.java_nio_file_NoSuchFileException>> noSuchFileException).getConstructor(thread),
-        rv = new cons(thread);
-        rv['<init>(Ljava/lang/String;)V'](thread, [util.initString(thread.getBsCl(), err.path)], (e) => {
-          thread.throwException(rv);
-        });
-      });
-    } else if (err.code === 'EEXIST') {
-      thread.getBsCl().initializeClass(thread, 'Ljava/nio/file/FileAlreadyExistsException;', (fileAlreadyExistsException) => {
-        const cons = (<ReferenceClassData<JVMTypes.java_nio_file_FileAlreadyExistsException>> fileAlreadyExistsException).getConstructor(thread),
-        rv = new cons(thread);
-        rv['<init>(Ljava/lang/String;)V'](thread, [util.initString(thread.getBsCl(), err.path)], (e) => {
-          cb(rv);
-        });
-      });
-    } else {
-      thread.getBsCl().initializeClass(thread, 'Lsun/nio/fs/UnixException;', (unixException) => {
-        thread.getBsCl().initializeClass(thread, 'Lsun/nio/fs/UnixConstants;', (unixConstants) => {
-            var cons = (<ReferenceClassData<JVMTypes.sun_nio_fs_UnixException>> unixException).getConstructor(thread),
-              rv = new cons(thread),
-              unixCons: typeof JVMTypes.sun_nio_fs_UnixConstants = <any> (<ReferenceClassData<JVMTypes.sun_nio_fs_UnixConstants>> unixConstants).getConstructor(thread),
-              errCode: number = (<any> unixCons)[`sun/nio/fs/UnixConstants/${err.code}`];
-            if (typeof(errCode) !== 'number') {
-              errCode = -1;
-            }
-            rv['sun/nio/fs/UnixException/errno'] = errCode;
+    thread.getBsCl().initializeClass(thread, 'Lsun/nio/fs/UnixException;', (unixException) => {
+      thread.getBsCl().initializeClass(thread, 'Lsun/nio/fs/UnixConstants;', (unixConstants) => {
+          var cons = (<ReferenceClassData<JVMTypes.sun_nio_fs_UnixException>> unixException).getConstructor(thread),
+            rv = new cons(thread),
+            unixCons: typeof JVMTypes.sun_nio_fs_UnixConstants = <any> (<ReferenceClassData<JVMTypes.sun_nio_fs_UnixConstants>> unixConstants).getConstructor(thread),
+            errCode: number = (<any> unixCons)[`sun/nio/fs/UnixConstants/${err.code}`];
+          if (typeof(errCode) !== 'number') {
+            errCode = -1;
             rv['sun/nio/fs/UnixException/msg'] = util.initString(thread.getBsCl(), err.message);
-            cb(rv);
-        });
+          } else {
+            rv['sun/nio/fs/UnixException/msg'] = null;
+          }
+          rv['sun/nio/fs/UnixException/errno'] = errCode;
+          cb(rv);
       });
-    }
+    });
   }
 
-  function convertStats(stats: fs.Stats, jvmStats: JVMTypes.sun_nio_fs_UnixFileAttributes): void {
+  function convertStats(
+      stats: fs.Stats,
+      jvmStats: JVMTypes.sun_nio_fs_UnixFileAttributes,
+      browserIdentity: BrowserFsIdentity = null): void {
+    const ino = browserIdentity !== null && stats.ino === 0 ? browserIdentity.ino : stats.ino,
+      dev = browserIdentity !== null && stats.dev === 0 ? browserIdentity.dev : stats.dev;
     jvmStats['sun/nio/fs/UnixFileAttributes/st_mode'] = stats.mode;
-    jvmStats['sun/nio/fs/UnixFileAttributes/st_ino'] = Long.fromNumber(stats.ino);
-    jvmStats['sun/nio/fs/UnixFileAttributes/st_dev'] = Long.fromNumber(stats.dev);
+    jvmStats['sun/nio/fs/UnixFileAttributes/st_ino'] = Long.fromNumber(ino);
+    jvmStats['sun/nio/fs/UnixFileAttributes/st_dev'] = Long.fromNumber(dev);
     jvmStats['sun/nio/fs/UnixFileAttributes/st_rdev'] = Long.fromNumber(stats.rdev);
     jvmStats['sun/nio/fs/UnixFileAttributes/st_nlink'] = stats.nlink;
     jvmStats['sun/nio/fs/UnixFileAttributes/st_uid'] = stats.uid;
@@ -586,11 +1020,7 @@ export default function (): any {
     return (flag & mask) === value;
   }
 
-  /**
-   * Converts a numerical Unix open() flag to a NodeJS string open() flag.
-   * Returns NULL upon failure; throws a UnixException on thread when that happens.
-   */
-  function flag2nodeflag(thread: JVMThread, flag: number): string {
+  function decodeUnixOpenFlags(thread: JVMThread, flag: number): UnixOpenFlags {
     if (UnixConstants === null) {
       let UCCls = <ReferenceClassData<JVMTypes.sun_nio_fs_UnixConstants>> thread.getBsCl().getInitializedClass(thread, 'Lsun/nio/fs/UnixConstants;');
       if (UCCls === null) {
@@ -600,56 +1030,97 @@ export default function (): any {
       UnixConstants = <any> UCCls.getConstructor(thread);
     }
 
-    const sync = flagTest(flag, UnixConstants['sun/nio/fs/UnixConstants/O_SYNC']) || flagTest(flag, UnixConstants['sun/nio/fs/UnixConstants/O_DSYNC']);
-    const failIfExists = flagTest(flag, UnixConstants['sun/nio/fs/UnixConstants/O_EXCL'] | UnixConstants['sun/nio/fs/UnixConstants/O_CREAT']);
-    const O_ACCMODE = 0x3;
+    const O_ACCMODE = 0x3,
+      accessMode = flag & O_ACCMODE,
+      readOnly = UnixConstants['sun/nio/fs/UnixConstants/O_RDONLY'],
+      writeOnly = UnixConstants['sun/nio/fs/UnixConstants/O_WRONLY'],
+      readWrite = UnixConstants['sun/nio/fs/UnixConstants/O_RDWR'],
+      syncMask = UnixConstants['sun/nio/fs/UnixConstants/O_SYNC'],
+      dataSyncMask = UnixConstants['sun/nio/fs/UnixConstants/O_DSYNC'],
+      create = flagTest(flag, UnixConstants['sun/nio/fs/UnixConstants/O_CREAT']),
+      sync = flagTest(flag, syncMask);
 
-    if (flagTest(flag, O_ACCMODE, UnixConstants['sun/nio/fs/UnixConstants/O_RDWR'])) {
-      if (flagTest(flag, UnixConstants['sun/nio/fs/UnixConstants/O_APPEND'])) {
-        // 'a+' - Open file for reading and appending. The file is created if it does not exist.
-        // 'ax+' - Like 'a+' but fails if path exists.
-        return failIfExists ? 'ax+' : 'a+';
-      } else if (flagTest(flag, UnixConstants['sun/nio/fs/UnixConstants/O_CREAT'])) {
-        // 'w+' - Open file for reading and writing. The file is created (if it does not exist) or truncated (if it exists).
-        // 'wx+' - Like 'w+' but fails if path exists.
-        return failIfExists ? 'wx+' : 'w+';
-      } else {
-        // 'r+' - Open file for reading and writing. An exception occurs if the file does not exist.
-        // 'rs+' - Open file for reading and writing, telling the OS to open it synchronously.
-        return sync ? 'rs+' : 'r+';
-      }
-    } else if (flagTest(flag, O_ACCMODE, UnixConstants['sun/nio/fs/UnixConstants/O_RDONLY'])) {
-      // 'r' - Open file for reading. An exception occurs if the file does not exist.
-      // 'rs' - Open file for reading in synchronous mode. Instructs the operating system to bypass the local file system cache.
-      return sync ? 'rs' : 'r';
-    } else if (flagTest(flag, O_ACCMODE, UnixConstants['sun/nio/fs/UnixConstants/O_WRONLY'])) {
-      if (flagTest(flag, UnixConstants['sun/nio/fs/UnixConstants/O_APPEND'])) {
-        // 'ax' - Like 'a' but fails if path exists.
-        // 'a' - Open file for appending. The file is created if it does not exist.
-        return failIfExists ? 'ax' : 'a';
-      } else {
-        // 'w' - Open file for writing. The file is created (if it does not exist) or truncated (if it exists).
-        // 'wx' - Like 'w' but fails if path exists.
-        return failIfExists ? 'wx' : 'w';
-      }
-    } else {
+    if (accessMode !== readOnly && accessMode !== writeOnly && accessMode !== readWrite) {
       thread.throwNewException('Lsun/nio/fs/UnixException;', `Invalid open flag: ${flag}.`);
       return null;
     }
+
+    return {
+      read: accessMode === readOnly || accessMode === readWrite,
+      write: accessMode === writeOnly || accessMode === readWrite,
+      append: flagTest(flag, UnixConstants['sun/nio/fs/UnixConstants/O_APPEND']),
+      create: create,
+      createNew: create && flagTest(flag, UnixConstants['sun/nio/fs/UnixConstants/O_EXCL']),
+      truncate: flagTest(flag, UnixConstants['sun/nio/fs/UnixConstants/O_TRUNC']),
+      sync: sync,
+      dataSync: !sync && flagTest(flag, dataSyncMask),
+      noFollow: flagTest(flag, UnixConstants['sun/nio/fs/UnixConstants/O_NOFOLLOW'])
+    };
   }
 
-  function throwNodeError(thread: JVMThread, err: NodeJS.ErrnoException): void {
+  /**
+   * Rebuilds the JDK's Unix open flags with the host's numeric constants. The
+   * constants happen to match on many Linux hosts, but that is not portable.
+   */
+  function flag2nodeflag(thread: JVMThread, flag: number): number {
+    const decoded = decodeUnixOpenFlags(thread, flag);
+    if (decoded === null) {
+      return null;
+    }
+
+    const constants = (<any> fs).constants;
+    if (constants === undefined) {
+      thread.throwNewException('Lsun/nio/fs/UnixException;', 'Numeric open flags are unavailable on this host.');
+      return null;
+    }
+
+    let nodeFlag = decoded.read && decoded.write ? constants.O_RDWR :
+      decoded.write ? constants.O_WRONLY : constants.O_RDONLY;
+    const optionalFlags: Array<[boolean, string]> = [
+      [decoded.append, 'O_APPEND'],
+      [decoded.create, 'O_CREAT'],
+      [decoded.createNew, 'O_EXCL'],
+      [decoded.truncate, 'O_TRUNC'],
+      [decoded.sync, 'O_SYNC'],
+      [decoded.dataSync, 'O_DSYNC'],
+      [decoded.noFollow, 'O_NOFOLLOW']
+    ];
+    for (let i = 0; i < optionalFlags.length; i++) {
+      if (optionalFlags[i][0]) {
+        const constantName = optionalFlags[i][1],
+          constantValue = typeof constants[constantName] === 'number' ? constants[constantName] :
+            constantName === 'O_DSYNC' ? constants.O_SYNC : undefined;
+        if (typeof constantValue !== 'number') {
+          thread.throwNewException('Lsun/nio/fs/UnixException;', `${constantName} is unavailable on this host.`);
+          return null;
+        }
+        nodeFlag |= constantValue;
+      }
+    }
+    return nodeFlag;
+  }
+
+  function throwUnixException(thread: JVMThread, err: NodeJS.ErrnoException): void {
     convertError(thread, err, (convertedErr) => {
       thread.throwException(convertedErr);
     });
+  }
+
+  function throwChannelIOException(thread: JVMThread, err: NodeJS.ErrnoException): void {
+    thread.throwNewException(
+      'Ljava/io/IOException;',
+      err !== null && err !== undefined && typeof err.message === 'string' ?
+        err.message : String(err)
+    );
   }
 
   /**
    * Converts a Date object into [seconds, nanoseconds].
    */
   function date2components(date: Date): [number, number] {
-    let dateInMs = date.getTime();
-    return [Math.floor(dateInMs / 1000), (dateInMs % 1000) * 1000000];
+    const dateInMs = date.getTime();
+    const seconds = Math.floor(dateInMs / 1000);
+    return [seconds, (dateInMs - seconds * 1000) * 1000000];
   }
 
   class sun_nio_fs_UnixNativeDispatcher {
@@ -664,33 +1135,118 @@ export default function (): any {
     }
 
     public static 'open0(JII)I'(thread: JVMThread, pathAddress: Long, flags: number, mode: number): number | void {
-      // Essentially, convert open() args to fopen() args.
-      let flagStr = flag2nodeflag(thread, flags);
-      if (flagStr !== null) {
+      const decoded = decodeUnixOpenFlags(thread, flags);
+      if (decoded === null) {
+        return -1;
+      }
+
+      const pathStr = getStringFromHeap(thread, pathAddress);
+
+      if (!util.are_in_browser()) {
+        const nodeFlags = flag2nodeflag(thread, flags);
+        if (nodeFlags === null) {
+          return -1;
+        }
         thread.setStatus(ThreadStatus.ASYNC_WAITING);
-        let pathStr = getStringFromHeap(thread, pathAddress);
-        fs.open(pathStr, flagStr, mode, (err, fd) => {
+        fs.open(pathStr, nodeFlags, mode, (err, fd) => {
           if (err) {
-            throwNodeError(thread, err);
+            throwUnixException(thread, err);
+          } else if (decoded.append) {
+            fs.fstat(fd, (statErr, stats) => {
+              if (statErr) {
+                fs.close(fd, () => throwUnixException(thread, statErr));
+              } else {
+                FDState.open(fd, stats.size, true, 0, pathStr);
+                thread.asyncReturn(fd);
+              }
+            });
           } else {
-            if (flagStr.indexOf('a') !== -1) {
-              // Need to figure out size of file to set position.
-              fs.fstat(fd, (err, stats) => {
-                if (err) {
-                  throwNodeError(thread, err);
-                } else {
-                  FDState.open(fd, stats.size);
-                  thread.asyncReturn(fd);
-                }
-              });
+            FDState.open(fd, 0, false, 0, pathStr);
+            thread.asyncReturn(fd);
+          }
+        });
+        return;
+      }
+
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      const syncMode = decoded.sync ? 1 : decoded.dataSync ? 2 : 0;
+      const finishBrowserOpen = (fd: number): void => {
+        const initialize = (): void => {
+          fs.fstat(fd, (statErr, stats) => {
+            if (statErr) {
+              fs.close(fd, () => throwUnixException(thread, statErr));
             } else {
-              FDState.open(fd, 0);
+              getBrowserFsFdIdentity(fd);
+              FDState.open(
+                fd,
+                decoded.append ? stats.size : 0,
+                decoded.append,
+                syncMode,
+                pathStr
+              );
               thread.asyncReturn(fd);
             }
+          });
+        };
+        if (decoded.write && decoded.truncate && !decoded.append) {
+          fs.ftruncate(fd, 0, (truncateErr) => {
+            if (truncateErr) {
+              fs.close(fd, () => throwUnixException(thread, truncateErr));
+            } else {
+              initialize();
+            }
+          });
+        } else {
+          initialize();
+        }
+      };
+      const openBrowserFile = (): void => {
+        if (!decoded.write) {
+          fs.open(pathStr, 'r', mode, (err, fd) => err ? throwUnixException(thread, err) : finishBrowserOpen(fd));
+        } else if (decoded.createNew) {
+          fs.open(pathStr, 'wx+', mode, (err, fd) => err ? throwUnixException(thread, err) : finishBrowserOpen(fd));
+        } else if (!decoded.create) {
+          fs.open(pathStr, 'r+', mode, (err, fd) => err ? throwUnixException(thread, err) : finishBrowserOpen(fd));
+        } else {
+          let racesRemaining = 3;
+          const openExisting = (): void => {
+            fs.open(pathStr, 'r+', mode, (existingErr, existingFd) => {
+              if (!existingErr) {
+                finishBrowserOpen(existingFd);
+              } else if (existingErr.code !== 'ENOENT') {
+                throwUnixException(thread, existingErr);
+              } else {
+                fs.open(pathStr, 'wx+', mode, (createErr, createdFd) => {
+                  if (!createErr) {
+                    finishBrowserOpen(createdFd);
+                  } else if (createErr.code === 'EEXIST' && racesRemaining-- > 0) {
+                    openExisting();
+                  } else {
+                    throwUnixException(thread, createErr);
+                  }
+                });
+              }
+            });
+          };
+          openExisting();
+        }
+      };
+
+      if (decoded.noFollow) {
+        fs.lstat(pathStr, (err, stats) => {
+          if (!err && stats.isSymbolicLink()) {
+            const loopErr = <NodeJS.ErrnoException> new Error(`ELOOP: too many symbolic links encountered, open '${pathStr}'`);
+            loopErr.code = 'ELOOP';
+            loopErr.path = pathStr;
+            throwUnixException(thread, loopErr);
+          } else if (err && err.code !== 'ENOENT') {
+            throwUnixException(thread, err);
+          } else {
+            openBrowserFile();
           }
         });
       } else {
-        return -1;
+        openBrowserFile();
       }
     }
 
@@ -701,14 +1257,9 @@ export default function (): any {
 
     public static 'close(I)V'(thread: JVMThread, fd: number): void {
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.close(fd, (err?) => {
-        if (err) {
-          throwNodeError(thread, err);
-        } else {
-          FDState.close(fd);
-          thread.asyncReturn();
-        }
-      });
+      // UnixNativeDispatcher.close mirrors the JDK's raw close helper, which
+      // retires the descriptor without surfacing close(2) failures.
+      closeFileDescriptor(fd, () => thread.asyncReturn());
     }
 
     public static 'fopen0(JJ)J'(thread: JVMThread, pathAddress: Long, flagsAddress: Long): void {
@@ -717,20 +1268,20 @@ export default function (): any {
       let flagsStr = getStringFromHeap(thread, flagsAddress);
       fs.open(pathStr, flagsStr, (err, fd) => {
         if (err) {
-          throwNodeError(thread, err);
+          throwUnixException(thread, err);
         } else {
           if (flagsStr.indexOf('a') !== -1) {
             // Need to figure out file size to update file position.
             fs.fstat(fd, (err, stats) => {
               if (err) {
-                throwNodeError(thread, err);
+                throwUnixException(thread, err);
               } else {
-                FDState.open(fd, stats.size);
+                FDState.open(fd, stats.size, true, 0, pathStr);
                 thread.asyncReturn(Long.fromNumber(fd), null);
               }
             });
           } else {
-            FDState.open(fd, 0);
+            FDState.open(fd, 0, false, 0, pathStr);
             thread.asyncReturn(Long.fromNumber(fd), null);
           }
         }
@@ -740,26 +1291,36 @@ export default function (): any {
     public static 'fclose(J)V'(thread: JVMThread, fdLong: Long): void {
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
       const fd = fdLong.toNumber();
-      fs.close(fd, (err?) => {
-        if (err) {
-          throwNodeError(thread, err);
+      closeFileDescriptor(fd, (err) => {
+        if (err && err.code !== 'EINTR') {
+          throwUnixException(thread, err);
         } else {
-          FDState.close(fd);
           thread.asyncReturn();
         }
       });
     }
 
-    public static 'link0(JJ)V'(thread: JVMThread, arg0: Long, arg1: Long): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'link0(JJ)V'(thread: JVMThread, existingAddr: Long, linkAddr: Long): void {
+      const existingPath = getStringFromHeap(thread, existingAddr),
+        linkPath = getStringFromHeap(thread, linkAddr);
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      fs.link(existingPath, linkPath, (err) => {
+        if (err) {
+          throwUnixException(thread, err);
+        } else {
+          thread.asyncReturn();
+        }
+      });
     }
 
     public static 'unlink0(J)V'(thread: JVMThread, pathAddress: Long): void {
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.unlink(getStringFromHeap(thread, pathAddress), (err) => {
+      const pathStr = getStringFromHeap(thread, pathAddress);
+      fs.unlink(pathStr, (err) => {
         if (err) {
-          throwNodeError(thread, err);
+          throwUnixException(thread, err);
         } else {
+          FDState.markUnlinked(pathStr);
           thread.asyncReturn();
         }
       });
@@ -774,10 +1335,24 @@ export default function (): any {
     }
 
     public static 'rename0(JJ)V'(thread: JVMThread, oldAddr: Long, newAddr: Long): void {
+      const oldPath = getStringFromHeap(thread, oldAddr),
+        newPath = getStringFromHeap(thread, newAddr);
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.rename(getStringFromHeap(thread, oldAddr), getStringFromHeap(thread, newAddr), (err) => {
+      if (util.are_in_browser()) {
+        const oldLocation = getBrowserFsLocation(oldPath),
+          newLocation = getBrowserFsLocation(newPath);
+        if (oldLocation !== null && newLocation !== null && oldLocation.fs !== newLocation.fs) {
+          const crossDeviceError = <NodeJS.ErrnoException>
+            new Error(`EXDEV: cross-device link not permitted, rename '${oldPath}' -> '${newPath}'`);
+          crossDeviceError.code = 'EXDEV';
+          crossDeviceError.path = oldPath;
+          throwUnixException(thread, crossDeviceError);
+          return;
+        }
+      }
+      fs.rename(oldPath, newPath, (err) => {
         if (err) {
-          throwNodeError(thread, err);
+          throwUnixException(thread, err);
         } else {
           thread.asyncReturn();
         }
@@ -792,7 +1367,7 @@ export default function (): any {
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
       fs.mkdir(getStringFromHeap(thread, pathAddr), mode, (err) => {
         if (err) {
-          throwNodeError(thread, err);
+          throwUnixException(thread, err);
         } else {
           thread.asyncReturn();
         }
@@ -803,7 +1378,7 @@ export default function (): any {
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
       fs.rmdir(getStringFromHeap(thread, pathAddr), (err) => {
         if (err) {
-          throwNodeError(thread, err);
+          throwUnixException(thread, err);
         } else {
           thread.asyncReturn();
         }
@@ -814,7 +1389,7 @@ export default function (): any {
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
       fs.readlink(getStringFromHeap(thread, pathAddr), (err, linkPath) => {
         if (err) {
-          throwNodeError(thread, err);
+          throwUnixException(thread, err);
         } else {
           thread.asyncReturn(stringToByteArray(thread, linkPath));
         }
@@ -825,36 +1400,47 @@ export default function (): any {
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
       fs.realpath(getStringFromHeap(thread, pathAddress), (err, resolvedPath) => {
         if (err) {
-          throwNodeError(thread, err);
+          throwUnixException(thread, err);
         } else {
           thread.asyncReturn(stringToByteArray(thread, resolvedPath));
         }
       });
     }
 
-    public static 'symlink0(JJ)V'(thread: JVMThread, arg0: Long, arg1: Long): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'symlink0(JJ)V'(thread: JVMThread, targetAddr: Long, linkAddr: Long): void {
+      const targetPath = getStringFromHeap(thread, targetAddr),
+        linkPath = getStringFromHeap(thread, linkAddr);
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      fs.symlink(targetPath, linkPath, 'file', (err) => {
+        if (err) {
+          throwUnixException(thread, err);
+        } else {
+          thread.asyncReturn();
+        }
+      });
     }
 
     public static 'stat0(JLsun/nio/fs/UnixFileAttributes;)V'(thread: JVMThread, pathAddress: Long, jvmStats: JVMTypes.sun_nio_fs_UnixFileAttributes): void {
+      const pathString = getStringFromHeap(thread, pathAddress);
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.stat(getStringFromHeap(thread, pathAddress), (err, stats) => {
+      fs.stat(pathString, (err, stats) => {
         if (err) {
-          throwNodeError(thread, err);
+          throwUnixException(thread, err);
         } else {
-          convertStats(stats, jvmStats);
+          convertStats(stats, jvmStats, util.are_in_browser() ? getBrowserFsPathIdentity(pathString) : null);
           thread.asyncReturn();
         }
       });
     }
 
     public static 'lstat0(JLsun/nio/fs/UnixFileAttributes;)V'(thread: JVMThread, pathAddress: Long, jvmStats: JVMTypes.sun_nio_fs_UnixFileAttributes): void {
+      const pathString = getStringFromHeap(thread, pathAddress);
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.lstat(getStringFromHeap(thread, pathAddress), (err, stats) => {
+      fs.lstat(pathString, (err, stats) => {
         if (err) {
-          throwNodeError(thread, err);
+          throwUnixException(thread, err);
         } else {
-          convertStats(stats, jvmStats);
+          convertStats(stats, jvmStats, util.are_in_browser() ? getBrowserFsPathIdentity(pathString) : null);
           thread.asyncReturn();
         }
       });
@@ -864,9 +1450,9 @@ export default function (): any {
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
       fs.fstat(fd, (err, stats) => {
         if (err) {
-          throwNodeError(thread, err);
+          throwUnixException(thread, err);
         } else {
-          convertStats(stats, jvmStats);
+          convertStats(stats, jvmStats, util.are_in_browser() ? getBrowserFsFdIdentity(fd) : null);
           thread.asyncReturn();
         }
       });
@@ -876,36 +1462,122 @@ export default function (): any {
       thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
     }
 
-    public static 'chown0(JII)V'(thread: JVMThread, arg0: Long, arg1: number, arg2: number): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'chown0(JII)V'(thread: JVMThread, pathAddr: Long, uid: number, gid: number): void {
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      fs.chown(getStringFromHeap(thread, pathAddr), uid, gid, (err) => {
+        if (err) {
+          throwUnixException(thread, err);
+        } else {
+          thread.asyncReturn();
+        }
+      });
     }
 
-    public static 'lchown0(JII)V'(thread: JVMThread, arg0: Long, arg1: number, arg2: number): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'lchown0(JII)V'(thread: JVMThread, pathAddr: Long, uid: number, gid: number): void {
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      fs.lchown(getStringFromHeap(thread, pathAddr), uid, gid, (err) => {
+        if (err) {
+          throwUnixException(thread, err);
+        } else {
+          thread.asyncReturn();
+        }
+      });
     }
 
-    public static 'fchown(III)V'(thread: JVMThread, arg0: number, arg1: number, arg2: number): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'fchown(III)V'(thread: JVMThread, fd: number, uid: number, gid: number): void {
+      if (util.are_in_browser()) {
+        // BrowserFS models a single uid/gid (both zero) and cannot persist
+        // ownership. Treat descriptor ownership copying as an accepted no-op.
+        return;
+      }
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      fs.fchown(fd, uid, gid, (err) => {
+        if (err) {
+          throwUnixException(thread, err);
+        } else {
+          thread.asyncReturn();
+        }
+      });
     }
 
-    public static 'chmod0(JI)V'(thread: JVMThread, arg0: Long, arg1: number): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'chmod0(JI)V'(thread: JVMThread, pathAddr: Long, mode: number): void {
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      fs.chmod(getStringFromHeap(thread, pathAddr), mode, (err) => {
+        if (err) {
+          throwUnixException(thread, err);
+        } else {
+          thread.asyncReturn();
+        }
+      });
     }
 
-    public static 'fchmod(II)V'(thread: JVMThread, arg0: number, arg1: number): void {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
+    public static 'fchmod(II)V'(thread: JVMThread, fd: number, mode: number): void {
+      if (util.are_in_browser()) {
+        const file = getBrowserFsFile(fd);
+        if (file !== null && typeof file.getStats === 'function' && typeof file.sync === 'function') {
+          const stats = file.getStats();
+          if (typeof stats.chmod === 'function') {
+            stats.chmod(mode);
+          } else {
+            stats.mode = (stats.mode & 0xF000) | mode;
+          }
+          thread.setStatus(ThreadStatus.ASYNC_WAITING);
+          syncBrowserFsFile(thread, file, () => thread.asyncReturn());
+          return;
+        }
+      }
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      fs.fchmod(fd, mode, (err) => {
+        if (err) {
+          throwUnixException(thread, err);
+        } else {
+          thread.asyncReturn();
+        }
+      });
     }
 
     public static 'utimes0(JJJ)V'(thread: JVMThread, pathAddress: Long, times0: Long, times1: Long): void {
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
       const p = getStringFromHeap(thread, pathAddress);
-      const t0 = new Date(times0.toNumber());
-      const t1 = new Date(times1.toNumber());
+      const t0 = new Date(times0.toNumber() / 1000);
+      const t1 = new Date(times1.toNumber() / 1000);
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      if (util.are_in_browser()) {
+        const location = getBrowserFsLocation(p),
+          backend = location === null ? null : location.fs;
+        if (backend !== null && backend.store !== undefined &&
+            typeof backend.store.beginTransaction === 'function' &&
+            typeof backend._findINode === 'function' && backend._findINode.length === 3 &&
+            typeof backend.getINode === 'function') {
+          let transaction: any = null;
+          try {
+            transaction = backend.store.beginTransaction('readwrite');
+            const metadataNodeId = backend._findINode(
+                transaction,
+                path.dirname(location.path),
+                path.basename(location.path)
+              ),
+              inode = backend.getINode(transaction, location.path, metadataNodeId);
+            inode.atime = t0.getTime();
+            inode.mtime = t1.getTime();
+            inode.ctime = Date.now();
+            transaction.put(metadataNodeId, inode.toBuffer(), true);
+            transaction.commit();
+            thread.asyncReturn();
+          } catch (err) {
+            if (transaction !== null && typeof transaction.abort === 'function') {
+              try {
+                transaction.abort();
+              } catch (abortErr) {
+              }
+            }
+            throwUnixException(thread, <NodeJS.ErrnoException> err);
+          }
+          return;
+        }
+      }
       fs.utimes(p, t0, t1, (err) => {
-        // Ignore ENOTSUP errors; some BFS backends do not support this operation,
-        // and ignoring the error isn't typically an issue.
-        if (err && err.code !== 'ENOTSUP') {
-          throwNodeError(thread, err);
+        if (err) {
+          throwUnixException(thread, err);
         } else {
           thread.asyncReturn();
         }
@@ -913,14 +1585,24 @@ export default function (): any {
     }
 
     public static 'futimes(IJJ)V'(thread: JVMThread, fd: number, times0: Long, times1: Long): void {
+      const t0 = new Date(times0.toNumber() / 1000);
+      const t1 = new Date(times1.toNumber() / 1000);
+      if (util.are_in_browser()) {
+        const file = getBrowserFsFile(fd);
+        if (file !== null && typeof file.getStats === 'function' && typeof file.sync === 'function') {
+          const stats = file.getStats();
+          stats.atime = t0;
+          stats.mtime = t1;
+          stats.ctime = new Date();
+          thread.setStatus(ThreadStatus.ASYNC_WAITING);
+          syncBrowserFsFile(thread, file, () => thread.asyncReturn());
+          return;
+        }
+      }
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      const t0 = new Date(times0.toNumber());
-      const t1 = new Date(times1.toNumber());
       fs.futimes(fd, t0, t1, (err) => {
-        // Ignore ENOTSUP errors; some BFS backends do not support this operation,
-        // and ignoring the error isn't typically an issue.
-        if (err && err.code !== 'ENOTSUP') {
-          throwNodeError(thread, err);
+        if (err) {
+          throwUnixException(thread, err);
         } else {
           thread.asyncReturn();
         }
@@ -961,7 +1643,7 @@ export default function (): any {
       let buff = thread.getJVM().getHeap().get_buffer(buf.toNumber(), nbyte);
       fs.read(fd, buff, 0, nbyte, FDState.getPos(fd), (err, bytesRead) => {
         if (err) {
-          throwNodeError(thread, err);
+          throwUnixException(thread, err);
         } else {
           FDState.incrementPos(fd, bytesRead);
           thread.asyncReturn(bytesRead);
@@ -972,14 +1654,18 @@ export default function (): any {
     public static 'write(IJI)I'(thread: JVMThread, fd: number, buf: Long, nbyte: number): void {
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
       let buff = thread.getJVM().getHeap().get_buffer(buf.toNumber(), nbyte);
-      fs.write(fd, buff, 0, nbyte, FDState.getPos(fd), (err, bytesWritten) => {
-        if (err) {
-          throwNodeError(thread, err);
-        } else {
-          FDState.incrementPos(fd, bytesWritten);
-          thread.asyncReturn(bytesWritten);
-        }
-      });
+      writeBuffer(
+        thread,
+        fd,
+        buff,
+        0,
+        nbyte,
+        FDState.getPos(fd),
+        true,
+        true,
+        (bytesWritten) => thread.asyncReturn(bytesWritten),
+        (err) => throwUnixException(thread, err)
+      );
     }
 
     public static 'access0(JI)V'(thread: JVMThread, pathAddress: Long, arg1: number): void {
@@ -989,7 +1675,7 @@ export default function (): any {
       if (util.are_in_browser()) {
         fs.stat(pathString, (err: Error, stat: fs.Stats) => {
           if (err) {
-            throwNodeError(thread, err);
+            throwUnixException(thread, err);
           } else {
             thread.asyncReturn();
           }
@@ -999,7 +1685,7 @@ export default function (): any {
         const mode = arg1 & 7;
         fs.access(pathString, mode, (err: Error) => {
           if (err) {
-            throwNodeError(thread, err);
+            throwUnixException(thread, err);
           } else {
             thread.asyncReturn();
           }
@@ -1041,7 +1727,7 @@ export default function (): any {
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
       statfs(pathString, (err: NodeJS.ErrnoException, stats: any) => {
         if (err) {
-          throwNodeError(thread, err);
+          throwUnixException(thread, err);
           return;
         }
 
@@ -1068,12 +1754,14 @@ export default function (): any {
     }
 
     public static 'strerror(I)[B'(thread: JVMThread, arg0: number): JVMTypes.JVMArray<number> {
-      thread.throwNewException('Ljava/lang/UnsatisfiedLinkError;', 'Native method not implemented.');
-      return null;
+      const message = BrowserFS.Errors.ErrorStrings[arg0] || `Unix error ${arg0}`;
+      return stringToByteArray(thread, message);
     }
 
     public static 'init()I'(thread: JVMThread): number {
-      return 0;
+      // Both Node and the BrowserFS bridge implement descriptor timestamp
+      // updates, so expose the vendor SUPPORTS_FUTIMES capability bit.
+      return 4;
     }
 
   }
@@ -1098,6 +1786,13 @@ export default function (): any {
     }
 
     public static 'init()V'(thread: JVMThread): void {
+    }
+
+    public static 'flistxattr(IJI)I'(thread: JVMThread, fd: number, address: Long, size: number): number {
+      // Node and BrowserFS do not expose descriptor-based extended attributes.
+      // Report an empty list so COPY_ATTRIBUTES can still preserve the basic
+      // and POSIX attributes that these hosts do support.
+      return 0;
     }
 
     public static 'setmntent0(JJ)J'(thread: JVMThread, pathAddress: Long, modeAddress: Long): Long {
@@ -1186,6 +1881,7 @@ export default function (): any {
     'sun/nio/ch/FileChannelImpl': sun_nio_ch_FileChannelImpl,
     'sun/nio/ch/NativeThread': sun_nio_ch_NativeThread,
     'sun/nio/ch/IOUtil': sun_nio_ch_IOUtil,
+    'sun/nio/fs/UnixCopyFile': sun_nio_fs_UnixCopyFile,
     'sun/nio/ch/FileDispatcherImpl': sun_nio_ch_FileDispatcherImpl,
     'sun/nio/fs/LinuxNativeDispatcher': sun_nio_fs_LinuxNativeDispatcher,
     'sun/nio/fs/UnixNativeDispatcher': sun_nio_fs_UnixNativeDispatcher
