@@ -3,16 +3,12 @@ package java.nio.file;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
-import java.io.Closeable;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.io.RandomAccessFile;
 import java.io.UncheckedIOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.Charset;
@@ -21,7 +17,6 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.BasicFileAttributeView;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.FileAttributeView;
-import java.nio.file.attribute.FileStoreAttributeView;
 import java.nio.file.attribute.FileOwnerAttributeView;
 import java.nio.file.attribute.FileTime;
 import java.nio.file.attribute.GroupPrincipal;
@@ -36,107 +31,32 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
+import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.function.BiPredicate;
+import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.regex.PatternSyntaxException;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 public final class Files {
   private static int temporaryProviderCounter;
 
   private Files() {}
 
-  private static native void createHardLink0(String link, String existing) throws IOException;
-
-  private static native void createSymbolicLink0(String link, String target) throws IOException;
-
-  private static native String readSymbolicLink0(String link) throws IOException;
-
-  private static native void deletePath0(String path) throws IOException;
-
-  private static native boolean isSameFile0(String first, String second) throws IOException;
-
-  private static native long fileStoreBlockSize0(String path) throws IOException;
-
   public static InputStream newInputStream(Path path, OpenOption... options) throws IOException {
-    Objects.requireNonNull(options);
-    boolean deleteOnClose = false;
-    for (OpenOption option : options) {
-      Objects.requireNonNull(option);
-      if (option == StandardOpenOption.WRITE || option == StandardOpenOption.APPEND) {
-        throw new UnsupportedOperationException();
-      } else if (option == StandardOpenOption.DELETE_ON_CLOSE) {
-        deleteOnClose = true;
-      }
-    }
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      return path.getFileSystem().provider().newInputStream(path, options);
-    }
-    File file = toFile(path);
-    validateInputTarget(file);
-    InputStream input = new FileInputStream(file);
-    deleteAfterOpening(file, input, deleteOnClose);
-    return input;
+    return path.getFileSystem().provider().newInputStream(path, options);
   }
 
   public static OutputStream newOutputStream(Path path, OpenOption... options) throws IOException {
-    Objects.requireNonNull(options);
-    boolean append = false;
-    boolean create = options.length == 0;
-    boolean createNew = false;
-    boolean deleteOnClose = false;
-    boolean truncate = options.length == 0;
-    for (OpenOption option : options) {
-      Objects.requireNonNull(option);
-      if (option == StandardOpenOption.APPEND) {
-        append = true;
-      } else if (option == StandardOpenOption.CREATE) {
-        create = true;
-      } else if (option == StandardOpenOption.CREATE_NEW) {
-        createNew = true;
-      } else if (option == StandardOpenOption.DELETE_ON_CLOSE) {
-        deleteOnClose = true;
-      } else if (option == StandardOpenOption.TRUNCATE_EXISTING) {
-        truncate = true;
-      } else if (option == StandardOpenOption.READ) {
-        throw new IllegalArgumentException();
-      } else if (option != StandardOpenOption.WRITE
-          && option != StandardOpenOption.SYNC
-          && option != StandardOpenOption.DSYNC
-          && option != StandardOpenOption.SPARSE) {
-        throw new UnsupportedOperationException();
-      }
-    }
-    if (append && truncate) {
-      throw new IllegalArgumentException();
-    }
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      return path.getFileSystem().provider().newOutputStream(path, options);
-    }
-    File file = toFile(path);
-    validateOutputTarget(file, create, createNew);
-    if (append || truncate) {
-      OutputStream output = new FileOutputStream(file, append && !truncate);
-      deleteAfterOpening(file, output, deleteOnClose);
-      return output;
-    }
-    if (!file.exists() && !file.createNewFile()) {
-      throw new IOException("Unable to create file");
-    }
-    OutputStream output = new RandomAccessFileOutputStream(file);
-    deleteAfterOpening(file, output, deleteOnClose);
-    return output;
+    return path.getFileSystem().provider().newOutputStream(path, options);
   }
 
   public static SeekableByteChannel newByteChannel(Path path, OpenOption... options) throws IOException {
-    Objects.requireNonNull(options);
     HashSet<OpenOption> optionSet = new HashSet<OpenOption>();
-    for (OpenOption option : options) {
-      optionSet.add(Objects.requireNonNull(option));
-    }
+    Collections.addAll(optionSet, options);
     return newByteChannel(path, optionSet);
   }
 
@@ -144,91 +64,7 @@ public final class Files {
       Path path,
       Set<? extends OpenOption> options,
       FileAttribute<?>... attrs) throws IOException {
-    Objects.requireNonNull(options);
-    requireFileAttributes(attrs);
-    boolean read = options.isEmpty();
-    boolean write = false;
-    boolean append = false;
-    boolean create = false;
-    boolean createNew = false;
-    boolean deleteOnClose = false;
-    boolean truncate = false;
-    boolean sync = false;
-    boolean dsync = false;
-    boolean created = false;
-    for (OpenOption option : options) {
-      Objects.requireNonNull(option);
-      if (option == StandardOpenOption.READ) {
-        read = true;
-      } else if (option == StandardOpenOption.WRITE) {
-        write = true;
-      } else if (option == StandardOpenOption.APPEND) {
-        append = true;
-        write = true;
-      } else if (option == StandardOpenOption.CREATE) {
-        create = true;
-      } else if (option == StandardOpenOption.CREATE_NEW) {
-        createNew = true;
-      } else if (option == StandardOpenOption.DELETE_ON_CLOSE) {
-        deleteOnClose = true;
-      } else if (option == StandardOpenOption.TRUNCATE_EXISTING) {
-        truncate = true;
-      } else if (option == StandardOpenOption.SYNC) {
-        sync = true;
-      } else if (option == StandardOpenOption.DSYNC) {
-        dsync = true;
-      } else if (option != StandardOpenOption.SPARSE) {
-        throw new UnsupportedOperationException();
-      }
-    }
-    if (!read && !write) {
-      read = true;
-    }
-    if (read && append) {
-      throw new IllegalArgumentException();
-    }
-    if (append && truncate) {
-      throw new IllegalArgumentException();
-    }
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      return path.getFileSystem().provider().newByteChannel(path, options, attrs);
-    }
-    File file = toFile(path);
-    validateOutputTarget(file, create, createNew);
-    if (write && !file.exists() && (create || createNew)) {
-      if (!file.createNewFile()) {
-        throw new IOException("Unable to create file");
-      }
-      created = true;
-    }
-    if (!file.exists()) {
-      throw new NoSuchFileException(file.toString());
-    }
-    String mode = write ? (sync ? "rws" : dsync ? "rwd" : "rw") : "r";
-    RandomAccessFile randomAccessFile = new RandomAccessFile(file, mode);
-    if (write && truncate && !append) {
-      randomAccessFile.setLength(0L);
-    }
-    if (append) {
-      randomAccessFile.seek(randomAccessFile.length());
-    }
-    SeekableByteChannel channel = randomAccessFile.getChannel();
-    try {
-      if (created) {
-        applyFileAttributes(path, attrs);
-      }
-      deleteAfterOpening(file, channel, deleteOnClose);
-    } catch (IOException e) {
-      channel.close();
-      throw e;
-    } catch (RuntimeException e) {
-      try {
-        channel.close();
-      } catch (IOException ignored) {
-      }
-      throw e;
-    }
-    return channel;
+    return path.getFileSystem().provider().newByteChannel(path, options, attrs);
   }
 
   public static Path createTempFile(String prefix, String suffix, FileAttribute<?>... attrs) throws IOException {
@@ -278,580 +114,244 @@ public final class Files {
   }
 
   public static Path createFile(Path path, FileAttribute<?>... attrs) throws IOException {
-    requireFileAttributes(attrs);
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      HashSet<OpenOption> options = new HashSet<OpenOption>();
-      options.add(StandardOpenOption.CREATE_NEW);
-      options.add(StandardOpenOption.WRITE);
-      SeekableByteChannel channel = path.getFileSystem().provider().newByteChannel(path, options, attrs);
-      channel.close();
-      return path;
-    }
-    File file = toFile(path);
-    validateOutputTarget(file, true, true);
-    if (!file.createNewFile()) {
-      throw new IOException("Unable to create file");
-    }
-    applyFileAttributes(path, attrs);
+    HashSet<OpenOption> options = new HashSet<OpenOption>();
+    options.add(StandardOpenOption.CREATE_NEW);
+    options.add(StandardOpenOption.WRITE);
+    SeekableByteChannel channel = newByteChannel(path, options, attrs);
+    channel.close();
     return path;
   }
 
   public static Path createDirectory(Path path, FileAttribute<?>... attrs) throws IOException {
-    requireFileAttributes(attrs);
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      path.getFileSystem().provider().createDirectory(path, attrs);
-      return path;
-    }
-    File file = toFile(path);
-    validateOutputTarget(file, true, true);
-    if (!file.mkdir()) {
-      throw new IOException("Unable to create directory");
-    }
-    applyFileAttributes(path, attrs);
+    path.getFileSystem().provider().createDirectory(path, attrs);
     return path;
   }
 
   public static Path createLink(Path link, Path existing) throws IOException {
-    if (link.getFileSystem() != FileSystems.getDefault()) {
-      link.getFileSystem().provider().createLink(link, existing);
-      return link;
-    }
-    if (existing.getFileSystem() != FileSystems.getDefault()) {
-      throw new ProviderMismatchException();
-    }
-    File linkFile = toFile(link);
-    File existingFile = toFile(existing);
-    createHardLink0(linkFile.toString(), existingFile.toString());
+    link.getFileSystem().provider().createLink(link, existing);
     return link;
   }
 
   public static Path createSymbolicLink(Path link, Path target, FileAttribute<?>... attrs) throws IOException {
-    requireFileAttributes(attrs);
-    if (link.getFileSystem() != FileSystems.getDefault()) {
-      link.getFileSystem().provider().createSymbolicLink(link, target, attrs);
-      return link;
-    }
-    if (target.getFileSystem() != FileSystems.getDefault()) {
-      throw new ProviderMismatchException();
-    }
-    File linkFile = toFile(link);
-    Path targetPath = Objects.requireNonNull(target);
-    createSymbolicLink0(linkFile.toString(), targetPath.toString());
+    link.getFileSystem().provider().createSymbolicLink(link, target, attrs);
     return link;
   }
 
   public static Path createDirectories(Path path, FileAttribute<?>... attrs) throws IOException {
-    requireFileAttributes(attrs);
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      if (exists(path)) {
-        if (!isDirectory(path)) {
-          throw new FileAlreadyExistsException(path.toString());
-        }
-        return path;
+    try {
+      createDirectory(path, attrs);
+      return path;
+    } catch (FileAlreadyExistsException e) {
+      if (!isDirectory(path)) {
+        throw e;
       }
-      Path parent = path.getParent();
-      if (parent != null) {
-        createDirectories(parent);
-      }
+      return path;
+    } catch (IOException ignored) {
+    }
+
+    SecurityException securityFailure = null;
+    try {
+      path = path.toAbsolutePath();
+    } catch (SecurityException e) {
+      securityFailure = e;
+    }
+
+    Path parent = path.getParent();
+    while (parent != null) {
       try {
-        createDirectory(path, attrs);
+        parent.getFileSystem().provider().checkAccess(parent);
+        break;
+      } catch (NoSuchFileException e) {
+        parent = parent.getParent();
+      }
+    }
+
+    if (parent == null) {
+      if (securityFailure != null) {
+        throw securityFailure;
+      }
+      throw new FileSystemException(
+          path.toString(), null, "Unable to determine if root directory exists");
+    }
+
+    Path child = parent;
+    for (Path name : parent.relativize(path)) {
+      child = child.resolve(name);
+      try {
+        createDirectory(child, attrs);
       } catch (FileAlreadyExistsException e) {
-        if (!isDirectory(path)) {
+        if (!isDirectory(child)) {
           throw e;
         }
       }
-      return path;
     }
-    File file = toFile(path);
-    if (file.exists()) {
-      if (!file.isDirectory()) {
-        throw new FileAlreadyExistsException(file.toString());
-      }
-      return path;
-    }
-    File ancestor = file.getParentFile();
-    while (ancestor != null && !ancestor.exists()) {
-      ancestor = ancestor.getParentFile();
-    }
-    if (ancestor != null && !ancestor.isDirectory()) {
-      throw new FileSystemException(file.toString(), null, "Not a directory");
-    }
-    if (!file.mkdirs() && !file.isDirectory()) {
-      throw new IOException("Unable to create directories");
-    }
-    applyFileAttributes(path, attrs);
     return path;
   }
 
   public static void delete(Path path) throws IOException {
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      path.getFileSystem().provider().delete(path);
-      return;
-    }
-    File file = toFile(path);
-    if (!file.exists() && !isSymbolicLink(path)) {
-      throw new NoSuchFileException(file.toString());
-    }
-    deleteExisting(file);
+    path.getFileSystem().provider().delete(path);
   }
 
   public static boolean deleteIfExists(Path path) throws IOException {
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      try {
-        path.getFileSystem().provider().delete(path);
-        return true;
-      } catch (NoSuchFileException e) {
-        return false;
-      }
-    }
-    File file = toFile(path);
-    if (!file.exists() && !isSymbolicLink(path)) {
-      return false;
-    }
-    deleteExisting(file);
-    return true;
+    return path.getFileSystem().provider().deleteIfExists(path);
   }
 
   public static Path copy(Path source, Path target, CopyOption... options) throws IOException {
-    Objects.requireNonNull(options);
-    boolean replaceExisting = false;
-    boolean copyAttributes = false;
-    boolean followLinks = true;
-    for (CopyOption option : options) {
-      Objects.requireNonNull(option);
-      if (option == StandardCopyOption.REPLACE_EXISTING) {
-        replaceExisting = true;
-      } else if (option == StandardCopyOption.COPY_ATTRIBUTES) {
-        copyAttributes = true;
-      } else if (option == LinkOption.NOFOLLOW_LINKS) {
-        followLinks = false;
-      } else {
-        throw new UnsupportedOperationException();
-      }
-    }
-    if (source.getFileSystem() != FileSystems.getDefault()
-        || target.getFileSystem() != FileSystems.getDefault()) {
-      BasicFileAttributes sourceAttributes = followLinks
-          ? readAttributes(source, BasicFileAttributes.class)
-          : readAttributes(source, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-      if (source.getFileSystem() == target.getFileSystem()) {
-        try {
-          if (isSameFile(source, target)) {
-            return target;
-          }
-        } catch (NoSuchFileException e) {
-        }
-        source.getFileSystem().provider().copy(source, target, options);
-        return target;
-      }
-      if (exists(target)) {
-        if (!replaceExisting) {
-          throw new FileAlreadyExistsException(target.toString());
-        }
-        delete(target);
-      }
-      if (sourceAttributes.isDirectory()) {
-        createDirectory(target);
-      } else {
-        InputStream input = followLinks ? newInputStream(source) : newInputStream(source, LinkOption.NOFOLLOW_LINKS);
-        try {
-          OutputStream output = newOutputStream(target);
-          try {
-            copyStream(input, output);
-          } finally {
-            output.close();
-          }
-        } finally {
-          input.close();
-        }
-      }
-      if (copyAttributes) {
-        setLastModifiedTime(target, sourceAttributes.lastModifiedTime());
-      }
-      return target;
-    }
-    File sourceFile = toFile(source);
-    File targetFile = toFile(target);
-    boolean sourceSymbolicLink = !followLinks && isSymbolicLink(source);
-    if (!sourceFile.exists() && !sourceSymbolicLink) {
-      throw new NoSuchFileException(sourceFile.toString());
-    }
-    if (sourceSymbolicLink) {
-      if (sourceFile.getAbsoluteFile().equals(targetFile.getAbsoluteFile())) {
-        return target;
-      }
-    } else if (sourceFile.getCanonicalPath().equals(targetFile.getCanonicalPath())) {
-      return target;
-    }
-    if (targetFile.exists() || isSymbolicLink(target)) {
-      if (!replaceExisting) {
-        throw new FileAlreadyExistsException(targetFile.toString());
-      }
-      deleteExisting(targetFile);
-    }
-    File targetParent = targetFile.getParentFile();
-    if (targetParent != null) {
-      if (!targetParent.exists()) {
-        throw new NoSuchFileException(targetFile.toString());
-      }
-      if (!targetParent.isDirectory()) {
-        throw new FileSystemException(targetFile.toString(), null, "Not a directory");
-      }
-    }
-    if (sourceSymbolicLink) {
-      createSymbolicLink(target, readSymbolicLink(source));
-      return target;
-    }
-    if (sourceFile.isDirectory()) {
-      if (!targetFile.mkdir()) {
-        throw new IOException("Unable to create directory");
-      }
-      if (copyAttributes && !targetFile.setLastModified(sourceFile.lastModified())) {
-        throw new IOException("Unable to copy file attributes");
-      }
-      return target;
-    }
-    InputStream input = new FileInputStream(sourceFile);
-    try {
-      OutputStream output = new FileOutputStream(targetFile);
-      try {
-        copyStream(input, output);
-      } finally {
-        output.close();
-      }
-    } finally {
-      input.close();
-    }
-    if (copyAttributes && !targetFile.setLastModified(sourceFile.lastModified())) {
-      throw new IOException("Unable to copy file attributes");
+    java.nio.file.spi.FileSystemProvider provider =
+        source.getFileSystem().provider();
+    if (target.getFileSystem().provider() == provider) {
+      provider.copy(source, target, options);
+    } else {
+      copyToForeignTarget(source, target, options);
     }
     return target;
   }
 
   public static long copy(InputStream in, Path target, CopyOption... options) throws IOException {
     Objects.requireNonNull(in);
-    Objects.requireNonNull(options);
     boolean replaceExisting = false;
     for (CopyOption option : options) {
-      Objects.requireNonNull(option);
       if (option == StandardCopyOption.REPLACE_EXISTING) {
         replaceExisting = true;
+      } else if (option == null) {
+        throw new NullPointerException("options contains 'null'");
       } else {
-        throw new UnsupportedOperationException();
+        throw new UnsupportedOperationException(option + " not supported");
       }
     }
-    if (target.getFileSystem() != FileSystems.getDefault()) {
-      if (exists(target)) {
-        if (!replaceExisting) {
-          throw new FileAlreadyExistsException(target.toString());
-        }
-        delete(target);
-      }
-      OutputStream output = newOutputStream(target);
+
+    SecurityException securityFailure = null;
+    if (replaceExisting) {
       try {
-        return copyStream(in, output);
-      } finally {
-        output.close();
+        deleteIfExists(target);
+      } catch (SecurityException e) {
+        securityFailure = e;
       }
     }
-    File targetFile = toFile(target);
-    if (targetFile.exists()) {
-      if (!replaceExisting) {
-        throw new FileAlreadyExistsException(targetFile.toString());
-      }
-      deleteExisting(targetFile);
-    } else {
-      File parent = targetFile.getParentFile();
-      if (parent != null) {
-        if (!parent.exists()) {
-          throw new NoSuchFileException(targetFile.toString());
-        }
-        if (!parent.isDirectory()) {
-          throw new FileSystemException(targetFile.toString(), null, "Not a directory");
-        }
-      }
-    }
-    OutputStream output = new FileOutputStream(targetFile);
+
+    OutputStream output;
     try {
-      return copyStream(in, output);
-    } finally {
-      output.close();
+      output = newOutputStream(
+          target, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+    } catch (FileAlreadyExistsException e) {
+      if (securityFailure != null) {
+        throw securityFailure;
+      }
+      throw e;
+    }
+    try (OutputStream stream = output) {
+      return copyStream(in, stream);
     }
   }
 
   public static long copy(Path source, OutputStream out) throws IOException {
     Objects.requireNonNull(out);
-    InputStream input = newInputStream(source);
-    try {
+    try (InputStream input = newInputStream(source)) {
       return copyStream(input, out);
-    } finally {
-      input.close();
     }
   }
 
   public static Path move(Path source, Path target, CopyOption... options) throws IOException {
-    Objects.requireNonNull(options);
-    boolean atomicMove = false;
-    boolean replaceExisting = false;
-    for (CopyOption option : options) {
-      Objects.requireNonNull(option);
-      if (option == StandardCopyOption.ATOMIC_MOVE) {
-        atomicMove = true;
-      } else if (option == StandardCopyOption.REPLACE_EXISTING) {
-        replaceExisting = true;
-      } else if (option != LinkOption.NOFOLLOW_LINKS) {
-        throw new UnsupportedOperationException();
-      }
-    }
-    if (source.getFileSystem() != FileSystems.getDefault()
-        || target.getFileSystem() != FileSystems.getDefault()) {
-      if (source.getFileSystem() == target.getFileSystem()) {
-        try {
-          if (isSameFile(source, target)) {
-            return target;
-          }
-        } catch (NoSuchFileException e) {
+    java.nio.file.spi.FileSystemProvider provider =
+        source.getFileSystem().provider();
+    if (target.getFileSystem().provider() == provider) {
+      provider.move(source, target, options);
+    } else {
+      CopyOption[] copyOptions = new CopyOption[options.length + 2];
+      for (int i = 0; i < options.length; i++) {
+        CopyOption option = options[i];
+        if (option == StandardCopyOption.ATOMIC_MOVE) {
+          throw new AtomicMoveNotSupportedException(
+              null, null, "Atomic move between providers is not supported");
         }
-        source.getFileSystem().provider().move(source, target, options);
-        return target;
+        copyOptions[i] = option;
       }
-      if (atomicMove) {
-        throw new IOException("Unable to move file atomically");
-      }
-      if (replaceExisting) {
-        copy(source, target, StandardCopyOption.REPLACE_EXISTING);
-      } else {
-        copy(source, target);
-      }
+      copyOptions[options.length] = LinkOption.NOFOLLOW_LINKS;
+      copyOptions[options.length + 1] = StandardCopyOption.COPY_ATTRIBUTES;
+      copyToForeignTarget(source, target, copyOptions);
       delete(source);
-      return target;
     }
-    File sourceFile = toFile(source);
-    File targetFile = toFile(target);
-    if (!sourceFile.exists()) {
-      throw new NoSuchFileException(sourceFile.toString());
-    }
-    if (sourceFile.getCanonicalPath().equals(targetFile.getCanonicalPath())) {
-      return target;
-    }
-    if (targetFile.exists()) {
-      if (!replaceExisting && !atomicMove) {
-        throw new FileAlreadyExistsException(targetFile.toString());
-      }
-      deleteExisting(targetFile);
-    }
-    File targetParent = targetFile.getParentFile();
-    if (targetParent != null) {
-      if (!targetParent.exists()) {
-        throw new NoSuchFileException(sourceFile.toString(), targetFile.toString(), null);
-      }
-      if (!targetParent.isDirectory()) {
-        throw new FileSystemException(sourceFile.toString(), targetFile.toString(), "Not a directory");
-      }
-    }
-    if (sourceFile.renameTo(targetFile)) {
-      return target;
-    }
-    if (atomicMove) {
-      throw new IOException("Unable to move file atomically");
-    }
-    copy(source, target, StandardCopyOption.REPLACE_EXISTING);
-    delete(source);
     return target;
   }
 
   public static boolean exists(Path path, LinkOption... options) {
-    boolean followLinks = followLinks(options);
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      try {
-        path.getFileSystem().provider().checkAccess(path);
-        return true;
-      } catch (IOException e) {
-        return false;
-      }
-    }
-    File file = toFile(path);
-    return file.exists() || (!followLinks && isSymbolicLink(path));
-  }
-
-  public static boolean notExists(Path path, LinkOption... options) {
-    return !exists(path, options);
-  }
-
-  public static boolean isDirectory(Path path, LinkOption... options) {
-    boolean followLinks = followLinks(options);
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      try {
-        return readAttributes(path, BasicFileAttributes.class, options).isDirectory();
-      } catch (IOException e) {
-        return false;
-      }
-    }
-    if (!followLinks && isSymbolicLink(path)) {
-      return false;
-    }
-    return toFile(path).isDirectory();
-  }
-
-  public static boolean isRegularFile(Path path, LinkOption... options) {
-    boolean followLinks = followLinks(options);
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      try {
-        return readAttributes(path, BasicFileAttributes.class, options).isRegularFile();
-      } catch (IOException e) {
-        return false;
-      }
-    }
-    if (!followLinks && isSymbolicLink(path)) {
-      return false;
-    }
-    return toFile(path).isFile();
-  }
-
-  public static boolean isSymbolicLink(Path path) {
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      try {
-        return readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS).isSymbolicLink();
-      } catch (IOException e) {
-        return false;
-      }
-    }
-    File file = toFile(path);
     try {
-      readSymbolicLink0(file.toString());
+      checkExistence(path, options);
       return true;
     } catch (IOException e) {
       return false;
     }
   }
 
-  public static Path readSymbolicLink(Path link) throws IOException {
-    if (link.getFileSystem() != FileSystems.getDefault()) {
-      return link.getFileSystem().provider().readSymbolicLink(link);
+  public static boolean notExists(Path path, LinkOption... options) {
+    try {
+      checkExistence(path, options);
+      return false;
+    } catch (NoSuchFileException e) {
+      return true;
+    } catch (IOException e) {
+      return false;
     }
-    return Path.of(readSymbolicLink0(toFile(link).toString()));
+  }
+
+  public static boolean isDirectory(Path path, LinkOption... options) {
+    requireLinkOptions(options);
+    try {
+      return path.getFileSystem().provider()
+          .readAttributes(path, BasicFileAttributes.class, options).isDirectory();
+    } catch (IOException e) {
+      return false;
+    }
+  }
+
+  public static boolean isRegularFile(Path path, LinkOption... options) {
+    requireLinkOptions(options);
+    try {
+      return path.getFileSystem().provider()
+          .readAttributes(path, BasicFileAttributes.class, options).isRegularFile();
+    } catch (IOException e) {
+      return false;
+    }
+  }
+
+  public static boolean isSymbolicLink(Path path) {
+    try {
+      return readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS).isSymbolicLink();
+    } catch (IOException e) {
+      return false;
+    }
+  }
+
+  public static Path readSymbolicLink(Path link) throws IOException {
+    return link.getFileSystem().provider().readSymbolicLink(link);
   }
 
   public static long size(Path path) throws IOException {
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      return readAttributes(path, BasicFileAttributes.class).size();
-    }
-    File file = toFile(path);
-    if (!file.exists()) {
-      throw new NoSuchFileException(file.toString());
-    }
-    return file.length();
+    return readAttributes(path, BasicFileAttributes.class).size();
   }
 
   public static FileStore getFileStore(Path path) throws IOException {
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      return path.getFileSystem().provider().getFileStore(path);
-    }
-    File file = toFile(path);
-    if (!file.exists()) {
-      throw new NoSuchFileException(file.toString());
-    }
-    final File storeFile = file.getAbsoluteFile();
-    return new FileStore() {
-      public String name() {
-        File root = storeFile;
-        while (root.getParentFile() != null) {
-          root = root.getParentFile();
-        }
-        String name = root.getPath();
-        return name.length() == 0 ? storeFile.getPath() : name;
-      }
-
-      public String type() {
-        return "";
-      }
-
-      public boolean isReadOnly() {
-        return !storeFile.canWrite();
-      }
-
-      public long getTotalSpace() throws IOException {
-        return storeFile.getTotalSpace();
-      }
-
-      public long getUsableSpace() throws IOException {
-        return storeFile.getUsableSpace();
-      }
-
-      public long getUnallocatedSpace() throws IOException {
-        return storeFile.getFreeSpace();
-      }
-
-      public long getBlockSize() throws IOException {
-        return fileStoreBlockSize0(storeFile.toString());
-      }
-
-      public boolean supportsFileAttributeView(Class<? extends FileAttributeView> type) {
-        Class<? extends FileAttributeView> viewType = Objects.requireNonNull(type);
-        return viewType == BasicFileAttributeView.class
-            || viewType == FileOwnerAttributeView.class
-            || viewType == PosixFileAttributeView.class;
-      }
-
-      public boolean supportsFileAttributeView(String name) {
-        String viewName = Objects.requireNonNull(name);
-        return viewName.equals("basic") || viewName.equals("owner") || viewName.equals("posix");
-      }
-
-      public <V extends FileStoreAttributeView> V getFileStoreAttributeView(Class<V> type) {
-        Objects.requireNonNull(type);
-        return null;
-      }
-
-      public Object getAttribute(String attribute) throws IOException {
-        String attributeName = Objects.requireNonNull(attribute);
-        if (attributeName.equals("totalSpace")) {
-          return Long.valueOf(getTotalSpace());
-        }
-        if (attributeName.equals("usableSpace")) {
-          return Long.valueOf(getUsableSpace());
-        }
-        if (attributeName.equals("unallocatedSpace")) {
-          return Long.valueOf(getUnallocatedSpace());
-        }
-        throw new UnsupportedOperationException();
-      }
-    };
+    return path.getFileSystem().provider().getFileStore(path);
   }
 
   public static <A extends BasicFileAttributes> A readAttributes(
       Path path,
       Class<A> type,
       LinkOption... options) throws IOException {
-    requireLinkOptions(options);
-    Class<A> attributeType = Objects.requireNonNull(type);
-    if (attributeType != BasicFileAttributes.class && attributeType != PosixFileAttributes.class) {
-      throw new UnsupportedOperationException();
-    }
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      return path.getFileSystem().provider().readAttributes(path, attributeType, options);
-    }
-    File file = toFile(path);
-    boolean symbolicLink = !followLinks(options) && isSymbolicLink(path);
-    if (!file.exists() && !symbolicLink) {
-      throw new NoSuchFileException(file.toString());
-    }
-    if (attributeType == BasicFileAttributes.class) {
-      return attributeType.cast(readBasicFileAttributes(file, symbolicLink));
-    }
-    return attributeType.cast(readPosixFileAttributes(file, symbolicLink));
+    return path.getFileSystem().provider().readAttributes(path, type, options);
   }
 
   public static <V extends FileAttributeView> V getFileAttributeView(
       final Path path,
       Class<V> type,
       LinkOption... options) {
+    FileSystem fileSystem = path.getFileSystem();
+    if (fileSystem != FileSystems.getDefault()) {
+      return fileSystem.provider().getFileAttributeView(path, type, options);
+    }
     requireLinkOptions(options);
     final LinkOption[] linkOptions = options.clone();
     final Class<V> viewType = Objects.requireNonNull(type);
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      return path.getFileSystem().provider().getFileAttributeView(path, viewType, options);
-    }
     toFile(path);
     if (viewType != BasicFileAttributeView.class) {
       if (viewType == FileOwnerAttributeView.class) {
@@ -861,7 +361,7 @@ public final class Files {
           }
 
           public UserPrincipal getOwner() throws IOException {
-            return Files.getOwner(path);
+            return Files.getOwner(path, linkOptions);
           }
 
           public void setOwner(UserPrincipal owner) throws IOException {
@@ -890,7 +390,7 @@ public final class Files {
         }
 
         public UserPrincipal getOwner() throws IOException {
-          return Files.getOwner(path);
+          return Files.getOwner(path, linkOptions);
         }
 
         public void setGroup(GroupPrincipal group) throws IOException {
@@ -937,58 +437,7 @@ public final class Files {
 
   public static Map<String, Object> readAttributes(Path path, String attributes, LinkOption... options)
       throws IOException {
-    requireLinkOptions(options);
-    String attributeString = Objects.requireNonNull(attributes);
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      return path.getFileSystem().provider().readAttributes(path, attributeString, options);
-    }
-    String viewName = attributeViewName(attributeString);
-    String attributeNames = attributeNames(attributeString);
-    File file = toFile(path);
-    boolean symbolicLink = !followLinks(options) && isSymbolicLink(path);
-    if (!file.exists() && !symbolicLink) {
-      throw new NoSuchFileException(file.toString());
-    }
-    BasicFileAttributes basicAttributes = readBasicFileAttributes(file, symbolicLink);
-    PosixFileAttributes posixAttributes =
-        viewName.equals("posix") ? readPosixFileAttributes(file, symbolicLink) : null;
-    UserPrincipal ownerAttribute = viewName.equals("owner") ? currentUserPrincipal() : null;
-    HashMap<String, Object> values = new HashMap<String, Object>();
-    if (attributeNames.equals("*")) {
-      if (ownerAttribute != null) {
-        putOwnerAttribute(values, ownerAttribute, "owner");
-        return Collections.unmodifiableMap(values);
-      }
-      putBasicAttribute(values, basicAttributes, "lastModifiedTime");
-      putBasicAttribute(values, basicAttributes, "lastAccessTime");
-      putBasicAttribute(values, basicAttributes, "creationTime");
-      putBasicAttribute(values, basicAttributes, "size");
-      putBasicAttribute(values, basicAttributes, "isRegularFile");
-      putBasicAttribute(values, basicAttributes, "isDirectory");
-      putBasicAttribute(values, basicAttributes, "isSymbolicLink");
-      putBasicAttribute(values, basicAttributes, "isOther");
-      putBasicAttribute(values, basicAttributes, "fileKey");
-      if (posixAttributes != null) {
-        putPosixAttribute(values, posixAttributes, "owner");
-        putPosixAttribute(values, posixAttributes, "group");
-        putPosixAttribute(values, posixAttributes, "permissions");
-      }
-      return Collections.unmodifiableMap(values);
-    }
-    String[] names = attributeNames.split(",");
-    for (String name : names) {
-      if (name.length() == 0) {
-        throw new IllegalArgumentException();
-      }
-      if (posixAttributes != null) {
-        putPosixAttribute(values, posixAttributes, name);
-      } else if (ownerAttribute != null) {
-        putOwnerAttribute(values, ownerAttribute, name);
-      } else {
-        putBasicAttribute(values, basicAttributes, name);
-      }
-    }
-    return Collections.unmodifiableMap(values);
+    return path.getFileSystem().provider().readAttributes(path, attributes, options);
   }
 
   public static Path setAttribute(Path path, String attribute, Object value, LinkOption... options)
@@ -1037,47 +486,23 @@ public final class Files {
   }
 
   public static FileTime getLastModifiedTime(Path path, LinkOption... options) throws IOException {
-    requireLinkOptions(options);
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      return readAttributes(path, BasicFileAttributes.class, options).lastModifiedTime();
-    }
-    File file = toFile(path);
-    if (!file.exists()) {
-      throw new NoSuchFileException(file.toString());
-    }
-    return FileTime.fromMillis(file.lastModified());
+    return readAttributes(path, BasicFileAttributes.class, options).lastModifiedTime();
   }
 
   public static Path setLastModifiedTime(Path path, FileTime time) throws IOException {
-    FileTime fileTime = Objects.requireNonNull(time);
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      path.getFileSystem().provider().setAttribute(path, "basic:lastModifiedTime", fileTime);
-      return path;
-    }
-    File file = toFile(path);
-    if (!file.exists()) {
-      throw new NoSuchFileException(file.toString());
-    }
-    if (!file.setLastModified(fileTime.toMillis())) {
-      throw new IOException("Unable to set last modified time");
-    }
+    BasicFileAttributeView view = path.getFileSystem().provider()
+        .getFileAttributeView(path, BasicFileAttributeView.class);
+    view.setTimes(Objects.requireNonNull(time), null, null);
     return path;
   }
 
   public static UserPrincipal getOwner(Path path, LinkOption... options) throws IOException {
-    requireLinkOptions(options);
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      FileOwnerAttributeView view = getFileAttributeView(path, FileOwnerAttributeView.class, options);
-      if (view == null) {
-        throw new UnsupportedOperationException();
-      }
-      return view.getOwner();
+    FileOwnerAttributeView view = path.getFileSystem().provider()
+        .getFileAttributeView(path, FileOwnerAttributeView.class, options);
+    if (view == null) {
+      throw new UnsupportedOperationException();
     }
-    File file = toFile(path);
-    if (!file.exists()) {
-      throw new NoSuchFileException(file.toString());
-    }
-    return currentUserPrincipal();
+    return view.getOwner();
   }
 
   public static Path setOwner(Path path, UserPrincipal owner) throws IOException {
@@ -1099,19 +524,11 @@ public final class Files {
 
   public static Set<PosixFilePermission> getPosixFilePermissions(Path path, LinkOption... options)
       throws IOException {
-    requireLinkOptions(options);
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      PosixFileAttributeView view = getFileAttributeView(path, PosixFileAttributeView.class, options);
-      if (view == null) {
-        throw new UnsupportedOperationException();
-      }
-      return view.readAttributes().permissions();
+    PosixFileAttributes attributes = readAttributes(path, PosixFileAttributes.class, options);
+    if (attributes == null) {
+      throw new UnsupportedOperationException();
     }
-    File file = toFile(path);
-    if (!file.exists()) {
-      throw new NoSuchFileException(file.toString());
-    }
-    return readPosixFilePermissions(file);
+    return attributes.permissions();
   }
 
   public static Path setPosixFilePermissions(Path path, Set<PosixFilePermission> perms)
@@ -1160,38 +577,53 @@ public final class Files {
   }
 
   public static Stream<Path> list(Path dir) throws IOException {
-    if (dir.getFileSystem() != FileSystems.getDefault()) {
-      ArrayList<Path> paths = new ArrayList<Path>();
-      DirectoryStream<Path> stream = newDirectoryStream(dir);
-      try {
-        for (Path path : stream) {
-          paths.add(path);
+    final DirectoryStream<Path> directoryStream = newDirectoryStream(dir);
+    try {
+      final Iterator<Path> delegate = directoryStream.iterator();
+      Iterator<Path> iterator = new Iterator<Path>() {
+        public boolean hasNext() {
+          try {
+            return delegate.hasNext();
+          } catch (DirectoryIteratorException e) {
+            throw new UncheckedIOException(e.getCause());
+          }
         }
-      } finally {
-        stream.close();
+
+        public Path next() {
+          try {
+            return delegate.next();
+          } catch (DirectoryIteratorException e) {
+            throw new UncheckedIOException(e.getCause());
+          }
+        }
+      };
+      Spliterator<Path> spliterator =
+          Spliterators.spliteratorUnknownSize(iterator, Spliterator.DISTINCT);
+      return StreamSupport.stream(spliterator, false).onClose(new Runnable() {
+        public void run() {
+          try {
+            directoryStream.close();
+          } catch (IOException e) {
+            throw new UncheckedIOException(e);
+          }
+        }
+      });
+    } catch (Error | RuntimeException e) {
+      try {
+        directoryStream.close();
+      } catch (IOException closeException) {
+        try {
+          e.addSuppressed(closeException);
+        } catch (Throwable ignored) {
+          // Preserve the original stream-construction failure.
+        }
       }
-      return paths.stream();
+      throw e;
     }
-    File directory = toFile(dir);
-    if (!directory.exists()) {
-      throw new NoSuchFileException(directory.toString());
-    }
-    if (!directory.isDirectory()) {
-      throw new NotDirectoryException(directory.toString());
-    }
-    File[] children = directory.listFiles();
-    if (children == null) {
-      throw new IOException("Unable to list directory");
-    }
-    ArrayList<Path> paths = new ArrayList<Path>(children.length);
-    for (File child : children) {
-      paths.add(child.toPath());
-    }
-    return paths.stream();
   }
 
   public static DirectoryStream<Path> newDirectoryStream(Path dir) throws IOException {
-    return newDirectoryStream(dir, new DirectoryStream.Filter<Path>() {
+    return dir.getFileSystem().provider().newDirectoryStream(dir, new DirectoryStream.Filter<Path>() {
       public boolean accept(Path entry) {
         return true;
       }
@@ -1199,170 +631,23 @@ public final class Files {
   }
 
   public static DirectoryStream<Path> newDirectoryStream(Path dir, String glob) throws IOException {
-    Objects.requireNonNull(glob);
-    StringBuilder regex = new StringBuilder();
-    int groupDepth = 0;
-    for (int i = 0; i < glob.length(); i++) {
-      char ch = glob.charAt(i);
-      if (ch == '*') {
-        regex.append(".*");
-      } else if (ch == '?') {
-        regex.append('.');
-      } else if (ch == '{') {
-        groupDepth++;
-        regex.append('(');
-      } else if (ch == '}') {
-        if (groupDepth == 0) {
-          throw new PatternSyntaxException("Unmatched closing brace", glob, i);
-        }
-        groupDepth--;
-        regex.append(')');
-      } else if (ch == ',' && groupDepth > 0) {
-        regex.append('|');
-      } else if (ch == '[') {
-        int classStart = i;
-        i++;
-        if (i >= glob.length()) {
-          throw new PatternSyntaxException("Missing closing bracket", glob, classStart);
-        }
-        regex.append('[');
-        if (glob.charAt(i) == '!') {
-          regex.append('^');
-          i++;
-        } else if (glob.charAt(i) == '^') {
-          regex.append("\\^");
-          i++;
-        }
-        boolean closed = false;
-        for (; i < glob.length(); i++) {
-          char classChar = glob.charAt(i);
-          if (classChar == ']') {
-            regex.append(']');
-            closed = true;
-            break;
-          }
-          if (classChar == '\\') {
-            i++;
-            if (i >= glob.length()) {
-              throw new PatternSyntaxException("No character to escape", glob, i - 1);
-            }
-            classChar = glob.charAt(i);
-          }
-          if (classChar == '[' || classChar == ']' || classChar == '^' || classChar == '\\') {
-            regex.append('\\');
-          }
-          regex.append(classChar);
-        }
-        if (!closed) {
-          throw new PatternSyntaxException("Missing closing bracket", glob, classStart);
-        }
-      } else if (ch == '\\') {
-        i++;
-        if (i >= glob.length()) {
-          throw new PatternSyntaxException("No character to escape", glob, i - 1);
-        }
-        ch = glob.charAt(i);
-        if ("\\.[]{}()+-^$|*?".indexOf(ch) >= 0) {
-          regex.append('\\');
-        }
-        regex.append(ch);
-      } else {
-        if ("\\.[]{}()+-^$|".indexOf(ch) >= 0) {
-          regex.append('\\');
-        }
-        regex.append(ch);
-      }
+    if (glob.equals("*")) {
+      return newDirectoryStream(dir);
     }
-    if (groupDepth != 0) {
-      throw new PatternSyntaxException("Missing closing brace", glob, glob.length() - 1);
-    }
-    final String pattern = regex.toString();
-    return newDirectoryStream(dir, new DirectoryStream.Filter<Path>() {
+    FileSystem fileSystem = dir.getFileSystem();
+    final PathMatcher matcher = fileSystem.getPathMatcher("glob:" + glob);
+    DirectoryStream.Filter<Path> filter = new DirectoryStream.Filter<Path>() {
       public boolean accept(Path entry) {
-        Path fileName = entry.getFileName();
-        return fileName != null && fileName.toString().matches(pattern);
+        return matcher.matches(entry.getFileName());
       }
-    });
+    };
+    return fileSystem.provider().newDirectoryStream(dir, filter);
   }
 
   public static DirectoryStream<Path> newDirectoryStream(
       Path dir,
       DirectoryStream.Filter<? super Path> filter) throws IOException {
-    final DirectoryStream.Filter<? super Path> directoryFilter = Objects.requireNonNull(filter);
-    if (dir.getFileSystem() != FileSystems.getDefault()) {
-      return dir.getFileSystem().provider().newDirectoryStream(dir, directoryFilter);
-    }
-    File directory = toFile(dir);
-    if (!directory.exists()) {
-      throw new NoSuchFileException(directory.toString());
-    }
-    if (!directory.isDirectory()) {
-      throw new NotDirectoryException(directory.toString());
-    }
-    File[] children = directory.listFiles();
-    if (children == null) {
-      throw new IOException("Unable to list directory");
-    }
-    final ArrayList<Path> paths = new ArrayList<Path>(children.length);
-    for (File child : children) {
-      paths.add(child.toPath());
-    }
-    return new DirectoryStream<Path>() {
-      private boolean closed;
-      private boolean iteratorCreated;
-
-      public Iterator<Path> iterator() {
-        if (closed || iteratorCreated) {
-          throw new IllegalStateException();
-        }
-        iteratorCreated = true;
-        final Iterator<Path> iterator = paths.iterator();
-        return new Iterator<Path>() {
-          private Path nextPath;
-          private boolean nextPathReady;
-
-          public boolean hasNext() {
-            if (closed) {
-              return false;
-            }
-            if (nextPathReady) {
-              return true;
-            }
-            while (iterator.hasNext()) {
-              Path path = iterator.next();
-              try {
-                if (directoryFilter.accept(path)) {
-                  nextPath = path;
-                  nextPathReady = true;
-                  return true;
-                }
-              } catch (IOException e) {
-                throw new DirectoryIteratorException(e);
-              }
-            }
-            return false;
-          }
-
-          public Path next() {
-            if (closed || !hasNext()) {
-              throw new NoSuchElementException();
-            }
-            Path path = nextPath;
-            nextPath = null;
-            nextPathReady = false;
-            return path;
-          }
-
-          public void remove() {
-            throw new UnsupportedOperationException();
-          }
-        };
-      }
-
-      public void close() {
-        closed = true;
-      }
-    };
+    return dir.getFileSystem().provider().newDirectoryStream(dir, filter);
   }
 
   public static Stream<Path> walk(Path start, FileVisitOption... options) throws IOException {
@@ -1370,69 +655,23 @@ public final class Files {
   }
 
   public static Stream<Path> walk(Path start, int maxDepth, FileVisitOption... options) throws IOException {
-    Objects.requireNonNull(options);
-    for (FileVisitOption option : options) {
-      Objects.requireNonNull(option);
-    }
-    if (maxDepth < 0) {
-      throw new IllegalArgumentException();
-    }
-    if (start.getFileSystem() != FileSystems.getDefault()) {
-      ArrayList<Path> paths = new ArrayList<Path>();
-      ArrayList<Path> pending = new ArrayList<Path>();
-      ArrayList<Integer> depths = new ArrayList<Integer>();
-      pending.add(start);
-      depths.add(Integer.valueOf(0));
-      while (!pending.isEmpty()) {
-        int index = pending.size() - 1;
-        Path path = pending.remove(index);
-        int depth = depths.remove(index).intValue();
-        BasicFileAttributes attributes = readAttributes(path, BasicFileAttributes.class);
-        paths.add(path);
-        if (depth < maxDepth && attributes.isDirectory()) {
-          ArrayList<Path> children = new ArrayList<Path>();
-          DirectoryStream<Path> stream = newDirectoryStream(path);
-          try {
-            for (Path child : stream) {
-              children.add(child);
-            }
-          } finally {
-            stream.close();
-          }
-          for (int i = children.size() - 1; i >= 0; i--) {
-            pending.add(children.get(i));
-            depths.add(Integer.valueOf(depth + 1));
-          }
+    final FileTreeIterator iterator = new FileTreeIterator(start, maxDepth, options);
+    try {
+      Spliterator<FileTreeWalker.Event> spliterator =
+          Spliterators.spliteratorUnknownSize(iterator, Spliterator.DISTINCT);
+      return StreamSupport.stream(spliterator, false).onClose(new Runnable() {
+        public void run() {
+          iterator.close();
         }
-      }
-      return paths.stream();
-    }
-    File root = toFile(start);
-    if (!root.exists()) {
-      throw new NoSuchFileException(root.toString());
-    }
-    ArrayList<Path> paths = new ArrayList<Path>();
-    ArrayList<File> files = new ArrayList<File>();
-    ArrayList<Integer> depths = new ArrayList<Integer>();
-    files.add(root);
-    depths.add(Integer.valueOf(0));
-    while (!files.isEmpty()) {
-      int index = files.size() - 1;
-      File file = files.remove(index);
-      int depth = depths.remove(index).intValue();
-      paths.add(file.toPath());
-      if (depth < maxDepth && file.isDirectory()) {
-        File[] children = file.listFiles();
-        if (children == null) {
-          throw new IOException("Unable to list directory");
+      }).map(new Function<FileTreeWalker.Event, Path>() {
+        public Path apply(FileTreeWalker.Event event) {
+          return event.file();
         }
-        for (int i = children.length - 1; i >= 0; i--) {
-          files.add(children[i]);
-          depths.add(Integer.valueOf(depth + 1));
-        }
-      }
+      });
+    } catch (Error | RuntimeException e) {
+      iterator.close();
+      throw e;
     }
-    return paths.stream();
   }
 
   public static Stream<Path> find(
@@ -1440,15 +679,27 @@ public final class Files {
       int maxDepth,
       final BiPredicate<Path, BasicFileAttributes> matcher,
       FileVisitOption... options) throws IOException {
-    return walk(start, maxDepth, options).filter(new Predicate<Path>() {
-      public boolean test(final Path path) {
-        try {
-          return matcher.test(path, Files.readAttributes(path, BasicFileAttributes.class));
-        } catch (IOException e) {
-          throw new UncheckedIOException(e);
+    final FileTreeIterator iterator = new FileTreeIterator(start, maxDepth, options);
+    try {
+      Spliterator<FileTreeWalker.Event> spliterator =
+          Spliterators.spliteratorUnknownSize(iterator, Spliterator.DISTINCT);
+      return StreamSupport.stream(spliterator, false).onClose(new Runnable() {
+        public void run() {
+          iterator.close();
         }
-      }
-    });
+      }).filter(new Predicate<FileTreeWalker.Event>() {
+        public boolean test(FileTreeWalker.Event event) {
+          return matcher.test(event.file(), event.attributes());
+        }
+      }).map(new Function<FileTreeWalker.Event, Path>() {
+        public Path apply(FileTreeWalker.Event event) {
+          return event.file();
+        }
+      });
+    } catch (Error | RuntimeException e) {
+      iterator.close();
+      throw e;
+    }
   }
 
   public static Path walkFileTree(Path start, FileVisitor<? super Path> visitor) throws IOException {
@@ -1506,26 +757,7 @@ public final class Files {
   }
 
   public static long mismatch(Path path, Path path2) throws IOException {
-    Objects.requireNonNull(path);
-    Objects.requireNonNull(path2);
-    if (path.getFileSystem() != FileSystems.getDefault()
-        || path2.getFileSystem() != FileSystems.getDefault()) {
-      if (isSameFile(path, path2)) {
-        return -1L;
-      }
-      byte[] first = readAllBytes(path);
-      byte[] second = readAllBytes(path2);
-      int length = Math.min(first.length, second.length);
-      for (int i = 0; i < length; i++) {
-        if (first[i] != second[i]) {
-          return i;
-        }
-      }
-      return first.length == second.length ? -1L : length;
-    }
-    File firstFile = path.toFile();
-    File secondFile = path2.toFile();
-    if (firstFile.getCanonicalPath().equals(secondFile.getCanonicalPath())) {
+    if (isSameFile(path, path2)) {
       return -1L;
     }
     byte[] first = readAllBytes(path);
@@ -1540,50 +772,19 @@ public final class Files {
   }
 
   public static boolean isSameFile(Path path, Path path2) throws IOException {
-    Objects.requireNonNull(path);
-    Objects.requireNonNull(path2);
-    if (path.equals(path2)) {
-      return true;
-    }
-    if (path.getFileSystem() != FileSystems.getDefault()
-        || path2.getFileSystem() != FileSystems.getDefault()) {
-      return path.getFileSystem().provider().isSameFile(path, path2);
-    }
-    File first = toFile(path);
-    File second = toFile(path2);
-    String firstCanonical = first.getCanonicalPath();
-    String secondCanonical = second.getCanonicalPath();
-    if (firstCanonical.equals(secondCanonical)) {
-      return true;
-    }
-    if (!first.exists()) {
-      throw new NoSuchFileException(first.toString());
-    }
-    if (!second.exists()) {
-      throw new NoSuchFileException(second.toString());
-    }
-    return isSameFile0(first.toString(), second.toString());
+    return path.getFileSystem().provider().isSameFile(path, path2);
   }
 
   public static boolean isReadable(Path path) {
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      return hasAccess(path, AccessMode.READ);
-    }
-    return toFile(path).canRead();
+    return hasAccess(path, AccessMode.READ);
   }
 
   public static boolean isWritable(Path path) {
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      return hasAccess(path, AccessMode.WRITE);
-    }
-    return toFile(path).canWrite();
+    return hasAccess(path, AccessMode.WRITE);
   }
 
   public static boolean isExecutable(Path path) {
-    if (path.getFileSystem() != FileSystems.getDefault()) {
-      return hasAccess(path, AccessMode.EXECUTE);
-    }
-    return toFile(path).canExecute();
+    return hasAccess(path, AccessMode.EXECUTE);
   }
 
   public static boolean isHidden(Path path) throws IOException {
@@ -1802,16 +1003,6 @@ public final class Files {
     }
   }
 
-  private static void validateInputTarget(File file) throws IOException {
-    if (!file.exists()) {
-      File parent = file.getParentFile();
-      if (parent != null && parent.exists() && !parent.isDirectory()) {
-        throw new FileSystemException(file.toString(), null, "Not a directory");
-      }
-      throw new NoSuchFileException(file.toString());
-    }
-  }
-
   private static File createTemporaryFile(File directory, String prefix, String suffix) throws IOException {
     if (directory != null) {
       if (!directory.exists()) {
@@ -1867,6 +1058,69 @@ public final class Files {
     return result;
   }
 
+  private static void copyToForeignTarget(
+      Path source,
+      Path target,
+      CopyOption... options) throws IOException {
+    boolean replaceExisting = false;
+    boolean copyAttributes = false;
+    boolean followLinks = true;
+    for (CopyOption option : options) {
+      if (option == StandardCopyOption.REPLACE_EXISTING) {
+        replaceExisting = true;
+      } else if (option == StandardCopyOption.COPY_ATTRIBUTES) {
+        copyAttributes = true;
+      } else if (option == LinkOption.NOFOLLOW_LINKS) {
+        followLinks = false;
+      } else if (option == null) {
+        throw new NullPointerException();
+      } else {
+        throw new UnsupportedOperationException(option + " not supported");
+      }
+    }
+
+    LinkOption[] linkOptions = followLinks
+        ? new LinkOption[0]
+        : new LinkOption[] { LinkOption.NOFOLLOW_LINKS };
+    BasicFileAttributes sourceAttributes =
+        readAttributes(source, BasicFileAttributes.class, linkOptions);
+    if (sourceAttributes.isSymbolicLink()) {
+      throw new IOException("Copying of symbolic links not supported");
+    }
+
+    if (replaceExisting) {
+      deleteIfExists(target);
+    } else if (exists(target)) {
+      throw new FileAlreadyExistsException(target.toString());
+    }
+
+    if (sourceAttributes.isDirectory()) {
+      createDirectory(target);
+    } else {
+      try (InputStream input = newInputStream(source)) {
+        copy(input, target);
+      }
+    }
+
+    if (copyAttributes) {
+      BasicFileAttributeView view =
+          getFileAttributeView(target, BasicFileAttributeView.class);
+      try {
+        view.setTimes(
+            sourceAttributes.lastModifiedTime(),
+            sourceAttributes.lastAccessTime(),
+            sourceAttributes.creationTime());
+      } catch (Throwable e) {
+        try {
+          delete(target);
+        } catch (Throwable deleteFailure) {
+          e.addSuppressed(deleteFailure);
+        }
+        throw e;
+      }
+    }
+  }
+
   private static long copyStream(InputStream input, OutputStream output) throws IOException {
     long copied = 0L;
     byte[] buffer = new byte[8192];
@@ -1878,38 +1132,21 @@ public final class Files {
     return copied;
   }
 
-  private static void deleteAfterOpening(File file, Closeable stream, boolean deleteOnClose) throws IOException {
-    if (!deleteOnClose) {
-      return;
-    }
-    if (!file.delete()) {
-      stream.close();
-      throw new IOException("Unable to delete file");
-    }
-  }
-
-  private static void deleteExisting(File file) throws IOException {
-    if (isSymbolicLink(file.toPath())) {
-      deletePath0(file.toString());
-      return;
-    }
-    if (file.isDirectory()) {
-      File[] children = file.listFiles();
-      if (children != null && children.length > 0) {
-        throw new DirectoryNotEmptyException(file.toString());
-      }
-    }
-    if (!file.delete()) {
-      throw new IOException("Unable to delete file");
-    }
-  }
-
   private static boolean hasAccess(Path path, AccessMode mode) {
     try {
       path.getFileSystem().provider().checkAccess(path, mode);
       return true;
     } catch (IOException e) {
       return false;
+    }
+  }
+
+  private static void checkExistence(Path path, LinkOption... options) throws IOException {
+    if (followLinks(options)) {
+      path.getFileSystem().provider().checkAccess(path);
+    } else {
+      path.getFileSystem().provider().readAttributes(
+          path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
     }
   }
 
@@ -2251,25 +1488,5 @@ public final class Files {
         return null;
       }
     };
-  }
-}
-
-final class RandomAccessFileOutputStream extends OutputStream {
-  private final RandomAccessFile file;
-
-  RandomAccessFileOutputStream(File path) throws IOException {
-    file = new RandomAccessFile(path, "rw");
-  }
-
-  public void write(int value) throws IOException {
-    file.write(value);
-  }
-
-  public void write(byte[] bytes, int offset, int length) throws IOException {
-    file.write(bytes, offset, length);
-  }
-
-  public void close() throws IOException {
-    file.close();
   }
 }
