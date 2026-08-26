@@ -121,7 +121,9 @@ results, file contents, and source/target position updates, plus selected
 behavior covering writable, read-only, and empty mappings, plus selected Java
 13+ `MappedByteBuffer.force(int, int)` range forcing, zero-length range,
 read-only range no-op, empty-mapping validation order, and range validation
-behavior. Selected `Files` hard-link and symbolic-link APIs are also covered,
+behavior. Writable mappings retain their descriptor across channel close so a
+later full or ranged force remains safe and cannot reach a reused descriptor.
+Selected `Files` hard-link and symbolic-link APIs are also covered,
 including `createLink`, `createSymbolicLink`, `readSymbolicLink`,
 `NOFOLLOW_LINKS` existence checks, hard-link `isSameFile`, `Files.copy`
 symlink-object preservation with `NOFOLLOW_LINKS`, selected symlink
@@ -274,12 +276,26 @@ transfer/copy read and write-tail close races, host-error precedence, delayed
 two-class Unix exception conversion, single/paired synchronous VM completion
 throws, both exception-class initialization failures, raw Unix operation close
 races, and successful scratch-buffer reads.
-`FileChannelImpl.map0` still needs the
-persistent mapped-resource ownership tracked in `BUG-016`, and the injected
-BrowserFS close fixtures still do not exercise a genuinely asynchronous browser
-backend. The broader
-host-operation boundary therefore remains mitigated rather than fully resolved
-in `BUG-015`.
+Writable mapped buffers now own a generation-bound descriptor retention that is
+independent of their channel. Channel close completes logically after ordinary
+operations drain, while physical host close and fd reuse wait for every mapping
+retention and in-flight `force` operation. `force()` therefore remains valid
+after channel close, loops across short writes, and cannot target a reused fd.
+Unmap waits for concurrent forces before freeing heap storage and releasing the
+retention. Mapping tables are scoped by JVM heap so equal native addresses in
+multiple JVM instances cannot collide, and zero-based heap allocations are
+shifted to a nonzero page-aligned mapped address. The
+`mapped_buffer_fd_lifetime_test.cjs` native-map fixture covers ten partial-I/O,
+close/map/force/unmap race, multiple-retention, concurrent-force, fd-reuse,
+multi-JVM and adjacent-address collisions, completion-throw, cleanup-failure,
+zero-address, and legacy-close cases. `Java17MappedByteBuffer` also verifies
+that a writable mapping can be changed and forced after its channel closes.
+Doppio does not
+currently promise prompt GC-triggered unmapping, so an otherwise unreachable
+mapping may retain its copied heap storage and host descriptor until its cleaner
+runs explicitly or the VM terminates. The injected BrowserFS close fixtures
+still do not exercise a genuinely asynchronous browser backend; that remaining
+host-operation boundary keeps `BUG-015` mitigated rather than fully resolved.
 Native lock/release support and channel `EINTR`/`EAGAIN` translation to NIO
 `IOStatus` values remain outside this boundary coverage.
 
