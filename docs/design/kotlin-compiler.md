@@ -141,12 +141,15 @@ to `Hello.kt` backend codegen:
   missing-path zero results. Coverage lives in
   `classes/modern_test/Java17FileSpace.java`, protecting compiler cache and
   output-directory checks that ask the host filesystem for available space.
-- NIO `FileStore` disk-space queries now populate total, usable, and
-  unallocated space and `getBlockSize()` in Doppio's `Files` shim, with the
-  block size coming from host `statfs` when available. The OpenJDK
-  `sun.nio.fs.UnixNativeDispatcher.statvfs0` bridge is populated for native
-  class-library paths. Coverage lives in
-  `classes/modern_test/Java17FileStoreSpace.java`, protecting compiler cache
+- NIO `Files.getFileStore(...)` now returns the default provider's mounted
+  `FileStore`, including its real name, type, attribute-view capabilities, and
+  current-directory handling for an empty `Path`. Total, usable, and
+  unallocated space come through the OpenJDK
+  `sun.nio.fs.UnixNativeDispatcher.statvfs0` bridge. The runtime provider is a
+  JDK 8 implementation and therefore inherits the modern class library's
+  positive 4096-byte compatibility fallback for the Java 10+
+  `getBlockSize()` method. Coverage lives in the legacy `NioFilesPaths` check
+  and `classes/modern_test/Java17FileStoreSpace.java`, protecting compiler cache
   and output-directory checks that use `Files.getFileStore(...)` instead of
   `java.io.File`.
 - Default file-system `getFileStores()` enumeration now covers Linux mount-table
@@ -169,6 +172,31 @@ to `Hello.kt` backend codegen:
   `classes/modern_test/Java17FilesNoFollowLinkAttributes.java`, protecting
   compiler and build-tool scanners that avoid following linked source or
   dependency trees.
+- Default-file-system `Files.newInputStream`, `newOutputStream`, and
+  `newByteChannel` calls now reach the owning Unix provider. On CLI/Node, empty
+  read paths retain current-directory meaning; BrowserFS still rejects
+  directory read handles. Node reconstructs the provider's write/create/
+  truncate/append/sync/no-follow intent with host numeric flags. BrowserFS uses
+  explicit non-truncating create transitions, truncation, descriptor append
+  state, sync completion, and dirty delete-on-close cleanup. Kotlin compiler
+  loaders, output channels, and persistent-map paths use these APIs directly.
+  `Java11FilesString`, `Java11ProviderChannelFlags`, `NioFilesPaths`, the ZIP
+  fixture, and the Pages Chromium smoke protect the boundary. BrowserFS
+  multi-handle append and atomic no-follow remain backend limitations tracked
+  in `BUG-007`.
+- Core `Files` mutations now retain that provider boundary too. File/directory
+  creation (including recursive parents), links, deletion, and same-provider
+  copy/move delegate to the owning provider; foreign-provider copy/move uses
+  the JDK-style stream and basic-attribute bridge with suppressed close errors
+  and rollback after attribute failure. The Unix bridge supplies link,
+  symlink, transfer, ownership, mode, and timestamp operations. BrowserFS uses
+  mounted-backend device IDs plus stable key-value metadata node IDs so
+  unrelated existing paths are not mistaken for one file, rejects cross-mount
+  atomic moves, and lets ordinary cross-mount moves use the provider's
+  copy-with-attributes/delete fallback. The provider-spy fixture and Pages
+  Chromium create/delete/copy/move matrix protect these compiler cache and
+  output-tree operations. Descriptor xattrs and interruptible copy cancellation
+  remain explicit compatibility gaps in `BUG-010` and `BUG-011`.
 - Initial `posix:permissions` `FileAttribute` values are now applied for
   selected file, directory, temp-file, temp-directory, and `newByteChannel`
   creation paths. Coverage lives in
@@ -913,8 +941,13 @@ Current verified checks:
   `kotlin.Metadata`.
 - Repository-level NIO link coverage now lives in
   `classes/modern_test/Java17FilesLinks.java`, covering `Files.createLink`,
-  `createSymbolicLink`, `readSymbolicLink`, hard-link `isSameFile`,
-  `NOFOLLOW_LINKS` symlink existence checks, and dangling symlink cleanup.
+  `createSymbolicLink`, `readSymbolicLink`, hard-link `isSameFile`, file and
+  directory symlink `isRegularFile`/`isDirectory` checks with following and
+  `NOFOLLOW_LINKS`, symlink existence checks, and dangling symlink cleanup.
+  Symbolic-link queries and reads now use the owning provider's attribute and
+  read-link paths. In particular, an empty `Path` resolves to the current
+  directory and `readSymbolicLink` reports `NotLinkException` rather than the
+  custom native's incorrect missing-file result.
 - Repository-level permission-aware access coverage now lives in
   `classes/modern_test/Java17FilesAccessPermissions.java`. It compares the
   default `Files.isReadable`/`isWritable`/`isExecutable` facade with direct
@@ -922,7 +955,45 @@ Current verified checks:
   owner-execute-only, no-permission, and missing paths. This protects compiler
   source, classpath, cache, temporary-directory, and output-path capability
   probes from treating every existing path as readable, writable, and
-  executable.
+  executable. The legacy `NioFilesPaths` comparison also verifies that the
+  default provider treats an empty `Path` as the current directory for
+  following and no-follow existence and directory/regular-file type checks,
+  `size`, typed and string basic-attribute reads, `getAttribute`, basic
+  attribute-view, last-modified, and provider-mounted file-store reads, plus
+  read/write/execute access probes, instead of converting it to an empty `File`
+  path. Directory enumeration now follows the same boundary:
+  `Files.newDirectoryStream` uses the owning provider for plain, glob, and
+  predicate-filtered reads, while `Files.list` retains a lazy close-backed
+  provider iterator with an unknown-size `DISTINCT` spliterator. The empty
+  `Path` regression compares both facades with a direct provider listing, and
+  the Java 11 fixture protects filter exceptions, iterator/close behavior,
+  prefetched entries, and file-system glob validation. `Files.walk` and
+  `Files.find`, which the Kotlin compiler uses for SDK, transaction, archive,
+  and cleanup scans, now retain a lazy close-backed provider tree iterator
+  instead of eagerly recursing through `java.io.File`. Empty paths begin at the
+  provider current directory, symbolic links are not traversed without
+  `FOLLOW_LINKS`, and `find` receives the iterator's cached link-aware
+  attributes. Java 11 lifecycle and link regressions plus Java 13 ZIP coverage
+  protect this boundary. Attribute reads
+  delegate validation to the provider so invalid attribute/type combinations
+  preserve provider exception precedence. Non-default attribute-view lookups
+  likewise reach their provider before the default facade validates link
+  options, preserving ZIP's provider-defined acceptance of null option arrays
+  and elements. Last-modified reads and updates now
+  share provider semantics: symlink reads distinguish following from
+  `NOFOLLOW_LINKS`, dangling links remain readable only without following,
+  Unix microsecond update arguments are converted to JavaScript milliseconds,
+  and pre-epoch stat timestamps use normalized nonnegative nanosecond
+  remainders. Unsupported native timestamp updates now surface provider I/O
+  failures instead of reporting a no-op as success. Owner and POSIX permission
+  reads likewise use provider views and typed attributes, so empty paths resolve
+  to the current directory and owner-view getters preserve `NOFOLLOW_LINKS` for
+  dangling links. The existing owner and POSIX mutation facades remain separate
+  from this read-path unification. File identity and `mismatch` also share the
+  provider's stat-based identity check: an exactly equal missing path retains
+  the provider's equality fast path, while syntactically distinct missing
+  aliases such as `missing` and `./missing` now report `NoSuchFileException`
+  instead of matching canonical strings.
 - The focused I/O smoke includes `MappedByteBuffer` coverage; both runtimes
   print
   `aZcdYf:aZRSYf:ZRS:true:true:true:true:true:true:IndexOutOfBoundsException:0:true:true`.

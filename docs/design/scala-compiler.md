@@ -469,13 +469,36 @@ reduced to a focused Java or Scala fixture.
   for files and directories, plus missing-path zero results. Coverage lives in
   `classes/modern_test/Java17FileSpace.java`, protecting compiler and build
   tool output/cache directory checks.
-- NIO `FileStore` disk-space queries now populate total, usable, and
-  unallocated space and `getBlockSize()` in Doppio's `Files` shim, with the
-  block size coming from host `statfs` when available. The OpenJDK
-  `sun.nio.fs.UnixNativeDispatcher.statvfs0` bridge is populated for native
-  class-library paths. Coverage lives in
+- NIO `Files.getFileStore(...)` now returns the default provider's mounted
+  `FileStore`, including its real name, type, attribute-view capabilities, and
+  empty-`Path` current-directory behavior. Total, usable, and unallocated space
+  come through the OpenJDK `sun.nio.fs.UnixNativeDispatcher.statvfs0` bridge.
+  The runtime provider is a JDK 8 implementation and therefore inherits the
+  modern class library's positive 4096-byte compatibility fallback for the
+  Java 10+ `getBlockSize()` method. Coverage lives in the legacy
+  `NioFilesPaths` check and
   `classes/modern_test/Java17FileStoreSpace.java`, protecting compiler and
   build-tool output/cache directory checks that use `Files.getFileStore(...)`.
+- `Files.newDirectoryStream(...)` now opens directories through the owning
+  provider for plain, glob, and predicate-filtered enumeration. `Files.list`
+  consumes that provider iterator lazily, exposes an unknown-size `DISTINCT`
+  spliterator, translates deferred iterator I/O failures to
+  `UncheckedIOException`, and closes the underlying directory from the stream
+  close hook. Empty paths therefore enumerate the current directory instead of
+  failing through `File("")`; `NioFilesPaths` compares that behavior with a
+  direct provider listing, Java 11 checks cover Unix lifecycle/glob behavior,
+  and Java 13 checks cover basic ZIP enumeration for compiler and classpath
+  directory scans. The runtime does not claim `SecureDirectoryStream`: the Unix
+  dispatcher advertises no `openat` capability and uses its supported ordinary
+  directory-stream path.
+- `Files.walk(...)` and `Files.find(...)` now retain the vendor provider's lazy,
+  close-backed tree iterator rather than eagerly materializing a `java.io.File`
+  traversal. This preserves empty-`Path` current-directory behavior, default
+  no-follow traversal with opt-in `FOLLOW_LINKS`, and the iterator's cached
+  link-aware attributes for `find` predicates. Scala 2.13 compiler paths use
+  `Files.walk` directly, including a `Paths.get("")` pipeline cleanup path;
+  `NioFilesPaths`, the Java 11 lifecycle/link fixture, and the Java 13 ZIP
+  fixture protect those semantics.
 - Default file-system `getFileStores()` enumeration now covers Linux mount-table
   dispatch enough to materialize usable `FileStore` instances. Coverage lives
   in `classes/modern_test/Java17FileSystemStores.java`, protecting compiler and
@@ -489,12 +512,45 @@ reduced to a focused Java or Scala fixture.
   of dereferencing them, including dangling links. Coverage lives in
   `classes/modern_test/Java17FilesCopyNoFollowLinks.java`, protecting compiler
   and build-tool copy paths that preserve linked source or classpath trees.
+- `Files.isSymbolicLink(...)` and `Files.readSymbolicLink(...)` now use the
+  owning provider. The default Unix provider resolves an empty `Path` to the
+  current directory, so reading it reports `NotLinkException` rather than the
+  removed custom native's missing-file result. Coverage lives in
+  `classes/modern_test/Java17FilesLinks.java`.
 - `Files.readAttributes(..., NOFOLLOW_LINKS)` now reports symlink object
   attributes instead of followed-target attributes, including dangling links,
   for class-based, string-based, and basic-view reads. Coverage lives in
   `classes/modern_test/Java17FilesNoFollowLinkAttributes.java`, protecting
   compiler and build-tool scanners that avoid following linked source or
   dependency trees.
+- Non-default `Files.getFileAttributeView(...)` requests now reach their owning
+  provider before default-file-system link-option validation. The ZIP provider
+  therefore retains its provider-defined acceptance of null option arrays and
+  elements; all four Java 13 ZIP file-system constructors are covered by
+  `classes/modern_test/Java13FileSystems.java`.
+- Default-file-system `Files.newInputStream`, `newOutputStream`, and
+  `newByteChannel` calls now use the owning Unix provider. Node preserves
+  read/write, create, truncate, append, sync, and no-follow intent through host
+  numeric flags; BrowserFS uses explicit create/truncate transitions,
+  descriptor append and sync state, and dirty delete-on-close cleanup.
+  Scala reflection, compiler classpaths, and compiler outputs consume these
+  APIs, and the Java 11, provider-channel, legacy empty-path, Java 13 ZIP, and
+  Pages Chromium fixtures protect them. BrowserFS still rejects directory read
+  handles, cannot make append atomic across separately opened handles, and has
+  only a non-atomic no-follow precheck; `BUG-006` and `BUG-007` track those
+  backend boundaries.
+- Core `Files` mutations now use the owning provider as well: file/directory
+  creation (including recursive parents), links, deletion, and same-provider
+  copy/move delegate directly, while foreign-provider copy/move follows the
+  JDK stream/basic-attribute bridge with suppressed close failures and target
+  rollback after attribute failure. The Unix bridge now supplies the required
+  link, symlink, transfer, ownership, mode, and timestamp operations.
+  BrowserFS assigns stable synthetic device/inode identities from each mounted
+  synchronous key-value backend, rejects cross-mount atomic rename, and routes
+  ordinary cross-mount moves through copy-with-attributes/delete. The
+  provider-spy fixture and Pages Chromium mutation matrix protect Scala
+  compiler output/cache paths. Descriptor xattrs and interruptible copy
+  cancellation remain scoped in `BUG-010` and `BUG-011`.
 - Initial `posix:permissions` `FileAttribute` values are now applied for
   selected file, directory, temp-file, temp-directory, and `newByteChannel`
   creation paths. Coverage lives in

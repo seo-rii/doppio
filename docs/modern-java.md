@@ -126,16 +126,192 @@ including `createLink`, `createSymbolicLink`, `readSymbolicLink`,
 `NOFOLLOW_LINKS` existence checks, hard-link `isSameFile`, `Files.copy`
 symlink-object preservation with `NOFOLLOW_LINKS`, selected symlink
 `readAttributes(..., NOFOLLOW_LINKS)` behavior including dangling links, and
-dangling symlink cleanup. `java.io.File` disk-space queries now cover
+dangling symlink cleanup. Symbolic-link queries and reads use the owning
+provider, including the default Unix provider's empty-`Path` current-directory
+handling and resulting `NotLinkException` for `readSymbolicLink`. The obsolete
+custom read-link native has been removed. `Files.notExists` now preserves the
+provider's three-state existence result: only `NoSuchFileException` proves
+absence, while
+other I/O failures leave both `exists` and `notExists` false. The
+`Java11FilesString` fixture covers this distinction for follow and
+`NOFOLLOW_LINKS` probes with an overlong path component.
+
+Default `Files.newDirectoryStream` calls now use the owning file-system
+provider for plain, glob, and predicate-filtered enumeration. This gives an
+empty `Path` the provider's current-directory meaning and preserves the
+provider iterator's lazy filtering, prefetched-entry, exception, and close
+behavior. `Files.list` is likewise a lazy, close-backed, unknown-size
+`DISTINCT` stream and converts deferred `DirectoryIteratorException` failures
+to `UncheckedIOException`. Coverage lives in `NioFilesPaths` and
+`Java11FilesString`; `Java13FileSystems` protects basic enumeration through the
+same facade for ZIP paths.
+
+`Files.walk` and `Files.find` now use the vendor provider-backed
+`FileTreeIterator` instead of eagerly recursing through `java.io.File`.
+Returned streams are lazy, close-backed, and unknown-size; an empty `Path`
+therefore starts at the provider's current directory. Traversal does not follow
+symbolic links unless `FOLLOW_LINKS` is present, and `find` passes the
+iterator's cached, link-aware attributes to its predicate rather than
+re-reading each path with different link semantics. `NioFilesPaths` covers the
+empty-path root, `Java11FilesString` covers lifecycle and link traversal, and
+`Java13FileSystems` protects ZIP walking and finding. The Java 9 class-library
+compile exposes only `FileTreeIterator`, `FileTreeWalker`, and the walker's four
+nested class files from the vendor runtime in an ignored compile-support
+directory because `--release 9` hides package-private peers. Those support
+classes are compile-only and are not added to the Doppio runtime overlay.
+
+Default-file-system `Files.newInputStream`, `newOutputStream`, and
+`newByteChannel` calls now enter the owning Unix provider instead of converting
+the path to `java.io.File`. On the CLI/Node backend, read-only empty paths retain
+their current-directory meaning; BrowserFS still rejects directory read handles
+with `EISDIR`. Creation-only options on a read channel are ignored as the
+provider specifies, while initial attributes and unsupported options retain
+provider/channel validation. Known Unix errno values remain errno-backed
+through the native bridge, so failures such as a non-directory parent translate
+to `FileSystemException` instead of a generic `IOException`.
+
+For Node writes, the native bridge decodes the vendor Unix flags and rebuilds
+them with the current host's numeric `fs.constants`. `WRITE`, `CREATE`,
+`CREATE_NEW`, `TRUNCATE_EXISTING`, `APPEND`, `SYNC`, `DSYNC`, and
+`NOFOLLOW_LINKS` therefore retain their separate meanings, including kernel
+append behavior. BrowserFS accepts only string modes, so its bridge uses
+`r`/`r+`/`wx+` transitions, explicit truncation, descriptor append state, and
+write-completion sync calls. Dirty `DELETE_ON_CLOSE` handles track their
+successful unlink and discard that stale BrowserFS descriptor without a
+path-based close flush.
+
+Scatter reads feature-detect Node's callback `fs.readv` and use one host vector
+operation when it is available; the API first appeared in Node 12.17.0 and
+13.13.0. BrowserFS 1.3 and runtimes without that API retain the sequential
+fallback: it now commits descriptor position after every positive read, returns
+the committed prefix when a later raw read fails, and preserves the existing
+EOF, short-read, and empty-vector results.
+`Java17FileChannelPartialReadProgress` forces the later-vector failure and the
+native fast path while checking buffer contents, buffer positions, channel
+position, and the next scalar read. Sequential fallback remains a multi-call
+operation and is scoped in `BUG-013`.
+
+Gather writes feature-detect Node's callback `fs.writev` and use one host
+vector operation when it is available. BrowserFS 1.3 and Node releases before
+12.9 retain the sequential fallback: it now commits descriptor position after
+every successful vector, returns the committed prefix when a later raw write
+fails, and preserves the advanced position if a post-write sync or stat fails.
+`Java17FileChannelPartialProgress` forces the later-vector write, post-write
+sync, and post-append stat boundaries through a host preload fixture while also
+checking source-buffer positions. Sequential fallback append remains subject
+to backend interleaving and is scoped in `BUG-008`.
+
+Channel-native host failures now stay on the public NIO contract boundary:
+`FileChannelImpl` mapping/transfers and `FileDispatcherImpl` scalar/vector
+reads, writes, sizing, truncation, forcing, and close paths raise
+`java.io.IOException`. The shared write and descriptor-close primitives require
+their caller to select that policy explicitly. `UnixNativeDispatcher` and
+`UnixCopyFile` retain errno-backed `sun.nio.fs.UnixException`, allowing the
+provider to translate failures such as `EACCES` into path-aware exceptions.
+`Java17FileChannelIOExceptionBoundaries` injects failures into the Node scalar,
+native/fallback vector, post-append metadata, map read/allocation, transfer,
+force, and close paths and also verifies that a provider stat denial remains
+`AccessDeniedException`. Native mapping allocation exhaustion becomes Java
+`OutOfMemoryError`, allowing the vendor `FileChannelImpl` retry/wrapping path to
+return `IOException` rather than leaking a JavaScript error. Stream-owned input,
+output, and random-access channels invalidate their shared descriptor and retire
+its state before dispatching host close, including the error case. Their
+BrowserFS close path also discards a dirty descriptor whose path was already
+unlinked through either `java.io.File.delete()` or the Unix provider, and
+random-access descriptors now retain the path needed to detect that case. A
+direct native-map check separately fixes raw Unix close-error
+suppression, `fclose` EIO conversion and EINTR suppression, one-time
+retirement, and survival of state registered for a reused fd number. Every
+`FDState.open` now assigns a monotonic generation. Legacy input, output, and
+random-access operations capture it before host dispatch; a successful
+completion from a closed generation raises `IOException("Stream Closed")`
+exactly once instead of recreating missing state, mutating a replacement
+descriptor, copying stale read bytes, or issuing the append write's follow-up
+`fstat`. Random-access state operations invoked after close now raise Java
+`IOException` instead of leaking a JavaScript `TypeError`. The
+`legacy_fd_generation_test.cjs` native-map fixture deterministically covers 31
+closed-generation scalar, bulk, metadata, truncate, two-stage append, and
+post-close random-access boundaries on Node. Its replacement modes register a
+same-number state after host-close dispatch and verify that the later close
+callback leaves it intact. Legacy stream and random-access operations plus
+`FileDescriptor.sync()` now also hold generation-bound leases from host dispatch
+through Java completion. Close invalidates the Java
+descriptor and makes its generation non-current immediately, then both the
+stream and channel close paths defer host `close` until the last lease is
+released. This prevents the OS
+from reusing the numeric fd while submitted legacy work is still pending;
+completion or exception is delivered before the release that can wake close.
+The `legacy_fd_lease_test.cjs` native-map fixture covers seven multiple-operation,
+duplicate-close, success/error, delayed-close-error, two-stage append, sync,
+synchronous-dispatch-throw, duplicate-callback, post-close-dispatch same-number
+re-registration, and simulated unlinked BrowserFS close boundaries. The
+BrowserFS branch is injected through the shared close logic rather than a real
+asynchronously scheduled browser backend. Channel-native operations remain
+outside the lease boundary, and mapped buffers retain a separate
+descriptor-lifetime risk tracked in `BUG-016`; the broader host-operation
+boundary therefore remains mitigated rather than fully resolved in `BUG-015`.
+Native lock/release support and channel `EINTR`/`EAGAIN` translation to NIO
+`IOStatus` values remain outside this boundary coverage.
+
+Legacy `FileOutputStream(path, true)` descriptors now enter the same append
+state model before their file descriptor is exposed to Java. Stream writes and
+writes through the derived `FileChannel` therefore remain at EOF after an
+explicit channel-position reset, and successful stream writes reconcile the
+cached position with the descriptor size. An initial append-open `fstat`
+failure closes the host descriptor before raising `IOException`.
+`Java17FileOutputStreamAppendChannel` covers stream/channel mixing, scalar and
+gather writes, source-buffer progress, and growth from a second writer on Node;
+the preload check also validates append registration and failed-open cleanup.
+It injects a post-write `fstat` failure as well, verifying that committed
+progress survives and a following write restores the authoritative size. The
+Chromium smoke covers append-channel position queries and the supported
+single-handle BrowserFS path. Separate live BrowserFS handles still do not share
+inode and buffer state, so browser external-growth parity remains outside this
+guarantee and is tracked in `BUG-007`.
+
+The core `Files` mutation facade now follows the same boundary. `createFile`,
+`createDirectory`, recursive `createDirectories`, `createLink`,
+`createSymbolicLink`, `delete`, and `deleteIfExists` call the path's owning
+provider. Same-provider `copy` and `move` preserve the provider's option-array
+and exception behavior, while foreign-provider operations use the JDK-style
+stream/attribute bridge with close suppression and target cleanup on attribute
+failure. The default Unix provider is backed by link, symlink, unlink, rename,
+file-transfer, ownership, mode, and timestamp dispatcher operations. Node and
+BrowserFS do not expose descriptor extended attributes, so `COPY_ATTRIBUTES`
+copies supported basic/POSIX metadata but treats the xattr list as empty.
+
+BrowserFS 1.3 reports `(dev, ino) = (0, 0)` for every public `Stats` object.
+The bridge now derives a stable synthetic device from each mounted backend and
+a stable inode from the pinned synchronous key-value backend's metadata node
+ID. Existing-target copy/move therefore no longer mistake unrelated paths for
+the same file in the playground's InMemory mounts. Cross-mount BrowserFS rename
+reports `EXDEV`: atomic moves are rejected, and ordinary moves enter the
+provider's copy-with-attributes/delete fallback instead of silently performing
+a non-atomic mount-layer rename. Mutable non-key-value BrowserFS backends still
+fall back to path identity and do not claim hard-link/symlink alias parity.
+
+`NioFilesPaths`, `Java11FilesString`, `Java11ProviderChannelFlags`, the
+initial-POSIX fixture, and `Java13FileSystems` protect the CLI/provider and ZIP
+boundaries. The Pages Chromium smoke exercises ordinary BrowserFS write,
+missing-file, truncate, single-handle append, scatter-read and gather-write
+fallbacks, data-sync, dirty delete-on-close, output-stream, create/delete,
+legacy output `File.delete()` and random-access provider-unlink close,
+existing-target copy/move, replacement, attribute-copy, and cross-mount move
+paths. BrowserFS 1.3 still cannot share live inode state across separately
+opened or renamed handles, and its no-follow support is a non-atomic `lstat`
+precheck; those backend limits remain explicit in `BUG-007`.
+
+`java.io.File` disk-space queries now cover
 `getTotalSpace()`, `getFreeSpace()`, and `getUsableSpace()` for files and
 directories, plus missing-path zero results, backed by
-`classes/modern_test/Java17FileSpace.java`. NIO `FileStore` space queries now
-populate `getTotalSpace()`, `getUsableSpace()`, and
-`getUnallocatedSpace()`, plus the Java 10+ `getBlockSize()` surface, in
-Doppio's `Files` shim. `getBlockSize()` uses the host `statfs` block size when
-available, and the OpenJDK
-`sun.nio.fs.UnixNativeDispatcher.statvfs0` bridge populated for native
-class-library paths; coverage is in
+`classes/modern_test/Java17FileSpace.java`. NIO `Files.getFileStore(...)` now
+returns the default provider's mounted `FileStore`, including real name, type,
+attribute-view, and empty-`Path` current-directory behavior. Its total, usable,
+and unallocated space comes through the OpenJDK
+`sun.nio.fs.UnixNativeDispatcher.statvfs0` bridge. Because the runtime provider
+is a JDK 8 implementation, it inherits the modern class library's positive
+4096-byte compatibility fallback for the Java 10+ `getBlockSize()` method.
+Coverage is in the legacy `NioFilesPaths` check and
 `classes/modern_test/Java17FileStoreSpace.java`. Default file-system
 `getFileStores()` enumeration now covers Linux mount-table dispatch enough to
 materialize usable `FileStore` instances; coverage is in
@@ -1668,11 +1844,18 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   directory failure behavior plus the file
   helpers needed by the modern fixtures: temp file/directory creation
   including null/short prefixes and selected parent-directory failures,
-  `readAllBytes`, `readAllLines`, `lines`, `list`, selected `walk`/`find`,
-  `newDirectoryStream` iterator/close behavior, lazy filter exceptions, and
-  escaped glob metacharacters, buffered reader/writer helpers, byte-array and
-  line-based `write` including selected validation-order behavior, selected `newByteChannel` read/write/create/append and parent-target
-  paths, `delete`, `deleteIfExists`, including non-empty-directory
+  `readAllBytes`, `readAllLines`, `lines`, provider-backed lazy `list`,
+  provider-backed lazy `walk`/`find` with selected link traversal and close
+  behavior, provider-backed `newDirectoryStream` iterator/close behavior,
+  lazy filter exceptions, and file-system `PathMatcher` glob handling including
+  escaped metacharacters, buffered reader/writer helpers, byte-array and
+  line-based `write` including selected validation-order behavior,
+  provider-backed `newInputStream`/`newOutputStream` and `newByteChannel`
+  behavior including selected write/create/truncate/append/sync/no-follow/
+  delete-on-close and parent-target paths, provider-backed `createFile`,
+  `createDirectory`, recursive `createDirectories`, `createLink`,
+  `createSymbolicLink`, `delete`, and `deleteIfExists`,
+  including non-empty-directory
   failure behavior, basic
   existence/type/hidden/symlink/access queries, including permission-aware
   default-provider `checkAccess` read/write/execute modes for POSIX owner-only
@@ -1686,8 +1869,10 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   behavior, selected owner POSIX permission get/set behavior, selected
   `PosixFileAttributes` and
   `PosixFileAttributeView` behavior, selected POSIX string-attribute lookup,
-  read, and setter behavior,
-  selected `getAttribute`,
+  read, and setter behavior. Non-default `getFileAttributeView` requests reach
+  their owning provider before default-file-system link-option validation, so
+  ZIP retains its provider-defined acceptance of null option arrays and
+  elements. The shim also covers selected `getAttribute`,
   string-based `readAttributes`, `setAttribute`, and extension-based
   `probeContentType`, input helper parent-target validation, timestamp get/set helpers,
   `isSameFile`, selected hard-link and symbolic-link helpers, and basic
@@ -1704,12 +1889,15 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   path-copy `COPY_ATTRIBUTES` `lastModifiedTime` preservation for selected
   file, replacement, and directory copies, `NOFOLLOW_LINKS` symlink-object
   copying including dangling links, and unsupported stream-copy option
-  rejection. The tested move
+  rejection. Same-provider copy/move delegation, null option-array pass-through,
+  foreign-provider stream-close suppression, and attribute-failure rollback
+  are protected by `Java11FilesProviderMutations`. The tested move
   surface covers plain-file and directory basic movement, target-parent
   validation, same-file no-op, existing target
   rejection/replacement including selected directory targets, missing-source failure, `NOFOLLOW_LINKS`/`ATOMIC_MOVE`
-  option acceptance for plain files, and `COPY_ATTRIBUTES` rejection; it does
-  not verify real atomicity.
+  option acceptance for plain files, and `COPY_ATTRIBUTES` rejection. CLI tests
+  do not claim filesystem-wide atomicity; the browser smoke does verify that a
+  cross-mount `ATOMIC_MOVE` is rejected instead of degraded to copy/delete.
   The tested output option surface includes append, create-new, `WRITE`
   overwrite-without-truncate behavior, `READ` rejection for output helpers,
   selected output parent-target validation, selected `SYNC`/`DSYNC`/`SPARSE` acceptance, `DELETE_ON_CLOSE` immediate
@@ -1717,8 +1905,12 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   `DELETE_ON_CLOSE` without creation, and `WRITE`/`APPEND` rejection for input
   helpers.
 - Broader Java 11+ NIO file APIs, exact provider discovery edge cases,
-  remaining attribute/view/link APIs, directory walking edge cases, remaining glob syntax edge cases, broader stream helpers, and new default method
-  behavior beyond the tested factories are not implemented.
+  remaining attribute/view/link APIs, directory walking and glob edge cases,
+  broader stream helpers, and new default method behavior beyond the tested
+  factories are not implemented. The Unix dispatcher still reports no
+  `openat` capability, so the provider intentionally exposes an ordinary
+  `DirectoryStream`; unimplemented `SecureDirectoryStream` descriptor-relative
+  operations are not claimed.
 
 ## Known HTTP Client Gaps
 
