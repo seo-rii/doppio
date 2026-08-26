@@ -57,16 +57,20 @@ compiler-only JAR containing the 31 Java 8 bootstrap classes changed by the
 shared parsed-overlay dispatch. Kotlin and Scala put this artifact before
 `doppio.jar` and `rt.jar` for source analysis, eliminating host JDK metadata
 from the main compiler, broad modern interop, duration, diagnostic, Kotlin
-bytecode, focused lowering, shape/reflection, proxy, receiver lambda/sequence,
-annotation metadata, collection builders, control flow, Result/exception,
+bytecode, basic/advanced/modern constructs, local and JVM interop,
+default/synthetic and JVM-default lowering, indy string concat, focused
+lowering, contracts, enum polymorphism, mutable delegation, callable
+references/sequences, coroutine/suspend state machines, shape/reflection,
+I/O, standalone Kotlin reflection, proxy, receiver lambda/sequence, annotation
+metadata, collection builders, control flow, Result/exception,
 initialization/delegation, multifile facades, SAM conversion,
 extension/variance, CompletableFuture, concurrency, unsigned, text/regex,
 Scala core, MethodHandles, record, and StackWalker gates without changing
-Doppio's runtime bootstrap path. The broad gates compile and bytecode-check a
-direct `Runtime.version()` call, while CI also compares two forced-generation
-SHA-256 values and the exact class-only entry contract. A tested consumer
-checker locks the 40 migrated Kotlin/Scala smoke scripts to the ordered
-compiler-only paths and rejects runtime overlay contamination. See
+Doppio's runtime bootstrap path. The broad gates compile and
+bytecode-check a direct `Runtime.version()` call, while CI also compares two
+forced-generation SHA-256 values and the exact class-only entry contract. A
+tested consumer checker locks the 58 migrated Kotlin/Scala smoke scripts to the
+ordered compiler-only paths and rejects runtime overlay contamination. See
 `docs/design/compiler-bootstrap-overlay.md`.
 
 Java 17 `java.lang.invoke` note: the compatibility row above now also includes

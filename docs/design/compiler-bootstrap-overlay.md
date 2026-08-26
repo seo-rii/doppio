@@ -191,15 +191,19 @@ modern-bootstrap.jar : doppio.jar : rt.jar
 ```
 
 Kotlin's main compiler, modern interop, duration, diagnostic, bytecode shape,
-bytecode runtime, value class, reified array, inline control, delegation
-bridge, read-only delegate, when mapping, annotation reflection, capture shape,
-proxy, sequence builder, reflection shape, receiver lambda, annotation
-metadata, collection builder, control flow, Result/exception, initialization
-delegate, multifile facade, SAM, extension variance, CompletableFuture,
-concurrency, unsigned, text/regex, MethodHandles, and record smokes pass
-`-no-jdk` and add those three JARs, in that order, to the compiler's explicit
-target classpath along with the fixture's Kotlin dependencies. They do not pass
-a host `-jdk-home`.
+bytecode runtime, basic construct, advanced construct, local interop, modern
+construct, default/synthetic, JVM-default, indy string-concat, JVM interop,
+contracts, enum polymorphism, mutable delegate, callable reference/sequence,
+coroutine, suspend, suspend control, suspend inline, value class, reified array,
+I/O, standalone Kotlin reflection, inline control, delegation bridge, read-only
+delegate, when mapping, annotation reflection, capture shape, proxy, sequence
+builder, reflection shape, receiver lambda, annotation metadata, collection
+builder, control flow,
+Result/exception, initialization delegate, multifile facade, SAM, extension
+variance, CompletableFuture, concurrency, unsigned, text/regex, MethodHandles,
+and record smokes pass `-no-jdk` and add those three JARs, in that order, to the
+compiler's explicit target classpath along with the fixture's Kotlin
+dependencies. They do not pass a host `-jdk-home`.
 Scala's main compiler, modern interop, duration, diagnostic, core,
 MethodHandles, record, and StackWalker smokes pass the same ordered trio to
 `-javabootclasspath`; their ordinary `-classpath` continues to contain the
@@ -212,13 +216,14 @@ host Java 9+ class metadata as a fallback. Host `java` and `javap` may still run
 the generated fixture and inspect its bytecode for native comparison; they are
 not metadata inputs to the Doppio-hosted compilation.
 
-`ci/check_compiler_bootstrap_consumers.mjs` statically protects all 40 migrated
+`ci/check_compiler_bootstrap_consumers.mjs` statically protects all 58 migrated
 compiler consumers. It requires the exact ordered classpath variables and
-compiler flags, including the Kotlin record support-class suffix, rejects
-missing consumer scripts, and rejects adding `modern-bootstrap.jar` to a
-declared runtime classpath. Its unit test covers reordered paths, a missing
-record support path, missing Kotlin and Scala flags, missing target/boot
-classpath arguments, runtime contamination, and a missing consumer.
+compiler flags, including the Kotlin reflection JAR and record support-class
+suffixes, rejects missing consumer scripts, and rejects adding
+`modern-bootstrap.jar` to a declared runtime classpath. Its unit test covers
+reordered paths, missing reflection and record support paths, missing Kotlin
+and Scala flags, missing target/boot classpath arguments, runtime
+contamination, and a missing consumer.
 
 `doppio.jar` follows the overlay because transformed signatures can reference
 modern shim, helper, or marker types supplied there. Java 8 `rt.jar` remains
@@ -288,12 +293,12 @@ The implemented gates are:
    clean run has the same SHA-256.
 3. Re-running the task with unchanged content is a verified hash-cache hit;
    changing `rt.jar`, the transformer, or archive settings forces a rebuild.
-4. Thirty-two Kotlin compiler smokes use `-no-jdk` with
+4. Fifty Kotlin compiler smokes use `-no-jdk` with
    `modern-bootstrap.jar:doppio.jar:rt.jar` precedence and no host JDK metadata.
 5. Eight Scala compiler smokes use the same precedence through
    `-javabootclasspath` and no extracted host `java.base.jmod` classes.
 6. The tested compiler bootstrap consumer checker locks the ordered paths,
-   compiler flags, consumer inventory, and runtime exclusion for all 40
+   compiler flags, consumer inventory, and runtime exclusion for all 58
    migrated smoke scripts.
 7. The broad Kotlin and Scala modern interop smokes compile a direct
    `Runtime.version()` call and guard its `invokestatic` bytecode, while the
@@ -341,4 +346,18 @@ and 260 seconds. These four scripts also use 480-second compile budgets and
 unsigned, and text/regex compiles passed in 207, 370, 170, and 258 seconds.
 These four scripts use the same 480-second compile budgets and 30-second
 forced-termination bounds; concurrency would have exceeded its previous
-360-second default.
+360-second default. On 2026-08-24, the basic-construct, advanced-construct,
+local-interop, and modern-construct compiles passed in 225, 475, 230, and 159
+seconds. Basic construct, local interop, and modern construct use 480-second
+compile budgets with 30-second forced-termination bounds. Advanced construct
+uses a 600-second budget with the same bound because the measured compile left
+only five seconds of headroom under its previous 480-second budget. The
+default/synthetic, JVM-default, indy string-concat, and JVM interop compiles
+passed in 139, 129, 96, and 154 seconds. All four use 480-second compile budgets
+with 30-second forced-termination bounds. The contracts, enum-polymorphism,
+mutable-delegate, and callable-reference/sequence compiles passed in 135, 116,
+103, and 106 seconds. These four use the same budgets and bounds. The coroutine,
+suspend, suspend-control, and suspend-inline compiles passed in 139, 173, 131,
+and 100 seconds. These four also use the same budgets and bounds. The I/O and
+standalone Kotlin-reflection compiles passed in 208 and 107 seconds. Both use
+480-second compile budgets with 30-second forced-termination bounds.

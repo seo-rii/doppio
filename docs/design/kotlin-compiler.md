@@ -349,7 +349,9 @@ Current verified checks:
   `ci/kotlin_basic_construct_smoke.sh`. It compiles and runs a data class,
   annotation class, interface default implementation, generic class, default
   arguments, string templates, and a lambda. Both the host JVM and Doppio print
-  `name=2,4:5`. A focused local run completed in 122 seconds and the remaining
+  `name=2,4:5`. A focused local run completed in 122 seconds, and a 2026-08-24
+  strict-bootstrap compile completed in 225 seconds. Its default compile budget
+  is 480 seconds with a 30-second forced termination bound. The remaining
   full-classpath `ci/kotlin_smoke.sh` completed in 99 seconds. The full smoke
   now keeps the broad compiler classpath stress while compiling only the
   `HelloKt` program that prints `hi`.
@@ -362,14 +364,19 @@ Current verified checks:
   the operator/destructuring slice completed in 343 seconds. The previous
   split validation kept the remaining full-classpath `ci/kotlin_smoke.sh`
   green in 187 seconds. Both the host JVM and Doppio print
-  `mode-FAST:3:2,3:caught:4,6:10`.
+  `mode-FAST:3:2,3:caught:4,6:10`. A 2026-08-24 strict-bootstrap compile
+  completed in 475 seconds. Its previous 480-second budget left only five
+  seconds of headroom, so the default compile budget is 600 seconds with a
+  30-second forced termination bound.
 - A focused Kotlin local-interop smoke now lives in
   `classes/kotlin_local_interop_smoke` and runs through
   `ci/kotlin_local_interop_smoke.sh`. It compiles and runs nullable
   safe-call/Elvis flow, nested and inner classes, a function-local class,
   `Runnable`/`Comparator` SAM conversions, an anonymous object expression, a
   delegated local property, and an inline function. A focused local run
-  completed in 288 seconds and the remaining full-classpath
+  completed in 288 seconds, and a 2026-08-24 strict-bootstrap compile completed
+  in 230 seconds. Its default compile budget is 480 seconds with a 30-second
+  forced termination bound. The remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 211 seconds. Both the host JVM and Doppio
   print `OK:FALLBACK:3:9:2:1:accbbb:4:4:7`.
 - A focused Kotlin package/multifile facade smoke now lives in
@@ -401,7 +408,9 @@ Current verified checks:
   output checks for `suspend=7`, `state=14`, `pending->delayed=15`,
   `pending->fail=resume3`, `pending->thread=24`, `pending->executor=13`, and
   `pending>1>pending>pending>1>pending>pending>1>dispatch=36` while reducing
-  compile variance in the main full-classpath smoke.
+  compile variance in the main full-classpath smoke. A 2026-08-24
+  strict-bootstrap compile completed in 173 seconds. Its default compile budget
+  is 480 seconds with a 30-second forced termination bound.
 - A focused Kotlin read-only delegated-property smoke now lives in
   `classes/kotlin_readonly_delegate_smoke` and runs through
   `ci/kotlin_readonly_delegate_smoke.sh`. An initial focused local run completed
@@ -414,7 +423,9 @@ Current verified checks:
   member and local delegated properties.
 - `ci/kotlin_coroutine_smoke.sh` adds a smaller companion compile that checks
   nested `try`/`finally` cleanup across the same queued suspension shape with
-  `clean>inner>outer`; a local 2026-06-22 run completed in 127 seconds.
+  `clean>inner>outer`; a local 2026-06-22 run completed in 127 seconds, and a
+  2026-08-24 strict-bootstrap compile completed in 139 seconds. Its default
+  compile budget is 480 seconds with a 30-second forced termination bound.
 - A dedicated suspend-inline smoke now lives in
   `classes/kotlin_suspend_inline_smoke` and runs through
   `ci/kotlin_suspend_inline_smoke.sh`. It combines a `suspend inline` helper
@@ -430,8 +441,10 @@ Current verified checks:
   2026-07-13. Removing the incidental generic return and resume-action function
   object while preserving both successful and exceptional resume paths let the
   dedicated smoke complete in 181 seconds. The retained fixture therefore uses
-  its own source set and the original 360-second bounded budget rather than
-  increasing shared timeouts or reducing semantic coverage.
+  its own source set rather than increasing shared timeouts or reducing
+  semantic coverage. A 2026-08-24 strict-bootstrap compile completed in 100
+  seconds. Its default compile budget is 480 seconds with a 30-second forced
+  termination bound.
 - A queued suspend control-flow smoke now lives in
   `classes/kotlin_suspend_control_smoke` and runs through
   `ci/kotlin_suspend_control_smoke.sh`. It covers a three-resume state machine
@@ -450,7 +463,9 @@ Current verified checks:
   2026-07-10 expanded validation completed it in 169 seconds, and
   the remaining full-classpath main smoke in 800 seconds, confirming coverage
   preservation while showing that full-classpath timing variance is still a
-  tracking risk.
+  tracking risk. A 2026-08-24 strict-bootstrap compile completed in 131
+  seconds. Its default compile budget is 480 seconds with a 30-second forced
+  termination bound.
 - A focused Kotlin `@JvmInline value class` smoke now lives in
   `classes/kotlin_value_class_smoke` and runs through
   `ci/kotlin_value_class_smoke.sh`. An initial focused local run completed in 79
@@ -493,7 +508,9 @@ Current verified checks:
   `ci/kotlin_reflect_smoke.sh`, separate from the large `ci/kotlin_smoke.sh`
   suite so reflection regressions are isolated. A local 2026-07-11 validation
   completed the focused smoke in 273 seconds with explicit `kotlin-stdlib.jar`
-  and `kotlin-reflect.jar` source classpath; both the host JVM and Doppio
+  and `kotlin-reflect.jar` source classpath, and a 2026-08-24 strict-bootstrap
+  compile completed in 107 seconds. Its default compile budget is 480 seconds
+  with a 30-second forced termination bound. Both the host JVM and Doppio
   printed
   `ReflectSmokeBox|count,name|5|r:box:5|box:render:prefix|s:seed:1|d:x:8/d:x:12|ReflectEmptyNode,ReflectValueNode:empty|String[]:false|item:T[]:false,maybeItems:List[T?]:false`.
   This covers
@@ -517,7 +534,9 @@ Current verified checks:
   that both context declarations lower their context to leading JVM method
   parameters before running the generated code on the host JVM and Doppio. A
   2026-07-13 local run with the context-parameter coverage completed in 305
-  seconds within the unchanged 360-second compile budget.
+  seconds within the unchanged 360-second compile budget. A 2026-08-24
+  strict-bootstrap compile completed in 159 seconds. Its default compile budget
+  is 480 seconds with a 30-second forced termination bound.
 - A standalone `@JvmRecord` smoke now compiles with `-jvm-target 17` in
   `ci/kotlin_record_smoke.sh`, separate from the main smoke so the broad
   Kotlin suite can keep its default target. It verifies Kotlin-generated JVM
@@ -544,7 +563,9 @@ Current verified checks:
   runtime summary repeats both qualified paths 256 times so Doppio covers cold
   interpreter calls and the hot method path beyond its basic-block threshold.
   A 2026-07-13 local run with this coverage completed in 218 seconds within
-  the unchanged 360-second compile budget.
+  the unchanged 360-second compile budget. A 2026-08-24 strict-bootstrap
+  compile completed in 139 seconds. Its default compile budget is 480 seconds
+  with a 30-second forced termination bound.
 - A separate no-compatibility JVM-default smoke now lives in
   `classes/kotlin_jvm_default_smoke` and runs through
   `ci/kotlin_jvm_default_smoke.sh` with `-jvm-target 1.8` and
@@ -556,7 +577,9 @@ Current verified checks:
   `UPPER:KT:upper:DIAMOND:X|diamond:x!:UPPER:D:true:true:true`, covering
   inherited/default-argument dispatch, diamond resolution, delegation, and
   reflection-visible `Method.isDefault()` metadata. A local 2026-07-13 run
-  completed in 237 seconds within the 360-second compile budget.
+  completed in 237 seconds within the 360-second compile budget. A 2026-08-24
+  strict-bootstrap compile completed in 129 seconds. Its default compile budget
+  is 480 seconds with a 30-second forced termination bound.
 - A focused Java 17 indy string-concat smoke now lives in
   `classes/kotlin_indy_concat_smoke` and runs through
   `ci/kotlin_indy_concat_smoke.sh` with
@@ -570,6 +593,8 @@ Current verified checks:
   exceptions. Host JVM and Doppio both print
   `mix[7][4294967297][-9223372036854775808][1.25][-2.5][true][K][probe[box#1]]|nullable=null|calls=1|plain=17|throw=IllegalStateException:concat-boom`.
   The complete focused compile and runtime comparison passed in 291 seconds.
+  A 2026-08-24 strict-bootstrap compile completed in 96 seconds. Its default
+  compile budget is 480 seconds with a 30-second forced termination bound.
 - A focused Kotlin enum/string `when` lowering smoke now lives in
   `classes/kotlin_when_mapping_smoke` and runs through
   `ci/kotlin_when_mapping_smoke.sh`. An initial focused local run completed in
@@ -591,17 +616,6 @@ Current verified checks:
   inline `try/finally` `InlineMarker.finallyStart`/`finallyEnd`, non-local
   return lowering, `crossinline` Runnable classes, retained `noinline`
   `Function1` storage, and the noinline lambda `invokedynamic` site.
-- A minimal JVM interop annotation smoke was expanded on 2026-07-11 and a
-  focused local run completed in 177 seconds. Both the host JVM and Doppio
-  printed
-  `kt:java:ok7:IllegalArgumentException:fieldconst:top-3:o5obj:5:syn-kt:111111111:label/true,value/true,delta/true,value/true,arg0/false`.
-  The repo smoke now includes the same path and completed in 240 seconds with
-  the full classpath. Java reflection and `javap` verified `@file:JvmName`,
-  `@JvmName`, `@JvmStatic`, `@JvmField`, `const val`, `@Throws`, `@Volatile`,
-  `@Synchronized`, and `@JvmSynthetic` lowering into static members,
-  exception metadata, volatile fields, synchronized methods, and synthetic
-  method flags, plus `MethodParameters` names and `isNamePresent` metadata,
-  including the synthetic method's unnamed fallback parameter.
 - A dynamic-proxy/reflection smoke is now split into
   `classes/kotlin_proxy_smoke` and run through `ci/kotlin_proxy_smoke.sh`. A
   focused local run completed in 73 seconds, and a 2026-07-18 strict-bootstrap
@@ -657,7 +671,9 @@ Current verified checks:
 - A focused Kotlin mutable delegated-property smoke now lives in
   `classes/kotlin_mutable_delegate_smoke` and runs through
   `ci/kotlin_mutable_delegate_smoke.sh`. A focused local run completed in 183
-  seconds and a follow-up run through the remaining full-classpath
+  seconds, and a 2026-08-24 strict-bootstrap compile completed in 103 seconds.
+  Its default compile budget is 480 seconds with a 30-second forced termination
+  bound. A follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 347 seconds. Both the host JVM and Doppio
   printed
   `bind:primary:MutableDelegateOwner:primary:0|bind:primary:MutableDelegateOwner:primary:30|alt:secondary:MutableDelegateOwner:secondary:30|local:local:top:local:0|local:local:top:local:10`.
@@ -667,19 +683,25 @@ Current verified checks:
 - A focused Kotlin JVM interop smoke now lives in
   `classes/kotlin_jvm_interop_smoke` and runs through
   `ci/kotlin_jvm_interop_smoke.sh`. A focused local run completed in 177
-  seconds and a follow-up run through the remaining full-classpath
+  seconds, and a 2026-08-24 strict-bootstrap compile completed in 154 seconds.
+  Its default compile budget is 480 seconds with a 30-second forced termination
+  bound. A follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 240 seconds. Both the host JVM and Doppio
   printed
   `kt:java:ok7:IllegalArgumentException:fieldconst:top-3:o5obj:5:syn-kt:111111111:label/true,value/true,delta/true,value/true,arg0/false`.
-  Runtime reflection verifies `@JvmStatic`, `@JvmField`, `const val`,
-  `@Volatile`, `@Synchronized`, top-level `@JvmName`, object static access,
-  declared exception metadata, `@JvmSynthetic` method flags, and Java
-  `MethodParameters` names and `isNamePresent` metadata, including the
-  synthetic method's unnamed fallback parameter.
+  Runtime reflection and `javap` verify `@file:JvmName`, `@JvmName`,
+  `@JvmStatic`, `@JvmField`, `const val`, `@Throws`, `@Volatile`,
+  `@Synchronized`, and `@JvmSynthetic` lowering into static members, object
+  static access, exception metadata, volatile fields, synchronized methods,
+  and synthetic method flags, plus Java `MethodParameters` names and
+  `isNamePresent` metadata, including the synthetic method's unnamed fallback
+  parameter.
 - A focused Kotlin callable-reference/sequence smoke now lives in
   `classes/kotlin_reference_sequence_smoke` and runs through
   `ci/kotlin_reference_sequence_smoke.sh`. A focused local run completed in
-  155 seconds and a follow-up run through the remaining full-classpath
+  155 seconds, and a 2026-08-24 strict-bootstrap compile completed in 106
+  seconds. Its default compile budget is 480 seconds with a 30-second forced
+  termination bound. A follow-up run through the remaining full-classpath
   `ci/kotlin_smoke.sh` completed in 226 seconds. Both the host JVM and Doppio
   printed `a2|b7|c4|d9:20:8:7:10`. This covers top-level callable
   references, bound and unbound member references, constructor references,
@@ -859,16 +881,19 @@ Current verified checks:
   `TimeUnit.of(ChronoUnit)`, and `TimeUnit.convert(java.time.Duration)`, with
   negative fractional duration truncation toward zero. `javap` guards require
   the corresponding direct `invokevirtual`, `invokestatic`, and
-  `invokevirtual` references. The Doppio-hosted compiler uses a compile-only
-  JDK 11+ `-jdk-home` for these statically resolved methods, while the generated
-  bytecode runs against Doppio's parsed bootstrap overlay. A 2026-07-17
-  validation of this direct modern `TimeUnit` coverage completed in 99 seconds.
+  `invokevirtual` references. The Doppio-hosted compiler resolves these methods
+  from Doppio's ordered compiler-only bootstrap overlay without a host
+  `-jdk-home`, while the generated bytecode runs against Doppio's parsed
+  runtime overlay. A 2026-07-17 validation of this direct modern `TimeUnit`
+  coverage completed in 99 seconds.
 - A focused Kotlin I/O smoke now lives in `classes/kotlin_io_smoke` and runs
   through `ci/kotlin_io_smoke.sh`, comparing the generated output on both the
   host JVM and Doppio. The split local validation completed the focused smoke
   in 229 seconds and the remaining full-classpath main smoke in 578 seconds.
   A local 2026-07-10 validation with `FileStore` coverage completed the focused
-  smoke in 153 seconds.
+  smoke in 153 seconds. A 2026-08-24 strict-bootstrap compile completed in 208
+  seconds. Its default compile budget is 480 seconds with a 30-second forced
+  termination bound.
 - The focused I/O smoke includes file I/O helpers; both runtimes print
   `0:5:a,1:4:b,2:5:g|aaa|input.txt:17,nested/out.txt:17|616c706861|txt/out/nested/out.txt|true/true`.
   `javap` verified `FilesKt.writeText`, `appendText`, `readLines`,
@@ -998,7 +1023,9 @@ Current verified checks:
   casts in the caller, and lambda capture through an exactly-once block. Both
   the host JVM and Doppio print `KT2|missing|before>body7>after|7|1002`.
   A local 2026-06-30 validation completed the focused contracts smoke in 80
-  seconds and the remaining full-classpath Kotlin compiler smoke in 385
+  seconds, and a 2026-08-24 strict-bootstrap compile completed in 135 seconds.
+  Its default compile budget is 480 seconds with a 30-second forced termination
+  bound. The remaining full-classpath Kotlin compiler smoke completed in 385
   seconds.
 - A focused enum-polymorphism smoke now lives in `classes/kotlin_enum_smoke`
   and runs through `ci/kotlin_enum_smoke.sh`. It covers enum constants with
@@ -1006,8 +1033,10 @@ Current verified checks:
   `enumValues`, `enumValueOf`, `valueOf`, and `when` dispatch over those
   constants. Both the host JVM and Doppio print
   `A1B3G5|tk2|X1,x2,xxx3|low/high/high|IllegalArgumentException`.
-  A local 2026-06-30 validation completed the focused enum smoke in 83
-  seconds and the remaining full-classpath Kotlin compiler smoke in 388
+  A local 2026-06-30 validation completed the focused enum smoke in 83 seconds,
+  and a 2026-08-24 strict-bootstrap compile completed in 116 seconds. Its
+  default compile budget is 480 seconds with a 30-second forced termination
+  bound. The remaining full-classpath Kotlin compiler smoke completed in 388
   seconds.
 - A focused Kotlin bytecode-runtime smoke now lives in
   `classes/kotlin_bytecode_runtime_smoke` and runs through
