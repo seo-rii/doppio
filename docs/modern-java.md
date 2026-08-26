@@ -235,19 +235,33 @@ post-close random-access boundaries on Node. Its replacement modes register a
 same-number state after host-close dispatch and verify that the later close
 callback leaves it intact. Legacy stream and random-access operations plus
 `FileDescriptor.sync()` now also hold generation-bound leases from host dispatch
-through Java completion. Close invalidates the Java
+through native completion handling. Close invalidates the Java
 descriptor and makes its generation non-current immediately, then both the
 stream and channel close paths defer host `close` until the last lease is
 released. This prevents the OS
-from reusing the numeric fd while submitted legacy work is still pending;
-completion or exception is delivered before the release that can wake close.
+from reusing the numeric fd while submitted legacy work is still pending; the
+native callback selects its return or exception path before the release that can
+wake close. Exception construction itself may still initialize Java classes
+asynchronously after that selection.
 The `legacy_fd_lease_test.cjs` native-map fixture covers seven multiple-operation,
 duplicate-close, success/error, delayed-close-error, two-stage append, sync,
 synchronous-dispatch-throw, duplicate-callback, post-close-dispatch same-number
 re-registration, and simulated unlinked BrowserFS close boundaries. The
 BrowserFS branch is injected through the shared close logic rather than a real
-asynchronously scheduled browser backend. Channel-native operations remain
-outside the lease boundary, and mapped buffers retain a separate
+asynchronously scheduled browser backend. All nine `FileDispatcherImpl`
+read, positional-read, scatter-read, size, truncate, force, write,
+positional-write, and gather-write entry points now use the same lease boundary.
+One lease spans each complete native call, including sequential vector fallback
+and append metadata/sync tails. A close makes the generation non-current at
+once, so a later successful host callback selects
+`IOException("Stream Closed")`; its native completion handler runs before lease
+release can dispatch physical close. `nio_fd_lease_test.cjs` deterministically
+holds a channel `fstat` callback, closes the descriptor, rejects premature
+same-number registration, and verifies exception-initiation-before-host-close
+dispatch ordering.
+`FileChannelImpl` map/transfer operations, `UnixCopyFile`, and raw
+descriptor-backed `UnixNativeDispatcher` operations remain outside this first
+channel lease wave. Mapped buffers also retain the separate persistent
 descriptor-lifetime risk tracked in `BUG-016`; the broader host-operation
 boundary therefore remains mitigated rather than fully resolved in `BUG-015`.
 Native lock/release support and channel `EINTR`/`EAGAIN` translation to NIO
