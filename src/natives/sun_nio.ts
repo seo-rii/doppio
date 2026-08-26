@@ -22,6 +22,14 @@ interface IOVec {
 interface LeasedFDOperation {
   lease: FDOperationLease;
   finish: (action: () => void) => void;
+  completionStarted?: boolean;
+}
+
+interface LeasedFDPair {
+  sourceLease: FDOperationLease;
+  destinationLease: FDOperationLease;
+  finish: (action: () => void) => void;
+  completionStarted: boolean;
 }
 
 interface UnixOpenFlags {
@@ -117,6 +125,253 @@ export default function (): any {
     }
     thread.setStatus(ThreadStatus.ASYNC_WAITING);
     return {lease: lease, finish: makeLeasedFinisher(lease)};
+  }
+
+  function closedDescriptorError(message: string = 'Bad file descriptor'): NodeJS.ErrnoException {
+    const err = <NodeJS.ErrnoException> new Error(message);
+    err.code = 'EBADF';
+    return err;
+  }
+
+  function beginDescriptorPair(
+      thread: JVMThread,
+      sourceFd: number,
+      destinationFd: number,
+      unixErrors: boolean): LeasedFDPair {
+    if (sourceFd === -1 || destinationFd === -1) {
+      if (unixErrors) {
+        throwUnixException(thread, closedDescriptorError());
+      } else {
+        thread.throwNewException('Ljava/io/IOException;', 'Bad file descriptor');
+      }
+      return null;
+    }
+    const sourceLease = FDState.acquireOperation(sourceFd);
+    if (sourceLease === null) {
+      if (unixErrors) {
+        throwUnixException(thread, closedDescriptorError());
+      } else {
+        thread.throwNewException('Ljava/io/IOException;', 'Stream Closed');
+      }
+      return null;
+    }
+    const destinationLease = FDState.acquireOperation(destinationFd);
+    if (destinationLease === null) {
+      FDState.releaseOperation(sourceLease);
+      if (unixErrors) {
+        throwUnixException(thread, closedDescriptorError());
+      } else {
+        thread.throwNewException('Ljava/io/IOException;', 'Stream Closed');
+      }
+      return null;
+    }
+    let finished = false;
+    const finish = (action: () => void): void => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      try {
+        action();
+      } finally {
+        let releaseError: any = null;
+        const leases = [sourceLease, destinationLease];
+        for (let i = leases.length - 1; i >= 0; i--) {
+          try {
+            FDState.releaseOperation(leases[i]);
+          } catch (err) {
+            if (releaseError === null) {
+              releaseError = err;
+            }
+          }
+        }
+        if (releaseError !== null) {
+          throw releaseError;
+        }
+      }
+    };
+    thread.setStatus(ThreadStatus.ASYNC_WAITING);
+    return {
+      sourceLease: sourceLease,
+      destinationLease: destinationLease,
+      finish: finish,
+      completionStarted: false
+    };
+  }
+
+  function finishFileDispatcherPair(
+      thread: JVMThread,
+      operation: LeasedFDPair,
+      err: NodeJS.ErrnoException,
+      success: () => void): void {
+    if (operation.completionStarted) {
+      return;
+    }
+    operation.completionStarted = true;
+    operation.finish(() => {
+      if (err) {
+        throwChannelIOException(thread, err);
+      } else if (!FDState.isCurrent(
+          operation.sourceLease.fd,
+          operation.sourceLease.generation) ||
+          !FDState.isCurrent(
+            operation.destinationLease.fd,
+            operation.destinationLease.generation)) {
+        thread.throwNewException('Ljava/io/IOException;', 'Stream Closed');
+      } else {
+        success();
+      }
+    });
+  }
+
+  function dispatchFileDispatcherPair(
+      thread: JVMThread,
+      operation: LeasedFDPair,
+      dispatch: () => void): void {
+    try {
+      dispatch();
+    } catch (err) {
+      if (operation.sourceLease.released || operation.destinationLease.released) {
+        throw err;
+      }
+      finishFileDispatcherPair(
+        thread,
+        operation,
+        <NodeJS.ErrnoException> err,
+        () => {}
+      );
+    }
+  }
+
+  function beginUnixDescriptorOperation(
+      thread: JVMThread,
+      fd: number): LeasedFDOperation {
+    const lease = fd === -1 ? null : FDState.acquireOperation(fd);
+    if (lease === null) {
+      throwUnixException(thread, closedDescriptorError());
+      return null;
+    }
+    thread.setStatus(ThreadStatus.ASYNC_WAITING);
+    return {
+      lease: lease,
+      finish: makeLeasedFinisher(lease),
+      completionStarted: false
+    };
+  }
+
+  function finishUnixDescriptorOperation(
+      thread: JVMThread,
+      operation: LeasedFDOperation,
+      err: NodeJS.ErrnoException,
+      success: () => void): void {
+    if (operation.completionStarted) {
+      return;
+    }
+    operation.completionStarted = true;
+    const completionError = err || (FDState.isCurrent(
+      operation.lease.fd,
+      operation.lease.generation
+    ) ? null : closedDescriptorError());
+    if (completionError === null) {
+      operation.finish(success);
+      return;
+    }
+    try {
+      convertError(
+        thread,
+        completionError,
+        (convertedErr) => {
+          operation.finish(() => thread.throwException(convertedErr));
+        },
+        () => operation.finish(() => {})
+      );
+    } catch (conversionErr) {
+      if (operation.lease.released) {
+        throw conversionErr;
+      }
+      operation.finish(() => {
+        throw conversionErr;
+      });
+    }
+  }
+
+  function dispatchUnixDescriptorOperation(
+      thread: JVMThread,
+      operation: LeasedFDOperation,
+      dispatch: () => void): void {
+    try {
+      dispatch();
+    } catch (err) {
+      if (operation.lease.released || operation.completionStarted) {
+        throw err;
+      }
+      finishUnixDescriptorOperation(
+        thread,
+        operation,
+        <NodeJS.ErrnoException> err,
+        () => {}
+      );
+    }
+  }
+
+  function finishUnixDescriptorPair(
+      thread: JVMThread,
+      operation: LeasedFDPair,
+      err: NodeJS.ErrnoException,
+      success: () => void): void {
+    if (operation.completionStarted) {
+      return;
+    }
+    operation.completionStarted = true;
+    const descriptorsCurrent =
+      FDState.isCurrent(
+        operation.sourceLease.fd,
+        operation.sourceLease.generation) &&
+      FDState.isCurrent(
+        operation.destinationLease.fd,
+        operation.destinationLease.generation),
+      completionError = err || (descriptorsCurrent ? null : closedDescriptorError());
+    if (completionError === null) {
+      operation.finish(success);
+      return;
+    }
+    try {
+      convertError(
+        thread,
+        completionError,
+        (convertedErr) => {
+          operation.finish(() => thread.throwException(convertedErr));
+        },
+        () => operation.finish(() => {})
+      );
+    } catch (conversionErr) {
+      if (operation.sourceLease.released || operation.destinationLease.released) {
+        throw conversionErr;
+      }
+      operation.finish(() => {
+        throw conversionErr;
+      });
+    }
+  }
+
+  function dispatchUnixDescriptorPair(
+      thread: JVMThread,
+      operation: LeasedFDPair,
+      dispatch: () => void): void {
+    try {
+      dispatch();
+    } catch (err) {
+      if (operation.sourceLease.released || operation.destinationLease.released ||
+          operation.completionStarted) {
+        throw err;
+      }
+      finishUnixDescriptorPair(
+        thread,
+        operation,
+        <NodeJS.ErrnoException> err,
+        () => {}
+      );
+    }
   }
 
   function finishFileDispatcherOperation(
@@ -255,26 +510,22 @@ export default function (): any {
   }
 
   function syncBrowserFsFile(
-      thread: JVMThread,
       file: any,
-      cb: () => void): void {
+      cb: (err?: NodeJS.ErrnoException) => void): void {
     file._dirty = true;
     file.sync((err?: NodeJS.ErrnoException) => {
-      if (err) {
-        throwUnixException(thread, err);
-      } else {
-        cb();
-      }
+      cb(err);
     });
   }
 
   function finishWrite(
       thread: JVMThread,
-      fd: number,
+      lease: FDOperationLease,
       numBytes: number,
       advancePosition: boolean,
       cb: (numBytes: number) => void,
       errorCb: (err: NodeJS.ErrnoException, committedBytes: number) => void): void {
+    const fd = lease.fd;
     let finished = false,
       syncDispatched = false;
     const fail = (err: NodeJS.ErrnoException): void => {
@@ -291,6 +542,10 @@ export default function (): any {
     };
     const syncAndReturn = (): void => {
       if (syncDispatched) {
+        return;
+      }
+      if (!FDState.isCurrent(fd, lease.generation)) {
+        fail(closedDescriptorError('Stream Closed'));
         return;
       }
       syncDispatched = true;
@@ -334,7 +589,10 @@ export default function (): any {
       // Preserve at least this operation's progress even if the authoritative
       // post-append stat or sync fails. A successful stat also incorporates
       // growth from other append descriptors.
-      FDState.incrementPos(fd, numBytes);
+      if (!FDState.incrementPosIfCurrent(fd, lease.generation, numBytes)) {
+        fail(closedDescriptorError('Stream Closed'));
+        return;
+      }
       let callbackHandled = false;
       try {
         fs.fstat(fd, (err, stats) => {
@@ -344,8 +602,10 @@ export default function (): any {
           callbackHandled = true;
           if (err) {
             fail(err);
+          } else if (!FDState.isCurrent(fd, lease.generation)) {
+            fail(closedDescriptorError('Stream Closed'));
           } else {
-            FDState.setPos(fd, stats.size);
+            FDState.setPosIfCurrent(fd, lease.generation, stats.size);
             syncAndReturn();
           }
         });
@@ -357,7 +617,10 @@ export default function (): any {
       }
     } else {
       if (advancePosition) {
-        FDState.incrementPos(fd, numBytes);
+        if (!FDState.incrementPosIfCurrent(fd, lease.generation, numBytes)) {
+          fail(closedDescriptorError('Stream Closed'));
+          return;
+        }
       }
       syncAndReturn();
     }
@@ -365,7 +628,7 @@ export default function (): any {
 
   function writeBuffer(
       thread: JVMThread,
-      fd: number,
+      lease: FDOperationLease,
       data: Buffer,
       offset: number,
       length: number,
@@ -374,6 +637,7 @@ export default function (): any {
       appendAtEnd: boolean,
       cb: (numBytes: number) => void,
       errorCb: (err: NodeJS.ErrnoException, committedBytes: number) => void): void {
+    const fd = lease.fd;
     const append = FDState.isAppend(fd);
     let finished = false;
     const fail = (err: NodeJS.ErrnoException, committedBytes: number = 0): void => {
@@ -389,6 +653,10 @@ export default function (): any {
       }
     };
     const writeAt = (writePosition: number | null): void => {
+      if (!FDState.isCurrent(fd, lease.generation)) {
+        fail(closedDescriptorError('Stream Closed'));
+        return;
+      }
       let callbackHandled = false;
       try {
         fs.write(fd, data, offset, length, writePosition, (err, numBytes) => {
@@ -398,9 +666,11 @@ export default function (): any {
           callbackHandled = true;
           if (err) {
             fail(err);
+          } else if (!FDState.isCurrent(fd, lease.generation)) {
+            fail(closedDescriptorError('Stream Closed'), numBytes);
           } else {
             try {
-              finishWrite(thread, fd, numBytes, advancePosition, succeed, fail);
+              finishWrite(thread, lease, numBytes, advancePosition, succeed, fail);
             } catch (writeErr) {
               if (finished) {
                 throw writeErr;
@@ -427,8 +697,10 @@ export default function (): any {
           callbackHandled = true;
           if (err) {
             fail(err);
+          } else if (!FDState.isCurrent(fd, lease.generation)) {
+            fail(closedDescriptorError('Stream Closed'));
           } else {
-            FDState.setPos(fd, stats.size);
+            FDState.setPosIfCurrent(fd, lease.generation, stats.size);
             writeAt(stats.size);
           }
         });
@@ -549,27 +821,54 @@ export default function (): any {
         return;
       }
 
-      const data = Buffer.alloc(len);
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.read(srcFd, data, 0, len, position.toNumber(), (readErr, bytesRead) => {
-        if (readErr) {
-          throwChannelIOException(thread, readErr);
-        } else if (bytesRead === 0) {
-          thread.asyncReturn(Long.ZERO, null);
-        } else {
-          writeBuffer(
-            thread,
-            dstFd,
-            data,
-            0,
-            bytesRead,
-            FDState.getPos(dstFd),
-            true,
-            true,
-            (bytesWritten) => thread.asyncReturn(Long.fromNumber(bytesWritten), null),
-            (writeErr) => throwChannelIOException(thread, writeErr)
-          );
-        }
+      const operation = beginDescriptorPair(thread, srcFd, dstFd, false);
+      if (operation === null) {
+        return;
+      }
+      dispatchFileDispatcherPair(thread, operation, () => {
+        const data = Buffer.alloc(len);
+        let callbackHandled = false;
+        fs.read(srcFd, data, 0, len, position.toNumber(), (readErr, bytesRead) => {
+          if (callbackHandled) {
+            return;
+          }
+          callbackHandled = true;
+          if (readErr || bytesRead === 0) {
+            finishFileDispatcherPair(thread, operation, readErr, () => {
+              thread.asyncReturn(Long.ZERO, null);
+            });
+            return;
+          }
+          if (!FDState.isCurrent(srcFd, operation.sourceLease.generation) ||
+              !FDState.isCurrent(dstFd, operation.destinationLease.generation)) {
+            finishFileDispatcherPair(thread, operation, null, () => {});
+            return;
+          }
+          dispatchFileDispatcherPair(thread, operation, () => {
+            writeBuffer(
+              thread,
+              operation.destinationLease,
+              data,
+              0,
+              bytesRead,
+              FDState.getPos(dstFd),
+              true,
+              true,
+              (bytesWritten) => finishFileDispatcherPair(
+                thread,
+                operation,
+                null,
+                () => thread.asyncReturn(Long.fromNumber(bytesWritten), null)
+              ),
+              (writeErr) => finishFileDispatcherPair(
+                thread,
+                operation,
+                writeErr,
+                () => {}
+              )
+            );
+          });
+        });
       });
     }
 
@@ -681,65 +980,118 @@ export default function (): any {
         dstFd: number,
         srcFd: number,
         cancelAddress: Long): void {
-      const buffer = Buffer.alloc(8192);
+      const operation = beginDescriptorPair(thread, srcFd, dstFd, true);
+      if (operation === null) {
+        return;
+      }
+      let buffer: Buffer;
+      const descriptorsCurrent = (): boolean =>
+        FDState.isCurrent(srcFd, operation.sourceLease.generation) &&
+        FDState.isCurrent(dstFd, operation.destinationLease.generation);
 
       const copyNext = (): void => {
-        fs.read(
-          srcFd,
-          buffer,
-          0,
-          buffer.length,
-          FDState.getPos(srcFd),
-          (readErr, bytesRead) => {
-            if (readErr) {
-              throwUnixException(thread, readErr);
-              return;
-            }
-            if (bytesRead === 0) {
-              thread.asyncReturn();
-              return;
-            }
-            FDState.incrementPos(srcFd, bytesRead);
-
-            let written = 0;
-            const writeNext = (): void => {
-              writeBuffer(
-                thread,
-                dstFd,
-                buffer,
-                written,
-                bytesRead - written,
-                FDState.getPos(dstFd),
-                true,
-                false,
-                (bytesWritten) => {
-                  if (bytesWritten === 0) {
-                    const noProgress = <NodeJS.ErrnoException>
-                      new Error('Unable to make progress while copying a file.');
-                    noProgress.code = 'EIO';
-                    throwUnixException(thread, noProgress);
-                    return;
-                  }
-                  written += bytesWritten;
-                  if (written < bytesRead) {
-                    writeNext();
-                  } else {
-                    copyNext();
-                  }
-                },
-                (writeErr) => throwUnixException(thread, writeErr)
+        if (!descriptorsCurrent()) {
+          finishUnixDescriptorPair(thread, operation, null, () => {});
+          return;
+        }
+        let callbackHandled = false;
+        dispatchUnixDescriptorPair(thread, operation, () => {
+          fs.read(
+            srcFd,
+            buffer,
+            0,
+            buffer.length,
+            FDState.getPos(srcFd),
+            (readErr, bytesRead) => {
+              if (callbackHandled) {
+                return;
+              }
+              callbackHandled = true;
+              if (readErr) {
+                finishUnixDescriptorPair(thread, operation, readErr, () => {});
+                return;
+              }
+              if (!descriptorsCurrent()) {
+                finishUnixDescriptorPair(thread, operation, null, () => {});
+                return;
+              }
+              if (bytesRead === 0) {
+                finishUnixDescriptorPair(
+                  thread,
+                  operation,
+                  null,
+                  () => thread.asyncReturn()
+                );
+                return;
+              }
+              FDState.incrementPosIfCurrent(
+                srcFd,
+                operation.sourceLease.generation,
+                bytesRead
               );
-            };
-            writeNext();
-          }
-        );
+
+              let written = 0;
+              const writeNext = (): void => {
+                if (!descriptorsCurrent()) {
+                  finishUnixDescriptorPair(thread, operation, null, () => {});
+                  return;
+                }
+                dispatchUnixDescriptorPair(thread, operation, () => {
+                  writeBuffer(
+                    thread,
+                    operation.destinationLease,
+                    buffer,
+                    written,
+                    bytesRead - written,
+                    FDState.getPos(dstFd),
+                    true,
+                    false,
+                    (bytesWritten) => {
+                      if (!descriptorsCurrent()) {
+                        finishUnixDescriptorPair(thread, operation, null, () => {});
+                        return;
+                      }
+                      if (bytesWritten === 0) {
+                        const noProgress = <NodeJS.ErrnoException>
+                          new Error('Unable to make progress while copying a file.');
+                        noProgress.code = 'EIO';
+                        finishUnixDescriptorPair(
+                          thread,
+                          operation,
+                          noProgress,
+                          () => {}
+                        );
+                        return;
+                      }
+                      written += bytesWritten;
+                      if (written < bytesRead) {
+                        writeNext();
+                      } else {
+                        copyNext();
+                      }
+                    },
+                    (writeErr) => finishUnixDescriptorPair(
+                      thread,
+                      operation,
+                      writeErr,
+                      () => {}
+                    )
+                  );
+                });
+              };
+              writeNext();
+            }
+          );
+        });
       };
 
       // OpenJDK uses cancelAddress to observe interrupt-driven cancellation.
       // Doppio currently has no native-thread signal path, so preserve the
       // complete transfer while keeping the native signature compatible.
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      copyNext();
+      dispatchUnixDescriptorPair(thread, operation, () => {
+        buffer = Buffer.alloc(8192);
+        copyNext();
+      });
     }
   }
 
@@ -976,7 +1328,7 @@ export default function (): any {
       dispatchFileDispatcherOperation(thread, operation, () => {
         writeBuffer(
           thread,
-          fd,
+          operation.lease,
           data,
           0,
           len,
@@ -1010,7 +1362,7 @@ export default function (): any {
       dispatchFileDispatcherOperation(thread, operation, () => {
         writeBuffer(
           thread,
-          fd,
+          operation.lease,
           data,
           0,
           len,
@@ -1075,7 +1427,7 @@ export default function (): any {
                 dispatchFileDispatcherOperation(thread, operation, () => {
                   finishWrite(
                     thread,
-                    fd,
+                    operation.lease,
                     numBytes,
                     true,
                     (written) => finishFileDispatcherOperation(
@@ -1113,7 +1465,7 @@ export default function (): any {
         dispatchFileDispatcherOperation(thread, operation, () => {
           writeBuffer(
             thread,
-            fd,
+            operation.lease,
             data,
             0,
             vec.len,
@@ -1230,10 +1582,22 @@ export default function (): any {
     return util.newArrayFromData<number>(thread, thread.getBsCl(), '[B', <number[]><any> i8);
   }
 
-  function convertError(thread: JVMThread, err: NodeJS.ErrnoException, cb: (err: JVMTypes.java_lang_Exception) => void): void {
+  function convertError(
+      thread: JVMThread,
+      err: NodeJS.ErrnoException,
+      cb: (err: JVMTypes.java_lang_Exception) => void,
+      failureCb: () => void = () => {}): void {
     thread.setStatus(ThreadStatus.ASYNC_WAITING);
     thread.getBsCl().initializeClass(thread, 'Lsun/nio/fs/UnixException;', (unixException) => {
+      if (unixException === null) {
+        failureCb();
+        return;
+      }
       thread.getBsCl().initializeClass(thread, 'Lsun/nio/fs/UnixConstants;', (unixConstants) => {
+          if (unixConstants === null) {
+            failureCb();
+            return;
+          }
           var cons = (<ReferenceClassData<JVMTypes.sun_nio_fs_UnixException>> unixException).getConstructor(thread),
             rv = new cons(thread),
             unixCons: typeof JVMTypes.sun_nio_fs_UnixConstants = <any> (<ReferenceClassData<JVMTypes.sun_nio_fs_UnixConstants>> unixConstants).getConstructor(thread),
@@ -1708,14 +2072,21 @@ export default function (): any {
     }
 
     public static 'fstat(ILsun/nio/fs/UnixFileAttributes;)V'(thread: JVMThread, fd: number, jvmStats: JVMTypes.sun_nio_fs_UnixFileAttributes): void {
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.fstat(fd, (err, stats) => {
-        if (err) {
-          throwUnixException(thread, err);
-        } else {
-          convertStats(stats, jvmStats, util.are_in_browser() ? getBrowserFsFdIdentity(fd) : null);
-          thread.asyncReturn();
-        }
+      const operation = beginUnixDescriptorOperation(thread, fd);
+      if (operation === null) {
+        return;
+      }
+      dispatchUnixDescriptorOperation(thread, operation, () => {
+        fs.fstat(fd, (err, stats) => {
+          finishUnixDescriptorOperation(thread, operation, err, () => {
+            convertStats(
+              stats,
+              jvmStats,
+              util.are_in_browser() ? getBrowserFsFdIdentity(fd) : null
+            );
+            thread.asyncReturn();
+          });
+        });
       });
     }
 
@@ -1746,18 +2117,30 @@ export default function (): any {
     }
 
     public static 'fchown(III)V'(thread: JVMThread, fd: number, uid: number, gid: number): void {
+      const operation = beginUnixDescriptorOperation(thread, fd);
+      if (operation === null) {
+        return;
+      }
       if (util.are_in_browser()) {
         // BrowserFS models a single uid/gid (both zero) and cannot persist
         // ownership. Treat descriptor ownership copying as an accepted no-op.
+        finishUnixDescriptorOperation(
+          thread,
+          operation,
+          null,
+          () => thread.asyncReturn()
+        );
         return;
       }
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.fchown(fd, uid, gid, (err) => {
-        if (err) {
-          throwUnixException(thread, err);
-        } else {
-          thread.asyncReturn();
-        }
+      dispatchUnixDescriptorOperation(thread, operation, () => {
+        fs.fchown(fd, uid, gid, (err) => {
+          finishUnixDescriptorOperation(
+            thread,
+            operation,
+            err,
+            () => thread.asyncReturn()
+          );
+        });
       });
     }
 
@@ -1773,27 +2156,41 @@ export default function (): any {
     }
 
     public static 'fchmod(II)V'(thread: JVMThread, fd: number, mode: number): void {
+      const operation = beginUnixDescriptorOperation(thread, fd);
+      if (operation === null) {
+        return;
+      }
       if (util.are_in_browser()) {
         const file = getBrowserFsFile(fd);
         if (file !== null && typeof file.getStats === 'function' && typeof file.sync === 'function') {
-          const stats = file.getStats();
-          if (typeof stats.chmod === 'function') {
-            stats.chmod(mode);
-          } else {
-            stats.mode = (stats.mode & 0xF000) | mode;
-          }
-          thread.setStatus(ThreadStatus.ASYNC_WAITING);
-          syncBrowserFsFile(thread, file, () => thread.asyncReturn());
+          dispatchUnixDescriptorOperation(thread, operation, () => {
+            const stats = file.getStats();
+            if (typeof stats.chmod === 'function') {
+              stats.chmod(mode);
+            } else {
+              stats.mode = (stats.mode & 0xF000) | mode;
+            }
+            syncBrowserFsFile(file, (err) => {
+              finishUnixDescriptorOperation(
+                thread,
+                operation,
+                err,
+                () => thread.asyncReturn()
+              );
+            });
+          });
           return;
         }
       }
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.fchmod(fd, mode, (err) => {
-        if (err) {
-          throwUnixException(thread, err);
-        } else {
-          thread.asyncReturn();
-        }
+      dispatchUnixDescriptorOperation(thread, operation, () => {
+        fs.fchmod(fd, mode, (err) => {
+          finishUnixDescriptorOperation(
+            thread,
+            operation,
+            err,
+            () => thread.asyncReturn()
+          );
+        });
       });
     }
 
@@ -1848,25 +2245,39 @@ export default function (): any {
     public static 'futimes(IJJ)V'(thread: JVMThread, fd: number, times0: Long, times1: Long): void {
       const t0 = new Date(times0.toNumber() / 1000);
       const t1 = new Date(times1.toNumber() / 1000);
+      const operation = beginUnixDescriptorOperation(thread, fd);
+      if (operation === null) {
+        return;
+      }
       if (util.are_in_browser()) {
         const file = getBrowserFsFile(fd);
         if (file !== null && typeof file.getStats === 'function' && typeof file.sync === 'function') {
-          const stats = file.getStats();
-          stats.atime = t0;
-          stats.mtime = t1;
-          stats.ctime = new Date();
-          thread.setStatus(ThreadStatus.ASYNC_WAITING);
-          syncBrowserFsFile(thread, file, () => thread.asyncReturn());
+          dispatchUnixDescriptorOperation(thread, operation, () => {
+            const stats = file.getStats();
+            stats.atime = t0;
+            stats.mtime = t1;
+            stats.ctime = new Date();
+            syncBrowserFsFile(file, (err) => {
+              finishUnixDescriptorOperation(
+                thread,
+                operation,
+                err,
+                () => thread.asyncReturn()
+              );
+            });
+          });
           return;
         }
       }
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.futimes(fd, t0, t1, (err) => {
-        if (err) {
-          throwUnixException(thread, err);
-        } else {
-          thread.asyncReturn();
-        }
+      dispatchUnixDescriptorOperation(thread, operation, () => {
+        fs.futimes(fd, t0, t1, (err) => {
+          finishUnixDescriptorOperation(
+            thread,
+            operation,
+            err,
+            () => thread.asyncReturn()
+          );
+        });
       });
     }
 
@@ -1900,33 +2311,57 @@ export default function (): any {
     }
 
     public static 'read(IJI)I'(thread: JVMThread, fd: number, buf: Long, nbyte: number): void {
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      let buff = thread.getJVM().getHeap().get_buffer(buf.toNumber(), nbyte);
-      fs.read(fd, buff, 0, nbyte, FDState.getPos(fd), (err, bytesRead) => {
-        if (err) {
-          throwUnixException(thread, err);
-        } else {
-          FDState.incrementPos(fd, bytesRead);
-          thread.asyncReturn(bytesRead);
-        }
+      const operation = beginUnixDescriptorOperation(thread, fd);
+      if (operation === null) {
+        return;
+      }
+      dispatchUnixDescriptorOperation(thread, operation, () => {
+        const scratch = Buffer.alloc(nbyte),
+          position = FDState.getPos(fd);
+        fs.read(fd, scratch, 0, nbyte, position, (err, bytesRead) => {
+          finishUnixDescriptorOperation(thread, operation, err, () => {
+            const destination = thread.getJVM().getHeap().get_buffer(
+              buf.toNumber(),
+              nbyte
+            );
+            scratch.copy(destination, 0, 0, bytesRead);
+            FDState.incrementPosIfCurrent(fd, operation.lease.generation, bytesRead);
+            thread.asyncReturn(bytesRead);
+          });
+        });
       });
     }
 
     public static 'write(IJI)I'(thread: JVMThread, fd: number, buf: Long, nbyte: number): void {
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      let buff = thread.getJVM().getHeap().get_buffer(buf.toNumber(), nbyte);
-      writeBuffer(
-        thread,
-        fd,
-        buff,
-        0,
-        nbyte,
-        FDState.getPos(fd),
-        true,
-        true,
-        (bytesWritten) => thread.asyncReturn(bytesWritten),
-        (err) => throwUnixException(thread, err)
-      );
+      const operation = beginUnixDescriptorOperation(thread, fd);
+      if (operation === null) {
+        return;
+      }
+      dispatchUnixDescriptorOperation(thread, operation, () => {
+        const buff = thread.getJVM().getHeap().get_buffer(buf.toNumber(), nbyte);
+        writeBuffer(
+          thread,
+          operation.lease,
+          buff,
+          0,
+          nbyte,
+          FDState.getPos(fd),
+          true,
+          true,
+          (bytesWritten) => finishUnixDescriptorOperation(
+            thread,
+            operation,
+            null,
+            () => thread.asyncReturn(bytesWritten)
+          ),
+          (err) => finishUnixDescriptorOperation(
+            thread,
+            operation,
+            err,
+            () => {}
+          )
+        );
+      });
     }
 
     public static 'access0(JI)V'(thread: JVMThread, pathAddress: Long, arg1: number): void {

@@ -5743,6 +5743,28 @@ function modernJava(grunt: IGrunt) {
     );
   });
 
+  grunt.registerTask('unit_test_nio_fd_operation_leases', 'Keep transfer, copy, and Unix descriptor operations generation-bound.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      testPath = path.resolve('ci/nio_fd_operation_lease_test.cjs'),
+      expected = 'nio-fd-operation-leases:18:ok\n';
+    child_process.execFile(
+      process.execPath,
+      ['--no-deprecation', testPath],
+      function(err?: any, stdout?: string, stderr?: string): void {
+        var actual = stdout + stderr;
+        if (err || actual !== expected) {
+          grunt.fail.fatal(
+            'NIO descriptor operation-lease output does not match.\nDoppio:\n' + actual +
+            '\nExpected:\n' + expected
+          );
+          return;
+        }
+        grunt.log.ok('NIO transfer, copy, and Unix operations retain their descriptor generations.');
+        done();
+      }
+    );
+  });
+
   grunt.registerMultiTask('parse_classfile_modern', 'Parse modern class-file fixtures with Doppio.', function() {
     var ReferenceClassData = require('../build/release-cli/src/ClassData').ReferenceClassData,
       options: {
