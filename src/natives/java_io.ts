@@ -10,6 +10,7 @@ import Long = Doppio.VM.Long;
 import assert = Doppio.Debug.Assert;
 import * as JVMTypes from '../../includes/JVMTypes';
 import FDState = Doppio.VM.FDState;
+import {FDCloseInfo, FDOperationLease} from '../fd_state';
 import {setImmediate} from 'browserfs';
 
 function throwNodeError(thread: JVMThread, err: NodeJS.ErrnoException): void {
@@ -18,6 +19,22 @@ function throwNodeError(thread: JVMThread, err: NodeJS.ErrnoException): void {
     type = 'Ljava/io/FileNotFoundException;';
   }
   thread.throwNewException(type, err.message);
+}
+
+function makeLeasedFinisher(
+    lease: FDOperationLease): (action: () => void) => void {
+  let finished = false;
+  return (action: () => void): void => {
+    if (finished) {
+      return;
+    }
+    finished = true;
+    try {
+      action();
+    } finally {
+      FDState.releaseOperation(lease);
+    }
+  };
 }
 
 export default function (): any {
@@ -67,6 +84,58 @@ export default function (): any {
     });
   }
 
+  function closeFileDescriptor(
+      thread: JVMThread,
+      fdObj: JVMTypes.java_io_FileDescriptor): void {
+    const fd = fdObj['java/io/FileDescriptor/fd'];
+    if (fd === -1) {
+      return;
+    }
+    // Logical close is immediate, while host close waits for every operation
+    // that already owns this descriptor generation to finish.
+    fdObj['java/io/FileDescriptor/fd'] = -1;
+    thread.setStatus(ThreadStatus.ASYNC_WAITING);
+    const requested = FDState.requestClose(fd, (closeInfo: FDCloseInfo) => {
+      if (util.are_in_browser() && closeInfo.unlinked) {
+        const browserFs = typeof (<any> fs).getFSModule === 'function' ?
+          (<any> fs).getFSModule() : null;
+        if (browserFs === null || typeof browserFs.closeFd !== 'function') {
+          const unavailableError = <NodeJS.ErrnoException>
+            new Error('Unable to discard an unlinked BrowserFS descriptor.');
+          unavailableError.code = 'EIO';
+          throwNodeError(thread, unavailableError);
+          return;
+        }
+        try {
+          browserFs.closeFd(fd);
+        } catch (closeErr) {
+          throwNodeError(thread, <NodeJS.ErrnoException> closeErr);
+          return;
+        }
+        thread.asyncReturn();
+        return;
+      }
+      try {
+        fs.close(fd, (err?: NodeJS.ErrnoException) => {
+          if (err) {
+            throwNodeError(thread, err);
+          } else {
+            thread.asyncReturn();
+          }
+        });
+      } catch (closeErr) {
+        throwNodeError(thread, <NodeJS.ErrnoException> closeErr);
+      }
+    });
+    if (!requested) {
+      thread.asyncReturn();
+    }
+  }
+
+  function throwStreamClosed(thread: JVMThread): void {
+    thread.throwNewException('Ljava/io/IOException;', 'Stream Closed');
+  }
+
   class java_io_Console {
 
     public static 'encoding()Ljava/lang/String;'(thread: JVMThread): JVMTypes.java_lang_String {
@@ -88,20 +157,39 @@ export default function (): any {
   class java_io_FileDescriptor {
 
     public static 'sync()V'(thread: JVMThread, javaThis: JVMTypes.java_io_FileDescriptor): void {
-      var fd = javaThis['java/io/FileDescriptor/fd'];
+      var fd = javaThis['java/io/FileDescriptor/fd'],
+        lease: FDOperationLease,
+        finish: (action: () => void) => void;
       if (fd === -1) {
         thread.throwNewException('Ljava/io/SyncFailedException;', 'Bad file descriptor');
       } else if (fd === 0 || fd === 1 || fd === 2) {
         return;
       } else {
+        lease = FDState.acquireOperation(fd);
+        if (lease === null) {
+          thread.throwNewException('Ljava/io/SyncFailedException;', 'Stream Closed');
+          return;
+        }
+        finish = makeLeasedFinisher(lease);
         thread.setStatus(ThreadStatus.ASYNC_WAITING);
-        fs.fsync(fd, (err?: NodeJS.ErrnoException) => {
-          if (err) {
-            thread.throwNewException('Ljava/io/SyncFailedException;', err.message);
-          } else {
-            thread.asyncReturn();
-          }
-        });
+        try {
+          fs.fsync(fd, (err?: NodeJS.ErrnoException) => {
+            finish(() => {
+              if (err) {
+                thread.throwNewException('Ljava/io/SyncFailedException;', err.message);
+              } else if (!FDState.isCurrent(fd, lease.generation)) {
+                thread.throwNewException('Ljava/io/SyncFailedException;', 'Stream Closed');
+              } else {
+                thread.asyncReturn();
+              }
+            });
+          });
+        } catch (syncErr) {
+          finish(() => thread.throwNewException(
+            'Ljava/io/SyncFailedException;',
+            (<NodeJS.ErrnoException> syncErr).message
+          ));
+        }
       }
     }
 
@@ -135,20 +223,39 @@ export default function (): any {
 
     public static 'read0()I'(thread: JVMThread, javaThis: JVMTypes.java_io_FileInputStream): void {
       var fdObj = javaThis["java/io/FileInputStream/fd"],
-        fd = fdObj["java/io/FileDescriptor/fd"];
+        fd = fdObj["java/io/FileDescriptor/fd"],
+        lease: FDOperationLease,
+        finish: (action: () => void) => void,
+        position: number;
       if (-1 === fd) {
         thread.throwNewException("Ljava/io/IOException;", "Bad file descriptor");
       } else if (0 !== fd) {
         // this is a real file that we've already opened
-        thread.setStatus(ThreadStatus.ASYNC_WAITING);
+        lease = FDState.acquireOperation(fd);
+        if (lease === null) {
+          throwStreamClosed(thread);
+          return;
+        }
         var buf = new Buffer(1);
-        fs.read(fd, buf, 0, 1, FDState.getPos(fd), (err, bytes_read) => {
-          if (err) {
-            return throwNodeError(thread, err);
-          }
-          FDState.incrementPos(fd, 1);
-          thread.asyncReturn(0 === bytes_read ? -1 : buf[0]);
-        });
+        finish = makeLeasedFinisher(lease);
+        position = FDState.getPos(fd);
+        thread.setStatus(ThreadStatus.ASYNC_WAITING);
+        try {
+          fs.read(fd, buf, 0, 1, position, (err, bytes_read) => {
+            finish(() => {
+              if (err) {
+                throwNodeError(thread, err);
+              } else if (!FDState.incrementPosIfCurrent(
+                  fd, lease.generation, bytes_read)) {
+                throwStreamClosed(thread);
+              } else {
+                thread.asyncReturn(0 === bytes_read ? -1 : buf[0]);
+              }
+            });
+          });
+        } catch (readErr) {
+          finish(() => throwNodeError(thread, <NodeJS.ErrnoException> readErr));
+        }
       } else {
         // reading from System.in, do it async
         thread.setStatus(ThreadStatus.ASYNC_WAITING);
@@ -159,7 +266,8 @@ export default function (): any {
     }
 
     public static 'readBytes([BII)I'(thread: JVMThread, javaThis: JVMTypes.java_io_FileInputStream, byteArr: JVMTypes.JVMArray<number>, offset: number, nBytes: number): number {
-      var buf: Buffer, pos: number,
+      var buf: Buffer, pos: number, lease: FDOperationLease,
+        finish: (action: () => void) => void,
         fdObj = javaThis["java/io/FileInputStream/fd"],
         fd = fdObj["java/io/FileDescriptor/fd"];
 
@@ -174,22 +282,36 @@ export default function (): any {
         thread.throwNewException("Ljava/io/IOException;", "Bad file descriptor");
       } else if (0 !== fd) {
         // this is a real file that we've already opened
-        pos = FDState.getPos(fd)
+        lease = FDState.acquireOperation(fd);
+        if (lease === null) {
+          throwStreamClosed(thread);
+          return;
+        }
+        pos = FDState.getPos(fd);
         buf = new Buffer(nBytes);
+        finish = makeLeasedFinisher(lease);
         thread.setStatus(ThreadStatus.ASYNC_WAITING);
-        fs.read(fd, buf, 0, nBytes, pos, (err, bytesRead) => {
-          if (null != err) {
-            throwNodeError(thread, err);
-          } else {
-            // not clear why, but sometimes node doesn't move the
-            // file pointer, so we do it here ourselves.
-            FDState.incrementPos(fd, bytesRead);
-            for (let i = 0; i < bytesRead; i++) {
-              byteArr.array[offset + i] = buf.readInt8(i);
-            }
-            thread.asyncReturn(0 === bytesRead ? -1 : bytesRead);
-          }
-        });
+        try {
+          fs.read(fd, buf, 0, nBytes, pos, (err, bytesRead) => {
+            finish(() => {
+              if (null != err) {
+                throwNodeError(thread, err);
+              } else if (!FDState.incrementPosIfCurrent(
+                  fd, lease.generation, bytesRead)) {
+                throwStreamClosed(thread);
+              } else {
+                // not clear why, but sometimes node doesn't move the
+                // file pointer, so we do it here ourselves.
+                for (let i = 0; i < bytesRead; i++) {
+                  byteArr.array[offset + i] = buf.readInt8(i);
+                }
+                thread.asyncReturn(0 === bytesRead ? -1 : bytesRead);
+              }
+            });
+          });
+        } catch (readErr) {
+          finish(() => throwNodeError(thread, <NodeJS.ErrnoException> readErr));
+        }
       } else {
         // reading from System.in, do it async
         thread.setStatus(ThreadStatus.ASYNC_WAITING);
@@ -210,16 +332,34 @@ export default function (): any {
       if (-1 === fd) {
         thread.throwNewException("Ljava/io/IOException;", "Bad file descriptor");
       } else if (0 !== fd) {
+        const lease = FDState.acquireOperation(fd);
+        if (lease === null) {
+          throwStreamClosed(thread);
+          return;
+        }
+        const position = FDState.getPos(fd),
+          finish = makeLeasedFinisher(lease);
         thread.setStatus(ThreadStatus.ASYNC_WAITING);
-        fs.fstat(fd, (err, stats) => {
-          if (err) {
-            return throwNodeError(thread, err);
-          }
-          var bytesLeft = stats.size - FDState.getPos(fd),
-            toSkip = Math.min(nBytes.toNumber(), bytesLeft);
-          FDState.incrementPos(fd, toSkip);
-          thread.asyncReturn(Long.fromNumber(toSkip), null);
-        });
+        try {
+          fs.fstat(fd, (err, stats) => {
+            finish(() => {
+              if (err) {
+                throwNodeError(thread, err);
+              } else {
+                var bytesLeft = stats.size - position,
+                  toSkip = Math.min(nBytes.toNumber(), bytesLeft);
+                if (!FDState.incrementPosIfCurrent(
+                    fd, lease.generation, toSkip)) {
+                  throwStreamClosed(thread);
+                } else {
+                  thread.asyncReturn(Long.fromNumber(toSkip), null);
+                }
+              }
+            });
+          });
+        } catch (statErr) {
+          finish(() => throwNodeError(thread, <NodeJS.ErrnoException> statErr));
+        }
       } else {
         // reading from System.in, do it async
         thread.setStatus(ThreadStatus.ASYNC_WAITING);
@@ -240,13 +380,29 @@ export default function (): any {
         // no buffering for stdin (if fd is 0)
         return 0;
       } else {
+        const lease = FDState.acquireOperation(fd);
+        if (lease === null) {
+          throwStreamClosed(thread);
+          return;
+        }
+        const position = FDState.getPos(fd),
+          finish = makeLeasedFinisher(lease);
         thread.setStatus(ThreadStatus.ASYNC_WAITING);
-        fs.fstat(fd, (err, stats) => {
-          if (err) {
-            return throwNodeError(thread, err);
-          }
-          thread.asyncReturn(stats.size - FDState.getPos(fd));
-        });
+        try {
+          fs.fstat(fd, (err, stats) => {
+            finish(() => {
+              if (err) {
+                throwNodeError(thread, err);
+              } else if (!FDState.isCurrent(fd, lease.generation)) {
+                throwStreamClosed(thread);
+              } else {
+                thread.asyncReturn(stats.size - position);
+              }
+            });
+          });
+        } catch (statErr) {
+          finish(() => throwNodeError(thread, <NodeJS.ErrnoException> statErr));
+        }
       }
     }
 
@@ -256,18 +412,7 @@ export default function (): any {
     }
 
     public static 'close0()V'(thread: JVMThread, javaThis: JVMTypes.java_io_FileInputStream): void {
-      var fdObj = javaThis['java/io/FileInputStream/fd'],
-        fd = fdObj['java/io/FileDescriptor/fd'];
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.close(fd, (err?: NodeJS.ErrnoException) => {
-        if (err) {
-          throwNodeError(thread, err);
-        } else {
-          fdObj['java/io/FileDescriptor/fd'] = -1;
-          FDState.close(fd);
-          thread.asyncReturn();
-        }
-      });
+      closeFileDescriptor(thread, javaThis['java/io/FileInputStream/fd']);
     }
 
   }
@@ -279,15 +424,20 @@ export default function (): any {
      * @param append whether the file is to be opened in append mode
      */
     public static 'open0(Ljava/lang/String;Z)V'(thread: JVMThread, javaThis: JVMTypes.java_io_FileOutputStream, name: JVMTypes.java_lang_String, append: number): void {
+      var filepath = name.toString();
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.open(name.toString(), append ? 'a' : 'w', (err, fd) => {
+      fs.open(filepath, append ? 'a' : 'w', (err, fd) => {
         if (err) {
           return throwNodeError(thread, err);
         }
         var fdObj = javaThis['java/io/FileOutputStream/fd'];
-        fdObj['java/io/FileDescriptor/fd'] = fd;
-        fs.fstat(fd, (err, stats) => {
-          FDState.setPos(fd, stats.size);
+        fs.fstat(fd, (statErr, stats) => {
+          if (statErr) {
+            fs.close(fd, () => throwNodeError(thread, statErr));
+            return;
+          }
+          fdObj['java/io/FileDescriptor/fd'] = fd;
+          FDState.open(fd, append ? stats.size : 0, append !== 0, 0, filepath);
           thread.asyncReturn();
         });
       });
@@ -317,19 +467,62 @@ export default function (): any {
     public static 'writeBytes([BIIZ)V'(thread: JVMThread, javaThis: JVMTypes.java_io_FileOutputStream, bytes: JVMTypes.JVMArray<number>, offset: number, len: number, append: number): void {
       var buf: Buffer = new Buffer(bytes.array),
         fdObj = javaThis['java/io/FileOutputStream/fd'],
-        fd = fdObj['java/io/FileDescriptor/fd'];
+        fd = fdObj['java/io/FileDescriptor/fd'],
+        appendMode = append !== 0 || FDState.isAppend(fd),
+        lease: FDOperationLease,
+        finish: (action: () => void) => void,
+        position: number,
+        writeCompleted = false;
       if (fd === -1) {
         thread.throwNewException('Ljava/io/IOException;', "Bad file descriptor");
       } else if (fd !== 1 && fd !== 2) {
         // normal file
+        lease = FDState.acquireOperation(fd);
+        if (lease === null) {
+          throwStreamClosed(thread);
+          return;
+        }
+        position = FDState.getPos(fd);
+        finish = makeLeasedFinisher(lease);
         thread.setStatus(ThreadStatus.ASYNC_WAITING);
-        fs.write(fd, buf, offset, len, FDState.getPos(fd), (err, numBytes) => {
-          if (err) {
-            return throwNodeError(thread, err);
-          }
-          FDState.incrementPos(fd, numBytes);
-          thread.asyncReturn();
-        });
+        try {
+          fs.write(fd, buf, offset, len, appendMode ? null : position, (err, numBytes) => {
+            if (writeCompleted) {
+              return;
+            }
+            writeCompleted = true;
+            if (err) {
+              finish(() => throwNodeError(thread, err));
+            } else if (!FDState.incrementPosIfCurrent(
+                fd, lease.generation, numBytes)) {
+              finish(() => throwStreamClosed(thread));
+            } else if (appendMode) {
+              try {
+                fs.fstat(fd, (statErr, stats) => {
+                  finish(() => {
+                    if (statErr) {
+                      throwNodeError(thread, statErr);
+                    } else if (!FDState.setPosIfCurrent(
+                        fd, lease.generation, stats.size)) {
+                      throwStreamClosed(thread);
+                    } else {
+                      thread.asyncReturn();
+                    }
+                  });
+                });
+              } catch (statDispatchErr) {
+                finish(() => throwNodeError(
+                  thread,
+                  <NodeJS.ErrnoException> statDispatchErr
+                ));
+              }
+            } else {
+              finish(() => thread.asyncReturn());
+            }
+          });
+        } catch (writeErr) {
+          finish(() => throwNodeError(thread, <NodeJS.ErrnoException> writeErr));
+        }
       } else {
         // The string is in UTF-8 format. But now we need to convert them to UTF-16 to print 'em out. :(
         var output: string = buf.toString("utf8", offset, offset + len);
@@ -348,18 +541,7 @@ export default function (): any {
     }
 
     public static 'close0()V'(thread: JVMThread, javaThis: JVMTypes.java_io_FileOutputStream): void {
-      var fdObj = javaThis['java/io/FileOutputStream/fd'],
-        fd = fdObj['java/io/FileDescriptor/fd'];
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.close(fd, (err?: NodeJS.ErrnoException) => {
-        if (err) {
-          return throwNodeError(thread, err);
-        } else {
-          fdObj['java/io/FileDescriptor/fd'] = -1;
-          FDState.close(fd);
-          thread.asyncReturn();
-        }
-      });
+      closeFileDescriptor(thread, javaThis['java/io/FileOutputStream/fd']);
     }
 
     public static 'initIDs()V'(thread: JVMThread): void {
@@ -464,13 +646,13 @@ export default function (): any {
             }
             var createdFdObj = javaThis['java/io/RandomAccessFile/fd'];
             createdFdObj['java/io/FileDescriptor/fd'] = createdFd;
-            FDState.open(createdFd, 0);
+            FDState.open(createdFd, 0, false, 0, filepath);
             thread.asyncReturn();
           });
         } else {
           var fdObj = javaThis['java/io/RandomAccessFile/fd'];
           fdObj['java/io/FileDescriptor/fd'] = fd;
-          FDState.open(fd, 0);
+          FDState.open(fd, 0, false, 0, filepath);
           thread.asyncReturn();
         }
       });
@@ -494,107 +676,249 @@ export default function (): any {
     public static 'read0()I'(thread: JVMThread, javaThis: JVMTypes.java_io_RandomAccessFile): void {
       var fdObj = javaThis["java/io/RandomAccessFile/fd"],
         fd = fdObj["java/io/FileDescriptor/fd"],
-        buf = new Buffer(1);
+        buf: Buffer,
+        lease: FDOperationLease,
+        finish: (action: () => void) => void,
+        position: number;
+      if (fd === -1) {
+        thread.throwNewException('Ljava/io/IOException;', "Bad file descriptor");
+        return;
+      }
+      lease = FDState.acquireOperation(fd);
+      if (lease === null) {
+        throwStreamClosed(thread);
+        return;
+      }
+      buf = new Buffer(1);
+      finish = makeLeasedFinisher(lease);
+      position = FDState.getPos(fd);
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.read(fd, buf, 0, 1, FDState.getPos(fd), function (err, bytesRead) {
-        if (err) {
-          return throwNodeError(thread, err);
-        } else {
-          FDState.incrementPos(fd, bytesRead);
-          // Read as uint, since return value is unsigned.
-          thread.asyncReturn(bytesRead === 0 ? -1 : buf[0]);
-        }
-      });
+      try {
+        fs.read(fd, buf, 0, 1, position, function (err, bytesRead) {
+          finish(() => {
+            if (err) {
+              throwNodeError(thread, err);
+            } else if (!FDState.incrementPosIfCurrent(
+                fd, lease.generation, bytesRead)) {
+              throwStreamClosed(thread);
+            } else {
+              // Read as uint, since return value is unsigned.
+              thread.asyncReturn(bytesRead === 0 ? -1 : buf[0]);
+            }
+          });
+        });
+      } catch (readErr) {
+        finish(() => throwNodeError(thread, <NodeJS.ErrnoException> readErr));
+      }
     }
 
     public static 'readBytes([BII)I'(thread: JVMThread, javaThis: JVMTypes.java_io_RandomAccessFile, byte_arr: JVMTypes.JVMArray<number>, offset: number, len: number): void {
       var fdObj = javaThis["java/io/RandomAccessFile/fd"],
         fd = fdObj["java/io/FileDescriptor/fd"],
-        buf = new Buffer(len);
+        buf: Buffer,
+        lease: FDOperationLease,
+        finish: (action: () => void) => void,
+        position: number;
+      if (fd === -1) {
+        thread.throwNewException('Ljava/io/IOException;', "Bad file descriptor");
+        return;
+      }
+      lease = FDState.acquireOperation(fd);
+      if (lease === null) {
+        throwStreamClosed(thread);
+        return;
+      }
+      buf = new Buffer(len);
+      finish = makeLeasedFinisher(lease);
+      position = FDState.getPos(fd);
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.read(fd, buf, 0, len, FDState.getPos(fd), function (err, bytesRead) {
-        if (err) {
-          return throwNodeError(thread, err);
-        } else {
-          for (let i = 0; i < bytesRead; i++) {
-            byte_arr.array[offset + i] = buf.readInt8(i);
-          }
-          FDState.incrementPos(fd, bytesRead);
-          thread.asyncReturn(0 === bytesRead && 0 !== len ? -1 : bytesRead);
-        }
-      });
+      try {
+        fs.read(fd, buf, 0, len, position, function (err, bytesRead) {
+          finish(() => {
+            if (err) {
+              throwNodeError(thread, err);
+            } else if (!FDState.incrementPosIfCurrent(
+                fd, lease.generation, bytesRead)) {
+              throwStreamClosed(thread);
+            } else {
+              for (let i = 0; i < bytesRead; i++) {
+                byte_arr.array[offset + i] = buf.readInt8(i);
+              }
+              thread.asyncReturn(0 === bytesRead && 0 !== len ? -1 : bytesRead);
+            }
+          });
+        });
+      } catch (readErr) {
+        finish(() => throwNodeError(thread, <NodeJS.ErrnoException> readErr));
+      }
     }
 
     public static 'write0(I)V'(thread: JVMThread, javaThis: JVMTypes.java_io_RandomAccessFile, value: number): void {
       let fdObj = javaThis["java/io/RandomAccessFile/fd"];
       let fd = fdObj["java/io/FileDescriptor/fd"];
+      if (fd === -1) {
+        thread.throwNewException('Ljava/io/IOException;', "Bad file descriptor");
+        return;
+      }
       let data = new Buffer(1);
-      data.writeInt8(value, 0);
+      data.writeUInt8(value & 0xff, 0);
+      let lease = FDState.acquireOperation(fd);
+      if (lease === null) {
+        throwStreamClosed(thread);
+        return;
+      }
+      let finish = makeLeasedFinisher(lease);
+      let position = FDState.getPos(fd);
 
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.write(fd, data, 0, 1, FDState.getPos(fd), (err, numBytes) => {
-        if (err) {
-          return throwNodeError(thread, err);
-        }
-
-        FDState.incrementPos(fd, numBytes);
-        thread.asyncReturn();
-      });
+      try {
+        fs.write(fd, data, 0, 1, position, (err, numBytes) => {
+          finish(() => {
+            if (err) {
+              throwNodeError(thread, err);
+            } else if (!FDState.incrementPosIfCurrent(
+                fd, lease.generation, numBytes)) {
+              throwStreamClosed(thread);
+            } else {
+              thread.asyncReturn();
+            }
+          });
+        });
+      } catch (writeErr) {
+        finish(() => throwNodeError(thread, <NodeJS.ErrnoException> writeErr));
+      }
     }
 
     public static 'writeBytes([BII)V'(thread: JVMThread, javaThis: JVMTypes.java_io_RandomAccessFile, byteArr: JVMTypes.JVMArray<number>, offset: number, len: number): void {
       var fdObj = javaThis["java/io/RandomAccessFile/fd"],
         fd = fdObj["java/io/FileDescriptor/fd"],
-        buf = new Buffer(byteArr.array);
+        buf: Buffer,
+        lease: FDOperationLease,
+        finish: (action: () => void) => void,
+        position: number;
+      if (fd === -1) {
+        thread.throwNewException('Ljava/io/IOException;', "Bad file descriptor");
+        return;
+      }
+      lease = FDState.acquireOperation(fd);
+      if (lease === null) {
+        throwStreamClosed(thread);
+        return;
+      }
+      buf = new Buffer(byteArr.array);
+      finish = makeLeasedFinisher(lease);
+      position = FDState.getPos(fd);
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.write(fd, buf, offset, len, FDState.getPos(fd), (err, numBytes) => {
-        if (err) {
-          return throwNodeError(thread, err);
-        }
-        FDState.incrementPos(fd, numBytes);
-        thread.asyncReturn();
-      });
+      try {
+        fs.write(fd, buf, offset, len, position, (err, numBytes) => {
+          finish(() => {
+            if (err) {
+              throwNodeError(thread, err);
+            } else if (!FDState.incrementPosIfCurrent(
+                fd, lease.generation, numBytes)) {
+              throwStreamClosed(thread);
+            } else {
+              thread.asyncReturn();
+            }
+          });
+        });
+      } catch (writeErr) {
+        finish(() => throwNodeError(thread, <NodeJS.ErrnoException> writeErr));
+      }
     }
 
     public static 'getFilePointer()J'(thread: JVMThread, javaThis: JVMTypes.java_io_RandomAccessFile): Long {
-      return Long.fromNumber(FDState.getPos(javaThis['java/io/RandomAccessFile/fd']['java/io/FileDescriptor/fd']));
+      var fd = javaThis['java/io/RandomAccessFile/fd']['java/io/FileDescriptor/fd'];
+      if (fd === -1) {
+        thread.throwNewException('Ljava/io/IOException;', "Bad file descriptor");
+        return null;
+      }
+      return Long.fromNumber(FDState.getPos(fd));
     }
 
     public static 'seek0(J)V'(thread: JVMThread, javaThis: JVMTypes.java_io_RandomAccessFile, pos: Long): void {
-      FDState.setPos(javaThis['java/io/RandomAccessFile/fd']['java/io/FileDescriptor/fd'], pos.toNumber());
+      var fd = javaThis['java/io/RandomAccessFile/fd']['java/io/FileDescriptor/fd'];
+      if (fd === -1) {
+        thread.throwNewException('Ljava/io/IOException;', "Bad file descriptor");
+        return;
+      }
+      FDState.setPos(fd, pos.toNumber());
     }
 
     public static 'length()J'(thread: JVMThread, javaThis: JVMTypes.java_io_RandomAccessFile): void {
       var fdObj = javaThis['java/io/RandomAccessFile/fd'],
-        fd = fdObj['java/io/FileDescriptor/fd'];
+        fd = fdObj['java/io/FileDescriptor/fd'],
+        lease: FDOperationLease,
+        finish: (action: () => void) => void;
+      if (fd === -1) {
+        thread.throwNewException('Ljava/io/IOException;', "Bad file descriptor");
+        return;
+      }
+      lease = FDState.acquireOperation(fd);
+      if (lease === null) {
+        throwStreamClosed(thread);
+        return;
+      }
+      finish = makeLeasedFinisher(lease);
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.fstat(fd, (err, stats) => {
-        if (err) {
-          return throwNodeError(thread, err);
-        }
-        thread.asyncReturn(Long.fromNumber(stats.size), null);
-      });
+      try {
+        fs.fstat(fd, (err, stats) => {
+          finish(() => {
+            if (err) {
+              throwNodeError(thread, err);
+            } else if (!FDState.isCurrent(fd, lease.generation)) {
+              throwStreamClosed(thread);
+            } else {
+              thread.asyncReturn(Long.fromNumber(stats.size), null);
+            }
+          });
+        });
+      } catch (statErr) {
+        finish(() => throwNodeError(thread, <NodeJS.ErrnoException> statErr));
+      }
     }
 
     public static 'setLength(J)V'(thread: JVMThread, javaThis: JVMTypes.java_io_RandomAccessFile, arg0: Long): void {
       var fdObj = javaThis['java/io/RandomAccessFile/fd'],
         fd = fdObj['java/io/FileDescriptor/fd'],
-        newLength = arg0.toNumber();
+        newLength = arg0.toNumber(),
+        position: number,
+        lease: FDOperationLease,
+        finish: (action: () => void) => void;
       if (fd === -1) {
         thread.throwNewException('Ljava/io/IOException;', "Bad file descriptor");
       } else if (newLength < 0) {
         thread.throwNewException('Ljava/io/IOException;', "Invalid argument");
       } else {
+        lease = FDState.acquireOperation(fd);
+        if (lease === null) {
+          throwStreamClosed(thread);
+          return;
+        }
+        position = FDState.getPos(fd);
+        finish = makeLeasedFinisher(lease);
         thread.setStatus(ThreadStatus.ASYNC_WAITING);
-        fs.ftruncate(fd, newLength, (err?: NodeJS.ErrnoException) => {
-          if (err) {
-            return throwNodeError(thread, err);
-          }
-          if (FDState.getPos(fd) > newLength) {
-            FDState.setPos(fd, newLength);
-          }
-          thread.asyncReturn();
-        });
+        try {
+          fs.ftruncate(fd, newLength, (err?: NodeJS.ErrnoException) => {
+            finish(() => {
+              if (err) {
+                throwNodeError(thread, err);
+              } else if (!FDState.isCurrent(fd, lease.generation)) {
+                throwStreamClosed(thread);
+              } else {
+                if (position > newLength) {
+                  FDState.setPos(fd, newLength);
+                }
+                thread.asyncReturn();
+              }
+            });
+          });
+        } catch (truncateErr) {
+          finish(() => throwNodeError(
+            thread,
+            <NodeJS.ErrnoException> truncateErr
+          ));
+        }
       }
     }
 
@@ -603,18 +927,7 @@ export default function (): any {
     }
 
     public static 'close0()V'(thread: JVMThread, javaThis: JVMTypes.java_io_RandomAccessFile): void {
-      var fdObj = javaThis['java/io/RandomAccessFile/fd'],
-        fd = fdObj['java/io/FileDescriptor/fd'];
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.close(fd, (err?: NodeJS.ErrnoException) => {
-        if (err) {
-          return throwNodeError(thread, err);
-        } else {
-          fdObj['java/io/FileDescriptor/fd'] = -1;
-          FDState.close(fd);
-          thread.asyncReturn();
-        }
-      });
+      closeFileDescriptor(thread, javaThis['java/io/RandomAccessFile/fd']);
     }
 
   }
@@ -767,7 +1080,12 @@ export default function (): any {
           });
         } else {
           fs.unlink(filepath, (err?: NodeJS.ErrnoException) => {
-            thread.asyncReturn(1);
+            if (err == null) {
+              FDState.markUnlinked(filepath);
+              thread.asyncReturn(1);
+            } else {
+              thread.asyncReturn(0);
+            }
           });
         }
       });
