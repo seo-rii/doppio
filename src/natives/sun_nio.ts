@@ -10,13 +10,18 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as BrowserFS from 'browserfs';
 import FDState = Doppio.VM.FDState;
-import {FDCloseInfo} from '../fd_state';
+import {FDCloseInfo, FDOperationLease} from '../fd_state';
 import { mappedByteBufferMappings } from './java_nio';
 let BFSUtils = BrowserFS.BFSRequire('bfs_utils');
 
 interface IOVec {
   base: number;
   len: number;
+}
+
+interface LeasedFDOperation {
+  lease: FDOperationLease;
+  finish: (action: () => void) => void;
 }
 
 interface UnixOpenFlags {
@@ -64,6 +69,22 @@ const browserFsOpenFiles = new WeakMap<object, BrowserFsIdentity>();
 let nextBrowserFsDevice = 1;
 let nextBrowserFsInode = 1;
 
+function makeLeasedFinisher(
+    lease: FDOperationLease): (action: () => void) => void {
+  let finished = false;
+  return (action: () => void): void => {
+    if (finished) {
+      return;
+    }
+    finished = true;
+    try {
+      action();
+    } finally {
+      FDState.releaseOperation(lease);
+    }
+  };
+}
+
 function readIOVecs(thread: JVMThread, address: Long, len: number): IOVec[] {
   const heap = thread.getJVM().getHeap(),
     base = address.toNumber(),
@@ -82,6 +103,59 @@ function readIOVecs(thread: JVMThread, address: Long, len: number): IOVec[] {
 }
 
 export default function (): any {
+  function beginFileDispatcherOperation(
+      thread: JVMThread,
+      fd: number): LeasedFDOperation {
+    if (fd === -1) {
+      thread.throwNewException('Ljava/io/IOException;', 'Bad file descriptor');
+      return null;
+    }
+    const lease = FDState.acquireOperation(fd);
+    if (lease === null) {
+      thread.throwNewException('Ljava/io/IOException;', 'Stream Closed');
+      return null;
+    }
+    thread.setStatus(ThreadStatus.ASYNC_WAITING);
+    return {lease: lease, finish: makeLeasedFinisher(lease)};
+  }
+
+  function finishFileDispatcherOperation(
+      thread: JVMThread,
+      operation: LeasedFDOperation,
+      err: NodeJS.ErrnoException,
+      success: () => void): void {
+    operation.finish(() => {
+      if (err) {
+        throwChannelIOException(thread, err);
+      } else if (!FDState.isCurrent(
+          operation.lease.fd,
+          operation.lease.generation)) {
+        thread.throwNewException('Ljava/io/IOException;', 'Stream Closed');
+      } else {
+        success();
+      }
+    });
+  }
+
+  function dispatchFileDispatcherOperation(
+      thread: JVMThread,
+      operation: LeasedFDOperation,
+      dispatch: () => void): void {
+    try {
+      dispatch();
+    } catch (err) {
+      if (operation.lease.released) {
+        throw err;
+      }
+      finishFileDispatcherOperation(
+        thread,
+        operation,
+        <NodeJS.ErrnoException> err,
+        () => {}
+      );
+    }
+  }
+
   function getBrowserFsModule(): any {
     return typeof (<any> fs).getFSModule === 'function' ? (<any> fs).getFSModule() : null;
   }
@@ -201,29 +275,58 @@ export default function (): any {
       advancePosition: boolean,
       cb: (numBytes: number) => void,
       errorCb: (err: NodeJS.ErrnoException, committedBytes: number) => void): void {
+    let finished = false,
+      syncDispatched = false;
     const fail = (err: NodeJS.ErrnoException): void => {
-      errorCb(err, numBytes);
+      if (!finished) {
+        finished = true;
+        errorCb(err, numBytes);
+      }
+    };
+    const succeed = (): void => {
+      if (!finished) {
+        finished = true;
+        cb(numBytes);
+      }
     };
     const syncAndReturn = (): void => {
+      if (syncDispatched) {
+        return;
+      }
+      syncDispatched = true;
       const syncMode = FDState.getSyncMode(fd);
       if (syncMode === 2 && typeof (<any> fs).fdatasync === 'function') {
-        (<any> fs).fdatasync(fd, (err?: NodeJS.ErrnoException) => {
-          if (err) {
-            fail(err);
-          } else {
-            cb(numBytes);
+        try {
+          (<any> fs).fdatasync(fd, (err?: NodeJS.ErrnoException) => {
+            if (err) {
+              fail(err);
+            } else {
+              succeed();
+            }
+          });
+        } catch (syncErr) {
+          if (finished) {
+            throw syncErr;
           }
-        });
+          fail(<NodeJS.ErrnoException> syncErr);
+        }
       } else if (syncMode !== 0) {
-        fs.fsync(fd, (err?: NodeJS.ErrnoException) => {
-          if (err) {
-            fail(err);
-          } else {
-            cb(numBytes);
+        try {
+          fs.fsync(fd, (err?: NodeJS.ErrnoException) => {
+            if (err) {
+              fail(err);
+            } else {
+              succeed();
+            }
+          });
+        } catch (syncErr) {
+          if (finished) {
+            throw syncErr;
           }
-        });
+          fail(<NodeJS.ErrnoException> syncErr);
+        }
       } else {
-        cb(numBytes);
+        succeed();
       }
     };
 
@@ -232,14 +335,26 @@ export default function (): any {
       // post-append stat or sync fails. A successful stat also incorporates
       // growth from other append descriptors.
       FDState.incrementPos(fd, numBytes);
-      fs.fstat(fd, (err, stats) => {
-        if (err) {
-          fail(err);
-        } else {
-          FDState.setPos(fd, stats.size);
-          syncAndReturn();
+      let callbackHandled = false;
+      try {
+        fs.fstat(fd, (err, stats) => {
+          if (callbackHandled) {
+            return;
+          }
+          callbackHandled = true;
+          if (err) {
+            fail(err);
+          } else {
+            FDState.setPos(fd, stats.size);
+            syncAndReturn();
+          }
+        });
+      } catch (statErr) {
+        if (finished) {
+          throw statErr;
         }
-      });
+        fail(<NodeJS.ErrnoException> statErr);
+      }
     } else {
       if (advancePosition) {
         FDState.incrementPos(fd, numBytes);
@@ -260,28 +375,69 @@ export default function (): any {
       cb: (numBytes: number) => void,
       errorCb: (err: NodeJS.ErrnoException, committedBytes: number) => void): void {
     const append = FDState.isAppend(fd);
+    let finished = false;
     const fail = (err: NodeJS.ErrnoException, committedBytes: number = 0): void => {
-      errorCb(err, committedBytes);
+      if (!finished) {
+        finished = true;
+        errorCb(err, committedBytes);
+      }
+    };
+    const succeed = (numBytes: number): void => {
+      if (!finished) {
+        finished = true;
+        cb(numBytes);
+      }
     };
     const writeAt = (writePosition: number | null): void => {
-      fs.write(fd, data, offset, length, writePosition, (err, numBytes) => {
-        if (err) {
-          fail(err);
-        } else {
-          finishWrite(thread, fd, numBytes, advancePosition, cb, errorCb);
+      let callbackHandled = false;
+      try {
+        fs.write(fd, data, offset, length, writePosition, (err, numBytes) => {
+          if (callbackHandled) {
+            return;
+          }
+          callbackHandled = true;
+          if (err) {
+            fail(err);
+          } else {
+            try {
+              finishWrite(thread, fd, numBytes, advancePosition, succeed, fail);
+            } catch (writeErr) {
+              if (finished) {
+                throw writeErr;
+              }
+              fail(<NodeJS.ErrnoException> writeErr, numBytes);
+            }
+          }
+        });
+      } catch (writeErr) {
+        if (finished) {
+          throw writeErr;
         }
-      });
+        fail(<NodeJS.ErrnoException> writeErr);
+      }
     };
 
     if (append && util.are_in_browser()) {
-      fs.fstat(fd, (err, stats) => {
-        if (err) {
-          fail(err);
-        } else {
-          FDState.setPos(fd, stats.size);
-          writeAt(stats.size);
+      let callbackHandled = false;
+      try {
+        fs.fstat(fd, (err, stats) => {
+          if (callbackHandled) {
+            return;
+          }
+          callbackHandled = true;
+          if (err) {
+            fail(err);
+          } else {
+            FDState.setPos(fd, stats.size);
+            writeAt(stats.size);
+          }
+        });
+      } catch (statErr) {
+        if (finished) {
+          throw statErr;
         }
-      });
+        fail(<NodeJS.ErrnoException> statErr);
+      }
     } else if (append && appendAtEnd) {
       writeAt(null);
     } else {
@@ -597,30 +753,37 @@ export default function (): any {
       const fd = fdObj["java/io/FileDescriptor/fd"],
         // read upto len bytes and store into mmap'd buffer at address
         addr = address.toNumber(),
-        buf = thread.getJVM().getHeap().get_buffer(addr, len);
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.read(fd, buf, 0, len, FDState.getPos(fd), (err, bytesRead) => {
-        if (err) {
-          throwChannelIOException(thread, err);
-        } else {
-          FDState.incrementPos(fd, bytesRead);
-          // Return -1 if we reached the end of the file.
-          thread.asyncReturn(bytesRead === 0 ? -1 : bytesRead);
-        }
+        buf = thread.getJVM().getHeap().get_buffer(addr, len),
+        operation = beginFileDispatcherOperation(thread, fd);
+      if (operation === null) {
+        return;
+      }
+      const position = FDState.getPos(fd);
+      dispatchFileDispatcherOperation(thread, operation, () => {
+        fs.read(fd, buf, 0, len, position, (err, bytesRead) => {
+          finishFileDispatcherOperation(thread, operation, err, () => {
+            FDState.incrementPos(fd, bytesRead);
+            // Return -1 if we reached the end of the file.
+            thread.asyncReturn(bytesRead === 0 ? -1 : bytesRead);
+          });
+        });
       });
     }
 
     public static 'pread0(Ljava/io/FileDescriptor;JIJ)I'(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor, address: Long, len: number, position: Long): void {
       const fd = fdObj["java/io/FileDescriptor/fd"],
         addr = address.toNumber(),
-        buf = thread.getJVM().getHeap().get_buffer(addr, len);
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.read(fd, buf, 0, len, position.toNumber(), (err, bytesRead) => {
-        if (err) {
-          throwChannelIOException(thread, err);
-        } else {
-          thread.asyncReturn(bytesRead === 0 && len !== 0 ? -1 : bytesRead);
-        }
+        buf = thread.getJVM().getHeap().get_buffer(addr, len),
+        operation = beginFileDispatcherOperation(thread, fd);
+      if (operation === null) {
+        return;
+      }
+      dispatchFileDispatcherOperation(thread, operation, () => {
+        fs.read(fd, buf, 0, len, position.toNumber(), (err, bytesRead) => {
+          finishFileDispatcherOperation(thread, operation, err, () => {
+            thread.asyncReturn(bytesRead === 0 && len !== 0 ? -1 : bytesRead);
+          });
+        });
       });
     }
 
@@ -630,7 +793,9 @@ export default function (): any {
         vecs = readIOVecs(thread, address, len),
         buffers = vecs.map((vec) => heap.get_buffer(vec.base, vec.len)),
         requestedBytes = vecs.reduce((total, vec) => total + vec.len, 0),
-        nativeReadv = !util.are_in_browser() ? (<any> fs).readv : null;
+        nativeReadv = !util.are_in_browser() ? (<any> fs).readv : null,
+        operation = vecs.length === 0 ? null :
+          beginFileDispatcherOperation(thread, fd);
       let total = 0,
         index = 0;
 
@@ -639,32 +804,37 @@ export default function (): any {
         thread.asyncReturn(Long.ZERO, null);
         return;
       }
+      if (operation === null) {
+        return;
+      }
 
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
       if (typeof nativeReadv === 'function') {
-        nativeReadv.call(
-          fs,
-          fd,
-          buffers,
-          FDState.getPos(fd),
-          (err: NodeJS.ErrnoException, bytesRead: number) => {
-            if (err) {
-              throwChannelIOException(thread, err);
-            } else {
-              FDState.incrementPos(fd, bytesRead);
-              thread.asyncReturn(
-                Long.fromNumber(bytesRead === 0 && requestedBytes > 0 ? -1 : bytesRead),
-                null
-              );
+        const position = FDState.getPos(fd);
+        dispatchFileDispatcherOperation(thread, operation, () => {
+          nativeReadv.call(
+            fs,
+            fd,
+            buffers,
+            position,
+            (err: NodeJS.ErrnoException, bytesRead: number) => {
+              finishFileDispatcherOperation(thread, operation, err, () => {
+                FDState.incrementPos(fd, bytesRead);
+                thread.asyncReturn(
+                  Long.fromNumber(bytesRead === 0 && requestedBytes > 0 ? -1 : bytesRead),
+                  null
+                );
+              });
             }
-          }
-        );
+          );
+        });
         return;
       }
 
       const readNext = (): void => {
         if (index >= vecs.length) {
-          thread.asyncReturn(Long.fromNumber(total), null);
+          finishFileDispatcherOperation(thread, operation, null, () => {
+            thread.asyncReturn(Long.fromNumber(total), null);
+          });
           return;
         }
 
@@ -675,25 +845,41 @@ export default function (): any {
           readNext();
           return;
         }
-        fs.read(fd, buf, 0, vec.len, FDState.getPos(fd), (err, bytesRead) => {
-          if (err) {
-            if (total > 0) {
-              thread.asyncReturn(Long.fromNumber(total), null);
-            } else {
-              throwChannelIOException(thread, err);
+        const position = FDState.getPos(fd);
+        let callbackHandled = false;
+        dispatchFileDispatcherOperation(thread, operation, () => {
+          fs.read(fd, buf, 0, vec.len, position, (err, bytesRead) => {
+            if (callbackHandled) {
+              return;
             }
-          } else if (bytesRead === 0) {
-            thread.asyncReturn(Long.fromNumber(total === 0 ? -1 : total), null);
-          } else {
-            total += bytesRead;
-            FDState.incrementPos(fd, bytesRead);
-            if (bytesRead < vec.len) {
-              thread.asyncReturn(Long.fromNumber(total), null);
+            callbackHandled = true;
+            if (err) {
+              if (total > 0) {
+                finishFileDispatcherOperation(thread, operation, null, () => {
+                  thread.asyncReturn(Long.fromNumber(total), null);
+                });
+              } else {
+                finishFileDispatcherOperation(thread, operation, err, () => {});
+              }
+            } else if (!FDState.isCurrent(fd, operation.lease.generation)) {
+              finishFileDispatcherOperation(thread, operation, null, () => {});
+            } else if (bytesRead === 0) {
+              finishFileDispatcherOperation(thread, operation, null, () => {
+                thread.asyncReturn(Long.fromNumber(total === 0 ? -1 : total), null);
+              });
             } else {
-              index++;
-              readNext();
+              total += bytesRead;
+              FDState.incrementPos(fd, bytesRead);
+              if (bytesRead < vec.len) {
+                finishFileDispatcherOperation(thread, operation, null, () => {
+                  thread.asyncReturn(Long.fromNumber(total), null);
+                });
+              } else {
+                index++;
+                readNext();
+              }
             }
-          }
+          });
         });
       };
 
@@ -721,44 +907,49 @@ export default function (): any {
     }
 
     public static 'size0(Ljava/io/FileDescriptor;)J'(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor): void {
-      let fd = fdObj["java/io/FileDescriptor/fd"];
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.fstat(fd, (err, stats) => {
-        if (err) {
-          throwChannelIOException(thread, err);
-        } else {
-          thread.asyncReturn(Long.fromNumber(stats.size), null);
-        }
+      const fd = fdObj["java/io/FileDescriptor/fd"],
+        operation = beginFileDispatcherOperation(thread, fd);
+      if (operation === null) {
+        return;
+      }
+      dispatchFileDispatcherOperation(thread, operation, () => {
+        fs.fstat(fd, (err, stats) => {
+          finishFileDispatcherOperation(thread, operation, err, () => {
+            thread.asyncReturn(Long.fromNumber(stats.size), null);
+          });
+        });
       });
     }
 
     public static 'truncate0(Ljava/io/FileDescriptor;J)I'(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor, size: Long): void {
-      let fd = fdObj["java/io/FileDescriptor/fd"];
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.ftruncate(fd, size.toNumber(), (err) => {
-        if (err) {
-          throwChannelIOException(thread, err);
-        } else {
-          // For some reason, this expects a return value.
-          // Give it the success status code.
-          thread.asyncReturn(0);
-        }
+      const fd = fdObj["java/io/FileDescriptor/fd"],
+        operation = beginFileDispatcherOperation(thread, fd);
+      if (operation === null) {
+        return;
+      }
+      dispatchFileDispatcherOperation(thread, operation, () => {
+        fs.ftruncate(fd, size.toNumber(), (err) => {
+          finishFileDispatcherOperation(thread, operation, err, () => {
+            // For some reason, this expects a return value.
+            // Give it the success status code.
+            thread.asyncReturn(0);
+          });
+        });
       });
     }
 
     public static 'force0(Ljava/io/FileDescriptor;Z)I'(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor, metaData: boolean): void {
       const fd = fdObj["java/io/FileDescriptor/fd"];
-      if (fd === -1) {
-        thread.throwNewException("Ljava/io/IOException;", "Bad file descriptor");
+      const operation = beginFileDispatcherOperation(thread, fd);
+      if (operation === null) {
         return;
       }
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      fs.fsync(fd, (err) => {
-        if (err) {
-          throwChannelIOException(thread, err);
-        } else {
-          thread.asyncReturn(0);
-        }
+      dispatchFileDispatcherOperation(thread, operation, () => {
+        fs.fsync(fd, (err) => {
+          finishFileDispatcherOperation(thread, operation, err, () => {
+            thread.asyncReturn(0);
+          });
+        });
       });
     }
 
@@ -777,38 +968,69 @@ export default function (): any {
       const fd = fdObj["java/io/FileDescriptor/fd"];
       const heap = thread.getJVM().getHeap();
       const data = heap.get_buffer(addr.toNumber(), len);
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      writeBuffer(
-        thread,
-        fd,
-        data,
-        0,
-        len,
-        FDState.getPos(fd),
-        true,
-        true,
-        (numBytes) => thread.asyncReturn(numBytes),
-        (err) => throwChannelIOException(thread, err)
-      );
+      const operation = beginFileDispatcherOperation(thread, fd);
+      if (operation === null) {
+        return;
+      }
+      const position = FDState.getPos(fd);
+      dispatchFileDispatcherOperation(thread, operation, () => {
+        writeBuffer(
+          thread,
+          fd,
+          data,
+          0,
+          len,
+          position,
+          true,
+          true,
+          (numBytes) => finishFileDispatcherOperation(
+            thread,
+            operation,
+            null,
+            () => thread.asyncReturn(numBytes)
+          ),
+          (err) => finishFileDispatcherOperation(
+            thread,
+            operation,
+            err,
+            () => {}
+          )
+        );
+      });
     }
 
     public static 'pwrite0(Ljava/io/FileDescriptor;JIJ)I'(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor, addr: Long, len: number, position: Long): void {
       const fd = fdObj["java/io/FileDescriptor/fd"];
       const heap = thread.getJVM().getHeap();
       const data = heap.get_buffer(addr.toNumber(), len);
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      writeBuffer(
-        thread,
-        fd,
-        data,
-        0,
-        len,
-        position.toNumber(),
-        false,
-        false,
-        (numBytes) => thread.asyncReturn(numBytes),
-        (err) => throwChannelIOException(thread, err)
-      );
+      const operation = beginFileDispatcherOperation(thread, fd);
+      if (operation === null) {
+        return;
+      }
+      dispatchFileDispatcherOperation(thread, operation, () => {
+        writeBuffer(
+          thread,
+          fd,
+          data,
+          0,
+          len,
+          position.toNumber(),
+          false,
+          false,
+          (numBytes) => finishFileDispatcherOperation(
+            thread,
+            operation,
+            null,
+            () => thread.asyncReturn(numBytes)
+          ),
+          (err) => finishFileDispatcherOperation(
+            thread,
+            operation,
+            err,
+            () => {}
+          )
+        );
+      });
     }
 
     public static 'writev0(Ljava/io/FileDescriptor;JI)J'(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor, address: Long, len: number): void {
@@ -816,7 +1038,9 @@ export default function (): any {
         heap = thread.getJVM().getHeap(),
         vecs = readIOVecs(thread, address, len),
         buffers = vecs.map((vec) => heap.get_buffer(vec.base, vec.len)),
-        nativeWritev = !util.are_in_browser() ? (<any> fs).writev : null;
+        nativeWritev = !util.are_in_browser() ? (<any> fs).writev : null,
+        operation = vecs.length === 0 ? null :
+          beginFileDispatcherOperation(thread, fd);
       let total = 0,
         index = 0;
 
@@ -825,67 +1049,104 @@ export default function (): any {
         thread.asyncReturn(Long.ZERO, null);
         return;
       }
+      if (operation === null) {
+        return;
+      }
 
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
       if (typeof nativeWritev === 'function') {
-        nativeWritev.call(
-          fs,
-          fd,
-          buffers,
-          FDState.isAppend(fd) ? null : FDState.getPos(fd),
-          (err: NodeJS.ErrnoException, numBytes: number) => {
-            if (err) {
-              throwChannelIOException(thread, err);
-            } else {
-              finishWrite(
-                thread,
-                fd,
-                numBytes,
-                true,
-                (written) => thread.asyncReturn(Long.fromNumber(written), null),
-                (writeErr) => throwChannelIOException(thread, writeErr)
-              );
+        const position = FDState.isAppend(fd) ? null : FDState.getPos(fd);
+        let callbackHandled = false;
+        dispatchFileDispatcherOperation(thread, operation, () => {
+          nativeWritev.call(
+            fs,
+            fd,
+            buffers,
+            position,
+            (err: NodeJS.ErrnoException, numBytes: number) => {
+              if (callbackHandled) {
+                return;
+              }
+              callbackHandled = true;
+              if (err) {
+                finishFileDispatcherOperation(thread, operation, err, () => {});
+              } else if (!FDState.isCurrent(fd, operation.lease.generation)) {
+                finishFileDispatcherOperation(thread, operation, null, () => {});
+              } else {
+                dispatchFileDispatcherOperation(thread, operation, () => {
+                  finishWrite(
+                    thread,
+                    fd,
+                    numBytes,
+                    true,
+                    (written) => finishFileDispatcherOperation(
+                      thread,
+                      operation,
+                      null,
+                      () => thread.asyncReturn(Long.fromNumber(written), null)
+                    ),
+                    (writeErr) => finishFileDispatcherOperation(
+                      thread,
+                      operation,
+                      writeErr,
+                      () => {}
+                    )
+                  );
+                });
+              }
             }
-          }
-        );
+          );
+        });
         return;
       }
 
       const writeNext = (): void => {
         if (index >= vecs.length) {
-          thread.asyncReturn(Long.fromNumber(total), null);
+          finishFileDispatcherOperation(thread, operation, null, () => {
+            thread.asyncReturn(Long.fromNumber(total), null);
+          });
           return;
         }
 
         const vec = vecs[index],
           data = buffers[index];
-        writeBuffer(
-          thread,
-          fd,
-          data,
-          0,
-          vec.len,
-          FDState.getPos(fd),
-          true,
-          true,
-          (numBytes) => {
-            total += numBytes;
-            if (numBytes < vec.len) {
-              thread.asyncReturn(Long.fromNumber(total), null);
-            } else {
-              index++;
-              writeNext();
+        const position = FDState.getPos(fd);
+        dispatchFileDispatcherOperation(thread, operation, () => {
+          writeBuffer(
+            thread,
+            fd,
+            data,
+            0,
+            vec.len,
+            position,
+            true,
+            true,
+            (numBytes) => {
+              if (!FDState.isCurrent(fd, operation.lease.generation)) {
+                finishFileDispatcherOperation(thread, operation, null, () => {});
+                return;
+              }
+              total += numBytes;
+              if (numBytes < vec.len) {
+                finishFileDispatcherOperation(thread, operation, null, () => {
+                  thread.asyncReturn(Long.fromNumber(total), null);
+                });
+              } else {
+                index++;
+                writeNext();
+              }
+            },
+            (err, committedBytes) => {
+              total += committedBytes;
+              if (committedBytes === 0 && total > 0) {
+                finishFileDispatcherOperation(thread, operation, null, () => {
+                  thread.asyncReturn(Long.fromNumber(total), null);
+                });
+              } else {
+                finishFileDispatcherOperation(thread, operation, err, () => {});
+              }
             }
-          },
-          (err, committedBytes) => {
-            total += committedBytes;
-            if (committedBytes === 0 && total > 0) {
-              thread.asyncReturn(Long.fromNumber(total), null);
-            } else {
-              throwChannelIOException(thread, err);
-            }
-          }
-        );
+          );
+        });
       };
 
       writeNext();

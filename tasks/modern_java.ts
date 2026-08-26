@@ -5721,6 +5721,28 @@ function modernJava(grunt: IGrunt) {
     );
   });
 
+  grunt.registerTask('unit_test_nio_fd_leases', 'Keep NIO host descriptors open until pending channel operations drain.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      testPath = path.resolve('ci/nio_fd_lease_test.cjs'),
+      expected = 'nio-fd-leases:3:ok\n';
+    child_process.execFile(
+      process.execPath,
+      ['--no-deprecation', testPath],
+      function(err?: any, stdout?: string, stderr?: string): void {
+        var actual = stdout + stderr;
+        if (err || actual !== expected) {
+          grunt.fail.fatal(
+            'NIO descriptor-lease output does not match.\nDoppio:\n' + actual +
+            '\nExpected:\n' + expected
+          );
+          return;
+        }
+        grunt.log.ok('NIO descriptor close waits for pending channel operations.');
+        done();
+      }
+    );
+  });
+
   grunt.registerMultiTask('parse_classfile_modern', 'Parse modern class-file fixtures with Doppio.', function() {
     var ReferenceClassData = require('../build/release-cli/src/ClassData').ReferenceClassData,
       options: {
