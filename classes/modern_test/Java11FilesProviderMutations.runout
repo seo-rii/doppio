@@ -1,0 +1,13 @@
+create-file:true:true:true:true:true
+create-directory:true:true:true
+create-link:true:true:true:true
+create-symbolic-link:true:true:true:true:true
+delete:true:true
+delete-if-exists:false:true:true
+copy:true:true:true:true:true
+move:true:true:true:true:true
+foreign-read-close:IOException:read-primary:1:IOException:close-secondary:true:true
+foreign-times-runtime:IllegalStateException:times-runtime:0:true:true:true:false
+foreign-times-io-delete:IOException:times-io:1:IOException:delete-secondary:true:true:true:true
+stream-to-path-write-close:IOException:target-write-primary:1:IOException:target-close-secondary:true:true
+path-to-stream-read-close:IOException:path-read-primary:1:IOException:path-close-secondary:true

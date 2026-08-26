@@ -1,0 +1,12 @@
+open-position:1
+reset-position:1
+stream-position:2
+gather-result:2
+buffer-positions:1:1
+gather-position:4
+external-position:5
+external-stream-position:6
+scalar-result:1
+scalar-buffer-position:1
+final-position:7
+content:ABCDEFG

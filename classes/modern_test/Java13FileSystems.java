@@ -11,12 +11,15 @@ import java.nio.file.FileVisitResult;
 import java.nio.file.FileSystems;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributeView;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileAttributeView;
+import java.nio.file.attribute.FileOwnerAttributeView;
+import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
@@ -115,6 +118,20 @@ public class Java13FileSystems {
     BasicFileAttributes viewAttrs = basicView.readAttributes();
     System.out.println("view:" + basicView.name() + ":" + viewAttrs.size() + ":" + viewAttrs.isRegularFile());
     System.out.println("missing-view:" + (Files.getFileAttributeView(hello, MissingFileAttributeView.class) == null));
+    BasicFileAttributeView nullOptionsView = Files.getFileAttributeView(
+        hello, BasicFileAttributeView.class, (LinkOption[]) null);
+    BasicFileAttributes nullOptionsAttrs = nullOptionsView.readAttributes();
+    System.out.println("view-null-options:" + nullOptionsView.name() + ":" +
+        nullOptionsAttrs.size() + ":" + nullOptionsAttrs.isRegularFile());
+    BasicFileAttributeView nullElementView = Files.getFileAttributeView(
+        hello, BasicFileAttributeView.class, new LinkOption[] { null });
+    BasicFileAttributes nullElementAttrs = nullElementView.readAttributes();
+    System.out.println("view-null-element:" + nullElementView.name() + ":" +
+        nullElementAttrs.size() + ":" + nullElementAttrs.isRegularFile());
+    System.out.println("unsupported-view-null-options:" +
+        (Files.getFileAttributeView(hello, MissingFileAttributeView.class, (LinkOption[]) null) == null) + ":" +
+        (Files.getFileAttributeView(hello, FileOwnerAttributeView.class, (LinkOption[]) null) == null) + ":" +
+        (Files.getFileAttributeView(hello, PosixFileAttributeView.class, new LinkOption[] { null }) == null));
     ByteArrayOutputStream copiedOut = new ByteArrayOutputStream();
     System.out.println("copy-out:" + Files.copy(hello, copiedOut) + ":" + copiedOut.toString("UTF-8"));
     Path copied = fs.getPath(label + "-copy.txt");
@@ -145,8 +162,9 @@ public class Java13FileSystems {
     System.out.println("dir-copy:" + Files.copy(nested, copiedDirectory).equals(copiedDirectory) +
         ":" + Files.isDirectory(copiedDirectory));
     Path defaultTarget = Files.createTempFile("doppio-java13-fs-copy-target", ".txt");
-    Files.deleteIfExists(defaultTarget);
     try {
+      System.out.println("same-default-zip:" + Files.isSameFile(defaultTarget, hello));
+      Files.deleteIfExists(defaultTarget);
       System.out.println("copy-to-default:" + Files.copy(hello, defaultTarget).equals(defaultTarget) +
           ":" + Files.readString(defaultTarget));
     } finally {
@@ -179,8 +197,12 @@ public class Java13FileSystems {
       }
     };
     printFailure(label + "-owner-get", () -> Files.getOwner(hello));
+    printFailure(label + "-owner-get-null-options",
+        () -> Files.getOwner(hello, (LinkOption[]) null));
     printFailure(label + "-owner-set", () -> Files.setOwner(hello, zipOwner));
     printFailure(label + "-posix-get", () -> Files.getPosixFilePermissions(hello));
+    printFailure(label + "-posix-get-null-options",
+        () -> Files.getPosixFilePermissions(hello, (LinkOption[]) null));
     printFailure(label + "-posix-set",
         () -> Files.setPosixFilePermissions(hello, EnumSet.of(PosixFilePermission.OWNER_READ)));
     printFailure(label + "-attr-owner-set",

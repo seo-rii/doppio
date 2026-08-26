@@ -47,6 +47,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.Spliterator;
 import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -114,6 +115,11 @@ public class Java11FilesString {
         System.out.println(readStream.read());
       } finally {
         readStream.close();
+      }
+      try (InputStream ignored = Files.newInputStream(path, new java.nio.file.OpenOption() {})) {
+        System.out.println(false);
+      } catch (UnsupportedOperationException e) {
+        System.out.println(e.getClass().getName());
       }
       try {
         Files.newInputStream(path, StandardOpenOption.WRITE).close();
@@ -270,6 +276,14 @@ public class Java11FilesString {
       System.out.println(Files.isReadable(missingQuery));
       System.out.println(Files.isWritable(missingQuery));
       System.out.println(Files.isExecutable(missingQuery));
+      char[] indeterminateNameChars = new char[300];
+      Arrays.fill(indeterminateNameChars, 'x');
+      Path indeterminateQuery = path.getParent().resolve(new String(indeterminateNameChars));
+      System.out.println("indeterminate-follow:" + Files.exists(indeterminateQuery) + ":"
+          + Files.notExists(indeterminateQuery));
+      System.out.println("indeterminate-nofollow:"
+          + Files.exists(indeterminateQuery, LinkOption.NOFOLLOW_LINKS) + ":"
+          + Files.notExists(indeterminateQuery, LinkOption.NOFOLLOW_LINKS));
       Path hiddenQuery = path.getParent().resolve("." + path.getFileName().toString() + ".hidden-query");
       try {
         Files.writeString(hiddenQuery, "hidden");
@@ -293,6 +307,14 @@ public class Java11FilesString {
         Files.deleteIfExists(hiddenQuery);
       }
       System.out.println(Files.isSameFile(missingQuery, missingQuery));
+      Path missingAliasQuery =
+          missingQuery.getParent().resolve(".").resolve(missingQuery.getFileName());
+      try {
+        Files.isSameFile(missingQuery, missingAliasQuery);
+        System.out.println(false);
+      } catch (NoSuchFileException e) {
+        System.out.println(e.getClass().getName());
+      }
       try {
         Files.isSameFile(path, missingQuery);
         System.out.println(false);
@@ -399,6 +421,12 @@ public class Java11FilesString {
       } catch (NullPointerException e) {
         System.out.println(e.getClass().getName());
       }
+      try {
+        Files.readAttributes(path, MissingBasicFileAttributes.class, (LinkOption[]) null);
+        System.out.println(false);
+      } catch (UnsupportedOperationException e) {
+        System.out.println(e.getClass().getName());
+      }
       BasicFileAttributeView basicView = Files.getFileAttributeView(path, BasicFileAttributeView.class);
       System.out.println(basicView != null);
       System.out.println(basicView.name());
@@ -502,6 +530,12 @@ public class Java11FilesString {
         Files.readAttributes(path, "size", new LinkOption[] { null });
         System.out.println(false);
       } catch (NullPointerException e) {
+        System.out.println(e.getClass().getName());
+      }
+      try {
+        Files.readAttributes(path, ":size", (LinkOption[]) null);
+        System.out.println(false);
+      } catch (IllegalArgumentException e) {
         System.out.println(e.getClass().getName());
       }
       try {
@@ -889,6 +923,7 @@ public class Java11FilesString {
       Path channelRoot = Files.createTempDirectory("doppio-files-channel");
       Path channelPath = channelRoot.resolve("channel.txt");
       Path channelParentFile = channelRoot.resolve("parent-file");
+      Path channelWriteOnlyMissing = channelRoot.resolve("write-only-missing.txt");
       try {
         SeekableByteChannel writeChannel =
             Files.newByteChannel(channelPath, EnumSet.of(StandardOpenOption.CREATE, StandardOpenOption.WRITE));
@@ -916,6 +951,44 @@ public class Java11FilesString {
           appendChannel.close();
         }
         System.out.println(Files.readString(channelPath));
+        SeekableByteChannel overwriteChannel =
+            Files.newByteChannel(channelPath, StandardOpenOption.WRITE);
+        try {
+          System.out.println(overwriteChannel.write(ByteBuffer.wrap(new byte[] { 90 })));
+        } finally {
+          overwriteChannel.close();
+        }
+        System.out.println(Files.readString(channelPath));
+        try (SeekableByteChannel readCreateNewChannel = Files.newByteChannel(
+            channelPath,
+            EnumSet.of(StandardOpenOption.READ, StandardOpenOption.CREATE_NEW))) {
+          System.out.println(readCreateNewChannel.size());
+        } catch (IOException e) {
+          System.out.println(false);
+        }
+        try (SeekableByteChannel ignored = Files.newByteChannel(
+            channelPath,
+            EnumSet.of(StandardOpenOption.READ),
+            new java.nio.file.attribute.FileAttribute<Object>() {
+              public String name() {
+                return "basic:lastModifiedTime";
+              }
+
+              public Object value() {
+                return FileTime.fromMillis(0L);
+              }
+            })) {
+          System.out.println(false);
+        } catch (UnsupportedOperationException e) {
+          System.out.println(e.getClass().getName());
+        }
+        try {
+          Files.newByteChannel(channelWriteOnlyMissing, StandardOpenOption.WRITE).close();
+          System.out.println(false);
+        } catch (NoSuchFileException e) {
+          System.out.println(e.getClass().getName());
+        }
+        System.out.println(Files.exists(channelWriteOnlyMissing));
         try {
           Files.newByteChannel(channelRoot.resolve("missing-channel.txt"), StandardOpenOption.READ);
           System.out.println(false);
@@ -987,6 +1060,7 @@ public class Java11FilesString {
           System.out.println(e.getClass().getName());
         }
       } finally {
+        Files.deleteIfExists(channelWriteOnlyMissing);
         Files.deleteIfExists(channelParentFile);
         Files.deleteIfExists(channelPath);
         Files.deleteIfExists(channelRoot);
@@ -1452,6 +1526,7 @@ public class Java11FilesString {
 
       Path timeRoot = Files.createTempDirectory("doppio-files-time");
       Path timePath = timeRoot.resolve("time.txt");
+      FileTime negativeTime = FileTime.fromMillis(-1L);
       FileTime fixedTime = FileTime.fromMillis(123456789L);
       FileTime attributeTime = FileTime.fromMillis(987654321L);
       try {
@@ -1464,6 +1539,13 @@ public class Java11FilesString {
         System.out.println(Files.getLastModifiedTime(timePath).toMillis());
         System.out.println(Files.setAttribute(timePath, "lastModifiedTime", fixedTime).equals(timePath));
         System.out.println(Files.getLastModifiedTime(timePath).toMillis());
+        System.out.println(Files.setLastModifiedTime(timePath, negativeTime).equals(timePath));
+        FileTime negativeResult = Files.getLastModifiedTime(timePath);
+        System.out.println(negativeResult.toMillis() >= negativeTime.toMillis()
+            && negativeResult.toMillis() <= 0L);
+        System.out.println(Files.readAttributes(timePath, BasicFileAttributes.class)
+            .lastModifiedTime().equals(negativeResult));
+        System.out.println(Files.setLastModifiedTime(timePath, fixedTime).equals(timePath));
         try {
           Files.getLastModifiedTime(timeRoot.resolve("missing-time.txt"));
           System.out.println(false);
@@ -1570,6 +1652,22 @@ public class Java11FilesString {
           System.out.println(Arrays.toString(names));
         } finally {
           listed.close();
+        }
+        Stream<Path> listedCharacteristics = Files.list(streamRoot);
+        try {
+          Spliterator<Path> spliterator = listedCharacteristics.spliterator();
+          System.out.println(spliterator.hasCharacteristics(Spliterator.DISTINCT));
+          System.out.println(spliterator.hasCharacteristics(Spliterator.SIZED));
+        } finally {
+          listedCharacteristics.close();
+        }
+        Stream<Path> closedList = Files.list(streamRoot);
+        try {
+          Iterator<Path> closedListIterator = closedList.iterator();
+          closedList.close();
+          System.out.println(!closedListIterator.hasNext());
+        } finally {
+          closedList.close();
         }
         try {
           Files.list(streamRoot.resolve("missing-list"));
@@ -1824,6 +1922,21 @@ public class Java11FilesString {
         } finally {
           singleIteratorStream.close();
         }
+        DirectoryStream<Path> prefetchedStream = Files.newDirectoryStream(directoryStreamRoot);
+        try {
+          Iterator<Path> prefetchedIterator = prefetchedStream.iterator();
+          boolean prefetched = prefetchedIterator.hasNext();
+          prefetchedStream.close();
+          System.out.println(prefetched && prefetchedIterator.hasNext());
+          try {
+            System.out.println(prefetchedIterator.next().getFileName() != null);
+          } catch (NoSuchElementException e) {
+            System.out.println(false);
+          }
+          System.out.println(!prefetchedIterator.hasNext());
+        } finally {
+          prefetchedStream.close();
+        }
         try {
           Files.newDirectoryStream(directoryStreamRoot.resolve("missing-directory-stream"));
           System.out.println(false);
@@ -1866,6 +1979,28 @@ public class Java11FilesString {
         } catch (PatternSyntaxException e) {
           System.out.println(e.getClass().getName());
         }
+        try {
+          try (DirectoryStream<Path> ignored =
+              Files.newDirectoryStream(directoryStreamRoot, "*.{txt,{bin,java}}")) {
+            System.out.println(false);
+          }
+        } catch (PatternSyntaxException e) {
+          System.out.println(e.getClass().getName());
+        }
+        try {
+          try (DirectoryStream<Path> ignored =
+              Files.newDirectoryStream(directoryStreamRoot, "[z-a]")) {
+            System.out.println(false);
+          }
+        } catch (PatternSyntaxException e) {
+          System.out.println(e.getClass().getName());
+        }
+        try {
+          Files.newDirectoryStream((Path) null, "*.{");
+          System.out.println(false);
+        } catch (RuntimeException e) {
+          System.out.println(e.getClass().getName());
+        }
       } finally {
         Files.deleteIfExists(directoryStreamJava);
         Files.deleteIfExists(directoryStreamLiteralQuestion);
@@ -1893,6 +2028,26 @@ public class Java11FilesString {
         } finally {
           walked.close();
         }
+        Stream<Path> walkedCharacteristics = Files.walk(walkRoot);
+        try {
+          Spliterator<Path> spliterator = walkedCharacteristics.spliterator();
+          System.out.println(!spliterator.hasCharacteristics(Spliterator.SIZED));
+        } finally {
+          walkedCharacteristics.close();
+        }
+        Stream<Path> closedWalk = Files.walk(walkRoot);
+        try {
+          Iterator<Path> iterator = closedWalk.iterator();
+          iterator.next();
+          closedWalk.close();
+          try {
+            System.out.println(!iterator.hasNext());
+          } catch (IllegalStateException e) {
+            System.out.println(e.getClass().getName());
+          }
+        } finally {
+          closedWalk.close();
+        }
         Stream<Path> walkedOne = Files.walk(walkRoot, 1);
         try {
           String[] names = walkedOne.map(p -> relativeName(walkRoot, p)).toArray(String[]::new);
@@ -1914,6 +2069,48 @@ public class Java11FilesString {
           System.out.println(followed.count());
         } finally {
           followed.close();
+        }
+        Path walkLink = walkRoot.resolve("link");
+        Path walkFileLink = walkRoot.resolve("file-link");
+        try {
+          Files.createSymbolicLink(walkLink, walkRoot.relativize(walkDirectory));
+          Files.createSymbolicLink(walkFileLink, walkRoot.relativize(walkFile));
+          Stream<Path> notFollowedLink = Files.walk(walkRoot);
+          try {
+            String[] names = notFollowedLink
+                .map(p -> relativeName(walkRoot, p))
+                .toArray(String[]::new);
+            Arrays.sort(names);
+            System.out.println(Arrays.toString(names));
+          } finally {
+            notFollowedLink.close();
+          }
+          Stream<Path> followedLink = Files.walk(walkRoot, FileVisitOption.FOLLOW_LINKS);
+          try {
+            String[] names = followedLink
+                .map(p -> relativeName(walkRoot, p))
+                .toArray(String[]::new);
+            Arrays.sort(names);
+            System.out.println(Arrays.toString(names));
+          } finally {
+            followedLink.close();
+          }
+          Stream<Path> foundWithoutFollowing = Files.find(
+              walkRoot,
+              Integer.MAX_VALUE,
+              (p, attrs) -> attrs.isRegularFile());
+          try {
+            String[] names = foundWithoutFollowing
+                .map(p -> relativeName(walkRoot, p))
+                .toArray(String[]::new);
+            Arrays.sort(names);
+            System.out.println(Arrays.toString(names));
+          } finally {
+            foundWithoutFollowing.close();
+          }
+        } finally {
+          Files.deleteIfExists(walkFileLink);
+          Files.deleteIfExists(walkLink);
         }
         try {
           Files.walk(walkRoot.resolve("missing-walk"));
@@ -2588,6 +2785,8 @@ public class Java11FilesString {
   private static String relativeName(Path root, Path path) {
     return path.equals(root) ? "." : root.relativize(path).toString().replace('\\', '/');
   }
+
+  private interface MissingBasicFileAttributes extends BasicFileAttributes {}
 
   private interface MissingFileAttributeView extends FileAttributeView {}
 }

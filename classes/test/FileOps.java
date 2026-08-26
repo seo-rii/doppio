@@ -36,8 +36,10 @@ class FileOps {
         File fCanon = new File(f.getCanonicalPath());
         System.out.println("Does the absolute path of '' exist?: " + fAbs.exists());
         System.out.println("Does the canonical path of '' exist?: " + fCanon.exists());
-        System.out.println("Does abspath == canonpath.abspath?: " + (fAbs.getAbsolutePath() == fCanon.getAbsolutePath()));
-        System.out.println("Does abspath.canonpath == canonpath?: " + (fAbs.getCanonicalPath() == fCanon.getCanonicalPath()));
+        System.out.println("Does abspath equal canonpath.abspath?: "
+            + fAbs.getAbsolutePath().equals(fCanon.getAbsolutePath()));
+        System.out.println("Does abspath.canonpath equal canonpath?: "
+            + fAbs.getCanonicalPath().equals(fCanon.getCanonicalPath()));
       }
       System.out.println("Does '' exist?: " + f.exists());
       System.out.println("What is the length of ''?: " + f.length());
@@ -150,6 +152,7 @@ class FileOps {
       //System.out.println("Moving on top of old file: " + f2.renameTo(f));
       System.out.println("Deleting old file: " + f.delete());
       System.out.println("Trying to move nonexistant old file: " + f.renameTo(f2));
+      System.out.println("Deleting renamed file: " + f2.delete());
     }
 
     // Read only.

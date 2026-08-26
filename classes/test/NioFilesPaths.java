@@ -2,8 +2,16 @@ package classes.test;
 
 import java.io.*;
 import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributeView;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileOwnerAttributeView;
 import java.nio.file.attribute.FileTime;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFileAttributes;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 class NioFilesPaths {
   static void printFile(Path fPath) throws IOException {
@@ -38,12 +46,161 @@ class NioFilesPaths {
         System.out.println("Does abspath.real == normalized path?: " + (pAbs.toRealPath() == pNorm));
       }
       System.out.println("Does '' exist?: " + Files.exists(p));
-      // REMOVED: Returns OS-specific value.
-      // System.out.println("What is the length of ''?: " + Files.size(p));
+      System.out.println("Does '' exist without following links?: "
+          + Files.exists(p, LinkOption.NOFOLLOW_LINKS));
+      System.out.println("Is '' a directory?: " + Files.isDirectory(p));
+      System.out.println("Is '' a directory without following links?: "
+          + Files.isDirectory(p, LinkOption.NOFOLLOW_LINKS));
+      System.out.println("Is '' a regular file?: " + Files.isRegularFile(p));
+      System.out.println("Is '' a regular file without following links?: "
+          + Files.isRegularFile(p, LinkOption.NOFOLLOW_LINKS));
+      try {
+        Files.size(p);
+        System.out.println("Can the size of '' be read?: true");
+      } catch (IOException e) {
+        System.out.println("Can the size of '' be read?: false");
+      }
+      try {
+        BasicFileAttributes attributes = Files.readAttributes(p, BasicFileAttributes.class);
+        System.out.println("Do typed attributes identify '' as a directory?: "
+            + attributes.isDirectory());
+      } catch (IOException e) {
+        System.out.println("Do typed attributes identify '' as a directory?: false");
+      }
+      try {
+        Map<String, Object> attributes = Files.readAttributes(
+            p, "basic:isDirectory,size", LinkOption.NOFOLLOW_LINKS);
+        System.out.println("Do string attributes identify '' as a directory?: "
+            + (Boolean.TRUE.equals(attributes.get("isDirectory"))
+                && attributes.get("size") instanceof Long));
+      } catch (IOException e) {
+        System.out.println("Do string attributes identify '' as a directory?: false");
+      }
+      try {
+        System.out.println("Does getAttribute identify '' as a directory?: "
+            + Boolean.TRUE.equals(Files.getAttribute(p, "basic:isDirectory")));
+      } catch (IOException e) {
+        System.out.println("Does getAttribute identify '' as a directory?: false");
+      }
+      try {
+        BasicFileAttributeView view = Files.getFileAttributeView(
+            p, BasicFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
+        System.out.println("Does the attribute view identify '' as a directory?: "
+            + view.readAttributes().isDirectory());
+      } catch (IOException e) {
+        System.out.println("Does the attribute view identify '' as a directory?: false");
+      }
+      try {
+        System.out.println("Does the last-modified time of '' match its attributes?: "
+            + Files.getLastModifiedTime(p).equals(
+                Files.readAttributes(p, BasicFileAttributes.class).lastModifiedTime()));
+      } catch (IOException e) {
+        System.out.println("Does the last-modified time of '' match its attributes?: false");
+      }
+      PosixFileAttributes posixAttributes =
+          Files.readAttributes(p, PosixFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+      try {
+        System.out.println("Does the owner of '' match its attributes?: "
+            + Files.getOwner(p, LinkOption.NOFOLLOW_LINKS).getName()
+                .equals(posixAttributes.owner().getName()));
+      } catch (IOException e) {
+        System.out.println("Does the owner of '' match its attributes?: false");
+      }
+      try {
+        System.out.println("Do the POSIX permissions of '' match its attributes?: "
+            + Files.getPosixFilePermissions(p, LinkOption.NOFOLLOW_LINKS)
+                .equals(posixAttributes.permissions()));
+      } catch (IOException e) {
+        System.out.println("Do the POSIX permissions of '' match its attributes?: false");
+      }
+      try {
+        FileOwnerAttributeView ownerView = Files.getFileAttributeView(
+            p, FileOwnerAttributeView.class, LinkOption.NOFOLLOW_LINKS);
+        System.out.println("Does the owner view of '' match its attributes?: "
+            + ownerView.getOwner().getName().equals(posixAttributes.owner().getName()));
+      } catch (IOException e) {
+        System.out.println("Does the owner view of '' match its attributes?: false");
+      }
+      try {
+        PosixFileAttributeView posixView = Files.getFileAttributeView(
+            p, PosixFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
+        System.out.println("Does the POSIX view owner of '' match its attributes?: "
+            + posixView.getOwner().getName().equals(posixAttributes.owner().getName()));
+      } catch (IOException e) {
+        System.out.println("Does the POSIX view owner of '' match its attributes?: false");
+      }
+      try {
+        FileStore providerStore = p.getFileSystem().provider().getFileStore(p);
+        FileStore emptyStore = Files.getFileStore(p);
+        FileStore absoluteStore = Files.getFileStore(p.toAbsolutePath());
+        System.out.println("Does the file store of '' match the absolute current directory?: "
+            + (emptyStore.equals(providerStore) && emptyStore.equals(absoluteStore)));
+        System.out.println("Does the file store of '' report a type?: "
+            + !emptyStore.type().isEmpty());
+      } catch (IOException e) {
+        System.out.println("Does the file store of '' match the absolute current directory?: false");
+        System.out.println("Does the file store of '' report a type?: false");
+      }
+      try {
+        Set<Path> providerEntries = new HashSet<Path>();
+        try (DirectoryStream<Path> stream = p.getFileSystem().provider().newDirectoryStream(
+            p, entry -> true)) {
+          for (Path entry : stream) {
+            providerEntries.add(entry);
+          }
+        }
+        Set<Path> facadeEntries = new HashSet<Path>();
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(p)) {
+          for (Path entry : stream) {
+            facadeEntries.add(entry);
+          }
+        }
+        Set<Path> listedEntries = new HashSet<Path>();
+        try (java.util.stream.Stream<Path> stream = Files.list(p)) {
+          stream.forEach(entry -> listedEntries.add(entry));
+        }
+        System.out.println("Does the directory stream of '' match the provider?: "
+            + facadeEntries.equals(providerEntries));
+        System.out.println("Does the list of '' match the provider?: "
+            + listedEntries.equals(providerEntries));
+      } catch (IOException e) {
+        System.out.println("Does the directory stream of '' match the provider?: false");
+        System.out.println("Does the list of '' match the provider?: false");
+      }
+      try (java.util.stream.Stream<Path> stream = Files.walk(p, 0)) {
+        Path[] walked = stream.toArray(Path[]::new);
+        System.out.println("Does the walk of '' at depth zero contain only itself?: "
+            + (walked.length == 1 && walked[0].equals(p)));
+      } catch (IOException e) {
+        System.out.println("Does the walk of '' at depth zero contain only itself?: false");
+      }
+      try (java.util.stream.Stream<Path> stream =
+          Files.find(p, 0, (path, attributes) -> attributes.isDirectory())) {
+        Path[] found = stream.toArray(Path[]::new);
+        System.out.println("Does the find of '' at depth zero identify the current directory?: "
+            + (found.length == 1 && found[0].equals(p)));
+      } catch (IOException e) {
+        System.out.println("Does the find of '' at depth zero identify the current directory?: false");
+      }
+      try (java.nio.channels.SeekableByteChannel channel = Files.newByteChannel(p)) {
+        System.out.println("Can a byte channel open ''?: " + channel.isOpen());
+      } catch (IOException e) {
+        System.out.println("Can a byte channel open ''?: false");
+      }
+      try (InputStream input = Files.newInputStream(p)) {
+        System.out.println("Can an input stream open ''?: " + (input != null));
+      } catch (IOException e) {
+        System.out.println("Can an input stream open ''?: false");
+      }
+      System.out.println("Can you read from ''?: " + Files.isReadable(p));
       System.out.println("Can you write to ''?: " + Files.isWritable(p));
+      System.out.println("Can you execute ''?: " + Files.isExecutable(p));
     }
 
-    final Path[] children = Files.list(testDirPath).toArray(Path[]::new);
+    final Path[] children;
+    try (java.util.stream.Stream<Path> stream = Files.list(testDirPath)) {
+      children = stream.toArray(Path[]::new);
+    }
     // Sort by name to avoid nondeterministic file orderings.
     Arrays.sort(children);
     for (final Path child : children) {

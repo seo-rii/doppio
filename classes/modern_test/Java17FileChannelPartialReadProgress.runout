@@ -1,0 +1,7 @@
+scatter-result:2
+buffer-positions:1:1
+buffer-bytes:A:B
+scatter-position:2
+next-read:1
+next-position:3
+next-byte:C

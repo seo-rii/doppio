@@ -4824,6 +4824,17 @@ function modernJava(grunt: IGrunt) {
     var done: (status?: boolean) => void = this.async(),
       srcDir = 'classes/modern_classlib',
       outDir = 'classes/modern_classlib/out',
+      compileSupportDir = 'build/modern-classlib-compile-support',
+      runtimeJar = path.resolve('vendor/java_home/lib/rt.jar'),
+      runtimePatchPath = srcDir + path.delimiter + compileSupportDir,
+      compileSupportEntries = [
+        'java/nio/file/FileTreeIterator.class',
+        'java/nio/file/FileTreeWalker.class',
+        'java/nio/file/FileTreeWalker$1.class',
+        'java/nio/file/FileTreeWalker$DirectoryNode.class',
+        'java/nio/file/FileTreeWalker$Event.class',
+        'java/nio/file/FileTreeWalker$EventType.class'
+      ],
       marker = outDir + '/.timestamp',
       inputFiles = grunt.file.expand([srcDir + '/**/*.java']),
       specialInputFiles = inputFiles.filter(function(src: string): boolean {
@@ -4834,11 +4845,15 @@ function modernJava(grunt: IGrunt) {
       normalInputFiles = inputFiles.filter(function(src: string): boolean {
         return specialInputFiles.indexOf(src) === -1;
       }),
-      newestSource = inputFiles.reduce(function(newest: Date, src: string): Date {
+      newestSource = inputFiles.concat(['tasks/modern_java.ts', runtimeJar]).reduce(function(
+          newest: Date, src: string): Date {
         var mtime = fs.statSync(src).mtime;
         return mtime > newest ? mtime : newest;
       }, new Date(0));
     grunt.config.requires('build.javac');
+    var jarTool = path.join(
+      path.dirname(grunt.config('build.javac')),
+      os.platform() === 'win32' ? 'jar.exe' : 'jar');
     if (inputFiles.length === 0) {
       return done();
     }
@@ -4865,12 +4880,24 @@ function modernJava(grunt: IGrunt) {
       compileSpecialFiles();
       return;
     }
-    child_process.exec(shellEscape(grunt.config('build.javac')) + ' -J-Dfile.encoding=UTF8 --release 9 --patch-module java.base=' + shellEscape(srcDir) + ' -d ' + shellEscape(outDir) + ' ' + normalInputFiles.map(shellEscape).join(' '),
-      function(err?: any, stdout?: Buffer, stderr?: Buffer) {
-        if (err) {
-          grunt.fail.fatal('Error compiling modern classlib: ' + err + '\n' + stdout.toString() + stderr.toString());
+    grunt.file.delete(compileSupportDir);
+    grunt.file.mkdir(compileSupportDir);
+    child_process.execFile(
+      jarTool,
+      ['--extract', '--file', runtimeJar].concat(compileSupportEntries),
+      { cwd: compileSupportDir },
+      function(extractErr?: any, extractStdout?: string, extractStderr?: string) {
+        if (extractErr) {
+          grunt.fail.fatal('Error extracting modern classlib compile support: ' + extractErr + '\n' +
+            extractStdout.toString() + extractStderr.toString());
         }
-        compileSpecialFiles();
+        child_process.exec(shellEscape(grunt.config('build.javac')) + ' -J-Dfile.encoding=UTF8 --release 9 --patch-module java.base=' + shellEscape(runtimePatchPath) + ' -d ' + shellEscape(outDir) + ' ' + normalInputFiles.map(shellEscape).join(' '),
+          function(err?: any, stdout?: Buffer, stderr?: Buffer) {
+            if (err) {
+              grunt.fail.fatal('Error compiling modern classlib: ' + err + '\n' + stdout.toString() + stderr.toString());
+            }
+            compileSpecialFiles();
+          });
       });
   });
 
@@ -5377,6 +5404,321 @@ function modernJava(grunt: IGrunt) {
         }
         done();
       });
+  });
+
+  grunt.registerTask('unit_test_filechannel_writev_partial_progress', 'Verify gather-write position after injected host failures.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      injectorPath = path.resolve('ci/writev_partial_failure_injector.cjs'),
+      mainClass = 'classes.modern_test.Java17FileChannelPartialProgress',
+      scenarios = [
+        ['fallback-write',
+          'mode:fallback-write\npartial-result:1\nbuffer-positions:1:0\npartial-position:1\nnext-write:1\nnext-position:2\ncontent:AZ\n'],
+        ['fallback-sync',
+          'mode:fallback-sync\nfailure:true\nbuffer-positions:0:0\npartial-position:1\nnext-write:1\nnext-position:2\ncontent:AZ\n'],
+        ['fallback-stat',
+          'mode:fallback-stat\nfailure:true\nbuffer-positions:0:0\npartial-position:1\nnext-write:1\nnext-position:2\ncontent:AZ\n']
+      ];
+    if (typeof (<any> fs).writev === 'function') {
+      scenarios.push([
+        'native-sync',
+        'mode:native-sync\nfailure:true\nbuffer-positions:0:0\npartial-position:2\nnext-write:1\nnext-position:3\ncontent:ABZ\n'
+      ]);
+    }
+    async.eachSeries(scenarios,
+      function(scenario: string[], next: (err?: any) => void): void {
+        var env: {[name: string]: string} = <any> Object.assign({}, process.env, {
+          DOPPIO_WRITEV_FAILURE_MODE: scenario[0]
+        });
+        child_process.execFile(
+          process.execPath,
+          [
+            '--no-deprecation',
+            '--require',
+            injectorPath,
+            'build/release-cli/console/runner.js',
+            '-classpath',
+            '.',
+            mainClass
+          ],
+          {env: env},
+          function(err?: any, stdout?: string, stderr?: string): void {
+            var actual = stdout + stderr,
+              expected = scenario[1];
+            if (err || actual !== expected) {
+              next(new Error(
+                'Gather-write partial-progress output does not match for ' + scenario[0] +
+                '.\nDoppio:\n' + actual + '\nExpected:\n' + expected
+              ));
+              return;
+            }
+            grunt.log.ok('Gather-write partial-progress output matched for ' + scenario[0] + '.');
+            next();
+          }
+        );
+      },
+      function(err?: any): void {
+        if (err) {
+          grunt.fail.fatal(err.message);
+        }
+        done();
+      });
+  });
+
+  grunt.registerTask('unit_test_filechannel_readv_partial_progress', 'Verify scatter-read position across injected host boundaries.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      injectorPath = path.resolve('ci/readv_partial_failure_injector.cjs'),
+      mainClass = 'classes.modern_test.Java17FileChannelPartialReadProgress',
+      scenarios = [
+        ['fallback-read',
+          'mode:fallback-read\nscatter-result:1\nbuffer-positions:1:0\nbuffer-bytes:A:-\nscatter-position:1\nnext-read:1\nnext-position:2\nnext-byte:B\n'],
+        ['fallback-eof',
+          'mode:fallback-eof\nscatter-result:1\nbuffer-positions:1:0\nbuffer-bytes:C:-\nscatter-position:3\nnext-read:-1\nnext-position:3\nnext-byte:-\n']
+      ];
+    if (typeof (<any> fs).readv === 'function') {
+      scenarios.push([
+        'native-read',
+        'mode:native-read\nscatter-result:2\nbuffer-positions:1:1\nbuffer-bytes:A:B\nscatter-position:2\nnext-read:1\nnext-position:3\nnext-byte:C\n'
+      ]);
+    }
+    async.eachSeries(scenarios,
+      function(scenario: string[], next: (err?: any) => void): void {
+        var env: {[name: string]: string} = <any> Object.assign({}, process.env, {
+          DOPPIO_READV_FAILURE_MODE: scenario[0]
+        });
+        child_process.execFile(
+          process.execPath,
+          [
+            '--no-deprecation',
+            '--require',
+            injectorPath,
+            'build/release-cli/console/runner.js',
+            '-classpath',
+            '.',
+            mainClass
+          ],
+          {env: env},
+          function(err?: any, stdout?: string, stderr?: string): void {
+            var actual = stdout + stderr,
+              expected = scenario[1];
+            if (err || actual !== expected) {
+              next(new Error(
+                'Scatter-read partial-progress output does not match for ' + scenario[0] +
+                '.\nDoppio:\n' + actual + '\nExpected:\n' + expected
+              ));
+              return;
+            }
+            grunt.log.ok('Scatter-read partial-progress output matched for ' + scenario[0] + '.');
+            next();
+          }
+        );
+      },
+      function(err?: any): void {
+        if (err) {
+          grunt.fail.fatal(err.message);
+        }
+        done();
+      });
+  });
+
+  grunt.registerTask('unit_test_file_output_stream_append_channel', 'Verify FileOutputStream append state, placement, and failed-open cleanup.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      injectorPath = path.resolve('ci/file_output_stream_append_injector.cjs'),
+      mainClass = 'classes.modern_test.Java17FileOutputStreamAppendChannel',
+      scenarios = [
+        ['state',
+          'mode:state\nopen-position:1\nreset-position:1\nstream-position:2\ngather-result:2\nbuffer-positions:1:1\ngather-position:4\nexternal-position:5\nexternal-stream-position:6\nscalar-result:1\nscalar-buffer-position:1\nfinal-position:7\ncontent:ABCDEFG\n'],
+        ['fstat-open',
+          'mode:fstat-open\nopen-failure:true\ncontent:A\n'],
+        ['fstat-write',
+          'mode:fstat-write\nwrite-failure:true\ncontent:ABC\n']
+      ];
+    async.eachSeries(scenarios,
+      function(scenario: string[], next: (err?: any) => void): void {
+        var env: {[name: string]: string} = <any> Object.assign({}, process.env, {
+          DOPPIO_FOS_APPEND_MODE: scenario[0]
+        });
+        child_process.execFile(
+          process.execPath,
+          [
+            '--no-deprecation',
+            '--require',
+            injectorPath,
+            'build/release-cli/console/runner.js',
+            '-classpath',
+            '.',
+            mainClass
+          ],
+          {env: env},
+          function(err?: any, stdout?: string, stderr?: string): void {
+            var actual = stdout + stderr,
+              expected = scenario[1];
+            if (err || actual !== expected) {
+              next(new Error(
+                'FileOutputStream append output does not match for ' + scenario[0] +
+                '.\nDoppio:\n' + actual + '\nExpected:\n' + expected
+              ));
+              return;
+            }
+            grunt.log.ok('FileOutputStream append output matched for ' + scenario[0] + '.');
+            next();
+          }
+        );
+      },
+      function(err?: any): void {
+        if (err) {
+          grunt.fail.fatal(err.message);
+        }
+        done();
+      });
+  });
+
+  grunt.registerTask('unit_test_filechannel_ioexception_boundaries', 'Verify channel IOException and provider UnixException boundaries.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      injectorPath = path.resolve('ci/filechannel_ioexception_injector.cjs'),
+      unixClosePolicyPath = path.resolve('ci/unix_close_policy_test.cjs'),
+      mainClass = 'classes.modern_test.Java17FileChannelIOExceptionBoundaries',
+      operationsExpected =
+        'size:java.io.IOException:true:false\n' +
+        'truncate:java.io.IOException:true:false\n' +
+        'write:java.io.IOException:true:false:0\n' +
+        'gather:java.io.IOException:true:false:0:0\n' +
+        'force:java.io.IOException:true:false\n' +
+        'map:java.io.IOException:true:false\n' +
+        'map-memory:java.io.IOException:true:true\n' +
+        'transfer-read:java.io.IOException:true:false\n' +
+        'transfer-write:java.io.IOException:true:false\n' +
+        'post-write:java.io.IOException:true:false:0:4\n' +
+        'provider:java.nio.file.AccessDeniedException:true:true\n' +
+        'content:ABCQ\n',
+      readCloseExpected =
+        'read:java.io.IOException:true:false\n' +
+        'buffer-positions:0:0\n' +
+        'close:java.io.IOException:true:false\n' +
+        'channel-open:false\n' +
+        'second-close:true\n' +
+        'content:ABC\n',
+      legacyCloseExpected =
+        'close:java.io.IOException:true:false\n' +
+        'descriptor-valid:false\n' +
+        'channel-open:false\n' +
+        'second-close:true\n' +
+        'content:ABC\n',
+      unixClosePolicyExpected =
+        'close-eio:returned:1:1\n' +
+        'fclose-eio:unix-exception:1:1\n' +
+        'fclose-eintr:returned:1:1\n',
+      scenarios = [
+        ['operations', 'mode:operations\n' + operationsExpected],
+        ['operations-fallback', 'mode:operations-fallback\n' + operationsExpected],
+        ['read-close-fallback', 'mode:read-close-fallback\n' + readCloseExpected],
+        ['legacy-close-input', 'mode:legacy-close-input\n' + legacyCloseExpected],
+        ['legacy-close-output', 'mode:legacy-close-output\n' + legacyCloseExpected],
+        ['legacy-close-random', 'mode:legacy-close-random\n' + legacyCloseExpected]
+      ];
+    if (typeof (<any> fs).readv === 'function') {
+      scenarios.push([
+        'read-close-native',
+        'mode:read-close-native\n' + readCloseExpected
+      ]);
+    }
+    async.eachSeries(scenarios,
+      function(scenario: string[], next: (err?: any) => void): void {
+        var env: {[name: string]: string} = <any> Object.assign({}, process.env, {
+          DOPPIO_FILECHANNEL_IOEXCEPTION_MODE: scenario[0]
+        });
+        child_process.execFile(
+          process.execPath,
+          [
+            '--no-deprecation',
+            '--require',
+            injectorPath,
+            'build/release-cli/console/runner.js',
+            '-classpath',
+            '.',
+            mainClass
+          ],
+          {env: env},
+          function(err?: any, stdout?: string, stderr?: string): void {
+            var actual = stdout + stderr,
+              expected = scenario[1];
+            if (err || actual !== expected) {
+              next(new Error(
+                'FileChannel exception-boundary output does not match for ' + scenario[0] +
+                '.\nDoppio:\n' + actual + '\nExpected:\n' + expected
+              ));
+              return;
+            }
+            grunt.log.ok('FileChannel exception-boundary output matched for ' + scenario[0] + '.');
+            next();
+          }
+        );
+      },
+      function(err?: any): void {
+        if (err) {
+          grunt.fail.fatal(err.message);
+          return;
+        }
+        child_process.execFile(
+          process.execPath,
+          ['--no-deprecation', unixClosePolicyPath],
+          function(policyErr?: any, stdout?: string, stderr?: string): void {
+            var actual = stdout + stderr;
+            if (policyErr || actual !== unixClosePolicyExpected) {
+              grunt.fail.fatal(
+                'Unix close-policy output does not match.\nDoppio:\n' + actual +
+                '\nExpected:\n' + unixClosePolicyExpected
+              );
+              return;
+            }
+            grunt.log.ok('Unix descriptor close policies matched their native contracts.');
+            done();
+          }
+        );
+      });
+  });
+
+  grunt.registerTask('unit_test_legacy_fd_generation', 'Fence legacy I/O callbacks across descriptor close and fd reuse.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      testPath = path.resolve('ci/legacy_fd_generation_test.cjs'),
+      expected = 'legacy-fd-generation:31:ok\n';
+    child_process.execFile(
+      process.execPath,
+      ['--no-deprecation', testPath],
+      function(err?: any, stdout?: string, stderr?: string): void {
+        var actual = stdout + stderr;
+        if (err || actual !== expected) {
+          grunt.fail.fatal(
+            'Legacy descriptor-generation output does not match.\nDoppio:\n' + actual +
+            '\nExpected:\n' + expected
+          );
+          return;
+        }
+        grunt.log.ok('Legacy descriptor generations fence delayed callbacks after close.');
+        done();
+      }
+    );
+  });
+
+  grunt.registerTask('unit_test_legacy_fd_leases', 'Keep legacy host descriptors open until pending operations drain.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      testPath = path.resolve('ci/legacy_fd_lease_test.cjs'),
+      expected = 'legacy-fd-leases:7:ok\n';
+    child_process.execFile(
+      process.execPath,
+      ['--no-deprecation', testPath],
+      function(err?: any, stdout?: string, stderr?: string): void {
+        var actual = stdout + stderr;
+        if (err || actual !== expected) {
+          grunt.fail.fatal(
+            'Legacy descriptor-lease output does not match.\nDoppio:\n' + actual +
+            '\nExpected:\n' + expected
+          );
+          return;
+        }
+        grunt.log.ok('Legacy descriptor close waits for pending host operations.');
+        done();
+      }
+    );
   });
 
   grunt.registerMultiTask('parse_classfile_modern', 'Parse modern class-file fixtures with Doppio.', function() {

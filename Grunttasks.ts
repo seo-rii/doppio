@@ -1265,7 +1265,13 @@ export function setup(grunt: IGrunt) {
     'run_java_modern:java17',
     'run_java_modern:reflect_parameters',
     'lineending:modern_java17',
-    'unit_test:modern_java17'
+    'unit_test:modern_java17',
+    'unit_test_filechannel_writev_partial_progress',
+    'unit_test_filechannel_readv_partial_progress',
+    'unit_test_file_output_stream_append_channel',
+    'unit_test_filechannel_ioexception_boundaries',
+    'unit_test_legacy_fd_generation',
+    'unit_test_legacy_fd_leases'
   ];
   var modernJavaTestTasks = ['modern-ci-release-cli'].concat(modernJavaRuntimeTestTasks);
   grunt.registerTask('test-modern-java', modernJavaTestTasks);

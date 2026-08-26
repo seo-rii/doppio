@@ -7,6 +7,10 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributeView;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileOwnerAttributeView;
+import java.nio.file.attribute.FileTime;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFileAttributes;
 import java.util.Map;
 
 public class Java17FilesNoFollowLinkAttributes {
@@ -18,6 +22,7 @@ public class Java17FilesNoFollowLinkAttributes {
     Path danglingLink = root.resolve("dangling-link.txt");
     try {
       Files.writeString(target, "alpha");
+      Files.setLastModifiedTime(target, FileTime.fromMillis(1234567890000L));
       Files.createSymbolicLink(link, target.getFileName());
 
       BasicFileAttributes followed = Files.readAttributes(link, BasicFileAttributes.class);
@@ -26,6 +31,12 @@ public class Java17FilesNoFollowLinkAttributes {
       System.out.println(followed.isRegularFile());
       System.out.println(followed.isSymbolicLink());
       printBasic(notFollowed, target.getFileName());
+      FileTime followedTime = Files.getLastModifiedTime(link);
+      FileTime notFollowedTime =
+          Files.getLastModifiedTime(link, LinkOption.NOFOLLOW_LINKS);
+      System.out.println(followedTime.equals(followed.lastModifiedTime()));
+      System.out.println(notFollowedTime.equals(notFollowed.lastModifiedTime()));
+      System.out.println(!followedTime.equals(notFollowedTime));
 
       Map<String, Object> notFollowedMap =
           Files.readAttributes(
@@ -47,10 +58,35 @@ public class Java17FilesNoFollowLinkAttributes {
       Map<String, Object> danglingMap =
           Files.readAttributes(danglingLink, "basic:*", LinkOption.NOFOLLOW_LINKS);
       printMap(danglingMap, danglingTarget.getFileName());
+      System.out.println(Files.getLastModifiedTime(danglingLink, LinkOption.NOFOLLOW_LINKS)
+          .equals(dangling.lastModifiedTime()));
+      PosixFileAttributes danglingPosix =
+          Files.readAttributes(danglingLink, PosixFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+      System.out.println(Files.getOwner(danglingLink, LinkOption.NOFOLLOW_LINKS).getName()
+          .equals(danglingPosix.owner().getName()));
+      System.out.println(Files.getPosixFilePermissions(danglingLink, LinkOption.NOFOLLOW_LINKS)
+          .equals(danglingPosix.permissions()));
+      FileOwnerAttributeView danglingOwnerView = Files.getFileAttributeView(
+          danglingLink, FileOwnerAttributeView.class, LinkOption.NOFOLLOW_LINKS);
+      System.out.println(danglingOwnerView.getOwner().getName()
+          .equals(danglingPosix.owner().getName()));
+      PosixFileAttributeView danglingPosixView = Files.getFileAttributeView(
+          danglingLink, PosixFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
+      System.out.println(danglingPosixView.getOwner().getName()
+          .equals(danglingPosix.owner().getName()));
 
       printFailure(
           "dangling-follow",
           () -> Files.readAttributes(danglingLink, BasicFileAttributes.class));
+      printFailure(
+          "dangling-time-follow",
+          () -> Files.getLastModifiedTime(danglingLink));
+      printFailure(
+          "dangling-owner-follow",
+          () -> Files.getOwner(danglingLink));
+      printFailure(
+          "dangling-posix-follow",
+          () -> Files.getPosixFilePermissions(danglingLink));
       printFailure(
           "missing-nofollow",
           () -> Files.readAttributes(root.resolve("missing.txt"), BasicFileAttributes.class,

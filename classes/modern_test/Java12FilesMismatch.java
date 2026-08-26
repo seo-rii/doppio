@@ -20,6 +20,14 @@ public class Java12FilesMismatch {
       System.out.println(Files.mismatch(
           first.resolveSibling("same-missing-file"),
           first.resolveSibling("same-missing-file")));
+      Path missing = first.resolveSibling("missing-file");
+      Path missingAlias = missing.getParent().resolve(".").resolve(missing.getFileName());
+      try {
+        Files.mismatch(missing, missingAlias);
+        System.out.println(false);
+      } catch (NoSuchFileException e) {
+        System.out.println(e.getClass().getName());
+      }
       System.out.println(Files.mismatch(first, second));
       System.out.println(Files.mismatch(first, longer));
       System.out.println(Files.mismatch(longer, first));
@@ -61,7 +69,7 @@ public class Java12FilesMismatch {
         System.out.println(e.getClass().getName());
       }
       try {
-        Files.mismatch(first, first.resolveSibling("missing-file"));
+        Files.mismatch(first, missing);
         System.out.println(false);
       } catch (NoSuchFileException e) {
         System.out.println(e.getClass().getName());
