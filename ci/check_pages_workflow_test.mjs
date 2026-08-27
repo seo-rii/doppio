@@ -160,6 +160,207 @@ jobs:
     throw new Error(`expected wrong deploy action to fail:\n${wrongActionResult.stdout}\n${wrongActionResult.stderr}`);
   }
 
+  const inlineCommentVersions = writeWorkflow(root, `
+concurrency:
+  group: pages-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    steps:
+      - name: Install Chromium
+        run: ./node_modules/.bin/playwright install --with-deps chromium
+      - name: Build Pages artifact
+        run: ./ci/build_pages.sh
+      - name: Run local browser playground smoke
+        run: ./ci/run_pages_browser_smoke.sh
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4 # uses: actions/upload-pages-artifact@v5
+        with:
+          name: github-pages-\${{ github.run_attempt }}
+          path: docs
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4 # uses: actions/deploy-pages@v5
+        with:
+          artifact_name: github-pages-\${{ github.run_attempt }}
+          timeout: '600000'
+          reporting_interval: '10000'
+`);
+  const inlineCommentVersionsResult = runChecker(inlineCommentVersions);
+  if (
+    inlineCommentVersionsResult.status === 0 ||
+    !inlineCommentVersionsResult.stderr.includes('deploy-pages@v5')
+  ) {
+    throw new Error(
+      `expected inline-comment action versions to fail:\n${inlineCommentVersionsResult.stdout}\n${inlineCommentVersionsResult.stderr}`
+    );
+  }
+
+  const fullLineCommentVersions = writeWorkflow(root, `
+concurrency:
+  group: pages-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    steps:
+      - name: Install Chromium
+        run: ./node_modules/.bin/playwright install --with-deps chromium
+      - name: Build Pages artifact
+        run: ./ci/build_pages.sh
+      - name: Run local browser playground smoke
+        run: ./ci/run_pages_browser_smoke.sh
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        # uses: actions/upload-pages-artifact@v5
+        with:
+          name: github-pages-\${{ github.run_attempt }}
+          path: docs
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        # uses: actions/deploy-pages@v5
+        with:
+          artifact_name: github-pages-\${{ github.run_attempt }}
+          timeout: '600000'
+          reporting_interval: '10000'
+`);
+  const fullLineCommentVersionsResult = runChecker(fullLineCommentVersions);
+  if (
+    fullLineCommentVersionsResult.status === 0 ||
+    !fullLineCommentVersionsResult.stderr.includes('deploy-pages@v5')
+  ) {
+    throw new Error(
+      `expected full-line-comment action versions to fail:\n${fullLineCommentVersionsResult.stdout}\n${fullLineCommentVersionsResult.stderr}`
+    );
+  }
+
+  const blockScalarDeployVersion = writeWorkflow(root, `
+concurrency:
+  group: pages-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    steps:
+      - name: Install Chromium
+        run: ./node_modules/.bin/playwright install --with-deps chromium
+      - name: Build Pages artifact
+        run: ./ci/build_pages.sh
+      - name: Run local browser playground smoke
+        run: ./ci/run_pages_browser_smoke.sh
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          name: github-pages-\${{ github.run_attempt }}
+          path: docs
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages-\${{ github.run_attempt }}
+          timeout: '600000'
+          reporting_interval: '10000'
+      - name: Disabled deploy text
+        if: false
+        run: |
+          uses: actions/deploy-pages@v5
+          with:
+            artifact_name: github-pages-\${{ github.run_attempt }}
+            timeout: '600000'
+            reporting_interval: '10000'
+`);
+  const blockScalarDeployVersionResult = runChecker(blockScalarDeployVersion);
+  if (
+    blockScalarDeployVersionResult.status === 0 ||
+    !blockScalarDeployVersionResult.stderr.includes('deploy-pages@v5')
+  ) {
+    throw new Error(
+      `expected block-scalar deploy version to fail:\n${blockScalarDeployVersionResult.stdout}\n${blockScalarDeployVersionResult.stderr}`
+    );
+  }
+
+  const blockScalarUploadVersion = writeWorkflow(root, `
+concurrency:
+  group: pages-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    steps:
+      - name: Install Chromium
+        run: ./node_modules/.bin/playwright install --with-deps chromium
+      - name: Build Pages artifact
+        run: ./ci/build_pages.sh
+      - name: Run local browser playground smoke
+        run: ./ci/run_pages_browser_smoke.sh
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          name: github-pages-\${{ github.run_attempt }}
+          path: docs
+      - name: Disabled upload text
+        if: false
+        run: |
+          uses: actions/upload-pages-artifact@v5
+          with:
+            name: github-pages-\${{ github.run_attempt }}
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+        with:
+          artifact_name: github-pages-\${{ github.run_attempt }}
+          timeout: '600000'
+          reporting_interval: '10000'
+`);
+  const blockScalarUploadVersionResult = runChecker(blockScalarUploadVersion);
+  if (
+    blockScalarUploadVersionResult.status === 0 ||
+    !blockScalarUploadVersionResult.stderr.includes('upload-pages-artifact@v5')
+  ) {
+    throw new Error(
+      `expected block-scalar upload version to fail:\n${blockScalarUploadVersionResult.stdout}\n${blockScalarUploadVersionResult.stderr}`
+    );
+  }
+
+  const backtickCommentChromiumInstall = writeWorkflow(root, `
+concurrency:
+  group: pages-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    steps:
+      - name: Install Chromium
+        run: echo \\\` # ./node_modules/.bin/playwright install --with-deps chromium
+      - name: Build Pages artifact
+        run: ./ci/build_pages.sh
+      - name: Run local browser playground smoke
+        run: ./ci/run_pages_browser_smoke.sh
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          name: github-pages-\${{ github.run_attempt }}
+          path: docs
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+        with:
+          artifact_name: github-pages-\${{ github.run_attempt }}
+          timeout: '600000'
+          reporting_interval: '10000'
+`);
+  const backtickCommentChromiumInstallResult = runChecker(backtickCommentChromiumInstall);
+  if (
+    backtickCommentChromiumInstallResult.status === 0 ||
+    !backtickCommentChromiumInstallResult.stderr.includes('install Chromium')
+  ) {
+    throw new Error(
+      `expected backtick-comment Chromium install to fail:\n${backtickCommentChromiumInstallResult.stdout}\n${backtickCommentChromiumInstallResult.stderr}`
+    );
+  }
+
   const missingAttemptArtifactName = writeWorkflow(root, `
 concurrency:
   group: pages-\${{ github.ref }}

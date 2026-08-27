@@ -33,7 +33,9 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Check Pages workflow settings
-        run: node ci/check_pages_workflow.mjs
+        run: |
+          node ci/check_pages_workflow_test.mjs
+          node ci/check_pages_workflow.mjs
 
       - name: Set up Node.js
         uses: actions/setup-node@v6

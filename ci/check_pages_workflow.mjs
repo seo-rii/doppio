@@ -6,94 +6,266 @@ const __filename = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(__filename), '..');
 const workflowPath = process.env.PAGES_WORKFLOW_PATH || path.join(repoRoot, '.github', 'workflows', 'pages.yml');
 
-const workflow = fs.readFileSync(workflowPath, 'utf8');
+function stripUnquotedComments(text) {
+  return text.split('\n').map((line) => {
+    let singleQuoted = false;
+    let doubleQuoted = false;
+    let escaped = false;
+    for (let index = 0; index < line.length; index += 1) {
+      const character = line[index];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (character === '\\' && doubleQuoted) {
+        escaped = true;
+        continue;
+      }
+      if (character === "'" && !doubleQuoted) {
+        if (singleQuoted && line[index + 1] === "'") {
+          index += 1;
+        } else {
+          singleQuoted = !singleQuoted;
+        }
+        continue;
+      }
+      if (character === '"' && !singleQuoted) {
+        doubleQuoted = !doubleQuoted;
+        continue;
+      }
+      if (
+        character === '#' &&
+        !singleQuoted &&
+        !doubleQuoted &&
+        (index === 0 || /\s/.test(line[index - 1]))
+      ) {
+        return line.slice(0, index).trimEnd();
+      }
+    }
+    return line;
+  }).join('\n');
+}
+
+const workflow = stripUnquotedComments(fs.readFileSync(workflowPath, 'utf8'));
+const workflowLines = workflow.split('\n');
 
 function fail(message) {
   console.error(message);
   process.exit(1);
 }
 
-if (!/concurrency:\s*\n\s+group:\s+pages-\$\{\{\s*github\.ref\s*\}\}\s*\n\s+cancel-in-progress:\s+true/.test(workflow)) {
+function indentation(line) {
+  return line.match(/^ */)[0].length;
+}
+
+function directChildIndent(lines, block) {
+  let childIndent = Number.POSITIVE_INFINITY;
+  for (let index = block.start + 1; index < block.end; index += 1) {
+    if (lines[index].trim() === '') {
+      continue;
+    }
+    const lineIndent = indentation(lines[index]);
+    if (lineIndent > block.indent) {
+      childIndent = Math.min(childIndent, lineIndent);
+    }
+  }
+  return childIndent;
+}
+
+function findDirectProperty(lines, block, key) {
+  const propertyIndent = directChildIndent(lines, block);
+  if (!Number.isFinite(propertyIndent)) {
+    return null;
+  }
+  const prefix = `${key}:`;
+  for (let index = block.start + 1; index < block.end; index += 1) {
+    if (indentation(lines[index]) !== propertyIndent) {
+      continue;
+    }
+    const content = lines[index].slice(propertyIndent);
+    if (content.startsWith(prefix)) {
+      return {
+        index,
+        indent: propertyIndent,
+        value: content.slice(prefix.length).trim(),
+      };
+    }
+  }
+  return null;
+}
+
+function findMappingBlock(lines, parent, key) {
+  const property = findDirectProperty(lines, parent, key);
+  if (!property || property.value !== '') {
+    return null;
+  }
+  let end = parent.end;
+  for (let index = property.index + 1; index < parent.end; index += 1) {
+    if (lines[index].trim() !== '' && indentation(lines[index]) <= property.indent) {
+      end = index;
+      break;
+    }
+  }
+  return {
+    start: property.index,
+    end,
+    indent: property.indent,
+  };
+}
+
+function normalizeScalar(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (value.startsWith("'") && value.endsWith("'")) {
+    return value.slice(1, -1).replaceAll("''", "'");
+  }
+  if (value.startsWith('"') && value.endsWith('"')) {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }
+  return value;
+}
+
+function findNamedStep(lines, stepsBlock, name) {
+  const stepIndent = directChildIndent(lines, stepsBlock);
+  if (!Number.isFinite(stepIndent)) {
+    return null;
+  }
+  const matches = [];
+  for (let index = stepsBlock.start + 1; index < stepsBlock.end; index += 1) {
+    if (indentation(lines[index]) !== stepIndent) {
+      continue;
+    }
+    const nameMatch = lines[index].slice(stepIndent).match(/^-\s+name:\s*(.+?)\s*$/);
+    if (!nameMatch || normalizeScalar(nameMatch[1]) !== name) {
+      continue;
+    }
+    let end = stepsBlock.end;
+    for (let nextIndex = index + 1; nextIndex < stepsBlock.end; nextIndex += 1) {
+      if (lines[nextIndex].trim() !== '' && indentation(lines[nextIndex]) <= stepIndent) {
+        end = nextIndex;
+        break;
+      }
+    }
+    matches.push({ start: index, end, indent: stepIndent });
+  }
+  return matches.length === 1 ? matches[0] : null;
+}
+
+const rootBlock = { start: -1, end: workflowLines.length, indent: -1 };
+const concurrencyBlock = findMappingBlock(workflowLines, rootBlock, 'concurrency');
+const concurrencyGroup = concurrencyBlock
+  ? normalizeScalar(findDirectProperty(workflowLines, concurrencyBlock, 'group')?.value)
+  : null;
+const cancelInProgress = concurrencyBlock
+  ? normalizeScalar(findDirectProperty(workflowLines, concurrencyBlock, 'cancel-in-progress')?.value)
+  : null;
+
+if (concurrencyGroup !== 'pages-${{ github.ref }}' || cancelInProgress !== 'true') {
   fail('Pages workflow must cancel superseded deployments for the same ref.');
 }
 
-if (!/uses:\s+actions\/deploy-pages@v5/.test(workflow)) {
+const jobsBlock = findMappingBlock(workflowLines, rootBlock, 'jobs');
+const deployJobBlock = jobsBlock ? findMappingBlock(workflowLines, jobsBlock, 'deploy') : null;
+const stepsBlock = deployJobBlock ? findMappingBlock(workflowLines, deployJobBlock, 'steps') : null;
+const uploadStep = stepsBlock ? findNamedStep(workflowLines, stepsBlock, 'Upload Pages artifact') : null;
+const deployStep = stepsBlock ? findNamedStep(workflowLines, stepsBlock, 'Deploy Pages') : null;
+
+const deployAction = deployStep
+  ? normalizeScalar(findDirectProperty(workflowLines, deployStep, 'uses')?.value)
+  : null;
+if (deployAction !== 'actions/deploy-pages@v5') {
   fail('Pages workflow must use actions/deploy-pages@v5.');
 }
 
 const expectedArtifactName = 'github-pages-${{ github.run_attempt }}';
-const uploadStepMatch = workflow.match(
-  /- name:\s+Upload Pages artifact[\s\S]*?uses:\s+actions\/upload-pages-artifact@v5[\s\S]*?with:\s*\n([\s\S]*?)(?:\n\s{6}- name:|\n\s{2}[A-Za-z0-9_-]+:|\n?$)/
-);
-if (!uploadStepMatch) {
-  fail('Pages workflow must configure the Upload Pages artifact step.');
+const uploadAction = uploadStep
+  ? normalizeScalar(findDirectProperty(workflowLines, uploadStep, 'uses')?.value)
+  : null;
+if (uploadAction !== 'actions/upload-pages-artifact@v5') {
+  fail('Pages workflow must use actions/upload-pages-artifact@v5.');
 }
 
-const uploadInputs = uploadStepMatch[1];
-const uploadNameMatch = uploadInputs.match(/^\s+name:\s+(.+?)\s*$/m);
-if (!uploadNameMatch || uploadNameMatch[1] !== expectedArtifactName) {
+const uploadInputs = findMappingBlock(workflowLines, uploadStep, 'with');
+const uploadName = uploadInputs
+  ? normalizeScalar(findDirectProperty(workflowLines, uploadInputs, 'name')?.value)
+  : null;
+if (uploadName !== expectedArtifactName) {
   fail('Pages upload artifact name must include github.run_attempt to support failed-job reruns.');
 }
 
-const deployStepMatch = workflow.match(
-  /- name:\s+Deploy Pages[\s\S]*?uses:\s+actions\/deploy-pages@v5[\s\S]*?with:\s*\n([\s\S]*?)(?:\n\s{6}- name:|\n\s{2}[A-Za-z0-9_-]+:|\n?$)/
-);
-if (!deployStepMatch) {
+const deployInputs = findMappingBlock(workflowLines, deployStep, 'with');
+if (!deployInputs) {
   fail('Pages workflow must configure the Deploy Pages step.');
 }
 
-const deployInputs = deployStepMatch[1];
-const deployArtifactMatch = deployInputs.match(/^\s+artifact_name:\s+(.+?)\s*$/m);
-if (!deployArtifactMatch || deployArtifactMatch[1] !== expectedArtifactName) {
+const deployArtifactName = normalizeScalar(
+  findDirectProperty(workflowLines, deployInputs, 'artifact_name')?.value
+);
+if (deployArtifactName !== expectedArtifactName) {
   fail('Pages deploy artifact_name must match the run-attempt-specific upload artifact name.');
 }
 
-const timeoutMatch = deployInputs.match(/^\s+timeout:\s+['"]?([0-9]+)['"]?/m);
-if (!timeoutMatch) {
+const timeout = normalizeScalar(findDirectProperty(workflowLines, deployInputs, 'timeout')?.value);
+if (!timeout || !/^[0-9]+$/.test(timeout)) {
   fail('Pages deploy step must set a timeout input.');
 }
 
-const timeoutMs = Number(timeoutMatch[1]);
+const timeoutMs = Number(timeout);
 if (!Number.isFinite(timeoutMs) || timeoutMs !== 600000) {
   fail('Pages deploy timeout must stay at the deploy-pages maximum of 600000 ms.');
 }
 
-const intervalMatch = deployInputs.match(/^\s+reporting_interval:\s+['"]?([0-9]+)['"]?/m);
-if (!intervalMatch) {
+const reportingInterval = normalizeScalar(
+  findDirectProperty(workflowLines, deployInputs, 'reporting_interval')?.value
+);
+if (!reportingInterval || !/^[0-9]+$/.test(reportingInterval)) {
   fail('Pages deploy step must set a reporting_interval input.');
 }
 
-const reportingIntervalMs = Number(intervalMatch[1]);
+const reportingIntervalMs = Number(reportingInterval);
 if (!Number.isFinite(reportingIntervalMs) || reportingIntervalMs < 10000) {
   fail('Pages deploy reporting_interval must be at least 10000 ms.');
 }
 
-const chromiumInstallIndex = workflow.indexOf('- name: Install Chromium');
-const buildIndex = workflow.indexOf('- name: Build Pages artifact');
-const localSmokeIndex = workflow.indexOf('- name: Run local browser playground smoke');
-const uploadIndex = workflow.indexOf('- name: Upload Pages artifact');
-const deployIndex = workflow.indexOf('- name: Deploy Pages');
+const chromiumInstallStep = stepsBlock
+  ? findNamedStep(workflowLines, stepsBlock, 'Install Chromium')
+  : null;
+const buildStep = stepsBlock ? findNamedStep(workflowLines, stepsBlock, 'Build Pages artifact') : null;
+const localSmokeStep = stepsBlock
+  ? findNamedStep(workflowLines, stepsBlock, 'Run local browser playground smoke')
+  : null;
+const chromiumInstallCommand = chromiumInstallStep
+  ? normalizeScalar(findDirectProperty(workflowLines, chromiumInstallStep, 'run')?.value)
+  : null;
+const localSmokeCommand = localSmokeStep
+  ? normalizeScalar(findDirectProperty(workflowLines, localSmokeStep, 'run')?.value)
+  : null;
 
 if (
-  chromiumInstallIndex < 0 ||
-  !/\.\/node_modules\/\.bin\/playwright\s+install\s+--with-deps\s+chromium\b/.test(workflow)
+  !chromiumInstallStep ||
+  !/^\.\/node_modules\/\.bin\/playwright\s+install\s+--with-deps\s+chromium\b/.test(
+    chromiumInstallCommand || ''
+  )
 ) {
   fail('Pages workflow must install Chromium for its local acceptance gate.');
 }
 if (
-  localSmokeIndex < 0 ||
-  !/- name:\s*Run local browser playground smoke\s*\n\s+run:\s*\.\/ci\/run_pages_browser_smoke\.sh\b/.test(workflow)
+  !localSmokeStep ||
+  !/^\.\/ci\/run_pages_browser_smoke\.sh\b/.test(localSmokeCommand || '')
 ) {
   fail('Pages workflow must run the local Chromium acceptance gate.');
 }
 if (
-  buildIndex < 0 ||
-  uploadIndex < 0 ||
-  deployIndex < 0 ||
-  chromiumInstallIndex > localSmokeIndex ||
-  buildIndex > localSmokeIndex ||
-  localSmokeIndex > uploadIndex ||
-  uploadIndex > deployIndex
+  !buildStep ||
+  chromiumInstallStep.start > localSmokeStep.start ||
+  buildStep.start > localSmokeStep.start ||
+  localSmokeStep.start > uploadStep.start ||
+  uploadStep.start > deployStep.start
 ) {
   fail('Pages workflow must pass the local Chromium gate after building and before upload/deploy.');
 }
