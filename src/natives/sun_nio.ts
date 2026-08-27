@@ -7,6 +7,7 @@ import util = Doppio.VM.Util;
 import Long = Doppio.VM.Long;
 import ThreadStatus = Doppio.VM.Enums.ThreadStatus;
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import * as BrowserFS from 'browserfs';
 import FDState = Doppio.VM.FDState;
@@ -1179,6 +1180,13 @@ export default function (): any {
         dstFd: number,
         srcFd: number,
         cancelAddress: Long): void {
+      const heap = thread.getJVM().getHeap(),
+        cancelAddressNumber = cancelAddress.isZero() ? 0 : cancelAddress.toNumber(),
+        osConstants = (<any> os).constants,
+        cancelErrno = osConstants !== undefined && osConstants !== null &&
+          osConstants.errno !== undefined &&
+          typeof osConstants.errno.ECANCELED === 'number' ?
+          osConstants.errno.ECANCELED : 125;
       const operation = beginDescriptorPair(thread, srcFd, dstFd, true);
       if (operation === null) {
         return;
@@ -1186,11 +1194,41 @@ export default function (): any {
       let buffer: Buffer;
       const descriptorsCurrent = (): boolean =>
         FDState.isCurrent(srcFd, operation.sourceLease.generation) &&
-        FDState.isCurrent(dstFd, operation.destinationLease.generation);
+        FDState.isCurrent(dstFd, operation.destinationLease.generation),
+        finishIfCancelled = (): boolean => {
+          if (cancelAddressNumber === 0 || operation.completionStarted) {
+            return operation.completionStarted;
+          }
+          let cancelWord: number;
+          try {
+            cancelWord = heap.get_word(cancelAddressNumber);
+          } catch (pollErr) {
+            finishUnixDescriptorPair(
+              thread,
+              operation,
+              <NodeJS.ErrnoException> (pollErr instanceof Error ?
+                pollErr : new Error(String(pollErr))),
+              () => {}
+            );
+            return true;
+          }
+          if (cancelWord === 0) {
+            return false;
+          }
+          const cancelError = <NodeJS.ErrnoException>
+            new Error('Operation canceled');
+          cancelError.code = 'ECANCELED';
+          cancelError.errno = cancelErrno;
+          finishUnixDescriptorPair(thread, operation, cancelError, () => {});
+          return true;
+        };
 
       const copyNext = (): void => {
         if (!descriptorsCurrent()) {
           finishUnixDescriptorPair(thread, operation, null, () => {});
+          return;
+        }
+        if (finishIfCancelled()) {
           return;
         }
         let callbackHandled = false;
@@ -1235,6 +1273,9 @@ export default function (): any {
                   finishUnixDescriptorPair(thread, operation, null, () => {});
                   return;
                 }
+                if (finishIfCancelled()) {
+                  return;
+                }
                 dispatchUnixDescriptorPair(thread, operation, () => {
                   writeBuffer(
                     thread,
@@ -1248,6 +1289,9 @@ export default function (): any {
                     (bytesWritten) => {
                       if (!descriptorsCurrent()) {
                         finishUnixDescriptorPair(thread, operation, null, () => {});
+                        return;
+                      }
+                      if (finishIfCancelled()) {
                         return;
                       }
                       if (bytesWritten === 0) {
@@ -1284,9 +1328,6 @@ export default function (): any {
         });
       };
 
-      // OpenJDK uses cancelAddress to observe interrupt-driven cancellation.
-      // Doppio currently has no native-thread signal path, so preserve the
-      // complete transfer while keeping the native signature compatible.
       dispatchUnixDescriptorPair(thread, operation, () => {
         buffer = Buffer.alloc(8192);
         copyNext();
@@ -1801,6 +1842,10 @@ export default function (): any {
             rv = new cons(thread),
             unixCons: typeof JVMTypes.sun_nio_fs_UnixConstants = <any> (<ReferenceClassData<JVMTypes.sun_nio_fs_UnixConstants>> unixConstants).getConstructor(thread),
             errCode: number = (<any> unixCons)[`sun/nio/fs/UnixConstants/${err.code}`];
+          if (typeof(errCode) !== 'number' && err.code === 'ECANCELED' &&
+              typeof err.errno === 'number') {
+            errCode = Math.abs(err.errno);
+          }
           if (typeof(errCode) !== 'number') {
             errCode = -1;
             rv['sun/nio/fs/UnixException/msg'] = util.initString(thread.getBsCl(), err.message);

@@ -5746,7 +5746,7 @@ function modernJava(grunt: IGrunt) {
   grunt.registerTask('unit_test_nio_fd_operation_leases', 'Keep transfer, copy, and Unix descriptor operations generation-bound.', function() {
     var done: (status?: boolean) => void = this.async(),
       testPath = path.resolve('ci/nio_fd_operation_lease_test.cjs'),
-      expected = 'nio-fd-operation-leases:18:ok\n';
+      expected = 'nio-fd-operation-leases:23:ok\n';
     child_process.execFile(
       process.execPath,
       ['--no-deprecation', testPath],

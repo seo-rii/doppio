@@ -1184,7 +1184,13 @@ export default function (): any {
 
     public static 'wait(J)V'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object, timeout: Long): void {
       debug("TE(wait): on lock *" + javaThis.ref);
-      javaThis.getMonitor().wait(thread, (fromTimer: boolean) => {
+      const monitor = javaThis.getMonitor();
+      if (monitor.getOwner() === thread && thread.isInterrupted()) {
+        thread.setInterrupted(false);
+        thread.throwNewException('Ljava/lang/InterruptedException;', 'wait interrupted');
+        return;
+      }
+      monitor.wait(thread, (fromTimer: boolean) => {
         thread.asyncReturn();
       }, timeout.toNumber());
     }

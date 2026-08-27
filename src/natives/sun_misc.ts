@@ -68,6 +68,21 @@ export default function (): any {
     fi[0][fi[1]] = val;
   }
 
+  function getIntVolatile(thread: JVMThread, unsafe: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long): number {
+    if (obj === null) {
+      return thread.getJVM().getHeap().get_word(offset.toNumber());
+    }
+    return getFromVMIndex<number>(thread, unsafe, obj, offset);
+  }
+
+  function putIntVolatile(thread: JVMThread, unsafe: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, value: number): void {
+    if (obj === null) {
+      thread.getJVM().getHeap().store_word(offset.toNumber(), value);
+      return;
+    }
+    setFromVMIndex<number>(thread, unsafe, obj, offset, value);
+  }
+
   function unsafeArrayBaseOffset(cls: JVMTypes.java_lang_Class): number {
     return 0;
   }
@@ -821,8 +836,8 @@ export default function (): any {
     public static 'getObjectVolatile(Ljava/lang/Object;J)Ljava/lang/Object;': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => JVMTypes.java_lang_Object = getFromVMIndex;
     public static 'putObjectVolatile(Ljava/lang/Object;JLjava/lang/Object;)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: JVMTypes.java_lang_Object) => void  = setFromVMIndex;
 
-    public static 'getIntVolatile(Ljava/lang/Object;J)I': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = getFromVMIndex;
-    public static 'putIntVolatile(Ljava/lang/Object;JI)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = setFromVMIndex;
+    public static 'getIntVolatile(Ljava/lang/Object;J)I': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = getIntVolatile;
+    public static 'putIntVolatile(Ljava/lang/Object;JI)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = putIntVolatile;
 
     public static 'getBooleanVolatile(Ljava/lang/Object;J)Z': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = getFromVMIndex;
     public static 'putBooleanVolatile(Ljava/lang/Object;JZ)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = setFromVMIndex;
@@ -1049,6 +1064,10 @@ export default function (): any {
       }
       setFromVMIndex(thread, <any> javaThis, obj, offset, value);
     }
+
+    public static 'getIntVolatile(Ljava/lang/Object;J)I': (thread: JVMThread, javaThis: JVMTypes.java_lang_Object, obj: JVMTypes.java_lang_Object, offset: Long) => number = getIntVolatile;
+
+    public static 'putIntVolatile(Ljava/lang/Object;JI)V': (thread: JVMThread, javaThis: JVMTypes.java_lang_Object, obj: JVMTypes.java_lang_Object, offset: Long, value: number) => void = putIntVolatile;
 
     public static 'getLong(Ljava/lang/Object;J)J'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object, obj: JVMTypes.java_lang_Object, offset: Long): Long {
       if (obj === null) {

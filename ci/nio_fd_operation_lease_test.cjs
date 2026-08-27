@@ -2,6 +2,7 @@
 
 const assert = require('assert');
 const fs = require('fs');
+const os = require('os');
 const doppio = require('../build/release-cli/src/doppiojvm');
 const natives = require('../build/release-cli/src/natives/sun_nio').default();
 
@@ -19,6 +20,10 @@ const originalFs = {
   write: fs.write
 };
 const openedFds = [];
+const cancelValue = 2147483647;
+const cancelErrno = os.constants && os.constants.errno &&
+  typeof os.constants.errno.ECANCELED === 'number' ?
+  os.constants.errno.ECANCELED : 125;
 
 class FakeUnixException {
 }
@@ -62,8 +67,13 @@ function makeChannelThread(events) {
   };
 }
 
-function makeUnixThread(events, delayedConversion = false) {
+function makeUnixThread(events, delayedConversion = false, heap = null) {
   const pendingInitializers = [];
+  const threadHeap = heap || {
+    get_buffer(address, length) {
+      return Buffer.alloc(length);
+    }
+  };
   const initialize = (className, callback) => {
     if (className === 'Lsun/nio/fs/UnixException;') {
       callback({getConstructor: () => FakeUnixException});
@@ -81,11 +91,7 @@ function makeUnixThread(events, delayedConversion = false) {
     getJVM() {
       return {
         getHeap() {
-          return {
-            get_buffer(address, length) {
-              return Buffer.alloc(length);
-            }
-          };
+          return threadHeap;
         }
       };
     },
@@ -117,6 +123,22 @@ function makeUnixThread(events, delayedConversion = false) {
     }
   };
   return thread;
+}
+
+function makeCancellationHeap(address, initialWord = 0) {
+  return {
+    address,
+    word: initialWord,
+    polls: 0,
+    get_word(actualAddress) {
+      assert.equal(actualAddress, address);
+      this.polls += 1;
+      return this.word;
+    },
+    get_buffer(actualAddress, length) {
+      return Buffer.alloc(length);
+    }
+  };
 }
 
 function makeFailingUnixThread(events, failedClassName) {
@@ -411,6 +433,249 @@ function testUnixCopyPairRollback() {
   assert.equal(sourceDrained(), 1);
 }
 
+function testUnixCopyAlreadyCancelled() {
+  const sourceFd = 12440;
+  const destinationFd = 12441;
+  const cancelAddress = 64;
+  const events = [];
+  const heap = makeCancellationHeap(cancelAddress, cancelValue);
+  const thread = makeUnixThread(events, false, heap);
+  let reads = 0;
+  let writes = 0;
+  openState(sourceFd);
+  openState(destinationFd);
+  fs.read = function() {
+    reads += 1;
+  };
+  fs.write = function() {
+    writes += 1;
+  };
+
+  unixCopyFile['transfer(IIJ)V'](
+    thread,
+    destinationFd,
+    sourceFd,
+    Long.fromNumber(cancelAddress)
+  );
+
+  assert.equal(reads, 0);
+  assert.equal(writes, 0);
+  assert.equal(heap.polls, 1);
+  assert.equal(thread.exceptions.length, 1);
+  assert.equal(
+    thread.exceptions[0]['sun/nio/fs/UnixException/errno'],
+    cancelErrno
+  );
+  assert.equal(requestDrain(sourceFd, 'cancelled-source', events)(), 1);
+  assert.equal(requestDrain(destinationFd, 'cancelled-destination', events)(), 1);
+}
+
+function testUnixCopyCancellationPollFailure() {
+  const sourceFd = 12448;
+  const destinationFd = 12449;
+  const cancelAddress = 76;
+  const events = [];
+  const heap = makeCancellationHeap(cancelAddress);
+  const thread = makeUnixThread(events, false, heap);
+  let reads = 0;
+  const pollError = new Error('injected cancellation polling failure');
+  pollError.code = 'EIO';
+  heap.get_word = function(actualAddress) {
+    assert.equal(actualAddress, cancelAddress);
+    this.polls += 1;
+    throw pollError;
+  };
+  openState(sourceFd);
+  openState(destinationFd);
+  fs.read = function() {
+    reads += 1;
+  };
+
+  unixCopyFile['transfer(IIJ)V'](
+    thread,
+    destinationFd,
+    sourceFd,
+    Long.fromNumber(cancelAddress)
+  );
+
+  assert.equal(reads, 0);
+  assert.equal(heap.polls, 1);
+  assert.equal(thread.exceptions.length, 1);
+  assert.equal(
+    thread.exceptions[0]['sun/nio/fs/UnixException/errno'],
+    5
+  );
+  assert.equal(requestDrain(sourceFd, 'poll-failure-source', events)(), 1);
+  assert.equal(requestDrain(destinationFd, 'poll-failure-destination', events)(), 1);
+}
+
+function testUnixCopyCancellationDuringRead() {
+  const sourceFd = 12442;
+  const destinationFd = 12443;
+  const cancelAddress = 68;
+  const events = [];
+  const heap = makeCancellationHeap(cancelAddress);
+  const thread = makeUnixThread(events, true, heap);
+  let readCallback = null;
+  let writes = 0;
+  openState(sourceFd);
+  openState(destinationFd);
+  fs.read = function(fd, data, offset, length, position, callback) {
+    assert.equal(fd, sourceFd);
+    assert.equal(offset, 0);
+    assert.equal(length, 8192);
+    assert.equal(position, 0);
+    readCallback = callback;
+  };
+  fs.write = function() {
+    writes += 1;
+  };
+
+  unixCopyFile['transfer(IIJ)V'](
+    thread,
+    destinationFd,
+    sourceFd,
+    Long.fromNumber(cancelAddress)
+  );
+  assert.equal(typeof readCallback, 'function');
+  heap.word = cancelValue;
+  readCallback(null, 4);
+  assert.equal(writes, 0);
+  assert.equal(FDState.getPos(sourceFd), 4);
+  assert.equal(FDState.getPos(destinationFd), 0);
+  assert.equal(thread.pendingConversions(), 1);
+
+  const sourceDrained = requestDrain(sourceFd, 'cancel-read-source', events);
+  const destinationDrained = requestDrain(
+    destinationFd,
+    'cancel-read-destination',
+    events
+  );
+  assert.equal(sourceDrained(), 0);
+  assert.equal(destinationDrained(), 0);
+  thread.advanceConversion();
+  assert.equal(thread.pendingConversions(), 1);
+  thread.advanceConversion();
+  assert.equal(thread.exceptions.length, 1);
+  assert.equal(
+    thread.exceptions[0]['sun/nio/fs/UnixException/errno'],
+    cancelErrno
+  );
+  assert.equal(sourceDrained(), 1);
+  assert.equal(destinationDrained(), 1);
+  assert.deepEqual(events, [
+    'exception',
+    'cancel-read-destination-drain',
+    'cancel-read-source-drain'
+  ]);
+
+  readCallback(null, 4);
+  assert.equal(thread.exceptions.length, 1);
+  assert.equal(writes, 0);
+}
+
+function testUnixCopyCancellationDuringPartialWrite() {
+  const sourceFd = 12444;
+  const destinationFd = 12445;
+  const cancelAddress = 72;
+  const events = [];
+  const heap = makeCancellationHeap(cancelAddress);
+  const thread = makeUnixThread(events, false, heap);
+  let readCallback = null;
+  const writeCalls = [];
+  openState(sourceFd);
+  openState(destinationFd);
+  fs.read = function(fd, data, offset, length, position, callback) {
+    assert.equal(fd, sourceFd);
+    readCallback = callback;
+  };
+  fs.write = function(fd, data, offset, length, position, callback) {
+    assert.equal(fd, destinationFd);
+    writeCalls.push({offset, length, position, callback});
+  };
+
+  unixCopyFile['transfer(IIJ)V'](
+    thread,
+    destinationFd,
+    sourceFd,
+    Long.fromNumber(cancelAddress)
+  );
+  readCallback(null, 8);
+  assert.equal(writeCalls.length, 1);
+  assert.deepEqual(
+    [writeCalls[0].offset, writeCalls[0].length, writeCalls[0].position],
+    [0, 8, 0]
+  );
+
+  heap.word = cancelValue;
+  const partialWriteCallback = writeCalls[0].callback;
+  partialWriteCallback(null, 3);
+  assert.equal(writeCalls.length, 1);
+  assert.equal(FDState.getPos(sourceFd), 8);
+  assert.equal(FDState.getPos(destinationFd), 3);
+  assert.equal(thread.exceptions.length, 1);
+  assert.equal(
+    thread.exceptions[0]['sun/nio/fs/UnixException/errno'],
+    cancelErrno
+  );
+  partialWriteCallback(null, 3);
+  assert.equal(thread.exceptions.length, 1);
+  assert.equal(writeCalls.length, 1);
+  assert.equal(requestDrain(sourceFd, 'cancel-write-source', events)(), 1);
+  assert.equal(requestDrain(destinationFd, 'cancel-write-destination', events)(), 1);
+}
+
+function testUnixCopyZeroCancellationAddress() {
+  const sourceFd = 12446;
+  const destinationFd = 12447;
+  const events = [];
+  const thread = makeUnixThread(events, false, {
+    get_word() {
+      throw new Error('zero cancellation address must not be polled');
+    },
+    get_buffer(address, length) {
+      return Buffer.alloc(length);
+    }
+  });
+  let reads = 0;
+  let writes = 0;
+  openState(sourceFd);
+  openState(destinationFd);
+  fs.read = function(fd, data, offset, length, position, callback) {
+    assert.equal(fd, sourceFd);
+    assert.equal(length, 8192);
+    assert.equal(position, reads === 0 ? 0 : 3);
+    const bytesRead = reads++ === 0 ? 3 : 0;
+    callback(null, bytesRead);
+    callback(null, bytesRead);
+  };
+  fs.write = function(fd, data, offset, length, position, callback) {
+    assert.equal(fd, destinationFd);
+    assert.equal(offset, 0);
+    assert.equal(length, 3);
+    assert.equal(position, 0);
+    writes += 1;
+    callback(null, length);
+    callback(null, length);
+  };
+
+  unixCopyFile['transfer(IIJ)V'](
+    thread,
+    destinationFd,
+    sourceFd,
+    Long.ZERO
+  );
+
+  assert.equal(reads, 2);
+  assert.equal(writes, 1);
+  assert.deepEqual(thread.returns, [undefined]);
+  assert.deepEqual(thread.exceptions, []);
+  assert.equal(FDState.getPos(sourceFd), 3);
+  assert.equal(FDState.getPos(destinationFd), 3);
+  assert.equal(requestDrain(sourceFd, 'zero-cancel-source', events)(), 1);
+  assert.equal(requestDrain(destinationFd, 'zero-cancel-destination', events)(), 1);
+}
+
 function testUnixCompletionSentinels() {
   const singleFd = 12420;
   const sourceFd = 12421;
@@ -673,11 +938,16 @@ try {
   testUnixCopyHostErrorPrecedence();
   testUnixCopyStopsAfterSourceClose();
   testUnixCopyPairRollback();
+  testUnixCopyAlreadyCancelled();
+  testUnixCopyCancellationPollFailure();
+  testUnixCopyCancellationDuringRead();
+  testUnixCopyCancellationDuringPartialWrite();
+  testUnixCopyZeroCancellationAddress();
   testUnixCompletionSentinels();
   testUnixConversionInitializationFailures();
   testUnixSingleDescriptorOperations();
   testUnixReadSuccess();
-  console.log('nio-fd-operation-leases:18:ok');
+  console.log('nio-fd-operation-leases:23:ok');
 } finally {
   Object.keys(originalFs).forEach((name) => {
     fs[name] = originalFs[name];
