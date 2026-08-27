@@ -69,8 +69,9 @@ Scala core, MethodHandles, record, and StackWalker gates without changing
 Doppio's runtime bootstrap path. The broad gates compile and
 bytecode-check a direct `Runtime.version()` call, while CI also compares two
 forced-generation SHA-256 values and the exact class-only entry contract. A
-tested consumer checker locks the 58 migrated Kotlin/Scala smoke scripts to the
-ordered compiler-only paths and rejects runtime overlay contamination. See
+tested consumer checker locks all 73 migrated Kotlin/Scala smoke scripts (50
+Kotlin and 23 Scala) to the ordered compiler-only paths and rejects runtime
+overlay contamination. See
 `docs/design/compiler-bootstrap-overlay.md`.
 
 Java 17 `java.lang.invoke` note: the compatibility row above now also includes
@@ -203,7 +204,7 @@ sync, and post-append stat boundaries through a host preload fixture while also
 checking source-buffer positions. Sequential fallback append remains subject
 to backend interleaving and is scoped in `BUG-008`.
 
-Channel-native host failures now stay on the public NIO contract boundary:
+Non-retryable channel-native host failures now stay on the public NIO contract boundary:
 `FileChannelImpl` mapping/transfers and `FileDispatcherImpl` scalar/vector
 reads, writes, sizing, truncation, forcing, and close paths raise
 `java.io.IOException`. The shared write and descriptor-close primitives require
@@ -249,8 +250,13 @@ The `legacy_fd_lease_test.cjs` native-map fixture covers seven multiple-operatio
 duplicate-close, success/error, delayed-close-error, two-stage append, sync,
 synchronous-dispatch-throw, duplicate-callback, post-close-dispatch same-number
 re-registration, and simulated unlinked BrowserFS close boundaries. The
-BrowserFS branch is injected through the shared close logic rather than a real
-asynchronously scheduled browser backend. All nine `FileDispatcherImpl`
+BrowserFS branch is injected through the shared close logic. Separately, the
+Chromium acceptance canary performs an actual BrowserFS descriptor read and
+defers its real result to the next event-loop turn before requesting its
+descriptor-state close.
+This exercises late completion and descriptor reuse without claiming that the
+pinned InMemory backend, whose callbacks are normally synchronous, provides a
+genuinely asynchronous host operation. All nine `FileDispatcherImpl`
 read, positional-read, scatter-read, size, truncate, force, write,
 positional-write, and gather-write entry points now use the same lease boundary.
 One lease spans each complete native call, including sequential vector fallback
@@ -290,14 +296,19 @@ close/map/force/unmap race, multiple-retention, concurrent-force, fd-reuse,
 multi-JVM and adjacent-address collisions, completion-throw, cleanup-failure,
 zero-address, and legacy-close cases. `Java17MappedByteBuffer` also verifies
 that a writable mapping can be changed and forced after its channel closes.
-Doppio does not
-currently promise prompt GC-triggered unmapping, so an otherwise unreachable
+Doppio does not currently promise prompt GC-triggered unmapping, so an otherwise unreachable
 mapping may retain its copied heap storage and host descriptor until its cleaner
-runs explicitly or the VM terminates. The injected BrowserFS close fixtures
-still do not exercise a genuinely asynchronous browser backend; that remaining
-host-operation boundary keeps `BUG-015` mitigated rather than fully resolved.
-Native lock/release support and channel `EINTR`/`EAGAIN` translation to NIO
-`IOStatus` values remain outside this boundary coverage.
+runs explicitly or the VM terminates. The six scalar, positional, and vector
+`FileDispatcherImpl` read/write operations also translate host `EINTR` to
+`IOStatus.INTERRUPTED` and `EAGAIN`/`EWOULDBLOCK` to `IOStatus.UNAVAILABLE`,
+using the exact Java `int` or `long` return shape. Terminal and per-host-callback
+guards prevent a duplicate callback, or a callback that starts a follow-up
+operation before the original host call throws, from completing twice or
+mutating position after completion. Sequential vectors return committed
+partial progress when a later element fails. The 45-case
+`file_dispatcher_status_test.cjs` fixture covers these status, callback,
+partial-progress, and close-generation boundaries. Native file locking remains
+an explicit unsupported platform boundary.
 
 Legacy `FileOutputStream(path, true)` descriptors now enter the same append
 state model before their file descriptor is exposed to Java. Stream writes and
@@ -342,7 +353,7 @@ boundaries. The Pages Chromium smoke exercises ordinary BrowserFS write,
 missing-file, truncate, single-handle append, scatter-read and gather-write
 fallbacks, data-sync, dirty delete-on-close, output-stream, create/delete,
 legacy output `File.delete()` and random-access provider-unlink close,
-existing-target copy/move, replacement, attribute-copy, and cross-mount move
+existing-target copy/move, replacement, attribute-copy path execution, and cross-mount move
 paths. BrowserFS 1.3 still cannot share live inode state across separately
 opened or renamed handles, and its no-follow support is a non-atomic `lstat`
 precheck; those backend limits remain explicit in `BUG-007`.
@@ -437,28 +448,16 @@ It also covers selected
 `sun.misc.Unsafe.reallocateMemory(long, long)` behavior for allocation from
 zero, growth, shrinkage, preserved prefixes, and zero-size frees.
 
-## Implementation Order
+## Compatibility Expansion Policy
 
-1. Accept and test simple Java 17-26 class-file containers that do not need new
-   JDK library APIs.
-2. Parse low-risk metadata-only structures: `CONSTANT_Module`,
-   `CONSTANT_Package`, `NestHost`, `NestMembers`, `Record`, and
-   `PermittedSubclasses`.
-3. Add targeted runtime support for nestmate access checks.
-4. Add targeted runtime coverage for private interface methods, Java 9
-   `StringConcatFactory` string concatenation, and minimal `StackWalker`
-   caller/frame lookup.
-5. Extend dynamic constants beyond the currently covered `nullConstant`,
-   `primitiveClass`, `enumConstant`, `getStaticFinal`, tested reference and
-   primitive `explicitCast` cases, and the targeted `invoke` fast paths, then
-   broaden `invokedynamic` linkage.
-6. Design and implement hard runtime surfaces separately: `java.lang.invoke`,
-   reflection metadata, records, modules, and virtual-thread-facing APIs. Start
-   `java.lang.invoke` work from `docs/design/java-lang-invoke.md`, track
-   synthetic modern-method reflection overlays in
-   `docs/design/runtime-reflection-overlays.md`, track the Kotlin compiler
-   bring-up in `docs/design/kotlin-compiler.md`, and track the Scala compiler
-   bring-up in `docs/design/scala-compiler.md`.
+The matrix above records the implemented release surface; it is not a claim of
+complete API support for any Java release. New runtime surfaces require focused
+native-oracle coverage and, for cross-cutting work, a design note. The existing
+design notes cover `java.lang.invoke`, synthetic modern-method reflection
+overlays, and Kotlin and Scala compiler bring-up. Named modules, native file
+locks, direct I/O, and other accepted platform boundaries must first gain a
+portable implementation and focused fixtures before the support profile can be
+expanded.
 
 ## Test Strategy
 
@@ -689,11 +688,9 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   arguments, sealed subclass enumeration, object-instance lookup, and selected
   `KType` classifier, generic argument, type-parameter, return-type, and
   nullability metadata.
-- Next blocker: broaden the Kotlin compiler smoke to more source constructs and
-  reduce remaining throughput variance. A local 2026-07-10 validation completed
-  the metadata-guarded main smoke in 74 seconds with the minimal classpath and
-  85 seconds with the full `kotlinc/lib/*.jar` classpath. Current notes live in
-  `docs/design/kotlin-compiler.md`.
+- The release workflow executes the complete manifest-backed Kotlin inventory
+  with per-script and process-group deadlines. Current implementation notes live
+  in `docs/design/kotlin-compiler.md`.
 
 ## Scala Compiler Bring-Up
 
@@ -1318,8 +1315,10 @@ zero, growth, shrinkage, preserved prefixes, and zero-size frees.
   subtype rejection;
   Java 18-26 simple parser-only class-file
   containers; and runnable Java 9/10/11/12/13/14/15/16/17 comparisons.
-- The default `grunt test` suite is not currently green under the Java 17 host
-  used here; existing Java 8-era output mismatches must be triaged separately.
+- The default `grunt test` suite is green under the supported Java 17 host: its
+  Java 8-era output is normalized where host formatting changed, and the
+  bundled Nashorn compatibility smoke uses a separate Doppio-owned golden
+  output. The gate currently reports 77/77 passing fixtures.
 
 ## Known Preview Gaps
 

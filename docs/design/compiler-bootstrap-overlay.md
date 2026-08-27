@@ -216,8 +216,8 @@ host Java 9+ class metadata as a fallback. Host `java` and `javap` may still run
 the generated fixture and inspect its bytecode for native comparison; they are
 not metadata inputs to the Doppio-hosted compilation.
 
-`ci/check_compiler_bootstrap_consumers.mjs` statically protects all 58 migrated
-compiler consumers. It requires the exact ordered classpath variables and
+`ci/check_compiler_bootstrap_consumers.mjs` statically protects all 73 migrated
+compiler consumers (50 Kotlin and 23 Scala). It requires the exact ordered classpath variables and
 compiler flags, including the Kotlin reflection JAR and record support-class
 suffixes, rejects missing consumer scripts, and rejects adding
 `modern-bootstrap.jar` to a declared runtime classpath. Its unit test covers
@@ -295,10 +295,10 @@ The implemented gates are:
    changing `rt.jar`, the transformer, or archive settings forces a rebuild.
 4. Fifty Kotlin compiler smokes use `-no-jdk` with
    `modern-bootstrap.jar:doppio.jar:rt.jar` precedence and no host JDK metadata.
-5. Eight Scala compiler smokes use the same precedence through
+5. Twenty-three Scala compiler smokes use the same precedence through
    `-javabootclasspath` and no extracted host `java.base.jmod` classes.
 6. The tested compiler bootstrap consumer checker locks the ordered paths,
-   compiler flags, consumer inventory, and runtime exclusion for all 58
+   compiler flags, consumer inventory, and runtime exclusion for all 73
    migrated smoke scripts.
 7. The broad Kotlin and Scala modern interop smokes compile a direct
    `Runtime.version()` call and guard its `invokestatic` bytecode, while the
