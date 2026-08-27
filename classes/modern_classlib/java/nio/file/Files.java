@@ -403,9 +403,9 @@ public final class Files {
 
         public void setTimes(FileTime lastModifiedTime, FileTime lastAccessTime, FileTime createTime)
             throws IOException {
-          if (lastModifiedTime != null) {
-            Files.setLastModifiedTime(path, lastModifiedTime);
-          }
+          path.getFileSystem().provider()
+              .getFileAttributeView(path, PosixFileAttributeView.class, linkOptions)
+              .setTimes(lastModifiedTime, lastAccessTime, createTime);
         }
       });
     }
@@ -420,9 +420,9 @@ public final class Files {
 
       public void setTimes(FileTime lastModifiedTime, FileTime lastAccessTime, FileTime createTime)
           throws IOException {
-        if (lastModifiedTime != null) {
-          Files.setLastModifiedTime(path, lastModifiedTime);
-        }
+        path.getFileSystem().provider()
+            .getFileAttributeView(path, BasicFileAttributeView.class, linkOptions)
+            .setTimes(lastModifiedTime, lastAccessTime, createTime);
       }
     });
   }
