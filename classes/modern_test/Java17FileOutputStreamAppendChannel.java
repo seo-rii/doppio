@@ -22,7 +22,7 @@ public class Java17FileOutputStreamAppendChannel {
       if ("fstat-open".equals(failureMode)) {
         runInjectedOpenFailure(path, failureMode);
       } else if ("fstat-write".equals(failureMode)) {
-        runInjectedWriteFailure(path, failureMode);
+        runInjectedWriteReconciliationFailure(path, failureMode);
       } else {
         runAppendMix(path, failureMode);
       }
@@ -46,20 +46,12 @@ public class Java17FileOutputStreamAppendChannel {
     System.out.println("content:" + Files.readString(path, StandardCharsets.UTF_8));
   }
 
-  private static void runInjectedWriteFailure(Path path, String failureMode) throws Exception {
+  private static void runInjectedWriteReconciliationFailure(
+      Path path, String failureMode) throws Exception {
     System.out.println("mode:" + failureMode);
     try (FileOutputStream stream = new FileOutputStream(path.toFile(), true)) {
-      boolean failed = false;
-      try {
-        stream.write('B');
-        System.out.println("write-failure:false");
-      } catch (IOException expected) {
-        failed = true;
-        System.out.println("write-failure:true");
-      }
-      if (!failed) {
-        throw new AssertionError("The injected post-write fstat did not fail.");
-      }
+      stream.write('B');
+      System.out.println("write-failure:false");
       stream.write('C');
     }
     System.out.println("content:" + Files.readString(path, StandardCharsets.UTF_8));

@@ -209,16 +209,48 @@ function testAppendInnerStat() {
   const closeThread = requestClose(natives, descriptorOwner);
   assert.equal(closeCalls.length, 0);
   releaseStat();
-  assertExceptionOnce(
-    writeThread,
-    'Ljava/io/IOException;',
-    'Stream Closed'
-  );
+  assertReturnedOnce(writeThread);
   assert.equal(closeCalls.length, 1);
   assertBefore(
-    'append-write:exception:Ljava/io/IOException;:Stream Closed',
+    'append-write:return',
     `host-close:${fd}`
   );
+  completeClose(closeThread, null, null, fd);
+  scenarioCount += 1;
+}
+
+function testAppendStatDispatchThrow() {
+  const fd = 12364;
+  const natives = javaIoNatives['java/io/FileOutputStream'];
+  const descriptorOwner = makeOwner('java/io/FileOutputStream', fd);
+  const writeThread = makeThread('append-stat-throw');
+  const statError = new Error('injected synchronous append fstat failure');
+  statError.code = 'EIO';
+
+  resetScenario(fd, 4, true, '/append-stat-throw');
+  fs.write = function(fdArg, buffer, offset, length, position, callback) {
+    assert.equal(fdArg, fd);
+    assert.equal(position, null);
+    callback(null, 1, buffer);
+  };
+  fs.fstat = function(fdArg) {
+    assert.equal(fdArg, fd);
+    throw statError;
+  };
+
+  assert.doesNotThrow(() => natives['writeBytes([BIIZ)V'](
+    writeThread,
+    descriptorOwner.owner,
+    {array: [67]},
+    0,
+    1,
+    1
+  ));
+  assertReturnedOnce(writeThread);
+  assert.equal(FDState.getPos(fd), 5);
+
+  const closeThread = requestClose(natives, descriptorOwner);
+  assert.equal(closeCalls.length, 1);
   completeClose(closeThread, null, null, fd);
   scenarioCount += 1;
 }
@@ -748,6 +780,7 @@ async function main() {
   try {
     testMultipleMixedReuse();
     testAppendInnerStat();
+    testAppendStatDispatchThrow();
     testDelayedCloseError();
     testSyncLease();
     testBrowserUnlinkedDrainSnapshot();
@@ -762,7 +795,8 @@ async function main() {
   } finally {
     [
       12351, 12352, 12353, 12354, 12355, 12356,
-      12357, 12358, 12359, 12360, 12361, 12362, 12363, 12400, 12401
+      12357, 12358, 12359, 12360, 12361, 12362, 12363, 12364,
+      12400, 12401
     ].forEach((fd) => {
       FDState.close(fd);
     });

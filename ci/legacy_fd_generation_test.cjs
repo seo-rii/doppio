@@ -323,7 +323,7 @@ function testOutputAppendStat() {
     const closeThread = closeDescriptor(natives, descriptorOwner);
     assert.equal(pendingCloses.length, 0);
     assert.doesNotThrow(releaseStat);
-    assertStreamClosedOnce(thread);
+    assertReturnedOnce(thread);
     assert.equal(pendingCloses.length, 1);
     if (reuse) {
       completeClose(closeThread, true);

@@ -77,6 +77,12 @@ public class Java17FileChannelPartialProgress {
             second
         });
         System.out.println("partial-result:" + written);
+      } else if (failureMode.equals("fallback-stat")) {
+        long written = channel.write(new ByteBuffer[] {
+            first,
+            second
+        });
+        System.out.println("committed-result:" + written);
       } else {
         try {
           channel.write(new ByteBuffer[] {
