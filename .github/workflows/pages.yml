@@ -6,25 +6,22 @@ on:
       - modern
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+permissions: {}
 
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Build and deploy Pages
+  build:
+    name: Build Pages artifact
     runs-on: ubuntu-latest
     timeout-minutes: 60
     outputs:
-      page_url: ${{ steps.deployment.outputs.page_url }}
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      artifact_name: ${{ steps.pages-artifact.outputs.name }}
+    permissions:
+      contents: read
+      pages: read
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -66,17 +63,38 @@ jobs:
       - name: Run local browser playground smoke
         run: ./ci/run_pages_browser_smoke.sh
 
+      - name: Define Pages artifact name
+        id: pages-artifact
+        run: echo "name=github-pages-${{ github.run_attempt }}" >> "$GITHUB_OUTPUT"
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
-          name: github-pages-${{ github.run_attempt }}
+          name: ${{ steps.pages-artifact.outputs.name }}
           path: docs
 
+  deploy:
+    name: Deploy Pages
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      pages: write
+      id-token: write
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
       - name: Deploy Pages
         id: deployment
         uses: actions/deploy-pages@v5
         with:
-          artifact_name: github-pages-${{ github.run_attempt }}
+          artifact_name: ${{ needs.build.outputs.artifact_name }}
           timeout: '600000'
           reporting_interval: '10000'
 
@@ -85,6 +103,8 @@ jobs:
     needs: deploy
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    permissions:
+      contents: read
     container:
       image: mcr.microsoft.com/playwright:v1.57.0-noble
       options: --ipc=host

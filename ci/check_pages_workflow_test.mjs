@@ -23,15 +23,30 @@ function runChecker(workflowPath) {
   });
 }
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'doppio-pages-workflow-'));
-try {
-  const complete = writeWorkflow(root, `
+function expectFailure(root, workflowText, expectedMessage, label) {
+  const result = runChecker(writeWorkflow(root, workflowText));
+  if (result.status === 0 || !result.stderr.includes(expectedMessage)) {
+    throw new Error(
+      `expected ${label} to fail with ${JSON.stringify(expectedMessage)}:\n${result.stdout}\n${result.stderr}`
+    );
+  }
+}
+
+const completeWorkflow = `
+permissions: {}
+
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_name: \${{ steps.pages-artifact.outputs.name }}
+    permissions:
+      contents: read
+      pages: read
     steps:
       - name: Install Chromium
         run: ./node_modules/.bin/playwright install --with-deps chromium
@@ -39,488 +54,362 @@ jobs:
         run: ./ci/build_pages.sh
       - name: Run local browser playground smoke
         run: ./ci/run_pages_browser_smoke.sh
+      - name: Define Pages artifact name
+        id: pages-artifact
+        run: echo "name=github-pages-\${{ github.run_attempt }}" >> "$GITHUB_OUTPUT"
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
-          name: github-pages-\${{ github.run_attempt }}
+          name: \${{ steps.pages-artifact.outputs.name }}
           path: docs
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    outputs:
+      page_url: \${{ steps.deployment.outputs.page_url }}
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy Pages
         id: deployment
         uses: actions/deploy-pages@v5
         with:
-          artifact_name: github-pages-\${{ github.run_attempt }}
+          artifact_name: \${{ needs.build.outputs.artifact_name }}
           timeout: '600000'
           reporting_interval: '10000'
-`);
-  const completeResult = runChecker(complete);
+
+  browser-smoke:
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Run browser playground smoke
+        env:
+          DOPPIO_PAGES_URL: \${{ needs.deploy.outputs.page_url }}
+        run: yarn site:browser-test
+`;
+
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'doppio-pages-workflow-'));
+try {
+  const completeResult = runChecker(writeWorkflow(root, completeWorkflow));
   if (completeResult.status !== 0) {
     throw new Error(`expected complete workflow to pass:\n${completeResult.stderr}`);
   }
 
-  const completeWorkflow = fs.readFileSync(complete, 'utf8');
-  const refScopedConcurrency = writeWorkflow(
+  expectFailure(
     root,
-    completeWorkflow.replace('group: pages\n', 'group: pages-\${{ github.ref }}\n')
+    completeWorkflow.replace('group: pages\n', 'group: pages-\${{ github.ref }}\n'),
+    'repository-wide pages group',
+    'ref-scoped concurrency'
   );
-  const refScopedConcurrencyResult = runChecker(refScopedConcurrency);
-  if (
-    refScopedConcurrencyResult.status === 0 ||
-    !refScopedConcurrencyResult.stderr.includes('repository-wide pages group')
-  ) {
-    throw new Error(
-      `expected ref-scoped Pages concurrency to fail:\n${refScopedConcurrencyResult.stdout}\n${refScopedConcurrencyResult.stderr}`
-    );
-  }
-
-  const cancellingConcurrency = writeWorkflow(
+  expectFailure(
     root,
-    completeWorkflow.replace('cancel-in-progress: false', 'cancel-in-progress: true')
+    completeWorkflow.replace('cancel-in-progress: false', 'cancel-in-progress: true'),
+    'must not cancel an active deployment',
+    'cancelling concurrency'
   );
-  const cancellingConcurrencyResult = runChecker(cancellingConcurrency);
-  if (
-    cancellingConcurrencyResult.status === 0 ||
-    !cancellingConcurrencyResult.stderr.includes('must not cancel an active deployment')
-  ) {
-    throw new Error(
-      `expected cancelling Pages concurrency to fail:\n${cancellingConcurrencyResult.stdout}\n${cancellingConcurrencyResult.stderr}`
-    );
-  }
+  expectFailure(
+    root,
+    completeWorkflow
+      .replace('group: pages\n', 'group: pages-feature\n')
+      .replace(
+        '      - name: Define Pages artifact name',
+        `      - name: Disabled concurrency text
+        if: false
+        run: |
+          concurrency:
+            group: pages
+            cancel-in-progress: false
+      - name: Define Pages artifact name`
+      ),
+    'repository-wide pages group',
+    'nested concurrency text'
+  );
 
-  const missingTimeout = writeWorkflow(root, `
-concurrency:
-  group: pages
-  cancel-in-progress: false
+  expectFailure(
+    root,
+    completeWorkflow.replace(
+      'permissions: {}',
+      `permissions:
+  contents: read
+  pages: write
+  id-token: write`
+    ),
+    'deployment permissions at workflow scope',
+    'broad workflow authority'
+  );
+  expectFailure(
+    root,
+    completeWorkflow.replace(
+      `    permissions:
+      contents: read
+      pages: read`,
+      `    permissions:
+      contents: read
+      pages: write
+      id-token: write`
+    ),
+    'build permissions',
+    'privileged build job'
+  );
+  expectFailure(
+    root,
+    completeWorkflow.replace(
+      `    permissions:
+      pages: write
+      id-token: write`,
+      `    permissions:
+      pages: write`
+    ),
+    'deploy permissions',
+    'deploy job without OIDC'
+  );
+  expectFailure(
+    root,
+    completeWorkflow.replace(
+      `  browser-smoke:
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read`,
+      `  browser-smoke:
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write`
+    ),
+    'browser-smoke permissions',
+    'privileged browser smoke'
+  );
 
-jobs:
-  deploy:
-    steps:
-      - name: Upload Pages artifact
+  expectFailure(
+    root,
+    completeWorkflow.replace(
+      'artifact_name: \${{ steps.pages-artifact.outputs.name }}',
+      'artifact_name: github-pages-\${{ github.run_attempt }}'
+    ),
+    'exact uploaded artifact name',
+    'unbound build artifact output'
+  );
+  expectFailure(
+    root,
+    completeWorkflow.replace(
+      'run: echo "name=github-pages-\${{ github.run_attempt }}" >> "$GITHUB_OUTPUT"',
+      'run: echo "name=github-pages" >> "$GITHUB_OUTPUT"'
+    ),
+    'derive its artifact name once',
+    'artifact name without run attempt'
+  );
+  expectFailure(
+    root,
+    completeWorkflow.replace(
+      '          name: \${{ steps.pages-artifact.outputs.name }}',
+      '          name: github-pages-\${{ github.run_attempt }}'
+    ),
+    'build artifact-name step output',
+    'upload name that bypasses its step output'
+  );
+  expectFailure(
+    root,
+    completeWorkflow.replace(
+      '          artifact_name: \${{ needs.build.outputs.artifact_name }}',
+      '          artifact_name: github-pages-\${{ github.run_attempt }}'
+    ),
+    'exact build job artifact output',
+    'deploy retry that recomputes run attempt'
+  );
+
+  const uploadStep = `      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
-          name: github-pages-\${{ github.run_attempt }}
+          name: \${{ steps.pages-artifact.outputs.name }}
           path: docs
-      - name: Deploy Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
-        with:
-          artifact_name: github-pages-\${{ github.run_attempt }}
-          reporting_interval: '10000'
-`);
-  const missingTimeoutResult = runChecker(missingTimeout);
-  if (missingTimeoutResult.status === 0 || !missingTimeoutResult.stderr.includes('timeout input')) {
-    throw new Error(`expected missing timeout to fail:\n${missingTimeoutResult.stdout}\n${missingTimeoutResult.stderr}`);
-  }
+`;
+  expectFailure(
+    root,
+    completeWorkflow
+      .replace(uploadStep, '')
+      .replace('      - name: Deploy Pages', `${uploadStep}      - name: Deploy Pages`),
+    'upload-pages-artifact@v5 in the build job',
+    'upload outside the build job'
+  );
+  expectFailure(
+    root,
+    completeWorkflow.replace(
+      '    steps:\n      - name: Deploy Pages',
+      `    steps:
+      - name: Run repository code
+        run: node ci/check_pages_workflow.mjs
+      - name: Deploy Pages`
+    ),
+    'dedicated deploy-pages action',
+    'repository code in deploy job'
+  );
 
-  const lowTimeout = writeWorkflow(root, `
-concurrency:
-  group: pages
-  cancel-in-progress: false
+  expectFailure(
+    root,
+    completeWorkflow.replace("          timeout: '600000'\n", ''),
+    'timeout input',
+    'missing deploy timeout'
+  );
+  expectFailure(
+    root,
+    completeWorkflow.replace("timeout: '600000'", "timeout: '300000'"),
+    'maximum of 600000',
+    'low deploy timeout'
+  );
+  expectFailure(
+    root,
+    completeWorkflow.replace("timeout: '600000'", "timeout: '1200000'"),
+    'maximum of 600000',
+    'high deploy timeout'
+  );
+  expectFailure(
+    root,
+    completeWorkflow.replace("          reporting_interval: '10000'\n", ''),
+    'reporting_interval input',
+    'missing reporting interval'
+  );
+  expectFailure(
+    root,
+    completeWorkflow.replace("reporting_interval: '10000'", "reporting_interval: '5000'"),
+    'at least 10000',
+    'low reporting interval'
+  );
 
-jobs:
-  deploy:
-    steps:
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          name: github-pages-\${{ github.run_attempt }}
-          path: docs
-      - name: Deploy Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
-        with:
-          artifact_name: github-pages-\${{ github.run_attempt }}
-          timeout: '300000'
-          reporting_interval: '10000'
-`);
-  const lowTimeoutResult = runChecker(lowTimeout);
-  if (lowTimeoutResult.status === 0 || !lowTimeoutResult.stderr.includes('maximum of 600000')) {
-    throw new Error(`expected low timeout to fail:\n${lowTimeoutResult.stdout}\n${lowTimeoutResult.stderr}`);
-  }
-
-  const highTimeout = writeWorkflow(root, `
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
-jobs:
-  deploy:
-    steps:
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          name: github-pages-\${{ github.run_attempt }}
-          path: docs
-      - name: Deploy Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
-        with:
-          artifact_name: github-pages-\${{ github.run_attempt }}
-          timeout: '1200000'
-          reporting_interval: '10000'
-`);
-  const highTimeoutResult = runChecker(highTimeout);
-  if (highTimeoutResult.status === 0 || !highTimeoutResult.stderr.includes('maximum of 600000')) {
-    throw new Error(`expected high timeout to fail:\n${highTimeoutResult.stdout}\n${highTimeoutResult.stderr}`);
-  }
-
-  const wrongAction = writeWorkflow(root, `
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
-jobs:
-  deploy:
-    steps:
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          name: github-pages-\${{ github.run_attempt }}
-          path: docs
-      - name: Deploy Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-        with:
-          artifact_name: github-pages-\${{ github.run_attempt }}
-          timeout: '600000'
-          reporting_interval: '10000'
-`);
-  const wrongActionResult = runChecker(wrongAction);
-  if (wrongActionResult.status === 0 || !wrongActionResult.stderr.includes('deploy-pages@v5')) {
-    throw new Error(`expected wrong deploy action to fail:\n${wrongActionResult.stdout}\n${wrongActionResult.stderr}`);
-  }
-
-  const inlineCommentVersions = writeWorkflow(root, `
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
-jobs:
-  deploy:
-    steps:
-      - name: Install Chromium
-        run: ./node_modules/.bin/playwright install --with-deps chromium
-      - name: Build Pages artifact
-        run: ./ci/build_pages.sh
-      - name: Run local browser playground smoke
-        run: ./ci/run_pages_browser_smoke.sh
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4 # uses: actions/upload-pages-artifact@v5
-        with:
-          name: github-pages-\${{ github.run_attempt }}
-          path: docs
-      - name: Deploy Pages
-        id: deployment
-        uses: actions/deploy-pages@v4 # uses: actions/deploy-pages@v5
-        with:
-          artifact_name: github-pages-\${{ github.run_attempt }}
-          timeout: '600000'
-          reporting_interval: '10000'
-`);
-  const inlineCommentVersionsResult = runChecker(inlineCommentVersions);
-  if (
-    inlineCommentVersionsResult.status === 0 ||
-    !inlineCommentVersionsResult.stderr.includes('deploy-pages@v5')
-  ) {
-    throw new Error(
-      `expected inline-comment action versions to fail:\n${inlineCommentVersionsResult.stdout}\n${inlineCommentVersionsResult.stderr}`
-    );
-  }
-
-  const fullLineCommentVersions = writeWorkflow(root, `
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
-jobs:
-  deploy:
-    steps:
-      - name: Install Chromium
-        run: ./node_modules/.bin/playwright install --with-deps chromium
-      - name: Build Pages artifact
-        run: ./ci/build_pages.sh
-      - name: Run local browser playground smoke
-        run: ./ci/run_pages_browser_smoke.sh
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
-        # uses: actions/upload-pages-artifact@v5
-        with:
-          name: github-pages-\${{ github.run_attempt }}
-          path: docs
-      - name: Deploy Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-        # uses: actions/deploy-pages@v5
-        with:
-          artifact_name: github-pages-\${{ github.run_attempt }}
-          timeout: '600000'
-          reporting_interval: '10000'
-`);
-  const fullLineCommentVersionsResult = runChecker(fullLineCommentVersions);
-  if (
-    fullLineCommentVersionsResult.status === 0 ||
-    !fullLineCommentVersionsResult.stderr.includes('deploy-pages@v5')
-  ) {
-    throw new Error(
-      `expected full-line-comment action versions to fail:\n${fullLineCommentVersionsResult.stdout}\n${fullLineCommentVersionsResult.stderr}`
-    );
-  }
-
-  const blockScalarDeployVersion = writeWorkflow(root, `
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
-jobs:
-  deploy:
-    steps:
-      - name: Install Chromium
-        run: ./node_modules/.bin/playwright install --with-deps chromium
-      - name: Build Pages artifact
-        run: ./ci/build_pages.sh
-      - name: Run local browser playground smoke
-        run: ./ci/run_pages_browser_smoke.sh
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          name: github-pages-\${{ github.run_attempt }}
-          path: docs
-      - name: Deploy Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-        with:
-          artifact_name: github-pages-\${{ github.run_attempt }}
-          timeout: '600000'
-          reporting_interval: '10000'
-      - name: Disabled deploy text
+  expectFailure(
+    root,
+    completeWorkflow.replace('uses: actions/deploy-pages@v5', 'uses: actions/deploy-pages@v4'),
+    'deploy-pages@v5',
+    'wrong deploy action'
+  );
+  expectFailure(
+    root,
+    completeWorkflow
+      .replace(
+        'uses: actions/upload-pages-artifact@v5',
+        'uses: actions/upload-pages-artifact@v4 # uses: actions/upload-pages-artifact@v5'
+      )
+      .replace(
+        'uses: actions/deploy-pages@v5',
+        'uses: actions/deploy-pages@v4 # uses: actions/deploy-pages@v5'
+      ),
+    'upload-pages-artifact@v5',
+    'inline-comment action versions'
+  );
+  expectFailure(
+    root,
+    completeWorkflow
+      .replace(
+        '        uses: actions/upload-pages-artifact@v5',
+        `        uses: actions/upload-pages-artifact@v4
+        # uses: actions/upload-pages-artifact@v5`
+      )
+      .replace(
+        '        uses: actions/deploy-pages@v5',
+        `        uses: actions/deploy-pages@v4
+        # uses: actions/deploy-pages@v5`
+      ),
+    'upload-pages-artifact@v5',
+    'full-line-comment action versions'
+  );
+  expectFailure(
+    root,
+    completeWorkflow
+      .replace('uses: actions/deploy-pages@v5', 'uses: actions/deploy-pages@v4')
+      .replace(
+        '      - name: Define Pages artifact name',
+        `      - name: Disabled deploy text
         if: false
         run: |
           uses: actions/deploy-pages@v5
           with:
-            artifact_name: github-pages-\${{ github.run_attempt }}
-            timeout: '600000'
-            reporting_interval: '10000'
-`);
-  const blockScalarDeployVersionResult = runChecker(blockScalarDeployVersion);
-  if (
-    blockScalarDeployVersionResult.status === 0 ||
-    !blockScalarDeployVersionResult.stderr.includes('deploy-pages@v5')
-  ) {
-    throw new Error(
-      `expected block-scalar deploy version to fail:\n${blockScalarDeployVersionResult.stdout}\n${blockScalarDeployVersionResult.stderr}`
-    );
-  }
-
-  const blockScalarUploadVersion = writeWorkflow(root, `
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
-jobs:
-  deploy:
-    steps:
-      - name: Install Chromium
-        run: ./node_modules/.bin/playwright install --with-deps chromium
-      - name: Build Pages artifact
-        run: ./ci/build_pages.sh
-      - name: Run local browser playground smoke
-        run: ./ci/run_pages_browser_smoke.sh
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
-        with:
-          name: github-pages-\${{ github.run_attempt }}
-          path: docs
-      - name: Disabled upload text
+            artifact_name: \${{ needs.build.outputs.artifact_name }}
+      - name: Define Pages artifact name`
+      ),
+    'deploy-pages@v5',
+    'block-scalar deploy version'
+  );
+  expectFailure(
+    root,
+    completeWorkflow
+      .replace('uses: actions/upload-pages-artifact@v5', 'uses: actions/upload-pages-artifact@v4')
+      .replace(
+        '      - name: Define Pages artifact name',
+        `      - name: Disabled upload text
         if: false
         run: |
           uses: actions/upload-pages-artifact@v5
           with:
-            name: github-pages-\${{ github.run_attempt }}
-      - name: Deploy Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
-        with:
-          artifact_name: github-pages-\${{ github.run_attempt }}
-          timeout: '600000'
-          reporting_interval: '10000'
-`);
-  const blockScalarUploadVersionResult = runChecker(blockScalarUploadVersion);
-  if (
-    blockScalarUploadVersionResult.status === 0 ||
-    !blockScalarUploadVersionResult.stderr.includes('upload-pages-artifact@v5')
-  ) {
-    throw new Error(
-      `expected block-scalar upload version to fail:\n${blockScalarUploadVersionResult.stdout}\n${blockScalarUploadVersionResult.stderr}`
-    );
-  }
+            name: \${{ steps.pages-artifact.outputs.name }}
+      - name: Define Pages artifact name`
+      ),
+    'upload-pages-artifact@v5',
+    'block-scalar upload version'
+  );
+  expectFailure(
+    root,
+    completeWorkflow.replace(
+      'run: ./node_modules/.bin/playwright install --with-deps chromium',
+      'run: echo \\` # ./node_modules/.bin/playwright install --with-deps chromium'
+    ),
+    'install Chromium',
+    'backtick-comment Chromium install'
+  );
 
-  const backtickCommentChromiumInstall = writeWorkflow(root, `
-concurrency:
-  group: pages
-  cancel-in-progress: false
+  expectFailure(
+    root,
+    completeWorkflow.replace(
+      'page_url: \${{ steps.deployment.outputs.page_url }}',
+      'page_url: \${{ steps.missing.outputs.page_url }}'
+    ),
+    'expose the deployment page_url',
+    'wrong deploy output'
+  );
+  expectFailure(
+    root,
+    completeWorkflow.replace(
+      'DOPPIO_PAGES_URL: \${{ needs.deploy.outputs.page_url }}',
+      'DOPPIO_PAGES_URL: \${{ needs.build.outputs.page_url }}'
+    ),
+    'consume only the deploy job page_url',
+    'wrong browser output source'
+  );
+  expectFailure(
+    root,
+    completeWorkflow.replace(
+      '        run: yarn site:browser-test',
+      `        uses: actions/upload-pages-artifact@v5
+        run: yarn site:browser-test`
+    ),
+    'consume only the deploy job page_url',
+    'deployment action in browser smoke'
+  );
 
-jobs:
-  deploy:
-    steps:
-      - name: Install Chromium
-        run: echo \\\` # ./node_modules/.bin/playwright install --with-deps chromium
-      - name: Build Pages artifact
-        run: ./ci/build_pages.sh
-      - name: Run local browser playground smoke
+  const localSmokeStep = `      - name: Run local browser playground smoke
         run: ./ci/run_pages_browser_smoke.sh
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          name: github-pages-\${{ github.run_attempt }}
-          path: docs
-      - name: Deploy Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
-        with:
-          artifact_name: github-pages-\${{ github.run_attempt }}
-          timeout: '600000'
-          reporting_interval: '10000'
-`);
-  const backtickCommentChromiumInstallResult = runChecker(backtickCommentChromiumInstall);
-  if (
-    backtickCommentChromiumInstallResult.status === 0 ||
-    !backtickCommentChromiumInstallResult.stderr.includes('install Chromium')
-  ) {
-    throw new Error(
-      `expected backtick-comment Chromium install to fail:\n${backtickCommentChromiumInstallResult.stdout}\n${backtickCommentChromiumInstallResult.stderr}`
-    );
-  }
-
-  const missingAttemptArtifactName = writeWorkflow(root, `
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
-jobs:
-  deploy:
-    steps:
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          path: docs
-      - name: Deploy Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
-        with:
-          timeout: '600000'
-          reporting_interval: '10000'
-`);
-  const missingAttemptArtifactNameResult = runChecker(missingAttemptArtifactName);
-  if (
-    missingAttemptArtifactNameResult.status === 0 ||
-    !missingAttemptArtifactNameResult.stderr.includes('github.run_attempt')
-  ) {
-    throw new Error(
-      `expected missing run-attempt artifact name to fail:\n${missingAttemptArtifactNameResult.stdout}\n${missingAttemptArtifactNameResult.stderr}`
-    );
-  }
-
-  const mismatchedDeployArtifactName = writeWorkflow(root, `
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
-jobs:
-  deploy:
-    steps:
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          name: github-pages-\${{ github.run_attempt }}
-          path: docs
-      - name: Deploy Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
-        with:
-          artifact_name: github-pages
-          timeout: '600000'
-          reporting_interval: '10000'
-`);
-  const mismatchedDeployArtifactNameResult = runChecker(mismatchedDeployArtifactName);
-  if (
-    mismatchedDeployArtifactNameResult.status === 0 ||
-    !mismatchedDeployArtifactNameResult.stderr.includes('artifact_name')
-  ) {
-    throw new Error(
-      `expected mismatched deploy artifact name to fail:\n${mismatchedDeployArtifactNameResult.stdout}\n${mismatchedDeployArtifactNameResult.stderr}`
-    );
-  }
-
-  const missingLocalSmoke = writeWorkflow(root, `
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
-jobs:
-  deploy:
-    steps:
-      - name: Install Chromium
-        run: ./node_modules/.bin/playwright install --with-deps chromium
-      - name: Build Pages artifact
-        run: ./ci/build_pages.sh
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          name: github-pages-\${{ github.run_attempt }}
-          path: docs
-      - name: Deploy Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
-        with:
-          artifact_name: github-pages-\${{ github.run_attempt }}
-          timeout: '600000'
-          reporting_interval: '10000'
-`);
-  const missingLocalSmokeResult = runChecker(missingLocalSmoke);
-  if (
-    missingLocalSmokeResult.status === 0 ||
-    !missingLocalSmokeResult.stderr.includes('local Chromium acceptance gate')
-  ) {
-    throw new Error(
-      `expected missing local browser smoke to fail:\n${missingLocalSmokeResult.stdout}\n${missingLocalSmokeResult.stderr}`
-    );
-  }
-
-  const lateLocalSmoke = writeWorkflow(root, `
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
-jobs:
-  deploy:
-    steps:
-      - name: Install Chromium
-        run: ./node_modules/.bin/playwright install --with-deps chromium
-      - name: Build Pages artifact
-        run: ./ci/build_pages.sh
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          name: github-pages-\${{ github.run_attempt }}
-          path: docs
-      - name: Run local browser playground smoke
-        run: ./ci/run_pages_browser_smoke.sh
-      - name: Deploy Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
-        with:
-          artifact_name: github-pages-\${{ github.run_attempt }}
-          timeout: '600000'
-          reporting_interval: '10000'
-`);
-  const lateLocalSmokeResult = runChecker(lateLocalSmoke);
-  if (
-    lateLocalSmokeResult.status === 0 ||
-    !lateLocalSmokeResult.stderr.includes('before upload/deploy')
-  ) {
-    throw new Error(
-      `expected late local browser smoke to fail:\n${lateLocalSmokeResult.stdout}\n${lateLocalSmokeResult.stderr}`
-    );
-  }
+`;
+  expectFailure(
+    root,
+    completeWorkflow.replace(localSmokeStep, ''),
+    'local Chromium acceptance gate',
+    'missing local smoke'
+  );
+  expectFailure(
+    root,
+    completeWorkflow
+      .replace(localSmokeStep, '')
+      .replace(uploadStep, `${uploadStep}${localSmokeStep}`),
+    'local Chromium gate before naming and uploading',
+    'late local smoke'
+  );
 } finally {
   fs.rmSync(root, { recursive: true, force: true });
 }
