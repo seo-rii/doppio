@@ -397,7 +397,8 @@ export default function (): any {
       operation: LeasedFDOperation,
       err: NodeJS.ErrnoException,
       success: () => void,
-      ioStatusType?: 'int' | 'long'): void {
+      ioStatusType?: 'int' | 'long',
+      committedSuccess: boolean = false): void {
     if (operation.completionStarted) {
       return;
     }
@@ -419,7 +420,7 @@ export default function (): any {
         } else {
           thread.asyncReturn(ioStatus);
         }
-      } else if (!FDState.isCurrent(
+      } else if (!committedSuccess && !FDState.isCurrent(
           operation.lease.fd,
           operation.lease.generation)) {
         thread.throwNewException('Ljava/io/IOException;', 'Stream Closed');
@@ -611,10 +612,6 @@ export default function (): any {
       if (syncDispatched || isOperationCompleted()) {
         return;
       }
-      if (!FDState.isCurrent(fd, lease.generation)) {
-        fail(closedDescriptorError('Stream Closed'));
-        return;
-      }
       syncDispatched = true;
       const syncMode = FDState.getSyncMode(fd);
       if (syncMode === 2 && typeof (<any> fs).fdatasync === 'function') {
@@ -686,10 +683,13 @@ export default function (): any {
           }
           callbackHandled = true;
           if (err) {
-            fail(err);
-          } else if (!FDState.isCurrent(fd, lease.generation)) {
-            fail(closedDescriptorError('Stream Closed'));
+            // The bytes are already committed. EOF reconciliation is
+            // advisory, but requested durability sync is not.
+            syncAndReturn();
           } else {
+            // A logical close can start while this leased tail is pending.
+            // In that case retain the committed lower bound and finish the
+            // operation before physical close drains the lease.
             FDState.setPosIfCurrent(fd, lease.generation, stats.size);
             syncAndReturn();
           }
@@ -698,7 +698,9 @@ export default function (): any {
         if (callbackStarted || finished || isOperationCompleted()) {
           throw statErr;
         }
-        fail(<NodeJS.ErrnoException> statErr);
+        // A synchronous metadata-dispatch failure has the same advisory
+        // status after a successful append write.
+        syncAndReturn();
       }
     } else {
       if (advancePosition) {
@@ -1735,7 +1737,9 @@ export default function (): any {
             thread,
             operation,
             null,
-            () => thread.asyncReturn(numBytes)
+            () => thread.asyncReturn(numBytes),
+            undefined,
+            numBytes > 0
           ),
           (err, committedBytes, ioStatusEligible) => finishFileDispatcherOperation(
             thread,
@@ -1773,7 +1777,9 @@ export default function (): any {
             thread,
             operation,
             null,
-            () => thread.asyncReturn(numBytes)
+            () => thread.asyncReturn(numBytes),
+            undefined,
+            numBytes > 0
           ),
           (err, committedBytes, ioStatusEligible) => finishFileDispatcherOperation(
             thread,
@@ -1840,7 +1846,9 @@ export default function (): any {
                       thread,
                       operation,
                       null,
-                      () => thread.asyncReturn(Long.fromNumber(written), null)
+                      () => thread.asyncReturn(Long.fromNumber(written), null),
+                      undefined,
+                      written > 0
                     ),
                     (writeErr) => finishFileDispatcherOperation(
                       thread,
@@ -1888,11 +1896,18 @@ export default function (): any {
               if (operation.completionStarted) {
                 return;
               }
+              total += numBytes;
               if (!FDState.isCurrent(fd, operation.lease.generation)) {
-                finishFileDispatcherOperation(thread, operation, null, () => {});
+                finishFileDispatcherOperation(
+                  thread,
+                  operation,
+                  null,
+                  () => thread.asyncReturn(Long.fromNumber(total), null),
+                  undefined,
+                  total > 0
+                );
                 return;
               }
-              total += numBytes;
               if (numBytes < vec.len) {
                 finishFileDispatcherOperation(thread, operation, null, () => {
                   thread.asyncReturn(Long.fromNumber(total), null);

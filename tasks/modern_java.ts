@@ -5438,7 +5438,7 @@ function modernJava(grunt: IGrunt) {
         ['fallback-sync',
           'mode:fallback-sync\nfailure:true\nbuffer-positions:0:0\npartial-position:1\nnext-write:1\nnext-position:2\ncontent:AZ\n'],
         ['fallback-stat',
-          'mode:fallback-stat\nfailure:true\nbuffer-positions:0:0\npartial-position:1\nnext-write:1\nnext-position:2\ncontent:AZ\n']
+          'mode:fallback-stat\ncommitted-result:2\nbuffer-positions:1:1\npartial-position:2\nnext-write:1\nnext-position:3\ncontent:ABZ\n']
       ];
     if (typeof (<any> fs).writev === 'function') {
       scenarios.push([
@@ -5552,7 +5552,7 @@ function modernJava(grunt: IGrunt) {
         ['fstat-open',
           'mode:fstat-open\nopen-failure:true\ncontent:A\n'],
         ['fstat-write',
-          'mode:fstat-write\nwrite-failure:true\ncontent:ABC\n']
+          'mode:fstat-write\nwrite-failure:false\ncontent:ABC\n']
       ];
     async.eachSeries(scenarios,
       function(scenario: string[], next: (err?: any) => void): void {
@@ -5609,7 +5609,7 @@ function modernJava(grunt: IGrunt) {
         'map-memory:java.io.IOException:true:true\n' +
         'transfer-read:java.io.IOException:true:false\n' +
         'transfer-write:java.io.IOException:true:false\n' +
-        'post-write:java.io.IOException:true:false:0:4\n' +
+        'post-write:1:1:4\n' +
         'provider:java.nio.file.AccessDeniedException:true:true\n' +
         'content:ABCQ\n',
       readCloseExpected =
@@ -5790,7 +5790,7 @@ function modernJava(grunt: IGrunt) {
   grunt.registerTask('unit_test_legacy_fd_leases', 'Keep legacy host descriptors open until pending operations drain.', function() {
     var done: (status?: boolean) => void = this.async(),
       testPath = path.resolve('ci/legacy_fd_lease_test.cjs'),
-      expected = 'legacy-fd-leases:14:ok\n';
+      expected = 'legacy-fd-leases:15:ok\n';
     child_process.execFile(
       process.execPath,
       ['--no-deprecation', testPath],
@@ -5878,7 +5878,7 @@ function modernJava(grunt: IGrunt) {
   grunt.registerTask('unit_test_nio_fd_leases', 'Keep NIO host descriptors open until pending channel operations drain.', function() {
     var done: (status?: boolean) => void = this.async(),
       testPath = path.resolve('ci/nio_fd_lease_test.cjs'),
-      expected = 'nio-fd-leases:3:ok\n';
+      expected = 'nio-fd-leases:6:ok\n';
     child_process.execFile(
       process.execPath,
       ['--no-deprecation', testPath],

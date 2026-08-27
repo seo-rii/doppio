@@ -594,20 +594,21 @@ export default function (): any {
                 fs.fstat(fd, (statErr, stats) => {
                   finish(() => {
                     if (statErr) {
-                      throwNodeError(thread, statErr);
-                    } else if (!FDState.setPosIfCurrent(
-                        fd, lease.generation, stats.size)) {
-                      throwStreamClosed(thread);
+                      // The append already committed. Keep the incremented
+                      // lower bound when EOF reconciliation is unavailable.
+                      thread.asyncReturn();
                     } else {
+                      // A logical close can make this update ineligible while
+                      // the lease still keeps the committed write alive.
+                      FDState.setPosIfCurrent(
+                        fd, lease.generation, stats.size);
                       thread.asyncReturn();
                     }
                   });
                 });
               } catch (statDispatchErr) {
-                finish(() => throwNodeError(
-                  thread,
-                  <NodeJS.ErrnoException> statDispatchErr
-                ));
+                // Metadata reconciliation is best effort after commit.
+                finish(() => thread.asyncReturn());
               }
             } else {
               finish(() => thread.asyncReturn());

@@ -187,18 +187,8 @@ public class Java17FileChannelIOExceptionBoundaries {
             StandardOpenOption.WRITE,
             StandardOpenOption.APPEND)) {
           ByteBuffer committed = ByteBuffer.wrap(new byte[] { 'Q' });
-          Throwable postWriteFailure = null;
-          try {
-            appendChannel.write(committed);
-          } catch (Throwable expected) {
-            postWriteFailure = expected;
-          }
-          if (postWriteFailure == null) {
-            throw new AssertionError("The injected post-write metadata failure was not observed.");
-          }
-          System.out.println("post-write:" + postWriteFailure.getClass().getName() + ":"
-              + (postWriteFailure.getClass() == IOException.class) + ":"
-              + postWriteFailure.getClass().getName().equals("sun.nio.fs.UnixException") + ":"
+          int committedBytes = appendChannel.write(committed);
+          System.out.println("post-write:" + committedBytes + ":"
               + committed.position() + ":" + appendChannel.position());
         }
 
