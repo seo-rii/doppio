@@ -953,7 +953,7 @@ export function setup(grunt: IGrunt) {
      'newer:javac',
      'javac_modern_classlib',
      'generate_doppio_jar',
-     'newer:run_java',
+     'run_java',
      // Windows: Convert CRLF to LF.
      'newer:lineending']);
   grunt.registerTask('clean_natives', "Deletes already-inlined sourcemaps from natives.", function() {

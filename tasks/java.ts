@@ -47,10 +47,33 @@ function java(grunt: IGrunt) {
   grunt.registerMultiTask('run_java', 'Run java on input files.', function() {
     var files: {src: string[]; dest: string}[] = <any> this.files,
         done: (status?: boolean) => void = this.async(),
-        tasks: Array<AsyncFunction<void>> = [];
+        tasks: Array<AsyncFunction<void>> = [],
+        javaExecutable: string = grunt.config('build.java'),
+        targetName: string = (<any> this).target || 'default',
+        versionStampPath = 'build/.native-java-version-' + targetName.replace(/[^A-Za-z0-9_.-]/g, '_'),
+        versionResult: any,
+        versionFingerprint: string,
+        versionMatches: boolean;
     grunt.config.requires('build.java');
+    grunt.config.requires('build.bootclasspath');
+    versionResult = child_process.spawnSync(javaExecutable, ['-version'], {encoding: 'utf8'});
+    if (versionResult.error || versionResult.status !== 0) {
+      grunt.fail.fatal('Unable to identify native Java runtime: ' +
+        (versionResult.error || versionResult.stderr || versionResult.stdout));
+      return done(false);
+    }
+    versionFingerprint = javaExecutable + '\n' + versionResult.stdout + versionResult.stderr;
+    versionMatches = fs.existsSync(versionStampPath) &&
+      fs.readFileSync(versionStampPath, 'utf8') === versionFingerprint;
+    if (!versionMatches) {
+      if (fs.existsSync(versionStampPath)) {
+        fs.unlinkSync(versionStampPath);
+      }
+      grunt.log.writeln('Native Java runtime changed; regenerating ' + targetName + ' runouts.');
+    }
     files.forEach(function(file: {src: string[]; dest: string}) {
-      if (fs.existsSync(file.dest) && fs.statSync(file.dest).mtime > fs.statSync(file.src[0]).mtime) {
+      if (versionMatches && fs.existsSync(file.dest) &&
+          fs.statSync(file.dest).mtime > fs.statSync(file.src[0]).mtime) {
         // No need to process file.
         return;
       }
@@ -69,6 +92,8 @@ function java(grunt: IGrunt) {
       if (err) {
         grunt.fail.fatal('java failed: ' + err);
       }
+      grunt.file.mkdir('build');
+      fs.writeFileSync(versionStampPath, versionFingerprint);
       done();
     });
   });
