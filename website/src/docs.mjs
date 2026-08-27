@@ -10,6 +10,10 @@ const documents = {
     title: 'Modern Java compatibility',
     path: 'modern-java.md'
   },
+  support: {
+    title: 'Support policy',
+    path: 'support.md'
+  },
   kotlin: {
     title: 'Kotlin compiler design',
     path: 'design/kotlin-compiler.md'
