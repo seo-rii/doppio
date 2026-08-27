@@ -12,6 +12,7 @@ const dispatcher = natives['sun/nio/ch/FileDispatcherImpl'];
 const iovAddress = 4096;
 const bufferAddress = 8192;
 const originals = {
+  close: fs.close,
   fstat: fs.fstat,
   fsync: fs.fsync,
   read: fs.read,
@@ -364,6 +365,88 @@ function testFallbackPartialStatus(kind, code) {
   }
 }
 
+function testFallbackCloseAfterProgress(kind, completion) {
+  const fd = nextFd++;
+  const descriptor = {'java/io/FileDescriptor/fd': fd};
+  const operationEvents = [];
+  const thread = makeThread([1, 1]);
+  const closeThread = makeThread();
+  const vectorMethod = kind === 'read' ? 'readv' : 'writev';
+  const scalarMethod = kind === 'read' ? 'read' : 'write';
+  const callbacks = [];
+  const closeCallbacks = [];
+  const originalAsyncReturn = thread.asyncReturn;
+  const originalCloseAsyncReturn = closeThread.asyncReturn;
+  thread.asyncReturn = function() {
+    originalAsyncReturn.apply(this, arguments);
+    operationEvents.push('vector-return');
+  };
+  closeThread.asyncReturn = function() {
+    originalCloseAsyncReturn.apply(this, arguments);
+    operationEvents.push('close-return');
+  };
+  FDState.open(
+    fd,
+    0,
+    false,
+    0,
+    `/dispatcher-fallback-close-${kind}-${completion}`
+  );
+  fs[vectorMethod] = undefined;
+  fs[scalarMethod] = function(fdArg, buffer, offset, length, position, callback) {
+    assert.equal(fdArg, fd);
+    callbacks.push(callback);
+  };
+  fs.close = function(fdArg, callback) {
+    assert.equal(fdArg, fd);
+    operationEvents.push('host-close');
+    closeCallbacks.push(callback);
+  };
+  try {
+    dispatcher[`${vectorMethod}0(Ljava/io/FileDescriptor;JI)J`](
+      thread, descriptor, Long.fromNumber(iovAddress), 2);
+    assert.equal(callbacks.length, 1);
+    callbacks[0](null, 1);
+    assert.equal(callbacks.length, 2);
+    assert.equal(FDState.getPos(fd), 1);
+
+    dispatcher['close0(Ljava/io/FileDescriptor;)V'](closeThread, descriptor);
+    assert.equal(descriptor['java/io/FileDescriptor/fd'], -1);
+    assert.deepEqual(thread.returns, []);
+    assert.deepEqual(thread.exceptions, []);
+    assert.deepEqual(closeThread.returns, []);
+    assert.equal(closeCallbacks.length, 0);
+
+    if (completion === 'error') {
+      callbacks[1](makeError('EIO'), 0);
+    } else {
+      callbacks[1](null, 0);
+    }
+    assertReturn(thread, 'long', 1);
+    assert.equal(closeCallbacks.length, 1);
+    assert.deepEqual(operationEvents, ['vector-return', 'host-close']);
+    assert.deepEqual(closeThread.returns, []);
+
+    closeCallbacks[0](null);
+    assert.deepEqual(closeThread.exceptions, []);
+    assert.deepEqual(closeThread.returns, [[]]);
+    assert.deepEqual(operationEvents, [
+      'vector-return',
+      'host-close',
+      'close-return'
+    ]);
+    callbacks[1](null, 0);
+    assertReturn(thread, 'long', 1);
+    assert.equal(closeCallbacks.length, 1);
+    assertions += 1;
+  } finally {
+    fs.close = originals.close;
+    fs[scalarMethod] = originals[scalarMethod];
+    fs[vectorMethod] = originals[vectorMethod];
+    FDState.close(fd);
+  }
+}
+
 function testScalarPendingSync(kind) {
   const fd = nextFd++;
   const descriptor = {'java/io/FileDescriptor/fd': fd};
@@ -525,6 +608,10 @@ try {
   testOrdinaryIOError();
   testFallbackCallbackThenThrow('read');
   testFallbackCallbackThenThrow('write');
+  for (const completion of ['error', 'zero']) {
+    testFallbackCloseAfterProgress('read', completion);
+    testFallbackCloseAfterProgress('write', completion);
+  }
   testScalarPendingSync('write');
   testScalarPendingSync('pwrite');
   testNativeWritevPendingTail();
@@ -532,6 +619,7 @@ try {
   console.log(`file-dispatcher-status:${assertions}:ok`);
 } finally {
   util.are_in_browser = originals.areInBrowser;
+  fs.close = originals.close;
   fs.fstat = originals.fstat;
   fs.fsync = originals.fsync;
   fs.read = originals.read;
