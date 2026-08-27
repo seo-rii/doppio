@@ -1,6 +1,6 @@
 import {OptionParser, ParseType, PrefixParseResult} from './option_parser';
 import JVM from './jvm';
-import {descriptor2typestr, int_classname} from './util';
+import {descriptor2typestr, int_classname, merge} from './util';
 import {setLogLevel, LogLevel} from './logging';
 import {JVMCLIOptions} from './interfaces';
 
@@ -115,6 +115,12 @@ let parser = new OptionParser({
 export default function java(args: string[], opts: JVMCLIOptions,
                      doneCb: (status: number) => void,
                      jvmStarted: (jvm: JVM) => void = function(jvm: JVM): void {}): void {
+  let bootstrapClasspath = opts.bootstrapClasspath ||
+    JVM.getDefaultOptions(opts.doppioHomePath).bootstrapClasspath;
+  opts = <JVMCLIOptions> merge(opts, {
+    bootstrapClasspath: bootstrapClasspath.slice(0)
+  });
+
   let parsedArgs = parser.parse(args),
     standard = parsedArgs['default'],
     nonStandard = parsedArgs['X'],
