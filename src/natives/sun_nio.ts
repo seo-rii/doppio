@@ -240,11 +240,14 @@ export default function (): any {
   function dispatchFileDispatcherPair(
       thread: JVMThread,
       operation: LeasedFDPair,
-      dispatch: () => void): void {
+      dispatch: () => void,
+      callbackState?: HostCallbackState): void {
     try {
       dispatch();
     } catch (err) {
-      if (operation.sourceLease.released || operation.destinationLease.released) {
+      if (operation.sourceLease.released || operation.destinationLease.released ||
+          operation.completionStarted ||
+          callbackState !== undefined && callbackState.callbackStarted) {
         throw err;
       }
       finishFileDispatcherPair(
@@ -370,12 +373,14 @@ export default function (): any {
   function dispatchUnixDescriptorPair(
       thread: JVMThread,
       operation: LeasedFDPair,
-      dispatch: () => void): void {
+      dispatch: () => void,
+      callbackState?: HostCallbackState): void {
     try {
       dispatch();
     } catch (err) {
       if (operation.sourceLease.released || operation.destinationLease.released ||
-          operation.completionStarted) {
+          operation.completionStarted ||
+          callbackState !== undefined && callbackState.callbackStarted) {
         throw err;
       }
       finishUnixDescriptorPair(
@@ -1127,10 +1132,12 @@ export default function (): any {
       if (operation === null) {
         return;
       }
+      const readCallbackState: HostCallbackState = {callbackStarted: false};
       dispatchFileDispatcherPair(thread, operation, () => {
         const data = Buffer.alloc(len);
         let callbackHandled = false;
         fs.read(srcFd, data, 0, len, position.toNumber(), (readErr, bytesRead) => {
+          readCallbackState.callbackStarted = true;
           if (callbackHandled) {
             return;
           }
@@ -1146,6 +1153,7 @@ export default function (): any {
             finishFileDispatcherPair(thread, operation, null, () => {});
             return;
           }
+          const writeCallbackState: HostCallbackState = {callbackStarted: false};
           dispatchFileDispatcherPair(thread, operation, () => {
             writeBuffer(
               thread,
@@ -1167,11 +1175,13 @@ export default function (): any {
                 operation,
                 writeErr,
                 () => {}
-              )
+              ),
+              writeCallbackState,
+              () => operation.completionStarted
             );
-          });
+          }, writeCallbackState);
         });
-      });
+      }, readCallbackState);
     }
 
     public static 'maxDirectTransferSize0()I'(thread: JVMThread): number {
@@ -1333,6 +1343,7 @@ export default function (): any {
         if (finishIfCancelled()) {
           return;
         }
+        const readCallbackState: HostCallbackState = {callbackStarted: false};
         let callbackHandled = false;
         dispatchUnixDescriptorPair(thread, operation, () => {
           fs.read(
@@ -1342,6 +1353,7 @@ export default function (): any {
             buffer.length,
             FDState.getPos(srcFd),
             (readErr, bytesRead) => {
+              readCallbackState.callbackStarted = true;
               if (callbackHandled) {
                 return;
               }
@@ -1378,6 +1390,9 @@ export default function (): any {
                 if (finishIfCancelled()) {
                   return;
                 }
+                const writeCallbackState: HostCallbackState = {
+                  callbackStarted: false
+                };
                 dispatchUnixDescriptorPair(thread, operation, () => {
                   writeBuffer(
                     thread,
@@ -1420,20 +1435,24 @@ export default function (): any {
                       operation,
                       writeErr,
                       () => {}
-                    )
+                    ),
+                    writeCallbackState,
+                    () => operation.completionStarted
                   );
-                });
+                }, writeCallbackState);
               };
               writeNext();
             }
           );
-        });
+        }, readCallbackState);
       };
 
       dispatchUnixDescriptorPair(thread, operation, () => {
         buffer = Buffer.alloc(8192);
-        copyNext();
       });
+      if (!operation.completionStarted) {
+        copyNext();
+      }
     }
   }
 
