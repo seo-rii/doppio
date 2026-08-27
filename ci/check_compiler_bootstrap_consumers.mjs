@@ -141,6 +141,10 @@ function checkCommon(scriptName, content) {
     }
   }
 
+  if (content.includes('classes/modern_classlib/out')) {
+    fail(`ci/${scriptName} must not reference producer-only loose build output.`);
+  }
+
   const lines = content.split(/\r?\n/);
   for (const line of lines) {
     if (/^\s*runtime_cp=/.test(line) && forbiddenRuntimeClasspathPattern.test(line)) {
