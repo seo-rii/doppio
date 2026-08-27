@@ -225,7 +225,7 @@ export function setup(grunt: IGrunt) {
       java: 'java',
       javap: 'javap',
       javac: 'javac',
-      is_java_8: true,
+      is_java_17: true,
       // Will be set by JDK download task.
       bootclasspath: null
     },
