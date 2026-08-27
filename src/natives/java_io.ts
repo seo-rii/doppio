@@ -37,6 +37,86 @@ function makeLeasedFinisher(
   };
 }
 
+function writeBufferFully(
+    fd: number,
+    buffer: Buffer,
+    offset: number,
+    length: number,
+    position: number,
+    lease: FDOperationLease,
+    onComplete: () => void,
+    onError: (err: NodeJS.ErrnoException) => void,
+    onStale: () => void): void {
+  let written = 0,
+    completed = false;
+  const complete = (action: () => void): void => {
+    if (completed) {
+      return;
+    }
+    completed = true;
+    action();
+  };
+  const writeNext = (): void => {
+    if (completed) {
+      return;
+    }
+    if (written === length) {
+      complete(onComplete);
+      return;
+    }
+    if (!FDState.isCurrent(fd, lease.generation)) {
+      complete(onStale);
+      return;
+    }
+    const remaining = length - written;
+    let callbackHandled = false,
+      callbackSynchronous = true;
+    try {
+      fs.write(
+        fd,
+        buffer,
+        offset + written,
+        remaining,
+        position === null ? null : position + written,
+        (err, numBytes) => {
+          if (callbackHandled || completed) {
+            return;
+          }
+          callbackHandled = true;
+          if (err) {
+            complete(() => onError(err));
+          } else if (
+              typeof numBytes !== 'number' ||
+              numBytes !== Math.floor(numBytes) ||
+              numBytes <= 0 ||
+              numBytes > remaining) {
+            const progressErr = <NodeJS.ErrnoException>
+              new Error('Invalid host write length.');
+            progressErr.code = 'EIO';
+            complete(() => onError(progressErr));
+          } else if (!FDState.incrementPosIfCurrent(
+              fd, lease.generation, numBytes)) {
+            complete(onStale);
+          } else {
+            written += numBytes;
+            if (written === length) {
+              complete(onComplete);
+            } else if (callbackSynchronous) {
+              setImmediate(writeNext);
+            } else {
+              writeNext();
+            }
+          }
+        }
+      );
+      callbackSynchronous = false;
+    } catch (writeErr) {
+      complete(() => onError(<NodeJS.ErrnoException> writeErr));
+    }
+  };
+  writeNext();
+}
+
 export default function (): any {
   /**
    * Provide buffering for the underlying input function, returning at most
@@ -488,8 +568,7 @@ export default function (): any {
         appendMode = append !== 0 || FDState.isAppend(fd),
         lease: FDOperationLease,
         finish: (action: () => void) => void,
-        position: number,
-        writeCompleted = false;
+        position: number;
       if (fd === -1) {
         thread.throwNewException('Ljava/io/IOException;', "Bad file descriptor");
       } else if (fd !== 1 && fd !== 2) {
@@ -502,18 +581,15 @@ export default function (): any {
         position = FDState.getPos(fd);
         finish = makeLeasedFinisher(lease);
         thread.setStatus(ThreadStatus.ASYNC_WAITING);
-        try {
-          fs.write(fd, buf, offset, len, appendMode ? null : position, (err, numBytes) => {
-            if (writeCompleted) {
-              return;
-            }
-            writeCompleted = true;
-            if (err) {
-              finish(() => throwNodeError(thread, err));
-            } else if (!FDState.incrementPosIfCurrent(
-                fd, lease.generation, numBytes)) {
-              finish(() => throwStreamClosed(thread));
-            } else if (appendMode) {
+        writeBufferFully(
+          fd,
+          buf,
+          offset,
+          len,
+          appendMode ? null : position,
+          lease,
+          () => {
+            if (appendMode) {
               try {
                 fs.fstat(fd, (statErr, stats) => {
                   finish(() => {
@@ -536,10 +612,10 @@ export default function (): any {
             } else {
               finish(() => thread.asyncReturn());
             }
-          });
-        } catch (writeErr) {
-          finish(() => throwNodeError(thread, <NodeJS.ErrnoException> writeErr));
-        }
+          },
+          (writeErr) => finish(() => throwNodeError(thread, writeErr)),
+          () => finish(() => throwStreamClosed(thread))
+        );
       } else {
         // The string is in UTF-8 format. But now we need to convert them to UTF-16 to print 'em out. :(
         var output: string = buf.toString("utf8", offset, offset + len);
@@ -826,22 +902,17 @@ export default function (): any {
       finish = makeLeasedFinisher(lease);
       position = FDState.getPos(fd);
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      try {
-        fs.write(fd, buf, offset, len, position, (err, numBytes) => {
-          finish(() => {
-            if (err) {
-              throwNodeError(thread, err);
-            } else if (!FDState.incrementPosIfCurrent(
-                fd, lease.generation, numBytes)) {
-              throwStreamClosed(thread);
-            } else {
-              thread.asyncReturn();
-            }
-          });
-        });
-      } catch (writeErr) {
-        finish(() => throwNodeError(thread, <NodeJS.ErrnoException> writeErr));
-      }
+      writeBufferFully(
+        fd,
+        buf,
+        offset,
+        len,
+        position,
+        lease,
+        () => finish(() => thread.asyncReturn()),
+        (writeErr) => finish(() => throwNodeError(thread, writeErr)),
+        () => finish(() => throwStreamClosed(thread))
+      );
     }
 
     public static 'getFilePointer()J'(thread: JVMThread, javaThis: JVMTypes.java_io_RandomAccessFile): Long {

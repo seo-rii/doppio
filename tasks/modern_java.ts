@@ -5746,7 +5746,7 @@ function modernJava(grunt: IGrunt) {
   grunt.registerTask('unit_test_legacy_fd_leases', 'Keep legacy host descriptors open until pending operations drain.', function() {
     var done: (status?: boolean) => void = this.async(),
       testPath = path.resolve('ci/legacy_fd_lease_test.cjs'),
-      expected = 'legacy-fd-leases:7:ok\n';
+      expected = 'legacy-fd-leases:14:ok\n';
     child_process.execFile(
       process.execPath,
       ['--no-deprecation', testPath],
