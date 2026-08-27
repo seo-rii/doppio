@@ -1048,21 +1048,27 @@ export default function (): any {
     }
 
     public static 'checkAccess(Ljava/io/File;I)Z'(thread: JVMThread, javaThis: JVMTypes.java_io_UnixFileSystem, file: JVMTypes.java_io_File, access: number): void {
-      var filepath = file['java/io/File/path'];
+      var filepath = file['java/io/File/path'].toString();
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      statFile(filepath.toString(), (stats) => {
-        if (stats == null) {
-          thread.asyncReturn(0);
-        } else {
-          // XXX: Assuming we're owner/group/other. :)
-          // Shift access so it's present in owner/group/other.
-          // Then, AND with the actual mode, and check if the result is above 0.
-          // That indicates that the access bit we're looking for was set on
-          // one of owner/group/other.
-          var mask = access | (access << 3) | (access << 6);
-          thread.asyncReturn((stats.mode & mask) > 0 ? 1 : 0);
-        }
-      });
+      // FileSystem only supplies read/write/execute bits. Reject F_OK and bits
+      // outside that POSIX mask instead of passing an invalid mode to Node.
+      if (access === 0 || (access & ~7) !== 0) {
+        thread.asyncReturn(0);
+      } else if (util.are_in_browser()) {
+        // BrowserFS is a documented single-user model. Match the NIO provider
+        // by consulting only the stored owner permission bits.
+        statFile(filepath, (stats) => {
+          var ownerAccess = stats === null ? 0 : (stats.mode >>> 6) & 7;
+          thread.asyncReturn((ownerAccess & access) === access ? 1 : 0);
+        });
+      } else {
+        // Java and POSIX use the same read/write/execute access bits: 4/2/1.
+        // Let the host decide effective access rather than inferring it from
+        // ownership-independent mode metadata.
+        fs.access(filepath, access, (err) => {
+          thread.asyncReturn(err == null ? 1 : 0);
+        });
+      }
     }
 
     public static 'getLastModifiedTime(Ljava/io/File;)J'(thread: JVMThread, javaThis: JVMTypes.java_io_UnixFileSystem, file: JVMTypes.java_io_File): void {

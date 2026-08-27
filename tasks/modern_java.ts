@@ -5743,6 +5743,28 @@ function modernJava(grunt: IGrunt) {
     );
   });
 
+  grunt.registerTask('unit_test_legacy_access_owner_bits', 'Align legacy file access checks with BrowserFS owner bits and native host access.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      testPath = path.resolve('ci/legacy_access_owner_bits_test.cjs'),
+      expected = 'legacy-access-owner-bits:22:ok\n';
+    child_process.execFile(
+      process.execPath,
+      ['--no-deprecation', testPath],
+      function(err?: any, stdout?: string, stderr?: string): void {
+        var actual = stdout + stderr;
+        if (err || actual !== expected) {
+          grunt.fail.fatal(
+            'Legacy access owner-bit output does not match.\nDoppio:\n' + actual +
+            '\nExpected:\n' + expected
+          );
+          return;
+        }
+        grunt.log.ok('Legacy file access matched NIO owner-bit and native host-access semantics.');
+        done();
+      }
+    );
+  });
+
   grunt.registerTask('unit_test_legacy_fd_generation', 'Fence legacy I/O callbacks across descriptor close and fd reuse.', function() {
     var done: (status?: boolean) => void = this.async(),
       testPath = path.resolve('ci/legacy_fd_generation_test.cjs'),
