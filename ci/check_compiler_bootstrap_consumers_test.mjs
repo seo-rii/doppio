@@ -289,6 +289,20 @@ try {
   expectFailure(runChecker(ciDir), 'runtime command must not reference', 'runtime command contamination');
 
   writeConsumers(ciDir);
+  fs.writeFileSync(
+    path.join(ciDir, 'kotlin_record_smoke.sh'),
+    kotlinFixture('$stdlib_jar:$support_dir').replace(
+      'compiler_target_cp=',
+      'test -f "$repo_root/classes/modern_classlib/out/java/lang/Record.class"\ncompiler_target_cp='
+    )
+  );
+  expectFailure(
+    runChecker(ciDir),
+    'must not reference producer-only loose build output',
+    'producer-only compiler input'
+  );
+
+  writeConsumers(ciDir);
   fs.rmSync(path.join(ciDir, 'kotlin_modern_java_interop_smoke.sh'));
   expectFailure(runChecker(ciDir), 'Missing compiler bootstrap consumer', 'missing consumer script');
 

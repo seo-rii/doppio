@@ -63,7 +63,10 @@ if [ ! -f "$modern_overlay_jar" ] || [ ! -f "$modern_boot_jar" ] || [ ! -f "$run
   exit 1
 fi
 
-test -f "$repo_root/classes/modern_classlib/out/java/lang/Record.class"
+if ! jar tf "$modern_boot_jar" | grep -Fx 'java/lang/Record.class' >/dev/null; then
+  echo "Doppio compiler bootstrap jar is missing java/lang/Record.class: $modern_boot_jar" >&2
+  exit 1
+fi
 
 rm -rf "$support_dir" "$out_dir"
 mkdir -p "$support_dir" "$out_dir"
