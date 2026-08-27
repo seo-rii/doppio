@@ -5809,6 +5809,28 @@ function modernJava(grunt: IGrunt) {
     );
   });
 
+  grunt.registerTask('unit_test_bootclasspath_defaults', 'Apply CLI bootstrap path options to fresh JVM defaults.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      testPath = path.resolve('ci/bootclasspath_defaults_test.cjs'),
+      expected = 'bootclasspath-defaults:5:ok\n';
+    child_process.execFile(
+      process.execPath,
+      ['--no-deprecation', testPath],
+      function(err?: any, stdout?: string, stderr?: string): void {
+        var actual = stdout + stderr;
+        if (err || actual !== expected) {
+          grunt.fail.fatal(
+            'Bootstrap classpath default output does not match.\nDoppio:\n' + actual +
+            '\nExpected:\n' + expected
+          );
+          return;
+        }
+        grunt.log.ok('CLI bootstrap classpath options compose with fresh JVM defaults.');
+        done();
+      }
+    );
+  });
+
   grunt.registerTask('unit_test_nio_fd_leases', 'Keep NIO host descriptors open until pending channel operations drain.', function() {
     var done: (status?: boolean) => void = this.async(),
       testPath = path.resolve('ci/nio_fd_lease_test.cjs'),
