@@ -2768,6 +2768,12 @@ export default function (): any {
         fs.stat(pathString, (err: Error, stat: fs.Stats) => {
           if (err) {
             throwUnixException(thread, err);
+          } else if ((((stat.mode >>> 6) & 7) & (arg1 & 7)) !== (arg1 & 7)) {
+            const accessError = <NodeJS.ErrnoException>
+              new Error(`EACCES: permission denied, access '${pathString}'`);
+            accessError.code = 'EACCES';
+            accessError.path = pathString;
+            throwUnixException(thread, accessError);
           } else {
             thread.asyncReturn();
           }

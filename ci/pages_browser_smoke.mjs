@@ -108,11 +108,32 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.EnumSet;
+import java.util.Set;
 
 public class Main {
   public static void main(String[] args) throws Exception {
     Path root = Files.createTempDirectory("doppio-browser-flags");
+
+    FileAttribute<Set<PosixFilePermission>> readOnly =
+        PosixFilePermissions.asFileAttribute(
+            EnumSet.of(PosixFilePermission.OWNER_READ));
+    FileAttribute<Set<PosixFilePermission>> writeOnly =
+        PosixFilePermissions.asFileAttribute(
+            EnumSet.of(PosixFilePermission.OWNER_WRITE));
+    FileAttribute<Set<PosixFilePermission>> executeOnly =
+        PosixFilePermissions.asFileAttribute(
+            EnumSet.of(PosixFilePermission.OWNER_EXECUTE));
+    FileAttribute<Set<PosixFilePermission>> noAccess =
+        PosixFilePermissions.asFileAttribute(
+            EnumSet.noneOf(PosixFilePermission.class));
+    printAccess("read", Files.createFile(root.resolve("read-only.txt"), readOnly));
+    printAccess("write", Files.createFile(root.resolve("write-only.txt"), writeOnly));
+    printAccess("execute", Files.createFile(root.resolve("execute-only.txt"), executeOnly));
+    printAccess("none", Files.createFile(root.resolve("no-access.txt"), noAccess));
 
     Path write = Files.write(
         root.resolve("write.txt"), "ABC".getBytes(StandardCharsets.UTF_8));
@@ -375,6 +396,13 @@ public class Main {
     System.out.println("browser-delete-if-exists:"
         + Files.deleteIfExists(created) + ":" + Files.deleteIfExists(created));
   }
+
+  private static void printAccess(String label, Path path) {
+    System.out.println("browser-access-" + label + ":"
+        + Files.isReadable(path) + ":"
+        + Files.isWritable(path) + ":"
+        + Files.isExecutable(path));
+  }
 }
 `);
   await page.locator('#run-button').click();
@@ -389,6 +417,10 @@ public class Main {
   const browserFlagsOutput = await page.locator('#console-output').innerText();
   assert.equal(browserFlagsState, 'ready', `browser provider flags failed:\n${browserFlagsOutput}`);
   for (const expectedOutput of [
+    'browser-access-read:true:false:false',
+    'browser-access-write:false:true:false',
+    'browser-access-execute:false:false:true',
+    'browser-access-none:false:false:false',
     'browser-write:ZBC',
     'browser-missing:false:false',
     'browser-truncate:T',
