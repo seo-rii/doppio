@@ -83,11 +83,12 @@ The `Package artifact` workflow owns the npm distribution gate. It performs a
 clean prepack, verifies the tarball allowlist and package-local runtime links, and
 installs the result in an isolated consumer. It then rebuilds twice, invokes all
 four command-line entry points, executes the browser bundle through Vite, and
-type-checks the public API with TypeScript 6. The workflow uses an offline JDK
-fixture so release certification does not depend on the download host. A normal
-first install still requires network access; the downloader pins the archive
-digest, validates its contents, and replaces an existing runtime
-transactionally.
+type-checks the public API with TypeScript 6. The isolated installed-consumer
+phase uses an offline JDK fixture, so its repeated install, rebuild, and runtime
+checks do not depend on the download host. Building the tarball from a fresh
+checkout still obtains the pinned JDK archive during prepack, and a normal first
+install also requires network access. The downloader pins the archive digest,
+validates its contents, and replaces an existing runtime transactionally.
 
 A release candidate is complete only when all three workflows pass on the same
 commit. The principal local equivalents are:

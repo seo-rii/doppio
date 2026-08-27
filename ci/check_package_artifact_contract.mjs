@@ -16,6 +16,7 @@ export function readPackageArtifactContract(root = repoRoot) {
     publicTypesSource: fs.readFileSync(path.join(root, 'types', 'public.d.ts'), 'utf8'),
     downloaderSource: fs.readFileSync(path.join(root, 'console', 'download_jdk.ts'), 'utf8'),
     downloaderTestSource: fs.readFileSync(path.join(root, 'ci', 'download_jdk_transaction_test.cjs'), 'utf8'),
+    supportSource: fs.readFileSync(path.join(root, 'docs', 'support.md'), 'utf8'),
     smokeSource: fs.readFileSync(path.join(root, 'ci', 'package_artifact_smoke.mjs'), 'utf8'),
     workflowSource: fs.readFileSync(path.join(root, '.github', 'workflows', 'package-artifact.yml'), 'utf8')
   };
@@ -164,6 +165,19 @@ export function checkPackageArtifactContract(sources) {
   assert.match(sources.downloaderTestSource, /assertFailedRunPreservesInstall/);
   assert.match(sources.downloaderTestSource, /DOPPIO_JDK_TEST_FAIL_REPLACE: 'after-backup'/);
   assert.match(sources.downloaderTestSource, /assert\.equal\(completedCases, 12\)/);
+
+  assert.match(
+    sources.supportSource,
+    /isolated\s+installed-consumer\s+phase\s+uses\s+an\s+offline\s+JDK\s+fixture/
+  );
+  assert.match(
+    sources.supportSource,
+    /Building\s+the\s+tarball\s+from\s+a\s+fresh\s+checkout\s+still\s+obtains\s+the\s+pinned\s+JDK\s+archive\s+during\s+prepack/
+  );
+  assert.doesNotMatch(
+    sources.supportSource,
+    /release certification does not depend on the download host/
+  );
 
   assert.match(sources.smokeSource, /function resolveNpmCli\(\)/);
   assert.match(sources.smokeSource, /run\(\s*process\.execPath,\s*\[npmCli, 'pack', '--json', '--silent'/s);
