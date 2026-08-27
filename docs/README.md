@@ -340,10 +340,10 @@ Whenever you add a native or rename a native file, you will need to re-generate 
 #### Browser Frontend: Ordinary JavaScript Script
 
 If you want to avoid adding your native methods to the in-browser filesystem, you can define a native method module in
-an ordinary JavaScript script included on the webpage and register it with DoppioJVM:
+an ordinary JavaScript script included on the webpage and register it with the `Doppio` browser global:
 
 ```{js}
-DoppioJVM.registerNativeModule(function() {
+Doppio.VM.JVM.registerNativeModule(function() {
   return {
     'classes/util/Test': {
       'addTwo(I)I': function(thread, arg0) {
@@ -355,7 +355,7 @@ DoppioJVM.registerNativeModule(function() {
 });
 ```
 
-DoppioJVM will call this function every time a JVM instance is created to retrieve a fresh copy of the native methods.
+Doppio will call this function every time a JVM instance is created to retrieve a fresh copy of the native methods.
 
 ### Asynchronous Native Methods
 
@@ -368,8 +368,8 @@ It's easy to write a DoppioJVM native method that invokes asynchronous browser f
 Here's an example that 'sleeps' the thread for 50 milliseconds:
 
 ```{js}
-// Native methods can reference DoppioJVM modules from the DoppioJVM global variable.
-var ThreadStatus = DoppioJVM.VM.Enums.ThreadStatus;
+// Native methods can reference Doppio modules from the Doppio browser global.
+var ThreadStatus = Doppio.VM.Enums.ThreadStatus;
 registerNatives({
   'classes/util/Test': {
     'sleep50()V': function(thread) {
