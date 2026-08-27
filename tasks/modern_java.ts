@@ -5724,7 +5724,7 @@ function modernJava(grunt: IGrunt) {
   grunt.registerTask('unit_test_file_dispatcher_status', 'Map retryable channel errno values to their exact IOStatus sentinel types.', function() {
     var done: (status?: boolean) => void = this.async(),
       testPath = path.resolve('ci/file_dispatcher_status_test.cjs'),
-      expected = 'file-dispatcher-status:45:ok\n';
+      expected = 'file-dispatcher-status:49:ok\n';
     child_process.execFile(
       process.execPath,
       ['--no-deprecation', testPath],

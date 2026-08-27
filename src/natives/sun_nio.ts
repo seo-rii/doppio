@@ -424,6 +424,21 @@ export default function (): any {
     });
   }
 
+  function finishCommittedFileDispatcherProgress(
+      thread: JVMThread,
+      operation: LeasedFDOperation,
+      total: number): void {
+    if (operation.completionStarted) {
+      return;
+    }
+    // The positive total was already committed before this terminal path.
+    // Complete it without revalidating or dispatching more descriptor work.
+    operation.completionStarted = true;
+    operation.finish(() => {
+      thread.asyncReturn(Long.fromNumber(total), null);
+    });
+  }
+
   function dispatchFileDispatcherOperation(
       thread: JVMThread,
       operation: LeasedFDOperation,
@@ -1560,14 +1575,16 @@ export default function (): any {
             callbackHandled = true;
             if (err) {
               if (total > 0) {
-                finishFileDispatcherOperation(thread, operation, null, () => {
-                  thread.asyncReturn(Long.fromNumber(total), null);
-                });
+                finishCommittedFileDispatcherProgress(thread, operation, total);
               } else {
                 finishFileDispatcherOperation(thread, operation, err, () => {}, 'long');
               }
             } else if (!FDState.isCurrent(fd, operation.lease.generation)) {
-              finishFileDispatcherOperation(thread, operation, null, () => {});
+              if (total > 0) {
+                finishCommittedFileDispatcherProgress(thread, operation, total);
+              } else {
+                finishFileDispatcherOperation(thread, operation, null, () => {});
+              }
             } else if (bytesRead === 0) {
               finishFileDispatcherOperation(thread, operation, null, () => {
                 thread.asyncReturn(Long.fromNumber(total === 0 ? -1 : total), null);
@@ -1589,9 +1606,7 @@ export default function (): any {
           if (total === 0) {
             return false;
           }
-          finishFileDispatcherOperation(thread, operation, null, () => {
-            thread.asyncReturn(Long.fromNumber(total), null);
-          });
+          finishCommittedFileDispatcherProgress(thread, operation, total);
           return true;
         });
       };
@@ -1874,9 +1889,7 @@ export default function (): any {
               }
               total += committedBytes;
               if (committedBytes === 0 && total > 0) {
-                finishFileDispatcherOperation(thread, operation, null, () => {
-                  thread.asyncReturn(Long.fromNumber(total), null);
-                });
+                finishCommittedFileDispatcherProgress(thread, operation, total);
               } else {
                 finishFileDispatcherOperation(
                   thread,
