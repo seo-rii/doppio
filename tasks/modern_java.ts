@@ -5765,6 +5765,28 @@ function modernJava(grunt: IGrunt) {
     );
   });
 
+  grunt.registerTask('unit_test_test_runner_args', 'Parse test-runner arguments without mutating built-in prototypes.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      testPath = path.resolve('ci/test_runner_args_test.cjs'),
+      expected = 'test-runner-args:7:ok\n';
+    child_process.execFile(
+      process.execPath,
+      ['--no-deprecation', testPath],
+      function(err?: any, stdout?: string, stderr?: string): void {
+        var actual = stdout + stderr;
+        if (err || actual !== expected) {
+          grunt.fail.fatal(
+            'Test-runner argument parsing output does not match.\nDoppio:\n' + actual +
+            '\nExpected:\n' + expected
+          );
+          return;
+        }
+        grunt.log.ok('Test-runner arguments preserve CLI behavior without prototype pollution.');
+        done();
+      }
+    );
+  });
+
   grunt.registerTask('unit_test_nio_fd_leases', 'Keep NIO host descriptors open until pending channel operations drain.', function() {
     var done: (status?: boolean) => void = this.async(),
       testPath = path.resolve('ci/nio_fd_lease_test.cjs'),
