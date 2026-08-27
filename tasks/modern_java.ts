@@ -5677,6 +5677,28 @@ function modernJava(grunt: IGrunt) {
       });
   });
 
+  grunt.registerTask('unit_test_file_dispatcher_status', 'Map retryable channel errno values to their exact IOStatus sentinel types.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      testPath = path.resolve('ci/file_dispatcher_status_test.cjs'),
+      expected = 'file-dispatcher-status:45:ok\n';
+    child_process.execFile(
+      process.execPath,
+      ['--no-deprecation', testPath],
+      function(err?: any, stdout?: string, stderr?: string): void {
+        var actual = stdout + stderr;
+        if (err || actual !== expected) {
+          grunt.fail.fatal(
+            'FileDispatcher IOStatus output does not match.\nDoppio:\n' + actual +
+            '\nExpected:\n' + expected
+          );
+          return;
+        }
+        grunt.log.ok('FileDispatcher retryable errno values matched their int and long IOStatus contracts.');
+        done();
+      }
+    );
+  });
+
   grunt.registerTask('unit_test_legacy_fd_generation', 'Fence legacy I/O callbacks across descriptor close and fd reuse.', function() {
     var done: (status?: boolean) => void = this.async(),
       testPath = path.resolve('ci/legacy_fd_generation_test.cjs'),

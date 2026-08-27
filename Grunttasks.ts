@@ -1271,6 +1271,7 @@ export function setup(grunt: IGrunt) {
     'unit_test_filechannel_readv_partial_progress',
     'unit_test_file_output_stream_append_channel',
     'unit_test_filechannel_ioexception_boundaries',
+    'unit_test_file_dispatcher_status',
     'unit_test_legacy_fd_generation',
     'unit_test_legacy_fd_leases',
     'unit_test_nio_fd_leases',

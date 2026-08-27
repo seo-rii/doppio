@@ -27,7 +27,11 @@ interface IOVec {
 interface LeasedFDOperation {
   lease: FDOperationLease;
   finish: (action: () => void) => void;
-  completionStarted?: boolean;
+  completionStarted: boolean;
+}
+
+interface HostCallbackState {
+  callbackStarted: boolean;
 }
 
 interface LeasedFDPair {
@@ -129,7 +133,11 @@ export default function (): any {
       return null;
     }
     thread.setStatus(ThreadStatus.ASYNC_WAITING);
-    return {lease: lease, finish: makeLeasedFinisher(lease)};
+    return {
+      lease: lease,
+      finish: makeLeasedFinisher(lease),
+      completionStarted: false
+    };
   }
 
   function closedDescriptorError(message: string = 'Bad file descriptor'): NodeJS.ErrnoException {
@@ -383,10 +391,29 @@ export default function (): any {
       thread: JVMThread,
       operation: LeasedFDOperation,
       err: NodeJS.ErrnoException,
-      success: () => void): void {
+      success: () => void,
+      ioStatusType?: 'int' | 'long'): void {
+    if (operation.completionStarted) {
+      return;
+    }
+    operation.completionStarted = true;
     operation.finish(() => {
       if (err) {
-        throwChannelIOException(thread, err);
+        let ioStatus: number = null;
+        if (ioStatusType !== undefined) {
+          if (err.code === 'EINTR') {
+            ioStatus = -3;
+          } else if (err.code === 'EAGAIN' || err.code === 'EWOULDBLOCK') {
+            ioStatus = -2;
+          }
+        }
+        if (ioStatus === null) {
+          throwChannelIOException(thread, err);
+        } else if (ioStatusType === 'long') {
+          thread.asyncReturn(Long.fromNumber(ioStatus), null);
+        } else {
+          thread.asyncReturn(ioStatus);
+        }
       } else if (!FDState.isCurrent(
           operation.lease.fd,
           operation.lease.generation)) {
@@ -400,18 +427,27 @@ export default function (): any {
   function dispatchFileDispatcherOperation(
       thread: JVMThread,
       operation: LeasedFDOperation,
-      dispatch: () => void): void {
+      dispatch: () => void,
+      ioStatusType?: 'int' | 'long',
+      callbackState?: HostCallbackState,
+      synchronousError?: (err: NodeJS.ErrnoException) => boolean): void {
     try {
       dispatch();
     } catch (err) {
-      if (operation.lease.released) {
+      if (operation.lease.released || operation.completionStarted ||
+          callbackState !== undefined && callbackState.callbackStarted) {
         throw err;
+      }
+      if (synchronousError !== undefined &&
+          synchronousError(<NodeJS.ErrnoException> err)) {
+        return;
       }
       finishFileDispatcherOperation(
         thread,
         operation,
         <NodeJS.ErrnoException> err,
-        () => {}
+        () => {},
+        ioStatusType
       );
     }
   }
@@ -529,24 +565,30 @@ export default function (): any {
       numBytes: number,
       advancePosition: boolean,
       cb: (numBytes: number) => void,
-      errorCb: (err: NodeJS.ErrnoException, committedBytes: number) => void): void {
-    const fd = lease.fd;
+      errorCb: (err: NodeJS.ErrnoException, committedBytes: number) => void,
+      callbackState?: HostCallbackState,
+      operationCompleted?: () => boolean): void {
+    const fd = lease.fd,
+      dispatchState = callbackState === undefined ?
+        {callbackStarted: false} : callbackState,
+      isOperationCompleted = operationCompleted === undefined ?
+        () => false : operationCompleted;
     let finished = false,
       syncDispatched = false;
     const fail = (err: NodeJS.ErrnoException): void => {
-      if (!finished) {
+      if (!finished && !isOperationCompleted()) {
         finished = true;
         errorCb(err, numBytes);
       }
     };
     const succeed = (): void => {
-      if (!finished) {
+      if (!finished && !isOperationCompleted()) {
         finished = true;
         cb(numBytes);
       }
     };
     const syncAndReturn = (): void => {
-      if (syncDispatched) {
+      if (syncDispatched || isOperationCompleted()) {
         return;
       }
       if (!FDState.isCurrent(fd, lease.generation)) {
@@ -556,8 +598,14 @@ export default function (): any {
       syncDispatched = true;
       const syncMode = FDState.getSyncMode(fd);
       if (syncMode === 2 && typeof (<any> fs).fdatasync === 'function') {
+        let callbackStarted = false;
         try {
           (<any> fs).fdatasync(fd, (err?: NodeJS.ErrnoException) => {
+            callbackStarted = true;
+            dispatchState.callbackStarted = true;
+            if (finished || isOperationCompleted()) {
+              return;
+            }
             if (err) {
               fail(err);
             } else {
@@ -565,14 +613,20 @@ export default function (): any {
             }
           });
         } catch (syncErr) {
-          if (finished) {
+          if (callbackStarted || finished || isOperationCompleted()) {
             throw syncErr;
           }
           fail(<NodeJS.ErrnoException> syncErr);
         }
       } else if (syncMode !== 0) {
+        let callbackStarted = false;
         try {
           fs.fsync(fd, (err?: NodeJS.ErrnoException) => {
+            callbackStarted = true;
+            dispatchState.callbackStarted = true;
+            if (finished || isOperationCompleted()) {
+              return;
+            }
             if (err) {
               fail(err);
             } else {
@@ -580,7 +634,7 @@ export default function (): any {
             }
           });
         } catch (syncErr) {
-          if (finished) {
+          if (callbackStarted || finished || isOperationCompleted()) {
             throw syncErr;
           }
           fail(<NodeJS.ErrnoException> syncErr);
@@ -590,6 +644,9 @@ export default function (): any {
       }
     };
 
+    if (isOperationCompleted()) {
+      return;
+    }
     if (FDState.isAppend(fd)) {
       // Preserve at least this operation's progress even if the authoritative
       // post-append stat or sync fails. A successful stat also incorporates
@@ -598,10 +655,13 @@ export default function (): any {
         fail(closedDescriptorError('Stream Closed'));
         return;
       }
-      let callbackHandled = false;
+      let callbackStarted = false,
+        callbackHandled = false;
       try {
         fs.fstat(fd, (err, stats) => {
-          if (callbackHandled) {
+          callbackStarted = true;
+          dispatchState.callbackStarted = true;
+          if (callbackHandled || finished || isOperationCompleted()) {
             return;
           }
           callbackHandled = true;
@@ -615,7 +675,7 @@ export default function (): any {
           }
         });
       } catch (statErr) {
-        if (finished) {
+        if (callbackStarted || finished || isOperationCompleted()) {
           throw statErr;
         }
         fail(<NodeJS.ErrnoException> statErr);
@@ -641,62 +701,89 @@ export default function (): any {
       advancePosition: boolean,
       appendAtEnd: boolean,
       cb: (numBytes: number) => void,
-      errorCb: (err: NodeJS.ErrnoException, committedBytes: number) => void): void {
-    const fd = lease.fd;
+      errorCb: (
+        err: NodeJS.ErrnoException,
+        committedBytes: number,
+        ioStatusEligible: boolean
+      ) => void,
+      callbackState?: HostCallbackState,
+      operationCompleted?: () => boolean): void {
+    const fd = lease.fd,
+      dispatchState = callbackState === undefined ?
+        {callbackStarted: false} : callbackState,
+      isOperationCompleted = operationCompleted === undefined ?
+        () => false : operationCompleted;
     const append = FDState.isAppend(fd);
     let finished = false;
-    const fail = (err: NodeJS.ErrnoException, committedBytes: number = 0): void => {
-      if (!finished) {
+    const fail = (
+        err: NodeJS.ErrnoException,
+        committedBytes: number = 0,
+        ioStatusEligible: boolean = false): void => {
+      if (!finished && !isOperationCompleted()) {
         finished = true;
-        errorCb(err, committedBytes);
+        errorCb(err, committedBytes, ioStatusEligible);
       }
     };
     const succeed = (numBytes: number): void => {
-      if (!finished) {
+      if (!finished && !isOperationCompleted()) {
         finished = true;
         cb(numBytes);
       }
     };
     const writeAt = (writePosition: number | null): void => {
+      if (finished || isOperationCompleted()) {
+        return;
+      }
       if (!FDState.isCurrent(fd, lease.generation)) {
         fail(closedDescriptorError('Stream Closed'));
         return;
       }
-      let callbackHandled = false;
+      let callbackStarted = false,
+        callbackHandled = false;
       try {
         fs.write(fd, data, offset, length, writePosition, (err, numBytes) => {
-          if (callbackHandled) {
+          callbackStarted = true;
+          dispatchState.callbackStarted = true;
+          if (callbackHandled || finished || isOperationCompleted()) {
             return;
           }
           callbackHandled = true;
           if (err) {
-            fail(err);
+            fail(err, 0, true);
           } else if (!FDState.isCurrent(fd, lease.generation)) {
             fail(closedDescriptorError('Stream Closed'), numBytes);
           } else {
-            try {
-              finishWrite(thread, lease, numBytes, advancePosition, succeed, fail);
-            } catch (writeErr) {
-              if (finished) {
-                throw writeErr;
-              }
-              fail(<NodeJS.ErrnoException> writeErr, numBytes);
-            }
+            finishWrite(
+              thread,
+              lease,
+              numBytes,
+              advancePosition,
+              succeed,
+              fail,
+              dispatchState,
+              isOperationCompleted
+            );
           }
         });
       } catch (writeErr) {
-        if (finished) {
+        if (callbackStarted || finished || isOperationCompleted()) {
           throw writeErr;
         }
-        fail(<NodeJS.ErrnoException> writeErr);
+        fail(<NodeJS.ErrnoException> writeErr, 0, true);
       }
     };
 
+    if (isOperationCompleted()) {
+      return;
+    }
     if (append && util.are_in_browser()) {
-      let callbackHandled = false;
+      let callbackStarted = false,
+        callbackHandled = false;
       try {
         fs.fstat(fd, (err, stats) => {
-          if (callbackHandled) {
+          callbackStarted = true;
+          dispatchState.callbackStarted = true;
+          if (callbackHandled || finished || isOperationCompleted()) {
             return;
           }
           callbackHandled = true;
@@ -710,7 +797,7 @@ export default function (): any {
           }
         });
       } catch (statErr) {
-        if (finished) {
+        if (callbackStarted || finished || isOperationCompleted()) {
           throw statErr;
         }
         fail(<NodeJS.ErrnoException> statErr);
@@ -1351,15 +1438,22 @@ export default function (): any {
         return;
       }
       const position = FDState.getPos(fd);
+      const callbackState: HostCallbackState = {callbackStarted: false};
+      let callbackHandled = false;
       dispatchFileDispatcherOperation(thread, operation, () => {
         fs.read(fd, buf, 0, len, position, (err, bytesRead) => {
+          callbackState.callbackStarted = true;
+          if (callbackHandled || operation.completionStarted) {
+            return;
+          }
+          callbackHandled = true;
           finishFileDispatcherOperation(thread, operation, err, () => {
             FDState.incrementPos(fd, bytesRead);
             // Return -1 if we reached the end of the file.
             thread.asyncReturn(bytesRead === 0 ? -1 : bytesRead);
-          });
+          }, 'int');
         });
-      });
+      }, 'int', callbackState);
     }
 
     public static 'pread0(Ljava/io/FileDescriptor;JIJ)I'(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor, address: Long, len: number, position: Long): void {
@@ -1370,13 +1464,20 @@ export default function (): any {
       if (operation === null) {
         return;
       }
+      const callbackState: HostCallbackState = {callbackStarted: false};
+      let callbackHandled = false;
       dispatchFileDispatcherOperation(thread, operation, () => {
         fs.read(fd, buf, 0, len, position.toNumber(), (err, bytesRead) => {
+          callbackState.callbackStarted = true;
+          if (callbackHandled || operation.completionStarted) {
+            return;
+          }
+          callbackHandled = true;
           finishFileDispatcherOperation(thread, operation, err, () => {
             thread.asyncReturn(bytesRead === 0 && len !== 0 ? -1 : bytesRead);
-          });
+          }, 'int');
         });
-      });
+      }, 'int', callbackState);
     }
 
     public static 'readv0(Ljava/io/FileDescriptor;JI)J'(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor, address: Long, len: number): void {
@@ -1402,6 +1503,8 @@ export default function (): any {
 
       if (typeof nativeReadv === 'function') {
         const position = FDState.getPos(fd);
+        const callbackState: HostCallbackState = {callbackStarted: false};
+        let callbackHandled = false;
         dispatchFileDispatcherOperation(thread, operation, () => {
           nativeReadv.call(
             fs,
@@ -1409,20 +1512,28 @@ export default function (): any {
             buffers,
             position,
             (err: NodeJS.ErrnoException, bytesRead: number) => {
+              callbackState.callbackStarted = true;
+              if (callbackHandled || operation.completionStarted) {
+                return;
+              }
+              callbackHandled = true;
               finishFileDispatcherOperation(thread, operation, err, () => {
                 FDState.incrementPos(fd, bytesRead);
                 thread.asyncReturn(
                   Long.fromNumber(bytesRead === 0 && requestedBytes > 0 ? -1 : bytesRead),
                   null
                 );
-              });
+              }, 'long');
             }
           );
-        });
+        }, 'long', callbackState);
         return;
       }
 
       const readNext = (): void => {
+        if (operation.completionStarted) {
+          return;
+        }
         if (index >= vecs.length) {
           finishFileDispatcherOperation(thread, operation, null, () => {
             thread.asyncReturn(Long.fromNumber(total), null);
@@ -1438,10 +1549,12 @@ export default function (): any {
           return;
         }
         const position = FDState.getPos(fd);
+        const callbackState: HostCallbackState = {callbackStarted: false};
         let callbackHandled = false;
         dispatchFileDispatcherOperation(thread, operation, () => {
           fs.read(fd, buf, 0, vec.len, position, (err, bytesRead) => {
-            if (callbackHandled) {
+            callbackState.callbackStarted = true;
+            if (callbackHandled || operation.completionStarted) {
               return;
             }
             callbackHandled = true;
@@ -1451,7 +1564,7 @@ export default function (): any {
                   thread.asyncReturn(Long.fromNumber(total), null);
                 });
               } else {
-                finishFileDispatcherOperation(thread, operation, err, () => {});
+                finishFileDispatcherOperation(thread, operation, err, () => {}, 'long');
               }
             } else if (!FDState.isCurrent(fd, operation.lease.generation)) {
               finishFileDispatcherOperation(thread, operation, null, () => {});
@@ -1472,6 +1585,14 @@ export default function (): any {
               }
             }
           });
+        }, 'long', callbackState, (err) => {
+          if (total === 0) {
+            return false;
+          }
+          finishFileDispatcherOperation(thread, operation, null, () => {
+            thread.asyncReturn(Long.fromNumber(total), null);
+          });
+          return true;
         });
       };
 
@@ -1565,6 +1686,7 @@ export default function (): any {
         return;
       }
       const position = FDState.getPos(fd);
+      const callbackState: HostCallbackState = {callbackStarted: false};
       dispatchFileDispatcherOperation(thread, operation, () => {
         writeBuffer(
           thread,
@@ -1581,14 +1703,17 @@ export default function (): any {
             null,
             () => thread.asyncReturn(numBytes)
           ),
-          (err) => finishFileDispatcherOperation(
+          (err, committedBytes, ioStatusEligible) => finishFileDispatcherOperation(
             thread,
             operation,
             err,
-            () => {}
-          )
+            () => {},
+            ioStatusEligible ? 'int' : undefined
+          ),
+          callbackState,
+          () => operation.completionStarted
         );
-      });
+      }, 'int', callbackState);
     }
 
     public static 'pwrite0(Ljava/io/FileDescriptor;JIJ)I'(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor, addr: Long, len: number, position: Long): void {
@@ -1599,6 +1724,7 @@ export default function (): any {
       if (operation === null) {
         return;
       }
+      const callbackState: HostCallbackState = {callbackStarted: false};
       dispatchFileDispatcherOperation(thread, operation, () => {
         writeBuffer(
           thread,
@@ -1615,14 +1741,17 @@ export default function (): any {
             null,
             () => thread.asyncReturn(numBytes)
           ),
-          (err) => finishFileDispatcherOperation(
+          (err, committedBytes, ioStatusEligible) => finishFileDispatcherOperation(
             thread,
             operation,
             err,
-            () => {}
-          )
+            () => {},
+            ioStatusEligible ? 'int' : undefined
+          ),
+          callbackState,
+          () => operation.completionStarted
         );
-      });
+      }, 'int', callbackState);
     }
 
     public static 'writev0(Ljava/io/FileDescriptor;JI)J'(thread: JVMThread, fdObj: JVMTypes.java_io_FileDescriptor, address: Long, len: number): void {
@@ -1647,6 +1776,7 @@ export default function (): any {
 
       if (typeof nativeWritev === 'function') {
         const position = FDState.isAppend(fd) ? null : FDState.getPos(fd);
+        const callbackState: HostCallbackState = {callbackStarted: false};
         let callbackHandled = false;
         dispatchFileDispatcherOperation(thread, operation, () => {
           nativeWritev.call(
@@ -1655,15 +1785,17 @@ export default function (): any {
             buffers,
             position,
             (err: NodeJS.ErrnoException, numBytes: number) => {
-              if (callbackHandled) {
+              callbackState.callbackStarted = true;
+              if (callbackHandled || operation.completionStarted) {
                 return;
               }
               callbackHandled = true;
               if (err) {
-                finishFileDispatcherOperation(thread, operation, err, () => {});
+                finishFileDispatcherOperation(thread, operation, err, () => {}, 'long');
               } else if (!FDState.isCurrent(fd, operation.lease.generation)) {
                 finishFileDispatcherOperation(thread, operation, null, () => {});
               } else {
+                const tailCallbackState: HostCallbackState = {callbackStarted: false};
                 dispatchFileDispatcherOperation(thread, operation, () => {
                   finishWrite(
                     thread,
@@ -1681,17 +1813,22 @@ export default function (): any {
                       operation,
                       writeErr,
                       () => {}
-                    )
+                    ),
+                    tailCallbackState,
+                    () => operation.completionStarted
                   );
-                });
+                }, undefined, tailCallbackState);
               }
             }
           );
-        });
+        }, 'long', callbackState);
         return;
       }
 
       const writeNext = (): void => {
+        if (operation.completionStarted) {
+          return;
+        }
         if (index >= vecs.length) {
           finishFileDispatcherOperation(thread, operation, null, () => {
             thread.asyncReturn(Long.fromNumber(total), null);
@@ -1702,6 +1839,7 @@ export default function (): any {
         const vec = vecs[index],
           data = buffers[index];
         const position = FDState.getPos(fd);
+        const callbackState: HostCallbackState = {callbackStarted: false};
         dispatchFileDispatcherOperation(thread, operation, () => {
           writeBuffer(
             thread,
@@ -1713,6 +1851,9 @@ export default function (): any {
             true,
             true,
             (numBytes) => {
+              if (operation.completionStarted) {
+                return;
+              }
               if (!FDState.isCurrent(fd, operation.lease.generation)) {
                 finishFileDispatcherOperation(thread, operation, null, () => {});
                 return;
@@ -1727,18 +1868,29 @@ export default function (): any {
                 writeNext();
               }
             },
-            (err, committedBytes) => {
+            (err, committedBytes, ioStatusEligible) => {
+              if (operation.completionStarted) {
+                return;
+              }
               total += committedBytes;
               if (committedBytes === 0 && total > 0) {
                 finishFileDispatcherOperation(thread, operation, null, () => {
                   thread.asyncReturn(Long.fromNumber(total), null);
                 });
               } else {
-                finishFileDispatcherOperation(thread, operation, err, () => {});
+                finishFileDispatcherOperation(
+                  thread,
+                  operation,
+                  err,
+                  () => {},
+                  ioStatusEligible ? 'long' : undefined
+                );
               }
-            }
+            },
+            callbackState,
+            () => operation.completionStarted
           );
-        });
+        }, 'long', callbackState);
       };
 
       writeNext();
