@@ -454,6 +454,129 @@ public class Main {
     ),
     true
   );
+
+  const browserLeaseEvents = await page.evaluate(async () => {
+    const browserFs = window.BrowserFS;
+    const doppio = window.Doppio;
+    if (!browserFs || !doppio?.VM?.FDState) {
+      throw new Error('Browser runtime did not expose BrowserFS and FDState.');
+    }
+
+    const fs = browserFs.BFSRequire('fs');
+    const BufferCtor = browserFs.BFSRequire('buffer').Buffer;
+    const FDState = doppio.VM.FDState;
+    const path = `/work/browser-fd-lease-${Date.now()}.txt`;
+    const events = [];
+    fs.writeFileSync(path, 'lease', 'utf8');
+    const fd = fs.openSync(path, 'r');
+    const originalRead = fs.read;
+    FDState.open(fd, 0, false, 0, path);
+    const lease = FDState.acquireOperation(fd);
+    if (!lease) {
+      throw new Error('Could not acquire the browser descriptor lease.');
+    }
+
+    try {
+      return await new Promise((resolve, reject) => {
+        let dispatchReturned = false;
+        let settled = false;
+        let hostReadCallbackCount = 0;
+        let timeout;
+        const finish = (error) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          clearTimeout(timeout);
+          if (error) {
+            reject(error);
+          } else {
+            resolve(events);
+          }
+        };
+        timeout = setTimeout(() => {
+          finish(new Error(`Browser descriptor lease timed out: ${events.join(',')}`));
+        }, 5_000);
+        // The pinned InMemory backend invokes read callbacks synchronously.
+        // Keep its real result, but defer delivery by one event-loop task to
+        // fault-inject the close/reuse window an asynchronous backend creates.
+        fs.read = function(...args) {
+          const callback = args.pop();
+          return originalRead.call(fs, ...args, (...callbackArgs) => {
+            hostReadCallbackCount += 1;
+            if (hostReadCallbackCount !== 1) {
+              const duplicateError =
+                new Error('BrowserFS invoked the deferred read callback more than once.');
+              if (settled) {
+                throw duplicateError;
+              }
+              finish(duplicateError);
+              return;
+            }
+            setTimeout(() => callback(...callbackArgs), 0);
+          });
+        };
+        const target = BufferCtor.alloc(5);
+
+        fs.read(fd, target, 0, target.length, 0, (readError, bytesRead) => {
+          events.push('read-completed');
+          if (!dispatchReturned) {
+            finish(new Error('Deferred BrowserFS read callback ran before dispatch returned.'));
+            return;
+          }
+          if (readError || bytesRead !== 5 || target.toString('utf8') !== 'lease') {
+            finish(readError || new Error(`Unexpected browser read result: ${bytesRead}`));
+            return;
+          }
+          if (FDState.isCurrent(fd, lease.generation)) {
+            finish(new Error('Logically closed browser descriptor remained current.'));
+            return;
+          }
+          events.push('release-operation');
+          FDState.releaseOperation(lease);
+        });
+        events.push('read-dispatched');
+
+        const closeAccepted = FDState.requestClose(fd, (closeInfo) => {
+          events.push('lease-drained');
+          fs.close(closeInfo.fd, (closeError) => {
+            events.push('host-closed');
+            try {
+              fs.unlinkSync(path);
+            } catch (unlinkError) {
+              finish(unlinkError);
+              return;
+            }
+            finish(closeError);
+          });
+        });
+        events.push('logical-close');
+        if (!closeAccepted) {
+          finish(new Error('Browser descriptor close request was rejected.'));
+          return;
+        }
+        try {
+          FDState.open(fd, 0, false, 0, path);
+          finish(new Error('Closing browser descriptor allowed early number reuse.'));
+          return;
+        } catch (_expected) {
+          events.push('reuse-blocked');
+        }
+        dispatchReturned = true;
+      });
+    } finally {
+      fs.read = originalRead;
+    }
+  });
+  assert.deepEqual(browserLeaseEvents, [
+    'read-dispatched',
+    'logical-close',
+    'reuse-blocked',
+    'read-completed',
+    'release-operation',
+    'lease-drained',
+    'host-closed'
+  ]);
   assert.deepEqual(browserErrors, []);
   await desktop.close();
 
@@ -480,7 +603,7 @@ public class Main {
   }
   await mobile.close();
 
-  console.log('Pages Chromium smoke passed for docs, mobile layout, Java, Kotlin, Scala, and provider file mutations.');
+  console.log('Pages Chromium smoke passed for docs, mobile layout, Java, Kotlin, Scala, provider file mutations, owner-mode access checks, and the event-loop-deferred BrowserFS descriptor lease canary.');
 } finally {
   await browser.close();
 }
