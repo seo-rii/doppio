@@ -67,6 +67,27 @@ export = JDKInfo;
   }
 }
 
+function deleteGeneratedArtifacts(grunt: IGrunt, includeTestOracles: boolean): void {
+  let generatedPaths = [
+    'includes',
+    'dist',
+    'build',
+    'doppio',
+    'doppio-dev',
+    'doppio-fast-dev'
+  ].concat(grunt.file.expand(['tscommand*.txt']));
+  if (includeTestOracles) {
+    generatedPaths = generatedPaths.concat(
+      grunt.file.expand(['classes/*/*.+(class|runout)', 'kotlin/**/*.class'])
+    );
+  }
+  generatedPaths.forEach((generatedPath: string) => {
+    if (grunt.file.exists(generatedPath)) {
+      grunt.file.delete(generatedPath);
+    }
+  });
+}
+
 /**
  * Returns a webpack configuration for testing a particular DoppioJVM build.
  */
@@ -1200,7 +1221,7 @@ export function setup(grunt: IGrunt) {
 
   grunt.registerTask('dist',
     [
-      'clean', 'release', 'fast-dev', 'dev', 'clean_natives', 'copy:dist'
+      'clean-distribution', 'release', 'fast-dev', 'dev', 'clean_natives', 'copy:dist'
     ]);
   grunt.registerTask('test',
     ['release-cli',
@@ -1323,12 +1344,12 @@ export function setup(grunt: IGrunt) {
       'listings:test-dev',
       'connect:server',
       'karma:dev']);
+  grunt.registerTask('clean-distribution', 'Deletes distribution build files without changing test oracles.', function() {
+    deleteGeneratedArtifacts(grunt, false);
+    grunt.log.writeln('Distribution build files have been deleted without changing Java test oracles.');
+  });
   grunt.registerTask('clean', 'Deletes built files.', function() {
-    ['includes', 'dist', 'build', 'doppio', 'doppio-dev'].concat(grunt.file.expand(['tscommand*.txt'])).concat(grunt.file.expand(['classes/*/*.+(class|runout)', 'kotlin/**/*.class'])).forEach(function (path: string) {
-      if (grunt.file.exists(path)) {
-        grunt.file.delete(path);
-      }
-    });
+    deleteGeneratedArtifacts(grunt, true);
     grunt.log.writeln('All built files have been deleted, except for Grunt-related tasks (e.g. tasks/*.js and Grunttasks.js).');
   });
   grunt.registerTask('test-browser-travis',

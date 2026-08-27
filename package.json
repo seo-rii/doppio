@@ -1,12 +1,27 @@
 {
   "name": "doppiojvm",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "A modern Java compatibility fork of the TypeScript DoppioJVM runtime.",
-  "engine": "node >= 6.0.0",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "packageManager": "yarn@1.22.22",
   "license": "MIT",
   "homepage": "https://seorii.page/doppio/",
-  "main": "dist/release/doppio.js",
-  "typings": "dist/typings/src/doppiojvm",
+  "main": "dist/release-cli/src/doppiojvm.js",
+  "browser": "dist/release/doppio.js",
+  "types": "types/public.d.ts",
+  "files": [
+    "CHANGELOG.md",
+    "bin",
+    "dist",
+    "docs/README.md",
+    "docs/modern-java.md",
+    "docs/support.md",
+    "install.js",
+    "prepack.cjs",
+    "types/public.d.ts"
+  ],
   "dependencies": {
     "async": "^2.0.0",
     "browserfs": "1.3.0",
@@ -82,7 +97,7 @@
   },
   "scripts": {
     "test": "grunt test",
-    "prepublish": "node ./prepublish.js",
+    "prepack": "node ./prepack.cjs",
     "install": "node ./install.js",
     "appveyor-test": "grunt --stack test-browser-appveyor",
     "site:browser-test": "node ci/pages_browser_smoke.mjs",
@@ -98,6 +113,7 @@
     "ci:check-kotlin-modern-source-guards:test": "node ci/check_kotlin_modern_source_guards_test.mjs",
     "ci:check-scala-modern-source-guards": "node ci/check_scala_modern_source_guards.mjs",
     "ci:check-scala-modern-source-guards:test": "node ci/check_scala_modern_source_guards_test.mjs",
+    "ci:check-package-artifact": "node ci/package_artifact_smoke.mjs",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "typecheck:bootstrap": "tsc --noEmit --ignoreConfig --noImplicitAny --noImplicitThis false --strict false --strictNullChecks false --strictPropertyInitialization false --useUnknownInCatchVariables false --module commonjs --target ES2015 --skipLibCheck types/legacy-globals.d.ts tasks/*.ts Grunttasks.ts",
     "typecheck:typescript-7-rc": "npx -y -p typescript@7.0.1-rc tsc --project tsconfig.json --noEmit",

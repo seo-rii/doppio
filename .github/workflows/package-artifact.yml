@@ -1,0 +1,63 @@
+name: Package artifact
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-artifact-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Build and consume npm package
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: yarn
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install dependencies
+        run: |
+          npm install -g yarn@1.22.22
+          yarn install --frozen-lockfile --ignore-engines --network-timeout 600000
+
+      - name: Check package artifact contract
+        run: |
+          node ci/check_package_artifact_contract_test.mjs
+          node ci/check_package_artifact_contract.mjs
+
+      - name: Verify transactional JDK installation
+        run: node ci/download_jdk_transaction_test.cjs
+
+      - name: Build and consume package artifact
+        env:
+          DOPPIO_PACKAGE_OUTPUT_DIR: build/package-artifact
+          DOPPIO_PACKAGE_ARTIFACT_BASENAME: doppiojvm-0.6.0-${{ github.sha }}-${{ github.run_attempt }}.tgz
+        run: yarn ci:check-package-artifact
+
+      - name: Upload verified npm package
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/package-artifact/doppiojvm-0.6.0-${{ github.sha }}-${{ github.run_attempt }}.tgz
+          if-no-files-found: error
+          retention-days: 14
+          archive: false
