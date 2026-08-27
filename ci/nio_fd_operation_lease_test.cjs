@@ -287,6 +287,63 @@ function testFileChannelTransferAppendTail() {
   assert.deepEqual(events, ['exception', 'destination-drain', 'source-drain']);
 }
 
+function testFileChannelReadThrowAfterStartingWrite() {
+  const sourceFd = 12450;
+  const destinationFd = 12451;
+  const events = [];
+  const thread = makeChannelThread(events);
+  const dispatchError = new Error('injected transfer read dispatch failure');
+  let caughtError = null;
+  let writeCallback = null;
+  let writes = 0;
+  openState(sourceFd);
+  openState(destinationFd);
+  fs.read = function(fd, data, offset, length, position, callback) {
+    assert.equal(fd, sourceFd);
+    callback(null, 4);
+    callback(null, 4);
+    throw dispatchError;
+  };
+  fs.write = function(fd, data, offset, length, position, callback) {
+    assert.equal(fd, destinationFd);
+    writes += 1;
+    writeCallback = callback;
+  };
+
+  try {
+    fileChannel['transferTo0(Ljava/io/FileDescriptor;JJLjava/io/FileDescriptor;)J'](
+      thread,
+      {},
+      {'java/io/FileDescriptor/fd': sourceFd},
+      Long.ZERO,
+      Long.fromNumber(4),
+      {'java/io/FileDescriptor/fd': destinationFd}
+    );
+  } catch (err) {
+    caughtError = err;
+  }
+  assert.equal(typeof writeCallback, 'function');
+  assert.equal(writes, 1);
+  const sourceDrained = requestDrain(sourceFd, 'source', events);
+  const destinationDrained = requestDrain(destinationFd, 'destination', events);
+  assert.equal(sourceDrained(), 0);
+  assert.equal(destinationDrained(), 0);
+  assert.equal(caughtError, dispatchError);
+  assert.deepEqual(thread.returns, []);
+  assert.deepEqual(thread.exceptions, []);
+
+  writeCallback(null, 4);
+  writeCallback(null, 4);
+  assert.deepEqual(thread.returns, []);
+  assert.deepEqual(thread.exceptions, [{
+    type: 'Ljava/io/IOException;',
+    message: 'Stream Closed'
+  }]);
+  assert.equal(sourceDrained(), 1);
+  assert.equal(destinationDrained(), 1);
+  assert.deepEqual(events, ['exception', 'destination-drain', 'source-drain']);
+}
+
 function testUnixCopyPairConversion() {
   const sourceFd = 12404;
   const destinationFd = 12405;
@@ -676,6 +733,62 @@ function testUnixCopyZeroCancellationAddress() {
   assert.equal(requestDrain(destinationFd, 'zero-cancel-destination', events)(), 1);
 }
 
+function testUnixCopyReadThrowAfterStartingWrite() {
+  const sourceFd = 12452;
+  const destinationFd = 12453;
+  const events = [];
+  const thread = makeUnixThread(events);
+  const dispatchError = new Error('injected copy read dispatch failure');
+  let caughtError = null;
+  let writeCallback = null;
+  let writes = 0;
+  openState(sourceFd);
+  openState(destinationFd);
+  fs.read = function(fd, data, offset, length, position, callback) {
+    assert.equal(fd, sourceFd);
+    callback(null, 4);
+    callback(null, 4);
+    throw dispatchError;
+  };
+  fs.write = function(fd, data, offset, length, position, callback) {
+    assert.equal(fd, destinationFd);
+    writes += 1;
+    writeCallback = callback;
+  };
+
+  try {
+    unixCopyFile['transfer(IIJ)V'](
+      thread,
+      destinationFd,
+      sourceFd,
+      Long.ZERO
+    );
+  } catch (err) {
+    caughtError = err;
+  }
+  assert.equal(typeof writeCallback, 'function');
+  assert.equal(writes, 1);
+  const sourceDrained = requestDrain(sourceFd, 'source', events);
+  const destinationDrained = requestDrain(destinationFd, 'destination', events);
+  assert.equal(sourceDrained(), 0);
+  assert.equal(destinationDrained(), 0);
+  assert.equal(caughtError, dispatchError);
+  assert.deepEqual(thread.returns, []);
+  assert.deepEqual(thread.exceptions, []);
+
+  writeCallback(null, 4);
+  writeCallback(null, 4);
+  assert.deepEqual(thread.returns, []);
+  assert.equal(thread.exceptions.length, 1);
+  assert.equal(
+    thread.exceptions[0]['sun/nio/fs/UnixException/errno'],
+    9
+  );
+  assert.equal(sourceDrained(), 1);
+  assert.equal(destinationDrained(), 1);
+  assert.deepEqual(events, ['exception', 'destination-drain', 'source-drain']);
+}
+
 function testUnixCompletionSentinels() {
   const singleFd = 12420;
   const sourceFd = 12421;
@@ -934,6 +1047,7 @@ try {
   testFileChannelTransferPair();
   testFileChannelPairRollback();
   testFileChannelTransferAppendTail();
+  testFileChannelReadThrowAfterStartingWrite();
   testUnixCopyPairConversion();
   testUnixCopyHostErrorPrecedence();
   testUnixCopyStopsAfterSourceClose();
@@ -943,11 +1057,12 @@ try {
   testUnixCopyCancellationDuringRead();
   testUnixCopyCancellationDuringPartialWrite();
   testUnixCopyZeroCancellationAddress();
+  testUnixCopyReadThrowAfterStartingWrite();
   testUnixCompletionSentinels();
   testUnixConversionInitializationFailures();
   testUnixSingleDescriptorOperations();
   testUnixReadSuccess();
-  console.log('nio-fd-operation-leases:23:ok');
+  console.log('nio-fd-operation-leases:25:ok');
 } finally {
   Object.keys(originalFs).forEach((name) => {
     fs[name] = originalFs[name];
