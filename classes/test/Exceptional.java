@@ -64,7 +64,7 @@ public class Exceptional {
       try {
         System.loadLibrary("cowsay");
       } catch (UnsatisfiedLinkError e) {
-        System.err.println(e.getMessage());
+        System.out.println("got an UnsatisfiedLinkError for a missing system library");
       }
 
       try {

@@ -11,7 +11,7 @@ public class ClassCast {
             a = (A)b;
         }
         catch (ClassCastException e) {
-            System.out.println("Caught ClassCastException as expected: " + e.getMessage());
+            System.out.println("Caught ClassCastException as expected");
         }
         System.out.println(A.class.isInstance(a));
         System.out.println(A.class.isInstance(b));
@@ -32,4 +32,3 @@ public class ClassCast {
     class A { int a; }
     class B { int a; }
 }
-

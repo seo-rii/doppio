@@ -21,7 +21,7 @@ class PackageTest {
     for (Package p : pkgs) {
       String name = p.getName();
       if (names.contains(name))
-        System.out.println("Found system package: " + p.toString());
+        System.out.println("Found system package: " + name);
     }
     // Ensure the code location is set. We can't test the exact value, as it differs
     // depending on the environment.

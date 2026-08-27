@@ -4,6 +4,7 @@ package classes.test;
 import java.lang.annotation.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 
 @Deprecated
 class Annotations {
@@ -22,39 +23,42 @@ class Annotations {
   public static void main(
       @Option( name="args" ) String[] args) throws NoSuchFieldException, NoSuchMethodException {
     System.out.println("Annotations on Annotations Class");
-    for (Annotation a : Annotations.class.getAnnotations()) {
-      System.out.println(a);
-    }
+    Deprecated deprecated = Annotations.class.getAnnotation(Deprecated.class);
+    System.out.println(deprecated != null && deprecated.annotationType() == Deprecated.class);
 
     System.out.println("Annotations on TestField");
     Field tf = Annotations.class.getField("testField");
-    for (Annotation a : tf.getAnnotations()) {
-      System.out.println(a);
-    }
+    Option testFieldOption = tf.getAnnotation(Option.class);
+    System.out.println(testFieldOption.annotationType().getName());
+    System.out.println(testFieldOption.name());
+    System.out.println(testFieldOption.usage().isEmpty());
+    System.out.println(testFieldOption.required());
 
     System.out.println("Annotations on NoAnnotationsField");
     Field naf = Annotations.class.getField("noAnnotationsField");
-    for (Annotation a : naf.getAnnotations()) {
-      System.out.println(a);
-    }
+    System.out.println(naf.getAnnotations().length);
 
     System.out.println("Annotations on main method");
     Method main = Annotations.class.getMethod("main", String[].class);
-    for (Annotation a : main.getAnnotations()) {
-      System.out.println(a);
-    }
+    Option mainOption = main.getAnnotation(Option.class);
+    System.out.println(mainOption.annotationType().getName());
+    System.out.println(mainOption.name());
+    System.out.println(mainOption.usage());
+    System.out.println(mainOption.required());
 
     System.out.println("Annotations on main method parameters");
-    for(Annotation[] annotations : main.getParameterAnnotations()) {
-      for (Annotation a : annotations) {
-        System.out.println(a);
-      }
-    }
+    Annotation[][] parameterAnnotations = main.getParameterAnnotations();
+    Option parameterOption = (Option) parameterAnnotations[0][0];
+    System.out.println(parameterOption.annotationType().getName());
+    System.out.println(parameterOption.name());
+    System.out.println(parameterOption.usage().isEmpty());
+    System.out.println(parameterOption.required());
 
     System.out.println("Annotations on Option");
-    for (Annotation a : Option.class.getAnnotations()) {
-      System.out.println(a);
-    }
+    Retention retention = Option.class.getAnnotation(Retention.class);
+    Target target = Option.class.getAnnotation(Target.class);
+    System.out.println(retention.value().name());
+    System.out.println(Arrays.toString(target.value()));
   }
 }
 @Retention(RetentionPolicy.RUNTIME)
