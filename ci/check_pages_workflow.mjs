@@ -68,4 +68,34 @@ if (!Number.isFinite(reportingIntervalMs) || reportingIntervalMs < 10000) {
   fail('Pages deploy reporting_interval must be at least 10000 ms.');
 }
 
+const chromiumInstallIndex = workflow.indexOf('- name: Install Chromium');
+const buildIndex = workflow.indexOf('- name: Build Pages artifact');
+const localSmokeIndex = workflow.indexOf('- name: Run local browser playground smoke');
+const uploadIndex = workflow.indexOf('- name: Upload Pages artifact');
+const deployIndex = workflow.indexOf('- name: Deploy Pages');
+
+if (
+  chromiumInstallIndex < 0 ||
+  !/\.\/node_modules\/\.bin\/playwright\s+install\s+--with-deps\s+chromium\b/.test(workflow)
+) {
+  fail('Pages workflow must install Chromium for its local acceptance gate.');
+}
+if (
+  localSmokeIndex < 0 ||
+  !/- name:\s*Run local browser playground smoke\s*\n\s+run:\s*\.\/ci\/run_pages_browser_smoke\.sh\b/.test(workflow)
+) {
+  fail('Pages workflow must run the local Chromium acceptance gate.');
+}
+if (
+  buildIndex < 0 ||
+  uploadIndex < 0 ||
+  deployIndex < 0 ||
+  chromiumInstallIndex > localSmokeIndex ||
+  buildIndex > localSmokeIndex ||
+  localSmokeIndex > uploadIndex ||
+  uploadIndex > deployIndex
+) {
+  fail('Pages workflow must pass the local Chromium gate after building and before upload/deploy.');
+}
+
 console.log('Pages workflow deployment settings checks passed.');

@@ -33,6 +33,12 @@ concurrency:
 jobs:
   deploy:
     steps:
+      - name: Install Chromium
+        run: ./node_modules/.bin/playwright install --with-deps chromium
+      - name: Build Pages artifact
+        run: ./ci/build_pages.sh
+      - name: Run local browser playground smoke
+        run: ./ci/run_pages_browser_smoke.sh
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
@@ -211,6 +217,78 @@ jobs:
   ) {
     throw new Error(
       `expected mismatched deploy artifact name to fail:\n${mismatchedDeployArtifactNameResult.stdout}\n${mismatchedDeployArtifactNameResult.stderr}`
+    );
+  }
+
+  const missingLocalSmoke = writeWorkflow(root, `
+concurrency:
+  group: pages-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    steps:
+      - name: Install Chromium
+        run: ./node_modules/.bin/playwright install --with-deps chromium
+      - name: Build Pages artifact
+        run: ./ci/build_pages.sh
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          name: github-pages-\${{ github.run_attempt }}
+          path: docs
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+        with:
+          artifact_name: github-pages-\${{ github.run_attempt }}
+          timeout: '600000'
+          reporting_interval: '10000'
+`);
+  const missingLocalSmokeResult = runChecker(missingLocalSmoke);
+  if (
+    missingLocalSmokeResult.status === 0 ||
+    !missingLocalSmokeResult.stderr.includes('local Chromium acceptance gate')
+  ) {
+    throw new Error(
+      `expected missing local browser smoke to fail:\n${missingLocalSmokeResult.stdout}\n${missingLocalSmokeResult.stderr}`
+    );
+  }
+
+  const lateLocalSmoke = writeWorkflow(root, `
+concurrency:
+  group: pages-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    steps:
+      - name: Install Chromium
+        run: ./node_modules/.bin/playwright install --with-deps chromium
+      - name: Build Pages artifact
+        run: ./ci/build_pages.sh
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          name: github-pages-\${{ github.run_attempt }}
+          path: docs
+      - name: Run local browser playground smoke
+        run: ./ci/run_pages_browser_smoke.sh
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+        with:
+          artifact_name: github-pages-\${{ github.run_attempt }}
+          timeout: '600000'
+          reporting_interval: '10000'
+`);
+  const lateLocalSmokeResult = runChecker(lateLocalSmoke);
+  if (
+    lateLocalSmokeResult.status === 0 ||
+    !lateLocalSmokeResult.stderr.includes('before upload/deploy')
+  ) {
+    throw new Error(
+      `expected late local browser smoke to fail:\n${lateLocalSmokeResult.stdout}\n${lateLocalSmokeResult.stderr}`
     );
   }
 } finally {
