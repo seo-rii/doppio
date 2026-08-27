@@ -1296,6 +1296,7 @@ export function setup(grunt: IGrunt) {
     'unit_test_file_dispatcher_status',
     'unit_test_legacy_fd_generation',
     'unit_test_legacy_fd_leases',
+    'unit_test_test_runner_args',
     'unit_test_nio_fd_leases',
     'unit_test_nio_fd_operation_leases',
     'unit_test_reflection_caller_depth',

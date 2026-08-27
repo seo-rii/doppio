@@ -103,24 +103,40 @@ function regularTest(argv: any): void {
   });
 }
 
-var optimist = require('optimist')
-  .boolean(['q', 'h', 'c', 'makefile', 'diff'])
-  .default({ diff: true })
-  .alias({
-    h: 'help',
-    q: 'quiet',
-    c: 'continue'
-  }).describe({
-    q: 'Suppress in-progress test output',
-    diff: 'Show failed test diff output',
-    c: 'Keep going after test failure',
-    // --makefile is only used from the makefile
-    h: 'Show this usage'
-  }).usage('Usage: $0 path/to/test [flags]');
+var parsedArgs = require('util').parseArgs({
+    args: process.argv.slice(2),
+    options: {
+      quiet: {type: 'boolean', short: 'q'},
+      help: {type: 'boolean', short: 'h'},
+      continue: {type: 'boolean', short: 'c'},
+      // --makefile is only used from the makefile.
+      makefile: {type: 'boolean'},
+      diff: {type: 'boolean', default: true}
+    },
+    allowPositionals: true,
+    allowNegative: true,
+    // Accept unknown options for CLI compatibility while keeping them confined
+    // to parseArgs' null-prototype values object.
+    strict: false
+  }),
+  parsedValues = parsedArgs.values,
+  argv: any = Object.create(null);
 
-var argv = optimist.argv;
+argv._ = parsedArgs.positionals;
+argv.q = argv.quiet = parsedValues.quiet === undefined ? false : parsedValues.quiet;
+argv.h = argv.help = parsedValues.help === undefined ? false : parsedValues.help;
+argv.c = argv.continue = parsedValues.continue === undefined ? false : parsedValues.continue;
+argv.makefile = parsedValues.makefile === undefined ? false : parsedValues.makefile;
+argv.diff = parsedValues.diff;
 if (argv.help) {
-  optimist.showHelp();
+  process.stderr.write(
+    `Usage: ${process.argv[0]} ${process.argv[1]} path/to/test [flags]\n\n` +
+    'Options:\n' +
+    '  -q, --quiet     Suppress in-progress test output\n' +
+    '  --diff          Show failed test diff output      [default: true]\n' +
+    '  -c, --continue  Keep going after test failure\n' +
+    '  -h, --help      Show this usage\n'
+  );
   process.exit(0);
 }
 
