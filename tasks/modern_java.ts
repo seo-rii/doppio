@@ -5787,6 +5787,28 @@ function modernJava(grunt: IGrunt) {
     );
   });
 
+  grunt.registerTask('unit_test_default_disable_assertions', 'Keep public default assertion exclusions array-shaped and isolated.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      testPath = path.resolve('ci/default_disable_assertions_test.cjs'),
+      expected = 'default-disable-assertions:2:ok\n';
+    child_process.execFile(
+      process.execPath,
+      ['--no-deprecation', testPath],
+      function(err?: any, stdout?: string, stderr?: string): void {
+        var actual = stdout + stderr;
+        if (err || actual !== expected) {
+          grunt.fail.fatal(
+            'Default disabled-assertion output does not match.\nDoppio:\n' + actual +
+            '\nExpected:\n' + expected
+          );
+          return;
+        }
+        grunt.log.ok('Default disabled-assertion lists are fresh arrays.');
+        done();
+      }
+    );
+  });
+
   grunt.registerTask('unit_test_nio_fd_leases', 'Keep NIO host descriptors open until pending channel operations drain.', function() {
     var done: (status?: boolean) => void = this.async(),
       testPath = path.resolve('ci/nio_fd_lease_test.cjs'),

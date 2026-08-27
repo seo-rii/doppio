@@ -343,7 +343,7 @@ class JVM {
       nativeClasspath: [],
       enableSystemAssertions: false,
       enableAssertions: false,
-      disableAssertions: null,
+      disableAssertions: [],
       properties: {},
       tmpDir: '/tmp',
       responsiveness: 1000,
