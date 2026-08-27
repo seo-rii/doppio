@@ -5148,6 +5148,28 @@ function modernJava(grunt: IGrunt) {
     });
   });
 
+  grunt.registerTask('unit_test_interruptible_copy_oracle', 'Keep the interruptible-copy oracle deterministic.', function() {
+    var sourcePath = 'classes/modern_test/Java17InterruptibleCopy.java',
+      runoutPath = 'classes/modern_test/Java17InterruptibleCopy.runout',
+      nativeSourcePatterns: string[] = grunt.config('run_java_modern.java17.src'),
+      unitTestConfig: any = grunt.config('unit_test.modern_java17'),
+      unitTestSourcePatterns: string[] = unitTestConfig.files[0].src,
+      expected = 'cancelled:true\n' +
+        'interrupt-restored:true\n' +
+        'target-exists:false\n' +
+        'source-size:4194304\n';
+    if (grunt.file.expand(nativeSourcePatterns).indexOf(sourcePath) !== -1) {
+      grunt.fail.fatal('Java17InterruptibleCopy must not use its race-sensitive native JVM output as an oracle.');
+    }
+    if (grunt.file.expand(unitTestSourcePatterns).indexOf(sourcePath) === -1) {
+      grunt.fail.fatal('Java17InterruptibleCopy must remain in the Doppio runtime oracle set.');
+    }
+    if (fs.readFileSync(runoutPath, 'utf8') !== expected) {
+      grunt.fail.fatal('Java17InterruptibleCopy must retain its deterministic cancellation and cleanup oracle.');
+    }
+    grunt.log.ok('Interruptible-copy runtime oracle remains deterministic.');
+  });
+
   grunt.registerTask('run_java_modern_multirelease', 'Run the multi-release JAR fixture on the native JVM.', function() {
     var done: (status?: boolean) => void = this.async(),
       jarPath = 'classes/modern_multirelease/java9-mr.jar',

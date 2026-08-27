@@ -631,7 +631,7 @@ export function setup(grunt: IGrunt) {
     run_java_modern: {
       java17: {
         expand: true,
-        src: ['classes/modern_test/Java9*.java', 'classes/modern_test/Java10*.java', 'classes/modern_test/Java11*.java', 'classes/modern_test/Java12*.java', 'classes/modern_test/Java13*.java', 'classes/modern_test/Java14*.java', 'classes/modern_test/Java15*.java', 'classes/modern_test/Java16*.java', 'classes/modern_test/Java17*.java', 'classes/modern_test/SealedViolation.java'],
+        src: ['classes/modern_test/Java9*.java', 'classes/modern_test/Java10*.java', 'classes/modern_test/Java11*.java', 'classes/modern_test/Java12*.java', 'classes/modern_test/Java13*.java', 'classes/modern_test/Java14*.java', 'classes/modern_test/Java15*.java', 'classes/modern_test/Java16*.java', 'classes/modern_test/Java17*.java', '!classes/modern_test/Java17InterruptibleCopy.java', 'classes/modern_test/SealedViolation.java'],
         ext: '.runout'
       },
       reflect_parameters: {
@@ -1284,6 +1284,7 @@ export function setup(grunt: IGrunt) {
     'unit_test_java21_sorted_set_sequenced',
     'unit_test_java21_sorted_map_sequenced',
     'unit_test_modern_classfile_runtime_versions',
+    'unit_test_interruptible_copy_oracle',
     'run_java_modern:java17',
     'run_java_modern:reflect_parameters',
     'lineending:modern_java17',
