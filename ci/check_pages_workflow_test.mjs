@@ -27,8 +27,8 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), 'doppio-pages-workflow-'));
 try {
   const complete = writeWorkflow(root, `
 concurrency:
-  group: pages-\${{ github.ref }}
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -57,10 +57,39 @@ jobs:
     throw new Error(`expected complete workflow to pass:\n${completeResult.stderr}`);
   }
 
+  const completeWorkflow = fs.readFileSync(complete, 'utf8');
+  const refScopedConcurrency = writeWorkflow(
+    root,
+    completeWorkflow.replace('group: pages\n', 'group: pages-\${{ github.ref }}\n')
+  );
+  const refScopedConcurrencyResult = runChecker(refScopedConcurrency);
+  if (
+    refScopedConcurrencyResult.status === 0 ||
+    !refScopedConcurrencyResult.stderr.includes('repository-wide pages group')
+  ) {
+    throw new Error(
+      `expected ref-scoped Pages concurrency to fail:\n${refScopedConcurrencyResult.stdout}\n${refScopedConcurrencyResult.stderr}`
+    );
+  }
+
+  const cancellingConcurrency = writeWorkflow(
+    root,
+    completeWorkflow.replace('cancel-in-progress: false', 'cancel-in-progress: true')
+  );
+  const cancellingConcurrencyResult = runChecker(cancellingConcurrency);
+  if (
+    cancellingConcurrencyResult.status === 0 ||
+    !cancellingConcurrencyResult.stderr.includes('must not cancel an active deployment')
+  ) {
+    throw new Error(
+      `expected cancelling Pages concurrency to fail:\n${cancellingConcurrencyResult.stdout}\n${cancellingConcurrencyResult.stderr}`
+    );
+  }
+
   const missingTimeout = writeWorkflow(root, `
 concurrency:
-  group: pages-\${{ github.ref }}
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -84,8 +113,8 @@ jobs:
 
   const lowTimeout = writeWorkflow(root, `
 concurrency:
-  group: pages-\${{ github.ref }}
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -110,8 +139,8 @@ jobs:
 
   const highTimeout = writeWorkflow(root, `
 concurrency:
-  group: pages-\${{ github.ref }}
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -136,8 +165,8 @@ jobs:
 
   const wrongAction = writeWorkflow(root, `
 concurrency:
-  group: pages-\${{ github.ref }}
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -162,8 +191,8 @@ jobs:
 
   const inlineCommentVersions = writeWorkflow(root, `
 concurrency:
-  group: pages-\${{ github.ref }}
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -199,8 +228,8 @@ jobs:
 
   const fullLineCommentVersions = writeWorkflow(root, `
 concurrency:
-  group: pages-\${{ github.ref }}
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -238,8 +267,8 @@ jobs:
 
   const blockScalarDeployVersion = writeWorkflow(root, `
 concurrency:
-  group: pages-\${{ github.ref }}
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -283,8 +312,8 @@ jobs:
 
   const blockScalarUploadVersion = writeWorkflow(root, `
 concurrency:
-  group: pages-\${{ github.ref }}
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -326,8 +355,8 @@ jobs:
 
   const backtickCommentChromiumInstall = writeWorkflow(root, `
 concurrency:
-  group: pages-\${{ github.ref }}
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -363,8 +392,8 @@ jobs:
 
   const missingAttemptArtifactName = writeWorkflow(root, `
 concurrency:
-  group: pages-\${{ github.ref }}
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -392,8 +421,8 @@ jobs:
 
   const mismatchedDeployArtifactName = writeWorkflow(root, `
 concurrency:
-  group: pages-\${{ github.ref }}
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -423,8 +452,8 @@ jobs:
 
   const missingLocalSmoke = writeWorkflow(root, `
 concurrency:
-  group: pages-\${{ github.ref }}
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -458,8 +487,8 @@ jobs:
 
   const lateLocalSmoke = writeWorkflow(root, `
 concurrency:
-  group: pages-\${{ github.ref }}
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   deploy:
