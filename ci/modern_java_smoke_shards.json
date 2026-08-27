@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "shards": [
+    {
+      "id": "compiler-01",
+      "scripts": [
+        "ci/kotlin_basic_construct_smoke.sh",
+        "ci/kotlin_default_synthetic_smoke.sh",
+        "ci/kotlin_local_interop_smoke.sh",
+        "ci/kotlin_methodhandle_smoke.sh",
+        "ci/kotlin_reflection_shape_smoke.sh",
+        "ci/kotlin_unsigned_smoke.sh",
+        "ci/kotlin_value_class_smoke.sh",
+        "ci/scala_library_smoke.sh",
+        "ci/scala_reflection_shape_smoke.sh"
+      ]
+    },
+    {
+      "id": "compiler-02",
+      "scripts": [
+        "ci/kotlin_capture_shape_smoke.sh",
+        "ci/kotlin_diagnostic_smoke.sh",
+        "ci/kotlin_enum_smoke.sh",
+        "ci/kotlin_modern_construct_smoke.sh",
+        "ci/kotlin_result_exception_smoke.sh",
+        "ci/kotlin_smoke.sh",
+        "ci/kotlin_when_mapping_smoke.sh",
+        "ci/scala_methodhandle_smoke.sh",
+        "ci/scala_stackwalker_smoke.sh"
+      ]
+    },
+    {
+      "id": "compiler-03",
+      "scripts": [
+        "ci/kotlin_collection_builder_smoke.sh",
+        "ci/kotlin_extension_variance_smoke.sh",
+        "ci/kotlin_multifile_facade_smoke.sh",
+        "ci/kotlin_reified_array_smoke.sh",
+        "ci/kotlin_sam_smoke.sh",
+        "ci/scala_annotation_smoke.sh",
+        "ci/scala_lambda_serialization_smoke.sh",
+        "ci/scala_language_smoke.sh",
+        "ci/scala_reflect_smoke.sh"
+      ]
+    },
+    {
+      "id": "compiler-04",
+      "scripts": [
+        "ci/kotlin_completable_future_smoke.sh",
+        "ci/kotlin_indy_concat_smoke.sh",
+        "ci/kotlin_inline_control_smoke.sh",
+        "ci/kotlin_mutable_delegate_smoke.sh",
+        "ci/kotlin_sequence_builder_smoke.sh",
+        "ci/scala_collection_smoke.sh",
+        "ci/scala_functional_smoke.sh",
+        "ci/scala_proxy_smoke.sh",
+        "ci/scala_smoke.sh"
+      ]
+    },
+    {
+      "id": "compiler-05",
+      "scripts": [
+        "ci/kotlin_annotation_reflection_smoke.sh",
+        "ci/kotlin_coroutine_smoke.sh",
+        "ci/kotlin_jvm_interop_smoke.sh",
+        "ci/kotlin_record_smoke.sh",
+        "ci/kotlin_reference_sequence_smoke.sh",
+        "ci/kotlin_text_regex_smoke.sh",
+        "ci/scala_interop_smoke.sh",
+        "ci/scala_macro_smoke.sh",
+        "ci/scala_record_smoke.sh"
+      ]
+    },
+    {
+      "id": "compiler-06",
+      "scripts": [
+        "ci/kotlin_advanced_construct_smoke.sh",
+        "ci/kotlin_control_flow_smoke.sh",
+        "ci/kotlin_duration_smoke.sh",
+        "ci/kotlin_jvm_default_smoke.sh",
+        "ci/kotlin_receiver_lambda_smoke.sh",
+        "ci/kotlin_suspend_smoke.sh",
+        "ci/scala_duration_smoke.sh",
+        "ci/scala_io_smoke.sh",
+        "ci/scala_package_smoke.sh"
+      ]
+    },
+    {
+      "id": "compiler-07",
+      "scripts": [
+        "ci/kotlin_bytecode_smoke.sh",
+        "ci/kotlin_contract_smoke.sh",
+        "ci/kotlin_delegation_bridge_smoke.sh",
+        "ci/kotlin_io_smoke.sh",
+        "ci/kotlin_readonly_delegate_smoke.sh",
+        "ci/kotlin_reflect_smoke.sh",
+        "ci/kotlin_suspend_inline_smoke.sh",
+        "ci/scala_core_smoke.sh",
+        "ci/scala_nio_smoke.sh"
+      ]
+    },
+    {
+      "id": "compiler-08",
+      "scripts": [
+        "ci/kotlin_annotation_metadata_smoke.sh",
+        "ci/kotlin_bytecode_runtime_smoke.sh",
+        "ci/kotlin_concurrency_smoke.sh",
+        "ci/kotlin_initialization_delegate_smoke.sh",
+        "ci/kotlin_modern_java_interop_smoke.sh",
+        "ci/kotlin_proxy_smoke.sh",
+        "ci/kotlin_suspend_control_smoke.sh",
+        "ci/scala_concurrent_smoke.sh",
+        "ci/scala_diagnostic_smoke.sh",
+        "ci/scala_modern_interop_smoke.sh"
+      ]
+    }
+  ]
+}

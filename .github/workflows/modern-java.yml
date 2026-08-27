@@ -8,17 +8,25 @@ concurrency:
   group: modern-java-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
-  test:
-    name: Modern Java compatibility tests
+  runtime:
+    name: Runtime and Java 17 compatibility tests
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 150
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    outputs:
+      runtime-artifact-name: ${{ steps.bundle_runtime.outputs.artifact_name }}
+      runtime-archive-sha256: ${{ steps.bundle_runtime.outputs.sha256 }}
+      runtime-run-id: ${{ steps.bundle_runtime.outputs.run_id }}
+      runtime-run-attempt: ${{ steps.bundle_runtime.outputs.run_attempt }}
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -64,6 +72,24 @@ jobs:
       - name: Verify compiler bootstrap overlay
         run: ./ci/modern_bootstrap_overlay_smoke.sh
 
+      - name: Bundle deterministic compiler runtime inputs
+        id: bundle_runtime
+        run: >-
+          node ci/modern_java_runtime_artifact.mjs create
+          --output-dir build/ci-artifacts
+          --manifest ci/modern_java_smoke_shards.json
+          --commit "$GITHUB_SHA"
+          --run-id "$GITHUB_RUN_ID"
+          --run-attempt "$GITHUB_RUN_ATTEMPT"
+          --github-output "$GITHUB_OUTPUT"
+
+      - name: Run Java 17 legacy compatibility tests
+        run: >-
+          ./node_modules/.bin/grunt --stack
+          check_jdk find_native_java run_java:default lineending:default
+          unit_test:default unit_test_nashorn_legacy
+          --grunt-ignore-compile-errors
+
       - name: Run modern Java compatibility tests
         run: ./node_modules/.bin/grunt --stack test-modern-java-runtime --grunt-ignore-compile-errors
 
@@ -72,235 +98,129 @@ jobs:
           ./node_modules/.bin/grunt --stack modern-ci-array-runout --grunt-ignore-compile-errors
           node build/release-cli/console/test_runner.js classes/test/ArrayOps --makefile
 
+      - name: Verify compiler runtime input snapshot
+        run: >-
+          node ci/modern_java_runtime_artifact.mjs verify-source
+          --archive "${{ steps.bundle_runtime.outputs.archive_path }}"
+          --manifest ci/modern_java_smoke_shards.json
+          --sha256 "${{ steps.bundle_runtime.outputs.sha256 }}"
+          --commit "$GITHUB_SHA"
+          --run-id "$GITHUB_RUN_ID"
+          --run-attempt "$GITHUB_RUN_ATTEMPT"
+          --artifact-name "${{ steps.bundle_runtime.outputs.artifact_name }}"
+
+      # A raw deterministic tar preserves payload modes without trusting the
+      # artifact transport to preserve permissions or symbolic links.
+      - name: Upload compiler runtime inputs
+        id: upload_runtime
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ steps.bundle_runtime.outputs.archive_path }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
+  compiler:
+    name: Compiler smoke (${{ matrix.shard }})
+    needs: runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      KOTLIN_SMOKE_CLASSPATH_MODE: full
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [compiler-01, compiler-02, compiler-03, compiler-04, compiler-05, compiler-06, compiler-07, compiler-08]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: yarn
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install dependencies without repository lifecycle scripts
+        timeout-minutes: 15
+        run: |
+          npm install -g yarn@1.22.22
+          TRAVIS=true yarn install --frozen-lockfile --ignore-engines --ignore-scripts --network-timeout 600000
+
       - name: Cache Kotlin compiler
         uses: actions/cache@v5
         with:
           path: build/kotlin-smoke-cache
-          key: kotlin-compiler-2.4.0
-
-      - name: Run Kotlin diagnostic smoke
-        run: ./ci/kotlin_diagnostic_smoke.sh
-
-      - name: Run Kotlin bytecode smoke
-        run: ./ci/kotlin_bytecode_smoke.sh
-
-      - name: Run Kotlin bytecode runtime smoke
-        run: ./ci/kotlin_bytecode_runtime_smoke.sh
-
-      - name: Run Kotlin read-only delegate smoke
-        run: ./ci/kotlin_readonly_delegate_smoke.sh
-
-      - name: Run Kotlin basic construct smoke
-        run: ./ci/kotlin_basic_construct_smoke.sh
-
-      - name: Run Kotlin advanced construct smoke
-        run: ./ci/kotlin_advanced_construct_smoke.sh
-
-      - name: Run Kotlin local interop smoke
-        run: ./ci/kotlin_local_interop_smoke.sh
-
-      - name: Run Kotlin multifile facade smoke
-        run: ./ci/kotlin_multifile_facade_smoke.sh
-
-      - name: Run Kotlin record smoke
-        run: ./ci/kotlin_record_smoke.sh
-
-      - name: Run Kotlin compiler smoke
-        env:
-          KOTLIN_SMOKE_CLASSPATH_MODE: full
-        run: ./ci/kotlin_smoke.sh
-
-      - name: Run Kotlin I/O smoke
-        run: ./ci/kotlin_io_smoke.sh
-
-      - name: Run Kotlin suspend smoke
-        run: ./ci/kotlin_suspend_smoke.sh
-
-      - name: Run Kotlin suspend control-flow smoke
-        run: ./ci/kotlin_suspend_control_smoke.sh
-
-      - name: Run Kotlin suspend-inline smoke
-        run: ./ci/kotlin_suspend_inline_smoke.sh
-
-      - name: Run Kotlin MethodHandles smoke
-        run: ./ci/kotlin_methodhandle_smoke.sh
-
-      - name: Run Kotlin coroutine smoke
-        run: ./ci/kotlin_coroutine_smoke.sh
-
-      - name: Run Kotlin reflect smoke
-        run: ./ci/kotlin_reflect_smoke.sh
-
-      - name: Run Kotlin reflection shape smoke
-        run: ./ci/kotlin_reflection_shape_smoke.sh
-
-      - name: Run Kotlin unsigned smoke
-        run: ./ci/kotlin_unsigned_smoke.sh
-
-      - name: Run Kotlin CompletableFuture smoke
-        run: ./ci/kotlin_completable_future_smoke.sh
-
-      - name: Run Kotlin SAM smoke
-        run: ./ci/kotlin_sam_smoke.sh
-
-      - name: Run Kotlin contract smoke
-        run: ./ci/kotlin_contract_smoke.sh
-
-      - name: Run Kotlin enum smoke
-        run: ./ci/kotlin_enum_smoke.sh
-
-      - name: Run Kotlin proxy smoke
-        run: ./ci/kotlin_proxy_smoke.sh
-
-      - name: Run Kotlin modern Java interop smoke
-        run: ./ci/kotlin_modern_java_interop_smoke.sh
-
-      - name: Run Kotlin concurrency smoke
-        run: ./ci/kotlin_concurrency_smoke.sh
-
-      - name: Run Kotlin duration smoke
-        run: ./ci/kotlin_duration_smoke.sh
-
-      - name: Run Kotlin text/regex smoke
-        run: ./ci/kotlin_text_regex_smoke.sh
-
-      - name: Run Kotlin Result/exception smoke
-        run: ./ci/kotlin_result_exception_smoke.sh
-
-      - name: Run Kotlin annotation metadata smoke
-        run: ./ci/kotlin_annotation_metadata_smoke.sh
-
-      - name: Run Kotlin annotation reflection smoke
-        run: ./ci/kotlin_annotation_reflection_smoke.sh
-
-      - name: Run Kotlin modern construct smoke
-        run: ./ci/kotlin_modern_construct_smoke.sh
-
-      - name: Run Kotlin capture shape smoke
-        run: ./ci/kotlin_capture_shape_smoke.sh
-
-      - name: Run Kotlin default/synthetic smoke
-        run: ./ci/kotlin_default_synthetic_smoke.sh
-
-      - name: Run Kotlin JVM-default smoke
-        run: ./ci/kotlin_jvm_default_smoke.sh
-
-      - name: Run Kotlin indy string-concat smoke
-        run: ./ci/kotlin_indy_concat_smoke.sh
-
-      - name: Run Kotlin when-mapping smoke
-        run: ./ci/kotlin_when_mapping_smoke.sh
-
-      - name: Run Kotlin value-class smoke
-        run: ./ci/kotlin_value_class_smoke.sh
-
-      - name: Run Kotlin reified/array smoke
-        run: ./ci/kotlin_reified_array_smoke.sh
-
-      - name: Run Kotlin JVM interop smoke
-        run: ./ci/kotlin_jvm_interop_smoke.sh
-
-      - name: Run Kotlin mutable delegate smoke
-        run: ./ci/kotlin_mutable_delegate_smoke.sh
-
-      - name: Run Kotlin reference/sequence smoke
-        run: ./ci/kotlin_reference_sequence_smoke.sh
-
-      - name: Run Kotlin inline-control smoke
-        run: ./ci/kotlin_inline_control_smoke.sh
-
-      - name: Run Kotlin delegation bridge smoke
-        run: ./ci/kotlin_delegation_bridge_smoke.sh
-
-      - name: Run Kotlin extension variance smoke
-        run: ./ci/kotlin_extension_variance_smoke.sh
-
-      - name: Run Kotlin receiver-lambda smoke
-        run: ./ci/kotlin_receiver_lambda_smoke.sh
-
-      - name: Run Kotlin control-flow smoke
-        run: ./ci/kotlin_control_flow_smoke.sh
-
-      - name: Run Kotlin initialization/delegate smoke
-        run: ./ci/kotlin_initialization_delegate_smoke.sh
-
-      - name: Run Kotlin collection-builder smoke
-        run: ./ci/kotlin_collection_builder_smoke.sh
-
-      - name: Run Kotlin sequence-builder smoke
-        run: ./ci/kotlin_sequence_builder_smoke.sh
+          key: kotlin-compiler-${{ runner.os }}-${{ hashFiles('ci/modern_java_compiler_inputs.lock.json') }}
 
       - name: Cache Scala compiler
         uses: actions/cache@v5
         with:
           path: build/scala-smoke-cache
-          key: scala-compiler-2.13.18
+          key: scala-compiler-${{ runner.os }}-${{ hashFiles('ci/modern_java_compiler_inputs.lock.json') }}
 
-      - name: Run Scala core smoke
-        run: ./ci/scala_core_smoke.sh
+      - name: Prepare verified compiler inputs
+        run: >-
+          node ci/prepare_modern_java_compiler_inputs.mjs
+          --lock ci/modern_java_compiler_inputs.lock.json
+          --kotlin-cache build/kotlin-smoke-cache
+          --scala-cache build/scala-smoke-cache
+          --marker build/modern-java-compiler-inputs.json
 
-      - name: Run Scala diagnostic smoke
-        run: ./ci/scala_diagnostic_smoke.sh
+      - name: Download compiler runtime inputs
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.runtime.outputs.runtime-artifact-name }}
+          path: build/ci-artifacts
+          digest-mismatch: error
 
-      - name: Run Scala record smoke
-        run: ./ci/scala_record_smoke.sh
+      - name: Verify and install compiler runtime inputs
+        run: >-
+          node ci/modern_java_runtime_artifact.mjs verify
+          --archive "build/ci-artifacts/${{ needs.runtime.outputs.runtime-artifact-name }}"
+          --manifest ci/modern_java_smoke_shards.json
+          --sha256 "${{ needs.runtime.outputs.runtime-archive-sha256 }}"
+          --commit "$GITHUB_SHA"
+          --run-id "${{ needs.runtime.outputs.runtime-run-id }}"
+          --run-attempt "${{ needs.runtime.outputs.runtime-run-attempt }}"
+          --artifact-name "${{ needs.runtime.outputs.runtime-artifact-name }}"
+          --extract-root .
 
-      - name: Run Scala MethodHandles smoke
-        run: ./ci/scala_methodhandle_smoke.sh
+      - name: Self-test transferred compiler runtime inputs
+        run: node ci/modern_java_runtime_self_test.mjs
 
-      - name: Run Scala I/O smoke
-        run: ./ci/scala_io_smoke.sh
+      - name: Run compiler smoke shard
+        id: run_shard
+        run: node ci/run_modern_java_smoke_shard.mjs "${{ matrix.shard }}"
 
-      - name: Run Scala NIO smoke
-        run: ./ci/scala_nio_smoke.sh
+      - name: Upload compiler smoke ledger
+        if: always() && steps.run_shard.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/compiler-smoke-results/compiler-smoke-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
 
-      - name: Run Scala proxy smoke
-        run: ./ci/scala_proxy_smoke.sh
-
-      - name: Run Scala concurrency smoke
-        run: ./ci/scala_concurrent_smoke.sh
-
-      - name: Run Scala annotation smoke
-        run: ./ci/scala_annotation_smoke.sh
-
-      - name: Run Scala runtime reflection smoke
-        run: ./ci/scala_reflect_smoke.sh
-
-      - name: Run Scala functional smoke
-        run: ./ci/scala_functional_smoke.sh
-
-      - name: Run Scala lambda serialization smoke
-        run: ./ci/scala_lambda_serialization_smoke.sh
-
-      - name: Run Scala collection smoke
-        run: ./ci/scala_collection_smoke.sh
-
-      - name: Run Scala language smoke
-        run: ./ci/scala_language_smoke.sh
-
-      - name: Run Scala library smoke
-        run: ./ci/scala_library_smoke.sh
-
-      - name: Run Scala interop smoke
-        run: ./ci/scala_interop_smoke.sh
-
-      - name: Run Scala package smoke
-        run: ./ci/scala_package_smoke.sh
-
-      - name: Run Scala macro smoke
-        run: ./ci/scala_macro_smoke.sh
-
-      - name: Run Scala reflection-shape smoke
-        run: ./ci/scala_reflection_shape_smoke.sh
-
-      - name: Run Scala modern interop smoke
-        run: ./ci/scala_modern_interop_smoke.sh
-
-      - name: Run Scala duration smoke
-        run: ./ci/scala_duration_smoke.sh
-
-      - name: Run Scala StackWalker smoke
-        run: ./ci/scala_stackwalker_smoke.sh
-
-      - name: Run Scala compiler smoke
-        run: ./ci/scala_smoke.sh
+  test:
+    name: Modern Java release gate
+    if: always()
+    needs: [runtime, compiler]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require all Modern Java jobs to pass
+        env:
+          RUNTIME_RESULT: ${{ needs.runtime.result }}
+          COMPILER_RESULT: ${{ needs.compiler.result }}
+        run: |
+          test "$RUNTIME_RESULT" = success
+          test "$COMPILER_RESULT" = success
