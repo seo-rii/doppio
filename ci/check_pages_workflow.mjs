@@ -165,8 +165,11 @@ const cancelInProgress = concurrencyBlock
   ? normalizeScalar(findDirectProperty(workflowLines, concurrencyBlock, 'cancel-in-progress')?.value)
   : null;
 
-if (concurrencyGroup !== 'pages-${{ github.ref }}' || cancelInProgress !== 'true') {
-  fail('Pages workflow must cancel superseded deployments for the same ref.');
+if (concurrencyGroup !== 'pages') {
+  fail('Pages workflow must use one repository-wide pages group.');
+}
+if (cancelInProgress !== 'false') {
+  fail('Pages workflow must not cancel an active deployment.');
 }
 
 const jobsBlock = findMappingBlock(workflowLines, rootBlock, 'jobs');
