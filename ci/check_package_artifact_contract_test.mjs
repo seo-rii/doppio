@@ -60,6 +60,13 @@ rejects('installed classpath jars carry integrity digests', {
 rejects('the downloader gate repairs classpath tampering', {
   downloaderTestSource: replaced(baseline.downloaderTestSource, 'tampered tools jar', 'untested tools jar')
 });
+rejects('the package support contract discloses the prepack download boundary', {
+  supportSource: replaced(
+    baseline.supportSource,
+    'Building the tarball from a fresh\ncheckout still obtains the pinned JDK archive during prepack',
+    'Building the tarball from a fresh checkout uses only the offline fixture'
+  )
+});
 rejects('raw artifact filenames must identify the commit and attempt', {
   workflowSource: replaced(
     baseline.workflowSource,
@@ -177,4 +184,4 @@ rejects('the verified tarball must be uploaded after the smoke', {
   )
 });
 
-console.log('package-artifact-contract-negative:28:ok');
+console.log('package-artifact-contract-negative:29:ok');
