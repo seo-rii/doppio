@@ -184,24 +184,41 @@ export default function (): any {
     }
   }
 
+  function isReflectionImplementationFrame(frame: IStackTraceFrame): boolean {
+    return frame.method.isHidden() ||
+      util.isMagicAccessor(frame.method.cls) ||
+      frame.method.fullSignature.indexOf('java/lang/reflect/Method/invoke') === 0;
+  }
+
   /**
-   * From JDK documentation:
-   *   Returns the class of the method realFramesToSkip frames up the stack
-   *   (zero-based), ignoring frames associated with
-   *   java.lang.reflect.Method.invoke() and its implementation. The first
-   *   frame is that associated with this method, so getCallerClass(0) returns
-   *   the Class object for sun.reflect.Reflection. Frames associated with
-   *   java.lang.reflect.Method.invoke() and its implementation are completely
-   *   ignored and do not count toward the number of "real" frames skipped.
+   * Resolves a physical stack depth before walking past reflection
+   * implementation frames. The no-argument Reflection.getCallerClass()
+   * intrinsic passes 2: Reflection is frame 0, its caller-sensitive API is
+   * frame 1, and the API's caller is frame 2. Filtering before applying that
+   * depth shifts Method.invoke's caller and can incorrectly grant access.
    */
-  function getCallerClass(thread: JVMThread, framesToSkip: number): JVMTypes.java_lang_Class {
+  function getCallerClassFromPhysicalDepth(thread: JVMThread, framesToSkip: number): JVMTypes.java_lang_Class {
+    var caller = thread.getStackTrace(),
+      idx = caller.length - 1 - framesToSkip;
+    for (; idx >= 0; idx--) {
+      var frame: IStackTraceFrame = caller[idx];
+      if (!isReflectionImplementationFrame(frame)) {
+        return frame.method.cls.getClassObject(thread);
+      }
+    }
+    return null;
+  }
+
+  /**
+   * The deprecated depth-taking overload counts only logical security frames;
+   * hidden and reflection implementation frames do not consume its depth.
+   */
+  function getCallerClassFromLogicalDepth(thread: JVMThread, framesToSkip: number): JVMTypes.java_lang_Class {
     var caller = thread.getStackTrace(),
       remaining = framesToSkip;
     for (var idx = caller.length - 1; idx >= 0; idx--) {
       var frame: IStackTraceFrame = caller[idx];
-      if (frame.method.isHidden() ||
-          util.isMagicAccessor(frame.method.cls) ||
-          frame.method.fullSignature.indexOf('java/lang/reflect/Method/invoke') === 0) {
+      if (isReflectionImplementationFrame(frame)) {
         continue;
       }
       if (remaining-- === 0) {
@@ -216,10 +233,10 @@ export default function (): any {
     public static 'getCallerClass()Ljava/lang/Class;'(thread: JVMThread): JVMTypes.java_lang_Class {
       // 0th item is Reflection class, 1st item is the class that called us,
       // and 2nd item is the caller of our caller, which is correct.
-      return getCallerClass(thread, 2);
+      return getCallerClassFromPhysicalDepth(thread, 2);
     }
 
-    public static 'getCallerClass(I)Ljava/lang/Class;': (thread: JVMThread, framesToSkip: number) => JVMTypes.java_lang_Class = getCallerClass;
+    public static 'getCallerClass(I)Ljava/lang/Class;': (thread: JVMThread, framesToSkip: number) => JVMTypes.java_lang_Class = getCallerClassFromLogicalDepth;
 
     public static 'getClassAccessFlags(Ljava/lang/Class;)I'(thread: JVMThread, classObj: JVMTypes.java_lang_Class): number {
       return (<ReferenceClassData<JVMTypes.java_lang_Object>> classObj.$cls).accessFlags.getRawByte();

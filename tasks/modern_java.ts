@@ -5765,6 +5765,28 @@ function modernJava(grunt: IGrunt) {
     );
   });
 
+  grunt.registerTask('unit_test_reflection_caller_depth', 'Preserve the distinct physical and logical caller-depth contracts.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      testPath = path.resolve('ci/reflection_caller_depth_test.cjs'),
+      expected = 'reflection-caller-depth:5:ok\n';
+    child_process.execFile(
+      process.execPath,
+      ['--no-deprecation', testPath],
+      function(err?: any, stdout?: string, stderr?: string): void {
+        var actual = stdout + stderr;
+        if (err || actual !== expected) {
+          grunt.fail.fatal(
+            'Reflection caller-depth output does not match.\nDoppio:\n' + actual +
+            '\nExpected:\n' + expected
+          );
+          return;
+        }
+        grunt.log.ok('Reflection caller-depth overloads preserve their distinct stack contracts.');
+        done();
+      }
+    );
+  });
+
   grunt.registerTask('unit_test_mapped_buffer_fd_lifetime', 'Retain writable mapping descriptors through force and unmap.', function() {
     var done: (status?: boolean) => void = this.async(),
       testPath = path.resolve('ci/mapped_buffer_fd_lifetime_test.cjs'),

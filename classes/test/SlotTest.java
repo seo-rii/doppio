@@ -17,9 +17,9 @@ public class SlotTest {
         return (U) mh.invoke(arg1, arg2);
       }
     } catch (WrongMethodTypeException e) {
-      System.out.println("WrongMethodTypeException: " + e);
+      System.out.println("WrongMethodTypeException");
     } catch (Throwable t) {
-      System.out.println("Caught: " + t);
+      System.out.println("Caught: " + t.getClass().getName());
     }
     return null;
   }
@@ -32,9 +32,9 @@ public class SlotTest {
         return (U) mh.invoke(arg1, arg2);
       }
     } catch (WrongMethodTypeException e) {
-      System.out.println("WrongMethodTypeException: " + e);
+      System.out.println("WrongMethodTypeException");
     } catch (Throwable t) {
-      System.out.println("Caught: " + t);
+      System.out.println("Caught: " + t.getClass().getName());
     }
     return null;
   }
@@ -47,10 +47,9 @@ public class SlotTest {
         return (U) mh.invoke(arg1, arg2);
       }
     } catch (WrongMethodTypeException e) {
-      System.out.println("WrongMethodTypeException: " + e);
+      System.out.println("WrongMethodTypeException");
     } catch (Throwable t) {
-      System.out.println("Caught: " + t);
-      t.printStackTrace();
+      System.out.println("Caught: " + t.getClass().getName());
     }
     return null;
   }
