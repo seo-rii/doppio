@@ -38,7 +38,7 @@ export default defineConfig({
     sourcemap: true,
     target: 'es2015',
     commonjsOptions: {
-      include: [/[\\/]build[\\/]release-cli[\\/]/, /node_modules/],
+      include: [/[\\/]build[\\/]release-cli[\\/]/, /[\\/]build-shims[\\/]/, /node_modules/],
       transformMixedEsModules: true
     },
     rollupOptions: {
@@ -51,20 +51,20 @@ export default defineConfig({
       plugins: [
         replaceLegacyJsonIncludes(),
         inject({
-          Buffer: rootPath('node_modules', 'browserfs', 'dist', 'shims', 'bufferGlobal.js'),
-          process: rootPath('node_modules', 'browserfs', 'dist', 'shims', 'process.js')
+          Buffer: rootPath('build-shims', 'browserfs-buffer-global.cjs'),
+          process: rootPath('build-shims', 'browserfs-process.cjs')
         })
       ]
     }
   },
   resolve: {
     alias: {
-      BFSBuffer: rootPath('node_modules', 'browserfs', 'dist', 'shims', 'bufferGlobal.js'),
-      buffer: rootPath('node_modules', 'browserfs', 'dist', 'shims', 'buffer.js'),
+      BFSBuffer: rootPath('build-shims', 'browserfs-buffer-global.cjs'),
+      buffer: rootPath('build-shims', 'browserfs-buffer.cjs'),
       crypto: rootPath('build-shims', 'crypto.mjs'),
-      fs: rootPath('node_modules', 'browserfs', 'dist', 'shims', 'fs.js'),
-      path: rootPath('node_modules', 'browserfs', 'dist', 'shims', 'path.js'),
-      process: rootPath('node_modules', 'browserfs', 'dist', 'shims', 'process.js')
+      fs: rootPath('build-shims', 'browserfs-fs.cjs'),
+      path: rootPath('build-shims', 'browserfs-path.cjs'),
+      process: rootPath('build-shims', 'browserfs-process.cjs')
     }
   }
 });
