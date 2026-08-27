@@ -13,7 +13,7 @@ export function debug_var(e: any): string {
   } else if (e instanceof gLong) {
     return e + "L";
   }
-  return e;
+  return String(e);
 }
 
 // used for debugging the stack and local variables

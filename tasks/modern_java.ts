@@ -5699,6 +5699,28 @@ function modernJava(grunt: IGrunt) {
       });
   });
 
+  grunt.registerTask('unit_test_logging_contract', 'Keep debug logging values consistent with the public string contract.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      testPath = path.resolve('ci/logging_contract_test.cjs'),
+      expected = 'logging-contract:6:ok\n';
+    child_process.execFile(
+      process.execPath,
+      ['--no-deprecation', testPath],
+      function(err?: any, stdout?: string, stderr?: string): void {
+        var actual = stdout + stderr;
+        if (err || actual !== expected) {
+          grunt.fail.fatal(
+            'Debug logging contract output does not match.\nDoppio:\n' + actual +
+            '\nExpected:\n' + expected
+          );
+          return;
+        }
+        grunt.log.ok('Debug logging values matched the public string return contract.');
+        done();
+      }
+    );
+  });
+
   grunt.registerTask('unit_test_file_dispatcher_status', 'Map retryable channel errno values to their exact IOStatus sentinel types.', function() {
     var done: (status?: boolean) => void = this.async(),
       testPath = path.resolve('ci/file_dispatcher_status_test.cjs'),
