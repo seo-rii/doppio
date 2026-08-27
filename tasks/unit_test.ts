@@ -36,6 +36,35 @@ function unitTest(grunt: IGrunt) {
       done(!testFailed);
     });
   });
+
+  grunt.registerTask('unit_test_nashorn_legacy', 'Run the bundled Nashorn compatibility smoke only on Doppio.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      runnerPath = 'build/release-cli/console/runner.js',
+      expectedPath = 'classes/test/NashornTest.expected';
+    if (!grunt.file.exists(runnerPath) || !grunt.file.exists(expectedPath)) {
+      grunt.log.error('Build the release CLI and keep the Nashorn expected output before running this smoke.');
+      return done(false);
+    }
+    child_process.execFile(process.execPath, [runnerPath, 'classes.test.NashornTest'], {
+      encoding: 'utf8',
+      env: Object.assign({}, process.env, {NODE_NO_WARNINGS: '1'})
+    }, function(err?: any, stdout?: string, stderr?: string) {
+      var actual = stdout.replace(/\r\n?/g, '\n'),
+        expected = grunt.file.read(expectedPath).replace(/\r\n?/g, '\n');
+      if (err || stderr.length > 0) {
+        grunt.log.error('Bundled Nashorn smoke failed to run.');
+        grunt.log.write(actual + stderr);
+        return done(false);
+      }
+      if (actual !== expected) {
+        grunt.log.error('Bundled Nashorn output did not match its Doppio-only golden.');
+        grunt.log.writeln('Doppio:\n' + actual + 'Expected:\n' + expected);
+        return done(false);
+      }
+      grunt.log.ok('Bundled Nashorn output matched its Doppio-only golden.');
+      done();
+    });
+  });
 }
 
 export = unitTest;

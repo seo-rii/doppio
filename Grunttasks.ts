@@ -465,7 +465,7 @@ export function setup(grunt: IGrunt) {
     run_java: {
       default: {
         expand: true,
-        src: 'classes/test/*.java',
+        src: ['classes/test/*.java', '!classes/test/NashornTest.java'],
         ext: '.runout'
       },
       array_ops: {
@@ -659,7 +659,7 @@ export function setup(grunt: IGrunt) {
       default: {
         files: [{
           expand: true,
-          src: 'classes/test/*.java'
+          src: ['classes/test/*.java', '!classes/test/NashornTest.java']
         }]
       },
       modern_java17: {
@@ -1204,7 +1204,8 @@ export function setup(grunt: IGrunt) {
     ]);
   grunt.registerTask('test',
     ['release-cli',
-     'unit_test']);
+     'unit_test:default',
+     'unit_test_nashorn_legacy']);
   var modernJavaRuntimeTestTasks = [
     'javac_modern_classlib',
     'generate_doppio_jar',
