@@ -703,17 +703,8 @@ public final class Files {
   }
 
   public static Path walkFileTree(Path start, FileVisitor<? super Path> visitor) throws IOException {
-    FileVisitor<? super Path> fileVisitor = Objects.requireNonNull(visitor);
-    if (start.getFileSystem() != FileSystems.getDefault()) {
-      walkPathFileTreeInternal(start, 0, Integer.MAX_VALUE, fileVisitor);
-      return start;
-    }
-    File root = toFile(start);
-    if (!root.exists()) {
-      throw new NoSuchFileException(root.toString());
-    }
-    walkFileTreeInternal(root, 0, Integer.MAX_VALUE, fileVisitor);
-    return start;
+    return walkFileTree(
+        start, Collections.<FileVisitOption>emptySet(), Integer.MAX_VALUE, visitor);
   }
 
   public static Path walkFileTree(
@@ -729,15 +720,43 @@ public final class Files {
       throw new IllegalArgumentException();
     }
     FileVisitor<? super Path> fileVisitor = Objects.requireNonNull(visitor);
-    if (start.getFileSystem() != FileSystems.getDefault()) {
-      walkPathFileTreeInternal(start, 0, maxDepth, fileVisitor);
-      return start;
+    try (FileTreeWalker walker = new FileTreeWalker(options, maxDepth)) {
+      FileTreeWalker.Event event = walker.walk(start);
+      do {
+        FileVisitResult result;
+        switch (event.type()) {
+          case ENTRY:
+            IOException failure = event.ioeException();
+            result = failure == null
+                ? fileVisitor.visitFile(event.file(), event.attributes())
+                : fileVisitor.visitFileFailed(event.file(), failure);
+            break;
+          case START_DIRECTORY:
+            result = fileVisitor.preVisitDirectory(event.file(), event.attributes());
+            if (result == FileVisitResult.SKIP_SUBTREE
+                || result == FileVisitResult.SKIP_SIBLINGS) {
+              walker.pop();
+            }
+            break;
+          case END_DIRECTORY:
+            result = fileVisitor.postVisitDirectory(event.file(), event.ioeException());
+            if (result == FileVisitResult.SKIP_SIBLINGS) {
+              result = FileVisitResult.CONTINUE;
+            }
+            break;
+          default:
+            throw new AssertionError("Unexpected file-tree event");
+        }
+        Objects.requireNonNull(result);
+        if (result == FileVisitResult.TERMINATE) {
+          break;
+        }
+        if (result == FileVisitResult.SKIP_SIBLINGS) {
+          walker.skipRemainingSiblings();
+        }
+        event = walker.next();
+      } while (event != null);
     }
-    File root = toFile(start);
-    if (!root.exists()) {
-      throw new NoSuchFileException(root.toString());
-    }
-    walkFileTreeInternal(root, 0, maxDepth, fileVisitor);
     return start;
   }
 
@@ -1148,108 +1167,6 @@ public final class Files {
       path.getFileSystem().provider().readAttributes(
           path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
     }
-  }
-
-  private static FileVisitResult walkFileTreeInternal(
-      File file,
-      int depth,
-      int maxDepth,
-      FileVisitor<? super Path> visitor) throws IOException {
-    Path path = file.toPath();
-    BasicFileAttributes attributes = readBasicFileAttributes(file);
-    if (file.isDirectory() && depth < maxDepth) {
-      FileVisitResult preResult = Objects.requireNonNull(visitor.preVisitDirectory(path, attributes));
-      if (preResult == FileVisitResult.TERMINATE) {
-        return FileVisitResult.TERMINATE;
-      }
-      if (preResult == FileVisitResult.SKIP_SUBTREE) {
-        return FileVisitResult.CONTINUE;
-      }
-      if (preResult == FileVisitResult.SKIP_SIBLINGS) {
-        return FileVisitResult.SKIP_SIBLINGS;
-      }
-      File[] children = file.listFiles();
-      if (children == null) {
-        FileVisitResult failureResult = Objects.requireNonNull(
-            visitor.visitFileFailed(path, new IOException("Unable to list directory")));
-        if (failureResult == FileVisitResult.TERMINATE || failureResult == FileVisitResult.SKIP_SIBLINGS) {
-          return failureResult;
-        }
-        return FileVisitResult.CONTINUE;
-      }
-      for (File child : children) {
-        FileVisitResult childResult = walkFileTreeInternal(child, depth + 1, maxDepth, visitor);
-        if (childResult == FileVisitResult.TERMINATE) {
-          return FileVisitResult.TERMINATE;
-        }
-        if (childResult == FileVisitResult.SKIP_SIBLINGS) {
-          break;
-        }
-      }
-      FileVisitResult postResult = Objects.requireNonNull(visitor.postVisitDirectory(path, null));
-      if (postResult == FileVisitResult.TERMINATE || postResult == FileVisitResult.SKIP_SIBLINGS) {
-        return postResult;
-      }
-      return FileVisitResult.CONTINUE;
-    }
-    FileVisitResult visitResult = Objects.requireNonNull(visitor.visitFile(path, attributes));
-    if (visitResult == FileVisitResult.TERMINATE || visitResult == FileVisitResult.SKIP_SIBLINGS) {
-      return visitResult;
-    }
-    return FileVisitResult.CONTINUE;
-  }
-
-  private static FileVisitResult walkPathFileTreeInternal(
-      Path path,
-      int depth,
-      int maxDepth,
-      FileVisitor<? super Path> visitor) throws IOException {
-    BasicFileAttributes attributes = readAttributes(path, BasicFileAttributes.class);
-    if (attributes.isDirectory() && depth < maxDepth) {
-      FileVisitResult preResult = Objects.requireNonNull(visitor.preVisitDirectory(path, attributes));
-      if (preResult == FileVisitResult.TERMINATE) {
-        return FileVisitResult.TERMINATE;
-      }
-      if (preResult == FileVisitResult.SKIP_SUBTREE) {
-        return FileVisitResult.CONTINUE;
-      }
-      if (preResult == FileVisitResult.SKIP_SIBLINGS) {
-        return FileVisitResult.SKIP_SIBLINGS;
-      }
-      DirectoryStream<Path> stream;
-      try {
-        stream = newDirectoryStream(path);
-      } catch (IOException e) {
-        FileVisitResult failureResult = Objects.requireNonNull(visitor.visitFileFailed(path, e));
-        if (failureResult == FileVisitResult.TERMINATE || failureResult == FileVisitResult.SKIP_SIBLINGS) {
-          return failureResult;
-        }
-        return FileVisitResult.CONTINUE;
-      }
-      try {
-        for (Path child : stream) {
-          FileVisitResult childResult = walkPathFileTreeInternal(child, depth + 1, maxDepth, visitor);
-          if (childResult == FileVisitResult.TERMINATE) {
-            return FileVisitResult.TERMINATE;
-          }
-          if (childResult == FileVisitResult.SKIP_SIBLINGS) {
-            break;
-          }
-        }
-      } finally {
-        stream.close();
-      }
-      FileVisitResult postResult = Objects.requireNonNull(visitor.postVisitDirectory(path, null));
-      if (postResult == FileVisitResult.TERMINATE || postResult == FileVisitResult.SKIP_SIBLINGS) {
-        return postResult;
-      }
-      return FileVisitResult.CONTINUE;
-    }
-    FileVisitResult visitResult = Objects.requireNonNull(visitor.visitFile(path, attributes));
-    if (visitResult == FileVisitResult.TERMINATE || visitResult == FileVisitResult.SKIP_SIBLINGS) {
-      return visitResult;
-    }
-    return FileVisitResult.CONTINUE;
   }
 
   private static String basicAttributeName(String attribute) {
