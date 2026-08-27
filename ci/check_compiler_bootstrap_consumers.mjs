@@ -67,7 +67,28 @@ const scalaConsumers = [
   'scala_methodhandle_smoke.sh',
   'scala_record_smoke.sh',
   'scala_stackwalker_smoke.sh',
+  'scala_annotation_smoke.sh',
+  'scala_collection_smoke.sh',
+  'scala_concurrent_smoke.sh',
+  'scala_functional_smoke.sh',
+  'scala_interop_smoke.sh',
+  'scala_io_smoke.sh',
+  'scala_lambda_serialization_smoke.sh',
+  'scala_language_smoke.sh',
+  'scala_library_smoke.sh',
+  'scala_macro_smoke.sh',
+  'scala_nio_smoke.sh',
+  'scala_package_smoke.sh',
+  'scala_proxy_smoke.sh',
+  'scala_reflect_smoke.sh',
+  'scala_reflection_shape_smoke.sh',
 ];
+const compileOnlyConsumers = new Set([
+  'kotlin_diagnostic_smoke.sh',
+  'scala_diagnostic_smoke.sh',
+]);
+const forbiddenRuntimeClasspathPattern =
+  /\$(?:\{(?:modern_overlay_jar|modern_boot_jar|runtime_boot_jar|compiler_boot_cp|compiler_target_cp)\}|(?:modern_overlay_jar|modern_boot_jar|runtime_boot_jar|compiler_boot_cp|compiler_target_cp)\b)/;
 
 function fail(message) {
   console.error(message);
@@ -82,6 +103,32 @@ function readConsumer(scriptName) {
   return fs.readFileSync(scriptPath, 'utf8');
 }
 
+function checkTimeoutPolicy(scriptName, content) {
+  if (!/^kill_after="\$\{[A-Z0-9_]+_KILL_AFTER_SECONDS:-30\}"$/m.test(content)) {
+    fail(`ci/${scriptName} is missing the 30-second forced-kill timeout assignment.`);
+  }
+
+  const lines = content.split(/\r?\n/);
+  const requiredPhases = ['compile'];
+  if (!compileOnlyConsumers.has(scriptName)) {
+    requiredPhases.push('run');
+  }
+  for (const phase of requiredPhases) {
+    const timeoutToken = '${' + phase + '_timeout}s';
+    const timeoutLines = lines.filter(
+      (line) => /\btimeout\b/.test(line) && line.includes(timeoutToken)
+    );
+    if (timeoutLines.length === 0) {
+      fail(`ci/${scriptName} is missing ${phase} timeout enforcement.`);
+    }
+    for (const line of timeoutLines) {
+      if (!line.includes('timeout -k "${kill_after}s" -s INT')) {
+        fail(`ci/${scriptName} must force-kill the ${phase} timeout after the grace period.`);
+      }
+    }
+  }
+}
+
 function checkCommon(scriptName, content) {
   const requiredAssignments = [
     'modern_overlay_jar="$repo_root/build/modern-bootstrap-overlay/modern-bootstrap.jar"',
@@ -94,10 +141,30 @@ function checkCommon(scriptName, content) {
     }
   }
 
-  for (const line of content.split(/\r?\n/)) {
-    if (/^\s*runtime_cp=/.test(line) && line.includes('$modern_overlay_jar')) {
-      fail(`ci/${scriptName} must not add modern-bootstrap.jar to the runtime classpath.`);
+  const lines = content.split(/\r?\n/);
+  for (const line of lines) {
+    if (/^\s*runtime_cp=/.test(line) && forbiddenRuntimeClasspathPattern.test(line)) {
+      fail(`ci/${scriptName} must not add compiler bootstrap classes to the runtime classpath.`);
     }
+    if (/\btimeout\b/.test(line) && line.includes('${run_timeout}s') && forbiddenRuntimeClasspathPattern.test(line)) {
+      fail(`ci/${scriptName} runtime command must not reference the compiler bootstrap classpath.`);
+    }
+  }
+
+  checkTimeoutPolicy(scriptName, content);
+}
+
+function checkCompleteInventory(language, expectedNames) {
+  const prefix = `${language.toLowerCase()}_`;
+  const expected = new Set(expectedNames);
+  const unexpected = fs.readdirSync(ciDir)
+    .filter((name) => name.startsWith(prefix) && name.endsWith('_smoke.sh'))
+    .filter((name) => !expected.has(name));
+  if (unexpected.length !== 0) {
+    fail(
+      `Compiler bootstrap consumer inventory is missing ${language} smoke scripts: ` +
+      unexpected.sort().map((name) => `ci/${name}`).join(', ')
+    );
   }
 }
 
@@ -127,6 +194,9 @@ for (const scriptName of scalaConsumers) {
     fail(`ci/${scriptName} must pass the Doppio compiler boot classpath to Scala.`);
   }
 }
+
+checkCompleteInventory('Kotlin', kotlinConsumers.keys());
+checkCompleteInventory('Scala', scalaConsumers);
 
 console.log(
   `Compiler bootstrap consumer checker validated ${kotlinConsumers.size} Kotlin and ${scalaConsumers.length} Scala smokes.`

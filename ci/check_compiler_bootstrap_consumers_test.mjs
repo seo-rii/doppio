@@ -67,6 +67,21 @@ const scalaConsumers = [
   'scala_methodhandle_smoke.sh',
   'scala_record_smoke.sh',
   'scala_stackwalker_smoke.sh',
+  'scala_annotation_smoke.sh',
+  'scala_collection_smoke.sh',
+  'scala_concurrent_smoke.sh',
+  'scala_functional_smoke.sh',
+  'scala_interop_smoke.sh',
+  'scala_io_smoke.sh',
+  'scala_lambda_serialization_smoke.sh',
+  'scala_language_smoke.sh',
+  'scala_library_smoke.sh',
+  'scala_macro_smoke.sh',
+  'scala_nio_smoke.sh',
+  'scala_package_smoke.sh',
+  'scala_proxy_smoke.sh',
+  'scala_reflect_smoke.sh',
+  'scala_reflection_shape_smoke.sh',
 ];
 
 function kotlinFixture(targetSuffix = '$stdlib_jar', runtimeClasspath = 'runtime_cp="$out_dir:$stdlib_jar"') {
@@ -75,11 +90,16 @@ modern_overlay_jar="$repo_root/build/modern-bootstrap-overlay/modern-bootstrap.j
 modern_boot_jar="$repo_root/vendor/java_home/lib/doppio.jar"
 runtime_boot_jar="$repo_root/vendor/java_home/lib/rt.jar"
 compiler_target_cp="$modern_overlay_jar:$modern_boot_jar:$runtime_boot_jar:${targetSuffix}"
+compile_timeout="\${FIXTURE_COMPILE_TIMEOUT_SECONDS:-60}"
+run_timeout="\${FIXTURE_RUN_TIMEOUT_SECONDS:-60}"
+kill_after="\${FIXTURE_KILL_AFTER_SECONDS:-30}"
+timeout -k "\${kill_after}s" -s INT "\${compile_timeout}s" \\
 org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \\
   -no-jdk \\
   -classpath "$compiler_target_cp" \\
   -d "$out_dir"
 ${runtimeClasspath}
+timeout -k "\${kill_after}s" -s INT "\${run_timeout}s" node runner.js
 `;
 }
 
@@ -89,10 +109,15 @@ modern_overlay_jar="$repo_root/build/modern-bootstrap-overlay/modern-bootstrap.j
 modern_boot_jar="$repo_root/vendor/java_home/lib/doppio.jar"
 runtime_boot_jar="$repo_root/vendor/java_home/lib/rt.jar"
 compiler_boot_cp="$modern_overlay_jar:$modern_boot_jar:$runtime_boot_jar"
+compile_timeout="\${FIXTURE_COMPILE_TIMEOUT_SECONDS:-60}"
+run_timeout="\${FIXTURE_RUN_TIMEOUT_SECONDS:-60}"
+kill_after="\${FIXTURE_KILL_AFTER_SECONDS:-30}"
+timeout -k "\${kill_after}s" -s INT "\${compile_timeout}s" \\
 scala.tools.nsc.Main \\
   -javabootclasspath "$compiler_boot_cp" \\
   -classpath "$source_cp"
 ${runtimeClasspath}
+timeout -k "\${kill_after}s" -s INT "\${run_timeout}s" node runner.js
 `;
 }
 
@@ -127,8 +152,25 @@ try {
   if (completeResult.status !== 0) {
     throw new Error(`expected complete consumers to pass:\n${completeResult.stdout}\n${completeResult.stderr}`);
   }
-  if (!completeResult.stdout.includes('validated 50 Kotlin and 8 Scala smokes')) {
+  if (!completeResult.stdout.includes('validated 50 Kotlin and 23 Scala smokes')) {
     throw new Error(`expected expanded compiler bootstrap inventory:\n${completeResult.stdout}`);
+  }
+
+  fs.writeFileSync(
+    path.join(ciDir, 'kotlin_diagnostic_smoke.sh'),
+    kotlinFixture()
+      .replace('run_timeout="${FIXTURE_RUN_TIMEOUT_SECONDS:-60}"\n', '')
+      .replace('timeout -k "${kill_after}s" -s INT "${run_timeout}s" node runner.js\n', '')
+  );
+  fs.writeFileSync(
+    path.join(ciDir, 'scala_diagnostic_smoke.sh'),
+    scalaFixture()
+      .replace('run_timeout="${FIXTURE_RUN_TIMEOUT_SECONDS:-60}"\n', '')
+      .replace('timeout -k "${kill_after}s" -s INT "${run_timeout}s" node runner.js\n', '')
+  );
+  const compileOnlyResult = runChecker(ciDir);
+  if (compileOnlyResult.status !== 0) {
+    throw new Error(`expected diagnostic compile-only consumers to pass:\n${compileOnlyResult.stdout}\n${compileOnlyResult.stderr}`);
   }
 
   fs.writeFileSync(
@@ -160,6 +202,46 @@ try {
 
   writeConsumers(ciDir);
   fs.writeFileSync(
+    path.join(ciDir, 'kotlin_duration_smoke.sh'),
+    kotlinFixture().replace(
+      'timeout -k "${kill_after}s" -s INT "${compile_timeout}s" \\\n',
+      ''
+    )
+  );
+  expectFailure(runChecker(ciDir), 'missing compile timeout enforcement', 'missing compile timeout');
+
+  writeConsumers(ciDir);
+  fs.writeFileSync(
+    path.join(ciDir, 'kotlin_duration_smoke.sh'),
+    kotlinFixture().replace(
+      'timeout -k "${kill_after}s" -s INT "${compile_timeout}s"',
+      'timeout -s INT "${compile_timeout}s"'
+    )
+  );
+  expectFailure(runChecker(ciDir), 'force-kill the compile timeout', 'missing forced kill compile timeout');
+
+  writeConsumers(ciDir);
+  fs.writeFileSync(
+    path.join(ciDir, 'kotlin_duration_smoke.sh'),
+    kotlinFixture().replace(
+      'timeout -k "${kill_after}s" -s INT "${run_timeout}s" node runner.js\n',
+      ''
+    )
+  );
+  expectFailure(runChecker(ciDir), 'missing run timeout enforcement', 'missing runtime timeout');
+
+  writeConsumers(ciDir);
+  fs.writeFileSync(
+    path.join(ciDir, 'kotlin_duration_smoke.sh'),
+    kotlinFixture().replace(
+      'timeout -k "${kill_after}s" -s INT "${run_timeout}s"',
+      'timeout -s INT "${run_timeout}s"'
+    )
+  );
+  expectFailure(runChecker(ciDir), 'force-kill the run timeout', 'missing forced kill runtime timeout');
+
+  writeConsumers(ciDir);
+  fs.writeFileSync(
     path.join(ciDir, 'kotlin_modern_java_interop_smoke.sh'),
     kotlinFixture().replace('  -classpath "$compiler_target_cp" \\\n', '')
   );
@@ -187,11 +269,32 @@ try {
     path.join(ciDir, 'scala_modern_interop_smoke.sh'),
     scalaFixture('runtime_cp="$out_dir:$modern_overlay_jar:$library_jar"')
   );
-  expectFailure(runChecker(ciDir), 'must not add modern-bootstrap.jar', 'runtime overlay contamination');
+  expectFailure(runChecker(ciDir), 'must not add compiler bootstrap classes', 'runtime overlay contamination');
+
+  writeConsumers(ciDir);
+  fs.writeFileSync(
+    path.join(ciDir, 'scala_modern_interop_smoke.sh'),
+    scalaFixture('runtime_cp="$out_dir:${compiler_boot_cp}:$library_jar"')
+  );
+  expectFailure(runChecker(ciDir), 'must not add compiler bootstrap classes', 'runtime aggregate contamination');
+
+  writeConsumers(ciDir);
+  fs.writeFileSync(
+    path.join(ciDir, 'kotlin_modern_java_interop_smoke.sh'),
+    kotlinFixture().replace(
+      'timeout -k "${kill_after}s" -s INT "${run_timeout}s" node runner.js',
+      'timeout -k "${kill_after}s" -s INT "${run_timeout}s" node runner.js -cp "$compiler_target_cp"'
+    )
+  );
+  expectFailure(runChecker(ciDir), 'runtime command must not reference', 'runtime command contamination');
 
   writeConsumers(ciDir);
   fs.rmSync(path.join(ciDir, 'kotlin_modern_java_interop_smoke.sh'));
   expectFailure(runChecker(ciDir), 'Missing compiler bootstrap consumer', 'missing consumer script');
+
+  writeConsumers(ciDir);
+  fs.writeFileSync(path.join(ciDir, 'scala_untracked_smoke.sh'), scalaFixture());
+  expectFailure(runChecker(ciDir), 'inventory is missing Scala smoke scripts', 'untracked Scala consumer');
 } finally {
   fs.rmSync(root, { recursive: true, force: true });
 }

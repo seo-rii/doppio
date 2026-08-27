@@ -51,9 +51,18 @@ if [ -z "$jline_jar" ]; then
 fi
 
 compiler_cp="$compiler_jar:$library_jar:$reflect_jar:$diff_utils_jar:$jline_jar"
+modern_overlay_jar="$repo_root/build/modern-bootstrap-overlay/modern-bootstrap.jar"
+modern_boot_jar="$repo_root/vendor/java_home/lib/doppio.jar"
+runtime_boot_jar="$repo_root/vendor/java_home/lib/rt.jar"
+compiler_boot_cp="$modern_overlay_jar:$modern_boot_jar:$runtime_boot_jar"
 out_dir="$work_dir/out"
 source_cp="$library_jar"
 runtime_cp="$out_dir:$library_jar"
+
+if [ ! -f "$modern_overlay_jar" ] || [ ! -f "$modern_boot_jar" ] || [ ! -f "$runtime_boot_jar" ]; then
+  echo "Doppio compiler boot classpath is incomplete; build the modern release CLI first." >&2
+  exit 1
+fi
 
 rm -rf "$out_dir"
 mkdir -p "$out_dir"
@@ -69,6 +78,7 @@ timeout -k "${kill_after}s" -s INT "${compile_timeout}s" \
   "-Xresponsiveness:$responsiveness" \
   -cp "$compiler_cp" \
   scala.tools.nsc.Main \
+  -javabootclasspath "$compiler_boot_cp" \
   -classpath "$source_cp" \
   -d "$out_dir" \
   "$source_dir"/*.scala

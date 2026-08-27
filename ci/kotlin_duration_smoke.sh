@@ -58,10 +58,11 @@ mkdir -p "$out_dir"
 
 compile_timeout="${KOTLIN_DURATION_SMOKE_COMPILE_TIMEOUT_SECONDS:-360}"
 run_timeout="${KOTLIN_DURATION_SMOKE_RUN_TIMEOUT_SECONDS:-60}"
+kill_after="${KOTLIN_DURATION_SMOKE_KILL_AFTER_SECONDS:-30}"
 responsiveness="${DOPPIO_KOTLIN_RESPONSIVENESS:-100000}"
 
 compile_start="$(date +%s)"
-timeout -s INT "${compile_timeout}s" \
+timeout -k "${kill_after}s" -s INT "${compile_timeout}s" \
   node --max-old-space-size=4096 --no-deprecation "$runner" \
   "-Xresponsiveness:$responsiveness" \
   -cp "$compiler_jar" \
@@ -118,7 +119,7 @@ if [ "$native_output" != "$expected_output" ]; then
   exit 1
 fi
 
-doppio_output="$(timeout -s INT "${run_timeout}s" node --no-deprecation "$runner" -cp "$runtime_cp" KotlinDurationHelloKt)"
+doppio_output="$(timeout -k "${kill_after}s" -s INT "${run_timeout}s" node --no-deprecation "$runner" -cp "$runtime_cp" KotlinDurationHelloKt)"
 if [ "$doppio_output" != "$expected_output" ]; then
   echo "Unexpected Doppio output: $doppio_output" >&2
   exit 1
