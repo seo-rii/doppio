@@ -149,6 +149,13 @@ rejects('Debug.Difflib exposes SequenceMatcher', {
     '  matcher: SequenceMatcherConstructor;'
   )
 });
+rejects('browser native-module examples use the shipped Doppio global', {
+  browserDocsSource: replaced(
+    baseline.browserDocsSource,
+    'Doppio.VM.JVM.registerNativeModule(',
+    'DoppioJVM.registerNativeModule('
+  )
+});
 rejects('all declared bins must be exercised', {
   smokeSource: replaced(
     baseline.smokeSource,
@@ -184,4 +191,4 @@ rejects('the verified tarball must be uploaded after the smoke', {
   )
 });
 
-console.log('package-artifact-contract-negative:29:ok');
+console.log('package-artifact-contract-negative:30:ok');

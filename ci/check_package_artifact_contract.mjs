@@ -14,6 +14,7 @@ export function readPackageArtifactContract(root = repoRoot) {
     gruntTasksSource: fs.readFileSync(path.join(root, 'Grunttasks.ts'), 'utf8'),
     prepackSource: fs.readFileSync(path.join(root, 'prepack.cjs'), 'utf8'),
     publicTypesSource: fs.readFileSync(path.join(root, 'types', 'public.d.ts'), 'utf8'),
+    browserDocsSource: fs.readFileSync(path.join(root, 'docs', 'README.md'), 'utf8'),
     downloaderSource: fs.readFileSync(path.join(root, 'console', 'download_jdk.ts'), 'utf8'),
     downloaderTestSource: fs.readFileSync(path.join(root, 'ci', 'download_jdk_transaction_test.cjs'), 'utf8'),
     supportSource: fs.readFileSync(path.join(root, 'docs', 'support.md'), 'utf8'),
@@ -116,6 +117,11 @@ export function checkPackageArtifactContract(sources) {
   assert.match(sources.publicTypesSource, /^\s+logLevel:\s*LogLevel;/m);
   assert.match(sources.publicTypesSource, /^\s+SequenceMatcher:\s*SequenceMatcherConstructor;/m);
   assert.match(sources.publicTypesSource, /callback:\s*\(error:\s*Error\s*\|\s*null,/);
+
+  assert.match(sources.browserDocsSource, /Doppio\.VM\.JVM\.registerNativeModule\(/);
+  assert.match(sources.browserDocsSource, /Doppio\.VM\.Enums\.ThreadStatus/);
+  assert.doesNotMatch(sources.browserDocsSource, /DoppioJVM\.registerNativeModule\(/);
+  assert.doesNotMatch(sources.browserDocsSource, /DoppioJVM\.VM\.Enums\.ThreadStatus/);
 
   assert.match(
     sources.downloaderSource,
