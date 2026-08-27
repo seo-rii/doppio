@@ -397,33 +397,390 @@ function testDuplicateCallbackIsIgnored() {
   scenarioCount += 1;
 }
 
+function testInvalidBulkWriteProgress() {
+  const scenarios = [
+    {
+      fd: 12358,
+      className: 'java/io/FileOutputStream',
+      progress: 0,
+      invoke(natives, thread, owner) {
+        natives['writeBytes([BIIZ)V'](
+          thread,
+          owner,
+          {array: [65, 66, 67]},
+          0,
+          3,
+          0
+        );
+      }
+    },
+    {
+      fd: 12359,
+      className: 'java/io/RandomAccessFile',
+      progress: -1,
+      invoke(natives, thread, owner) {
+        natives['writeBytes([BII)V'](
+          thread,
+          owner,
+          {array: [68, 69, 70]},
+          0,
+          3
+        );
+      }
+    },
+    {
+      fd: 12360,
+      className: 'java/io/FileOutputStream',
+      progress: 4,
+      invoke(natives, thread, owner) {
+        natives['writeBytes([BIIZ)V'](
+          thread,
+          owner,
+          {array: [71, 72, 73]},
+          0,
+          3,
+          0
+        );
+      }
+    }
+  ];
+
+  scenarios.forEach((scenario) => {
+    const natives = javaIoNatives[scenario.className];
+    const descriptorOwner = makeOwner(scenario.className, scenario.fd);
+    const writeThread = makeThread(`invalid-write-${scenario.fd}`);
+    let writeCallback;
+
+    resetScenario(scenario.fd, 7, false, `/invalid-write-${scenario.fd}`);
+    fs.write = function(fdArg, buffer, offset, length, position, callback) {
+      assert.equal(fdArg, scenario.fd);
+      assert.equal(offset, 0);
+      assert.equal(length, 3);
+      assert.equal(position, 7);
+      writeCallback = callback;
+    };
+
+    scenario.invoke(natives, writeThread, descriptorOwner.owner);
+    writeCallback(null, scenario.progress);
+    assertExceptionOnce(
+      writeThread,
+      'Ljava/io/IOException;',
+      'Invalid host write length.'
+    );
+    assert.equal(FDState.getPos(scenario.fd), 7);
+
+    const closeThread = requestClose(natives, descriptorOwner);
+    assert.equal(closeCalls.length, 1);
+    writeCallback(null, scenario.progress);
+    assertExceptionOnce(
+      writeThread,
+      'Ljava/io/IOException;',
+      'Invalid host write length.'
+    );
+    assert.equal(closeCalls.length, 1);
+    completeClose(closeThread, null, null, scenario.fd);
+    scenarioCount += 1;
+  });
+}
+
+function testOutputShortWritesFinishBeforeAppendStat() {
+  const fd = 12361;
+  const natives = javaIoNatives['java/io/FileOutputStream'];
+  const descriptorOwner = makeOwner('java/io/FileOutputStream', fd);
+  const writeThread = makeThread('short-append-write');
+  const writeCalls = [];
+  let statCalls = 0;
+  let releaseStat;
+
+  resetScenario(fd, 10, true, '/short-append-write');
+  fs.write = function(fdArg, buffer, offset, length, position, callback) {
+    assert.equal(fdArg, fd);
+    assert.equal(position, null);
+    writeCalls.push({buffer, offset, length, callback});
+  };
+  fs.fstat = function(fdArg, callback) {
+    assert.equal(fdArg, fd);
+    statCalls += 1;
+    releaseStat = () => callback(null, {size: 19});
+  };
+
+  natives['writeBytes([BIIZ)V'](
+    writeThread,
+    descriptorOwner.owner,
+    {array: [80, 81, 82, 83]},
+    0,
+    4,
+    1
+  );
+  assert.equal(writeCalls.length, 1);
+  assert.equal(writeCalls[0].offset, 0);
+  assert.equal(writeCalls[0].length, 4);
+  writeCalls[0].callback(null, 2);
+  assertNoCompletion(writeThread);
+  assert.equal(FDState.getPos(fd), 12);
+  assert.equal(statCalls, 0);
+  assert.equal(writeCalls.length, 2);
+  assert.equal(writeCalls[1].offset, 2);
+  assert.equal(writeCalls[1].length, 2);
+  writeCalls[0].callback(null, 2);
+  assert.equal(writeCalls.length, 2);
+  assert.equal(FDState.getPos(fd), 12);
+  assert.equal(statCalls, 0);
+
+  writeCalls[1].callback(null, 2);
+  assertNoCompletion(writeThread);
+  assert.equal(FDState.getPos(fd), 14);
+  assert.equal(statCalls, 1);
+  releaseStat();
+  assertReturnedOnce(writeThread);
+  assert.equal(FDState.getPos(fd), 19);
+
+  const closeThread = requestClose(natives, descriptorOwner);
+  assert.equal(closeCalls.length, 1);
+  completeClose(closeThread, null, null, fd);
+  scenarioCount += 1;
+}
+
+function testRandomAccessShortWrites() {
+  const fd = 12362;
+  const natives = javaIoNatives['java/io/RandomAccessFile'];
+  const descriptorOwner = makeOwner('java/io/RandomAccessFile', fd);
+  const writeThread = makeThread('short-random-write');
+  const writeCalls = [];
+
+  resetScenario(fd, 20, false, '/short-random-write');
+  fs.write = function(fdArg, buffer, offset, length, position, callback) {
+    assert.equal(fdArg, fd);
+    writeCalls.push({buffer, offset, length, position, callback});
+  };
+
+  natives['writeBytes([BII)V'](
+    writeThread,
+    descriptorOwner.owner,
+    {array: [84, 85, 86, 87]},
+    0,
+    4
+  );
+  assert.equal(writeCalls.length, 1);
+  assert.equal(writeCalls[0].offset, 0);
+  assert.equal(writeCalls[0].length, 4);
+  assert.equal(writeCalls[0].position, 20);
+  writeCalls[0].callback(null, 1);
+  assertNoCompletion(writeThread);
+  assert.equal(FDState.getPos(fd), 21);
+  assert.equal(writeCalls.length, 2);
+  assert.equal(writeCalls[1].offset, 1);
+  assert.equal(writeCalls[1].length, 3);
+  assert.equal(writeCalls[1].position, 21);
+  writeCalls[0].callback(null, 1);
+  assert.equal(writeCalls.length, 2);
+  assert.equal(FDState.getPos(fd), 21);
+
+  writeCalls[1].callback(null, 3);
+  assertReturnedOnce(writeThread);
+  assert.equal(FDState.getPos(fd), 24);
+
+  const closeThread = requestClose(natives, descriptorOwner);
+  assert.equal(closeCalls.length, 1);
+  completeClose(closeThread, null, null, fd);
+  scenarioCount += 1;
+}
+
+function testShortWriteLeaseFencesClose() {
+  const fd = 12363;
+  const natives = javaIoNatives['java/io/RandomAccessFile'];
+  const descriptorOwner = makeOwner('java/io/RandomAccessFile', fd);
+  const writeThread = makeThread('short-write-close');
+  const writeCalls = [];
+
+  resetScenario(fd, 30, false, '/short-write-close');
+  fs.write = function(fdArg, buffer, offset, length, position, callback) {
+    assert.equal(fdArg, fd);
+    writeCalls.push({offset, length, position, callback});
+  };
+
+  natives['writeBytes([BII)V'](
+    writeThread,
+    descriptorOwner.owner,
+    {array: [88, 89]},
+    0,
+    2
+  );
+  writeCalls[0].callback(null, 1);
+  assert.equal(FDState.getPos(fd), 31);
+  assert.equal(writeCalls.length, 2);
+  assertNoCompletion(writeThread);
+
+  const closeThread = requestClose(natives, descriptorOwner);
+  assert.equal(closeCalls.length, 0);
+  writeCalls[1].callback(null, 1);
+  assertExceptionOnce(
+    writeThread,
+    'Ljava/io/IOException;',
+    'Stream Closed'
+  );
+  assert.equal(closeCalls.length, 1);
+  completeClose(closeThread, null, 99, fd);
+  writeCalls[1].callback(null, 1);
+  assert.equal(FDState.getPos(fd), 99);
+  FDState.close(fd);
+  scenarioCount += 1;
+}
+
+async function testSynchronousShortWritesRemainStackSafe() {
+  const fd = 12400;
+  const initialPosition = 40;
+  const byteCount = 20000;
+  const natives = javaIoNatives['java/io/RandomAccessFile'];
+  const descriptorOwner = makeOwner('java/io/RandomAccessFile', fd);
+  const writeThread = makeThread('synchronous-short-write');
+  let writeCalls = 0;
+  let resolveCompletion;
+  const completion = new Promise((resolve) => {
+    resolveCompletion = resolve;
+  });
+  const originalAsyncReturn = writeThread.asyncReturn;
+  const originalThrowNewException = writeThread.throwNewException;
+
+  writeThread.asyncReturn = function(value) {
+    originalAsyncReturn.call(this, value);
+    resolveCompletion();
+  };
+  writeThread.throwNewException = function(type, message) {
+    originalThrowNewException.call(this, type, message);
+    resolveCompletion();
+  };
+
+  resetScenario(fd, initialPosition, false, '/synchronous-short-write');
+  fs.write = function(fdArg, buffer, offset, length, position, callback) {
+    assert.equal(fdArg, fd);
+    assert.equal(offset, writeCalls);
+    assert.equal(length, byteCount - writeCalls);
+    assert.equal(position, initialPosition + writeCalls);
+    writeCalls += 1;
+    callback(null, 1);
+  };
+
+  natives['writeBytes([BII)V'](
+    writeThread,
+    descriptorOwner.owner,
+    {array: new Array(byteCount).fill(65)},
+    0,
+    byteCount
+  );
+  let timeout;
+  try {
+    await Promise.race([
+      completion,
+      new Promise((resolve, reject) => {
+        timeout = setTimeout(() => reject(new Error(
+          'Synchronous short writes did not complete.'
+        )), 10000);
+      })
+    ]);
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  assertReturnedOnce(writeThread);
+  assert.equal(writeCalls, byteCount);
+  assert.equal(FDState.getPos(fd), initialPosition + byteCount);
+
+  const closeThread = requestClose(natives, descriptorOwner);
+  assert.equal(closeCalls.length, 1);
+  completeClose(closeThread, null, null, fd);
+
+  const closeFenceFd = 12401;
+  const closeFenceOwner = makeOwner(
+    'java/io/RandomAccessFile',
+    closeFenceFd
+  );
+  const closeFenceWriteThread = makeThread(
+    'synchronous-short-write-close'
+  );
+  let closeFenceWriteCalls = 0;
+
+  resetScenario(
+    closeFenceFd,
+    70,
+    false,
+    '/synchronous-short-write-close'
+  );
+  fs.write = function(fdArg, buffer, offset, length, position, callback) {
+    assert.equal(fdArg, closeFenceFd);
+    closeFenceWriteCalls += 1;
+    callback(null, 1);
+  };
+  natives['writeBytes([BII)V'](
+    closeFenceWriteThread,
+    closeFenceOwner.owner,
+    {array: [66, 67, 68]},
+    0,
+    3
+  );
+  assert.equal(closeFenceWriteCalls, 1);
+  const closeFenceCloseThread = requestClose(natives, closeFenceOwner);
+  assert.equal(closeCalls.length, 0);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(closeFenceWriteCalls, 1);
+  assertExceptionOnce(
+    closeFenceWriteThread,
+    'Ljava/io/IOException;',
+    'Stream Closed'
+  );
+  assert.equal(closeCalls.length, 1);
+  completeClose(
+    closeFenceCloseThread,
+    null,
+    null,
+    closeFenceFd
+  );
+  scenarioCount += 1;
+}
+
 fs.close = function(fdArg, callback) {
   events.push(`host-close:${fdArg}`);
   closeCalls.push({fd: fdArg, callback});
 };
 
-try {
-  testMultipleMixedReuse();
-  testAppendInnerStat();
-  testDelayedCloseError();
-  testSyncLease();
-  testBrowserUnlinkedDrainSnapshot();
-  testSyncDispatchThrowReleasesLease();
-  testDuplicateCallbackIsIgnored();
-  console.log(`legacy-fd-leases:${scenarioCount}:ok`);
-} finally {
-  [12351, 12352, 12353, 12354, 12355, 12356, 12357].forEach((fd) => {
-    FDState.close(fd);
-  });
-  util.are_in_browser = originalAreInBrowser;
-  fs.close = originalClose;
-  fs.fstat = originalFstat;
-  fs.fsync = originalFsync;
-  if (originalGetFSModule === undefined) {
-    delete fs.getFSModule;
-  } else {
-    fs.getFSModule = originalGetFSModule;
+async function main() {
+  try {
+    testMultipleMixedReuse();
+    testAppendInnerStat();
+    testDelayedCloseError();
+    testSyncLease();
+    testBrowserUnlinkedDrainSnapshot();
+    testSyncDispatchThrowReleasesLease();
+    testDuplicateCallbackIsIgnored();
+    testInvalidBulkWriteProgress();
+    testOutputShortWritesFinishBeforeAppendStat();
+    testRandomAccessShortWrites();
+    testShortWriteLeaseFencesClose();
+    await testSynchronousShortWritesRemainStackSafe();
+    console.log(`legacy-fd-leases:${scenarioCount}:ok`);
+  } finally {
+    [
+      12351, 12352, 12353, 12354, 12355, 12356,
+      12357, 12358, 12359, 12360, 12361, 12362, 12363, 12400, 12401
+    ].forEach((fd) => {
+      FDState.close(fd);
+    });
+    util.are_in_browser = originalAreInBrowser;
+    fs.close = originalClose;
+    fs.fstat = originalFstat;
+    fs.fsync = originalFsync;
+    if (originalGetFSModule === undefined) {
+      delete fs.getFSModule;
+    } else {
+      fs.getFSModule = originalGetFSModule;
+    }
+    fs.read = originalRead;
+    fs.write = originalWrite;
   }
-  fs.read = originalRead;
-  fs.write = originalWrite;
 }
+
+main().catch((err) => {
+  console.error(err);
+  process.exitCode = 1;
+});
