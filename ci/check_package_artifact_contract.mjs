@@ -133,7 +133,12 @@ export function checkPackageArtifactContract(sources) {
   assert.match(sources.downloaderSource, /statusCode !== 200/);
   assert.match(sources.downloaderSource, /Refusing (?:non-HTTPS JDK URL|JDK redirect to non-HTTPS URL)/);
   assert.match(sources.downloaderSource, /pipeline\(input, meter, output,/);
-  assert.match(sources.downloaderSource, /actualSha256 !== expectedSha256/);
+  assert.match(sources.downloaderSource, /pipeline\(source, meter, gunzip, extractor,/);
+  assert.equal(
+    sources.downloaderSource.match(/actualSha256 !== expectedSha256/g)?.length,
+    2,
+    'both the downloaded archive and the exact extraction stream must match the configured SHA-256'
+  );
   assert.match(sources.downloaderSource, /header\.type !== 'file' && header\.type !== 'directory'/);
   assert.match(sources.downloaderSource, /normalizeArchiveEntry\(header\.name\)/);
   assert.match(sources.downloaderSource, /MAX_EXTRACTED_BYTES/);
@@ -164,6 +169,7 @@ export function checkPackageArtifactContract(sources) {
     "'traversal'",
     "'symlink'",
     "'hardlink'",
+    "'archive-replacement'",
     "'rollback'",
     "'absolute-deadline'",
     "'fail-closed'"
@@ -174,9 +180,10 @@ export function checkPackageArtifactContract(sources) {
   assert.match(sources.downloaderTestSource, /package install replacement jar/);
   assert.match(sources.downloaderTestSource, /JDK is up-to-date and passed integrity checks/);
   assert.match(sources.downloaderTestSource, /assertFailedRunPreservesInstall/);
+  assert.match(sources.downloaderTestSource, /DOPPIO_JDK_TEST_REPLACEMENT_ARCHIVE: replacementArchive/);
   assert.match(sources.downloaderTestSource, /DOPPIO_JDK_TEST_FAIL_REPLACE: 'after-backup'/);
   assert.match(sources.downloaderTestSource, /body progress must occur repeatedly before the absolute deadline/);
-  assert.match(sources.downloaderTestSource, /assert\.equal\(completedCases, 13\)/);
+  assert.match(sources.downloaderTestSource, /assert\.equal\(completedCases, 14\)/);
 
   assert.match(
     sources.supportSource,
