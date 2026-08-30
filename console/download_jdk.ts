@@ -10,7 +10,6 @@ import * as url from 'url';
 import * as zlib from 'zlib';
 import rimraf = require('rimraf');
 
-const tarFs: any = require('tar-fs');
 const tarFsPackage = (require as any).resolve('tar-fs/package.json');
 // tar-stream is a tar-fs runtime dependency, but it may be nested instead of
 // hoisted. Resolve it from tar-fs so installed packages do not rely on the
@@ -39,6 +38,7 @@ interface DownloadConfig {
   expectedSha256: string;
   destinationRoot: string;
   localArchive?: string;
+  replacementArchiveBeforeExtraction?: string;
   failReplaceAfterBackup?: boolean;
 }
 
@@ -101,6 +101,7 @@ function loadConfig(): DownloadConfig {
     'DOPPIO_JDK_TEST_ARCHIVE',
     'DOPPIO_JDK_TEST_DESTINATION',
     'DOPPIO_JDK_TEST_SHA256',
+    'DOPPIO_JDK_TEST_REPLACEMENT_ARCHIVE',
     'DOPPIO_JDK_TEST_FAIL_REPLACE'
   ];
   const testRequested = testKeys.some((key) => process.env[key] !== undefined);
@@ -119,12 +120,16 @@ function loadConfig(): DownloadConfig {
   const archiveValue = process.env.DOPPIO_JDK_TEST_ARCHIVE;
   const destinationValue = process.env.DOPPIO_JDK_TEST_DESTINATION;
   const expectedSha256 = process.env.DOPPIO_JDK_TEST_SHA256;
+  const replacementArchiveValue = process.env.DOPPIO_JDK_TEST_REPLACEMENT_ARCHIVE;
   const failReplace = process.env.DOPPIO_JDK_TEST_FAIL_REPLACE;
   if (!testRootValue || !archiveValue || !destinationValue || !expectedSha256) {
     throw new Error('All JDK test override variables must be provided.');
   }
   if (!path.isAbsolute(testRootValue) || !path.isAbsolute(archiveValue) || !path.isAbsolute(destinationValue)) {
     throw new Error('JDK test override paths must be absolute.');
+  }
+  if (replacementArchiveValue !== undefined && !path.isAbsolute(replacementArchiveValue)) {
+    throw new Error('DOPPIO_JDK_TEST_REPLACEMENT_ARCHIVE must be absolute.');
   }
   if (!/^[0-9a-f]{64}$/.test(expectedSha256)) {
     throw new Error('DOPPIO_JDK_TEST_SHA256 must be a lowercase SHA-256 digest.');
@@ -136,6 +141,9 @@ function loadConfig(): DownloadConfig {
   const testRoot = path.resolve(testRootValue);
   const archivePath = path.resolve(archiveValue);
   const destinationRoot = path.resolve(destinationValue);
+  const replacementArchivePath = replacementArchiveValue === undefined
+    ? undefined
+    : path.resolve(replacementArchiveValue);
   const rootStat = fs.lstatSync(testRoot);
   if (!rootStat.isDirectory()) {
     throw new Error('DOPPIO_JDK_TEST_ROOT must be a directory.');
@@ -144,8 +152,12 @@ function loadConfig(): DownloadConfig {
   if (readRegularFile(markerPath).toString('utf8') !== TEST_MARKER_CONTENT) {
     throw new Error('The JDK test root has an invalid fixture marker.');
   }
-  if (!isWithin(testRoot, archivePath) || !isWithin(testRoot, destinationRoot)) {
-    throw new Error('JDK test archive and destination must be contained by DOPPIO_JDK_TEST_ROOT.');
+  if (
+    !isWithin(testRoot, archivePath) ||
+    !isWithin(testRoot, destinationRoot) ||
+    (replacementArchivePath !== undefined && !isWithin(testRoot, replacementArchivePath))
+  ) {
+    throw new Error('JDK test archive, replacement, and destination must be contained by DOPPIO_JDK_TEST_ROOT.');
   }
   const archiveStat = fs.lstatSync(archivePath);
   const destinationStat = fs.lstatSync(destinationRoot);
@@ -155,10 +167,23 @@ function loadConfig(): DownloadConfig {
   if (!destinationStat.isDirectory()) {
     throw new Error('DOPPIO_JDK_TEST_DESTINATION must be an existing directory.');
   }
+  if (replacementArchivePath !== undefined) {
+    const replacementStat = fs.lstatSync(replacementArchivePath);
+    if (!replacementStat.isFile() || replacementStat.size === 0) {
+      throw new Error('DOPPIO_JDK_TEST_REPLACEMENT_ARCHIVE must be a non-empty regular file.');
+    }
+  }
   const realTestRoot = fs.realpathSync(testRoot);
   const realArchivePath = fs.realpathSync(archivePath);
   const realDestinationRoot = fs.realpathSync(destinationRoot);
-  if (!isWithin(realTestRoot, realArchivePath) || !isWithin(realTestRoot, realDestinationRoot)) {
+  const realReplacementArchivePath = replacementArchivePath === undefined
+    ? undefined
+    : fs.realpathSync(replacementArchivePath);
+  if (
+    !isWithin(realTestRoot, realArchivePath) ||
+    !isWithin(realTestRoot, realDestinationRoot) ||
+    (realReplacementArchivePath !== undefined && !isWithin(realTestRoot, realReplacementArchivePath))
+  ) {
     throw new Error('Resolved JDK test paths must remain contained by DOPPIO_JDK_TEST_ROOT.');
   }
 
@@ -167,6 +192,7 @@ function loadConfig(): DownloadConfig {
     expectedSha256,
     destinationRoot: realDestinationRoot,
     localArchive: realArchivePath,
+    replacementArchiveBeforeExtraction: realReplacementArchivePath,
     failReplaceAfterBackup: failReplace === 'after-backup'
   };
 }
@@ -513,16 +539,37 @@ function normalizeArchiveEntry(name: string): string {
   return normalized;
 }
 
-function validateArchive(archivePath: string, callback: (error?: Error) => void): void {
-  const extractor = tarStream.extract();
+function extractVerifiedArchive(
+  archivePath: string,
+  destination: string,
+  expectedSha256: string,
+  callback: (error?: Error) => void
+): void {
+  (fs.mkdirSync as any)(destination, {recursive: true});
+  const digest = crypto.createHash('sha256');
+  let received = 0;
   const names: {[name: string]: string} = {};
   let validationError: Error = null;
   let entryCount = 0;
   let extractedBytes = 0;
-
+  const meter = new stream.Transform({
+    transform(chunk: Buffer, _encoding: string, done: (error?: Error, data?: Buffer) => void): void {
+      received += chunk.length;
+      if (received > MAX_ARCHIVE_BYTES) {
+        done(new Error(`JDK archive exceeds ${MAX_ARCHIVE_BYTES} bytes.`));
+        return;
+      }
+      digest.update(chunk);
+      done(undefined, chunk);
+    }
+  });
+  const source = fs.createReadStream(archivePath);
+  const gunzip = zlib.createGunzip();
+  const extractor = tarStream.extract();
   extractor.on('entry', (header: any, entryStream: any, next: () => void) => {
+    let normalized: string;
     try {
-      const normalized = normalizeArchiveEntry(header.name);
+      normalized = normalizeArchiveEntry(header.name);
       if (header.type !== 'file' && header.type !== 'directory') {
         throw new Error(`Unsupported JDK archive entry type ${header.type}: ${normalized}`);
       }
@@ -554,16 +601,49 @@ function validateArchive(archivePath: string, callback: (error?: Error) => void)
       extractor.destroy(validationError);
       return;
     }
-    entryStream.on('error', (error: Error) => extractor.destroy(error));
-    entryStream.on('end', next);
-    entryStream.resume();
-  });
 
-  const source = fs.createReadStream(archivePath);
-  const gunzip = zlib.createGunzip();
-  (stream as any).pipeline(source, gunzip, extractor, (error?: Error) => {
+    const absolutePath = path.resolve(destination, ...normalized.split('/'));
+    const archiveMode = typeof header.mode === 'number' ? header.mode : 0;
+    const mode = (archiveMode | (header.type === 'directory' ? 0o777 : 0o666)) & ~process.umask();
+    try {
+      if (!isWithin(destination, absolutePath)) {
+        throw new Error(`JDK archive entry escapes extraction root: ${normalized}`);
+      }
+      if (header.type === 'directory') {
+        (fs.mkdirSync as any)(absolutePath, {recursive: true, mode});
+        fs.chmodSync(absolutePath, mode);
+        entryStream.on('error', (error: Error) => extractor.destroy(error));
+        entryStream.on('end', next);
+        entryStream.resume();
+        return;
+      }
+      (fs.mkdirSync as any)(path.dirname(absolutePath), {recursive: true});
+      const output = fs.createWriteStream(absolutePath, {flags: 'wx', mode});
+      (stream as any).pipeline(entryStream, output, (error?: Error) => {
+        if (error) {
+          extractor.destroy(error);
+          return;
+        }
+        try {
+          fs.chmodSync(absolutePath, mode);
+          next();
+        } catch (chmodError) {
+          extractor.destroy(<Error> chmodError);
+        }
+      });
+    } catch (error) {
+      entryStream.resume();
+      extractor.destroy(<Error> error);
+    }
+  });
+  (stream as any).pipeline(source, meter, gunzip, extractor, (error?: Error) => {
     if (error) {
       callback(validationError || error);
+      return;
+    }
+    const actualSha256 = digest.digest('hex');
+    if (actualSha256 !== expectedSha256) {
+      callback(new Error(`JDK archive SHA-256 mismatch: expected ${expectedSha256}, received ${actualSha256}.`));
       return;
     }
     if (names[`${JDK_FOLDER}/lib/rt.jar`] !== 'file') {
@@ -572,28 +652,6 @@ function validateArchive(archivePath: string, callback: (error?: Error) => void)
     }
     callback();
   });
-}
-
-function extractArchive(archivePath: string, destination: string, callback: (error?: Error) => void): void {
-  (fs.mkdirSync as any)(destination, {recursive: true});
-  const source = fs.createReadStream(archivePath);
-  const gunzip = zlib.createGunzip();
-  const extractor = tarFs.extract(destination, {
-    chown: false,
-    map: (header: any): any => {
-      const normalized = normalizeArchiveEntry(header.name);
-      if (header.type !== 'file' && header.type !== 'directory') {
-        throw new Error(`Unsupported JDK archive entry type ${header.type}: ${normalized}`);
-      }
-      header.name = normalized;
-      return header;
-    },
-    readable: true,
-    strict: true,
-    utimes: false,
-    writable: true
-  });
-  (stream as any).pipeline(source, gunzip, extractor, callback);
 }
 
 function validateExtractedTree(root: string): void {
@@ -727,26 +785,30 @@ function installJdk(config: DownloadConfig, callback: (error?: Error) => void): 
       finish(downloadError);
       return;
     }
-    validateArchive(archivePath, (validationError?: Error) => {
-      if (validationError) {
-        finish(validationError);
+    try {
+      // Reproduce replacement at the boundary where the legacy validator
+      // handed a pathname back to a separately opened extraction pass.
+      if (config.replacementArchiveBeforeExtraction) {
+        fs.renameSync(config.replacementArchiveBeforeExtraction, archivePath);
+      }
+    } catch (error) {
+      finish(<Error> error);
+      return;
+    }
+    extractVerifiedArchive(archivePath, extractRoot, config.expectedSha256, (extractError?: Error) => {
+      if (extractError) {
+        finish(extractError);
         return;
       }
-      extractArchive(archivePath, extractRoot, (extractError?: Error) => {
-        if (extractError) {
-          finish(extractError);
-          return;
-        }
-        try {
-          const stagedJdkHome = path.join(extractRoot, JDK_FOLDER);
-          validateExtractedTree(stagedJdkHome);
-          writeMetadata(stagedJdkHome, config);
-          replaceJdk(stagedJdkHome, config, workDirectory);
-          finish();
-        } catch (error) {
-          finish(<Error> error);
-        }
-      });
+      try {
+        const stagedJdkHome = path.join(extractRoot, JDK_FOLDER);
+        validateExtractedTree(stagedJdkHome);
+        writeMetadata(stagedJdkHome, config);
+        replaceJdk(stagedJdkHome, config, workDirectory);
+        finish();
+      } catch (error) {
+        finish(<Error> error);
+      }
     });
   };
 

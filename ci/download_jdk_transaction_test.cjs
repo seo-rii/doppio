@@ -299,6 +299,14 @@ function runDownloader(compiledDownloader, fixture, archivePath, expectedSha256,
       : `${path.join(repoRoot, 'node_modules')}${path.delimiter}${process.env.NODE_PATH}`,
     ...extraEnvironment
   };
+  for (const optionalOverride of [
+    'DOPPIO_JDK_TEST_FAIL_REPLACE',
+    'DOPPIO_JDK_TEST_REPLACEMENT_ARCHIVE'
+  ]) {
+    if (!Object.prototype.hasOwnProperty.call(extraEnvironment, optionalOverride)) {
+      delete environment[optionalOverride];
+    }
+  }
   return childProcess.spawnSync(process.execPath, [compiledDownloader], {
     cwd: fixture.caseRoot,
     encoding: 'utf8',
@@ -324,6 +332,7 @@ function runNetworkDeadlineDownloader(compiledDownloader, fixture, preloadPath, 
     'DOPPIO_JDK_TEST_ARCHIVE',
     'DOPPIO_JDK_TEST_DESTINATION',
     'DOPPIO_JDK_TEST_FAIL_REPLACE',
+    'DOPPIO_JDK_TEST_REPLACEMENT_ARCHIVE',
     'DOPPIO_JDK_TEST_ROOT',
     'DOPPIO_JDK_TEST_SHA256'
   ]) {
@@ -474,6 +483,28 @@ async function main() {
     ]));
     completedCases += 1;
 
+    const replacement = createCaseRoot(suiteRoot, 'archive-replacement');
+    const approvedArchive = path.join(replacement.caseRoot, 'approved-java-home.tar.gz');
+    const replacementArchive = path.join(replacement.caseRoot, 'replacement-java-home.tar.gz');
+    await writeArchive(approvedArchive, safeArchiveEntries());
+    await writeArchive(replacementArchive, safeArchiveEntries().map((entry) => entry.type === 'file'
+      ? {...entry, contents: `replacement ${entry.name}\n`}
+      : entry));
+    const approvedSha256 = sha256File(approvedArchive);
+    assert.notEqual(sha256File(replacementArchive), approvedSha256);
+    writePreviousValidInstall(replacement.destinationRoot);
+    const beforeReplacement = snapshotTree(path.join(replacement.destinationRoot, 'java_home'));
+    const replacedArchive = runDownloader(
+      compiledDownloader,
+      replacement,
+      approvedArchive,
+      approvedSha256,
+      {DOPPIO_JDK_TEST_REPLACEMENT_ARCHIVE: replacementArchive}
+    );
+    assertFailedRunPreservesInstall(replacedArchive, replacement.destinationRoot, beforeReplacement);
+    assert.match(replacedArchive.stderr, /JDK archive SHA-256 mismatch/);
+    completedCases += 1;
+
     const rollback = createCaseRoot(suiteRoot, 'rollback');
     const rollbackArchive = path.join(rollback.caseRoot, 'java_home.tar.gz');
     await writeArchive(rollbackArchive, safeArchiveEntries());
@@ -572,7 +603,7 @@ async function main() {
     assertFailedRunPreservesInstall(rejectedOverride, failClosed.destinationRoot, beforeFailClosed);
     completedCases += 1;
 
-    assert.equal(completedCases, 13);
+    assert.equal(completedCases, 14);
     console.log(`download-jdk-transaction:${completedCases}:ok`);
   } finally {
     fs.rmSync(suiteRoot, {recursive: true, force: true});
