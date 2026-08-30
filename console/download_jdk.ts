@@ -40,6 +40,16 @@ interface DownloadConfig {
   localArchive?: string;
   replacementArchiveBeforeExtraction?: string;
   failReplaceAfterBackup?: boolean;
+  failRollbackAfterBackup?: boolean;
+}
+
+interface PreservedJdkRollback {
+  workDirectory: string;
+  backupPath: string;
+}
+
+interface JdkInstallError extends Error {
+  preservedRollback?: PreservedJdkRollback;
 }
 
 interface JdkInfo {
@@ -134,7 +144,11 @@ function loadConfig(): DownloadConfig {
   if (!/^[0-9a-f]{64}$/.test(expectedSha256)) {
     throw new Error('DOPPIO_JDK_TEST_SHA256 must be a lowercase SHA-256 digest.');
   }
-  if (failReplace !== undefined && failReplace !== 'after-backup') {
+  if (
+    failReplace !== undefined &&
+    failReplace !== 'after-backup' &&
+    failReplace !== 'after-backup-and-rollback'
+  ) {
     throw new Error('DOPPIO_JDK_TEST_FAIL_REPLACE has an invalid test failpoint.');
   }
 
@@ -193,7 +207,8 @@ function loadConfig(): DownloadConfig {
     destinationRoot: realDestinationRoot,
     localArchive: realArchivePath,
     replacementArchiveBeforeExtraction: realReplacementArchivePath,
-    failReplaceAfterBackup: failReplace === 'after-backup'
+    failReplaceAfterBackup: failReplace === 'after-backup' || failReplace === 'after-backup-and-rollback',
+    failRollbackAfterBackup: failReplace === 'after-backup-and-rollback'
   };
 }
 
@@ -743,9 +758,21 @@ function replaceJdk(stagedJdkHome: string, config: DownloadConfig, workDirectory
   } catch (error) {
     if (movedExisting && !fs.existsSync(finalJdkHome) && fs.existsSync(backupJdkHome)) {
       try {
+        if (config.failRollbackAfterBackup) {
+          throw new Error('Injected JDK rollback failure after backup for transaction testing.');
+        }
         fs.renameSync(backupJdkHome, finalJdkHome);
       } catch (rollbackError) {
-        throw new Error(`JDK replacement failed (${error}) and rollback failed (${rollbackError}).`);
+        const preservedRollback: PreservedJdkRollback = {
+          workDirectory: path.resolve(workDirectory),
+          backupPath: path.resolve(backupJdkHome)
+        };
+        const installError = <JdkInstallError> new Error(
+          `JDK replacement failed (${error}) and rollback failed (${rollbackError}). ` +
+          `Previous JDK retained at ${preservedRollback.backupPath}.`
+        );
+        installError.preservedRollback = preservedRollback;
+        throw installError;
       }
     }
     throw error;
@@ -770,11 +797,16 @@ function installJdk(config: DownloadConfig, callback: (error?: Error) => void): 
       return;
     }
     completed = true;
-    try {
-      (rimraf as any).sync(workDirectory);
-    } catch (cleanupError) {
-      if (!error) {
-        error = <Error> cleanupError;
+    const preservedRollback = error && (<JdkInstallError> error).preservedRollback;
+    const preserveWorkDirectory =
+      preservedRollback !== undefined && preservedRollback.workDirectory === path.resolve(workDirectory);
+    if (!preserveWorkDirectory) {
+      try {
+        (rimraf as any).sync(workDirectory);
+      } catch (cleanupError) {
+        if (!error) {
+          error = <Error> cleanupError;
+        }
       }
     }
     callback(error);

@@ -579,6 +579,40 @@ async function main() {
     );
     completedCases += 1;
 
+    const rollbackFailure = createCaseRoot(suiteRoot, 'rollback-failure');
+    const rollbackFailureArchive = path.join(rollbackFailure.caseRoot, 'java_home.tar.gz');
+    await writeArchive(rollbackFailureArchive, safeArchiveEntries());
+    writePreviousValidInstall(rollbackFailure.destinationRoot);
+    const rollbackFailureJdkHome = path.join(rollbackFailure.destinationRoot, 'java_home');
+    const beforeRollbackFailure = snapshotTree(rollbackFailureJdkHome);
+    const failedRollback = runDownloader(
+      compiledDownloader,
+      rollbackFailure,
+      rollbackFailureArchive,
+      sha256File(rollbackFailureArchive),
+      {DOPPIO_JDK_TEST_FAIL_REPLACE: 'after-backup-and-rollback'}
+    );
+    assert.equal(failedRollback.error, undefined);
+    assert.notEqual(failedRollback.status, 0, 'rollback failure unexpectedly installed the replacement JDK');
+    assert.match(failedRollback.stderr, /rollback failed/);
+    assert.equal(fs.existsSync(rollbackFailureJdkHome), false);
+    const retainedTransactions = fs.readdirSync(rollbackFailure.destinationRoot)
+      .filter((entry) => entry.startsWith('.doppio-jdk-install-'));
+    assert.equal(retainedTransactions.length, 1, 'rollback failure must retain exactly one transaction directory');
+    const retainedWorkDirectory = path.join(rollbackFailure.destinationRoot, retainedTransactions[0]);
+    const retainedBackupPath = path.join(retainedWorkDirectory, 'previous-java-home');
+    assert.ok(path.isAbsolute(retainedBackupPath));
+    assert.ok(
+      failedRollback.stderr.includes(`Previous JDK retained at ${retainedBackupPath}.`),
+      'rollback failure must report the absolute retained backup path'
+    );
+    assert.deepEqual(snapshotTree(retainedBackupPath), beforeRollbackFailure);
+    fs.renameSync(retainedBackupPath, rollbackFailureJdkHome);
+    assert.deepEqual(snapshotTree(rollbackFailureJdkHome), beforeRollbackFailure);
+    fs.rmSync(retainedWorkDirectory, {recursive: true, force: true});
+    assertCleanTransactionRoot(rollbackFailure.destinationRoot);
+    completedCases += 1;
+
     const failClosed = createCaseRoot(suiteRoot, 'fail-closed');
     const failClosedArchive = path.join(failClosed.caseRoot, 'java_home.tar.gz');
     await writeArchive(failClosedArchive, safeArchiveEntries());
@@ -603,7 +637,7 @@ async function main() {
     assertFailedRunPreservesInstall(rejectedOverride, failClosed.destinationRoot, beforeFailClosed);
     completedCases += 1;
 
-    assert.equal(completedCases, 14);
+    assert.equal(completedCases, 15);
     console.log(`download-jdk-transaction:${completedCases}:ok`);
   } finally {
     fs.rmSync(suiteRoot, {recursive: true, force: true});
