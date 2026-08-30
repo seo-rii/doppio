@@ -1112,8 +1112,15 @@ function sha256(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
 
-function runArtifactTool(args) {
-  return spawnSync(process.execPath, [artifactToolPath, ...args], { encoding: 'utf8' });
+function runArtifactTool(args, options = {}) {
+  return spawnSync(
+    process.execPath,
+    [...(options.nodeArguments || []), artifactToolPath, ...args],
+    {
+      encoding: 'utf8',
+      env: { ...process.env, ...(options.env || {}) },
+    }
+  );
 }
 
 function expectArtifactFailure(label, args, expectedMessage) {
@@ -1289,6 +1296,74 @@ try {
     'source snapshot changed after bundling'
   );
   fs.writeFileSync(sourceRunnerPath, sourceRunner);
+
+  const replacementRunner = `${sourceRunner}replacement archive bytes\n`;
+  fs.writeFileSync(sourceRunnerPath, replacementRunner);
+  const replacementDirectory = path.join(artifactRoot, 'boundary-replacement');
+  const replacementCreateResult = runArtifactTool([
+    ...createArguments,
+    '--output-dir', replacementDirectory,
+  ]);
+  fs.writeFileSync(sourceRunnerPath, sourceRunner);
+  if (replacementCreateResult.status !== 0) {
+    throw new Error(
+      `Unable to create pathname-replacement artifact:\n${replacementCreateResult.stderr}`
+    );
+  }
+
+  const boundaryDirectory = path.join(artifactRoot, 'boundary-original');
+  const boundaryArchive = path.join(boundaryDirectory, artifactName);
+  const replacementArchive = path.join(replacementDirectory, artifactName);
+  const replacementSha = sha256(fs.readFileSync(replacementArchive));
+  fs.mkdirSync(boundaryDirectory);
+  fs.copyFileSync(archiveOne, boundaryArchive);
+  const replacementMarker = path.join(artifactRoot, 'boundary-replaced');
+  const replacementHook = path.join(artifactRoot, 'replace-after-digest.cjs');
+  fs.writeFileSync(
+    replacementHook,
+    `'use strict';
+const crypto = require('node:crypto');
+const fs = require('node:fs');
+const originalDigest = crypto.Hash.prototype.digest;
+let replaced = false;
+crypto.Hash.prototype.digest = function (...args) {
+  const result = originalDigest.apply(this, args);
+  if (!replaced) {
+    replaced = true;
+    fs.renameSync(process.env.DOPPIO_TEST_REPLACEMENT_ARCHIVE, process.env.DOPPIO_TEST_ARCHIVE_PATH);
+    fs.writeFileSync(process.env.DOPPIO_TEST_REPLACEMENT_MARKER, 'replaced\\n');
+  }
+  return result;
+};
+`
+  );
+  const boundaryVerifyArguments = [...verifyArguments, '--extract-root', artifactRoot];
+  boundaryVerifyArguments[boundaryVerifyArguments.indexOf('--archive') + 1] = boundaryArchive;
+  const boundaryVerifyResult = runArtifactTool(boundaryVerifyArguments, {
+    nodeArguments: ['--require', replacementHook],
+    env: {
+      DOPPIO_TEST_ARCHIVE_PATH: boundaryArchive,
+      DOPPIO_TEST_REPLACEMENT_ARCHIVE: replacementArchive,
+      DOPPIO_TEST_REPLACEMENT_MARKER: replacementMarker,
+    },
+  });
+  if (boundaryVerifyResult.status !== 0) {
+    throw new Error(
+      `Artifact verification should survive pathname replacement after hashing:\n` +
+      `${boundaryVerifyResult.stderr}`
+    );
+  }
+  if (
+    !fs.existsSync(replacementMarker) ||
+    sha256(fs.readFileSync(boundaryArchive)) !== replacementSha
+  ) {
+    throw new Error('Runtime artifact pathname replacement regression did not replace the archive.');
+  }
+  if (fs.readFileSync(sourceRunnerPath, 'utf8') !== sourceRunner) {
+    throw new Error(
+      'Runtime artifact verifier installed replacement pathname bytes under the original digest.'
+    );
+  }
 
   const escapedInstallRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'doppio-runtime-install-escape-'));
   const buildPath = path.join(artifactRoot, 'build');

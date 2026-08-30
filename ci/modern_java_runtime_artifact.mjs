@@ -500,12 +500,13 @@ function inspectArtifact({
   if (!/^[0-9a-f]{64}$/.test(expectedSha256 || '')) {
     fail('Expected runtime artifact SHA-256 must be 64 lowercase hexadecimal characters.');
   }
-  const actualSha256 = sha256File(archivePath);
+  const archive = fs.readFileSync(archivePath);
+  const actualSha256 = sha256Buffer(archive);
   if (actualSha256 !== expectedSha256) {
     fail(`Runtime artifact SHA-256 mismatch: expected ${expectedSha256}, got ${actualSha256}.`);
   }
 
-  const entries = parseTar(fs.readFileSync(archivePath));
+  const entries = parseTar(archive);
   const provenance = verifyProvenance(
     entries,
     commitSha,
