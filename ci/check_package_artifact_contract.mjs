@@ -172,6 +172,7 @@ export function checkPackageArtifactContract(sources) {
     "'archive-replacement'",
     "'rollback'",
     "'absolute-deadline'",
+    "'rollback-failure'",
     "'fail-closed'"
   ]) {
     assert.ok(sources.downloaderTestSource.includes(fixtureCase), `missing downloader fixture case ${fixtureCase}`);
@@ -182,8 +183,10 @@ export function checkPackageArtifactContract(sources) {
   assert.match(sources.downloaderTestSource, /assertFailedRunPreservesInstall/);
   assert.match(sources.downloaderTestSource, /DOPPIO_JDK_TEST_REPLACEMENT_ARCHIVE: replacementArchive/);
   assert.match(sources.downloaderTestSource, /DOPPIO_JDK_TEST_FAIL_REPLACE: 'after-backup'/);
+  assert.match(sources.downloaderTestSource, /DOPPIO_JDK_TEST_FAIL_REPLACE: 'after-backup-and-rollback'/);
+  assert.match(sources.downloaderTestSource, /Previous JDK retained at/);
   assert.match(sources.downloaderTestSource, /body progress must occur repeatedly before the absolute deadline/);
-  assert.match(sources.downloaderTestSource, /assert\.equal\(completedCases, 14\)/);
+  assert.match(sources.downloaderTestSource, /assert\.equal\(completedCases, 15\)/);
 
   assert.match(
     sources.supportSource,
