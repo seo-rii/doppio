@@ -11,6 +11,8 @@ const manifestPath = process.env.MODERN_JAVA_WORKFLOW_MANIFEST_PATH ||
   path.join(repoRoot, 'ci', 'modern_java_smoke_shards.json');
 const compilerLockPath = process.env.MODERN_JAVA_WORKFLOW_COMPILER_LOCK_PATH ||
   path.join(repoRoot, 'ci', 'modern_java_compiler_inputs.lock.json');
+const compilerInputToolPath = process.env.MODERN_JAVA_WORKFLOW_COMPILER_INPUT_TOOL_PATH ||
+  path.join(repoRoot, 'ci', 'prepare_modern_java_compiler_inputs.mjs');
 const smokeScriptPattern = /^(?:kotlin|scala)[A-Za-z0-9_]*_smoke\.sh$/;
 const maximumCompilerInputBytes = 128 * 1024 * 1024;
 
@@ -288,6 +290,22 @@ try {
   compilerLock = JSON.parse(fs.readFileSync(compilerLockPath, 'utf8'));
 } catch (error) {
   fail(`Unable to read Modern Java compiler input lock: ${error.message}`);
+}
+
+let compilerInputTool;
+try {
+  compilerInputTool = stripUnquotedComments(fs.readFileSync(compilerInputToolPath, 'utf8'));
+} catch (error) {
+  fail(`Unable to read Modern Java compiler input tool: ${error.message}`);
+}
+if (
+  compilerInputTool.includes("redirect: 'follow'") ||
+  !compilerInputTool.includes('const maximumDownloadRedirects = 5;') ||
+  !compilerInputTool.includes('const downloadSignal = AbortSignal.timeout(600_000);') ||
+  !compilerInputTool.includes("redirect: 'manual'") ||
+  !/parsedUrl\s*=\s*requireDownloadUrl\(\s*nextUrl\.href,/.test(compilerInputTool)
+) {
+  fail('Modern Java compiler input downloads must use finite manually validated redirects.');
 }
 if (
   compilerLock?.schemaVersion !== 2 ||
