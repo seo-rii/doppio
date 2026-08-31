@@ -81,7 +81,12 @@ function requireSize(value, label) {
 }
 
 function requireDownloadUrl(value, label) {
-  const parsed = new URL(value);
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    fail(`${label} must be a valid URL.`);
+  }
   const allowedHttpsHost =
     parsed.protocol === 'https:' &&
     ['registry.npmjs.org', 'repo1.maven.org'].includes(parsed.hostname);
@@ -244,21 +249,55 @@ async function downloadVerified(url, expectedHash, expectedSize, targetPath) {
     `.${path.basename(targetPath)}.download-${process.pid}-${crypto.randomBytes(6).toString('hex')}`
   );
   try {
-    const parsedUrl = requireDownloadUrl(url, path.basename(targetPath));
+    let parsedUrl = requireDownloadUrl(url, path.basename(targetPath));
     let source;
     if (parsedUrl.protocol === 'file:') {
       source = fs.createReadStream(fileURLToPath(parsedUrl));
     } else {
-      const response = await fetch(parsedUrl, {
-        redirect: 'follow',
-        signal: AbortSignal.timeout(600_000),
-        headers: { 'user-agent': 'doppio-modern-java-ci' },
-      });
-      if (!response.ok || !response.body) {
-        fail(`Unable to download ${url}: HTTP ${response.status}.`);
+      const maximumDownloadRedirects = 5;
+      const downloadSignal = AbortSignal.timeout(600_000);
+      let redirectCount = 0;
+      for (;;) {
+        const response = await fetch(parsedUrl, {
+          redirect: 'manual',
+          signal: downloadSignal,
+          headers: { 'user-agent': 'doppio-modern-java-ci' },
+        });
+        if ([301, 302, 303, 307, 308].includes(response.status)) {
+          await response.body?.cancel();
+          if (redirectCount >= maximumDownloadRedirects) {
+            fail(`Unable to download ${url}: exceeded 5 redirects.`);
+          }
+          const location = response.headers.get('location');
+          if (!location) {
+            fail(`Unable to download ${url}: redirect is missing a Location header.`);
+          }
+          let nextUrl;
+          try {
+            nextUrl = new URL(location, parsedUrl);
+          } catch {
+            fail(`Unable to download ${url}: redirect has an invalid Location header.`);
+          }
+          parsedUrl = requireDownloadUrl(
+            nextUrl.href,
+            `${path.basename(targetPath)} redirect URL`
+          );
+          redirectCount += 1;
+          continue;
+        }
+        if (!response.ok || !response.body) {
+          await response.body?.cancel();
+          fail(`Unable to download ${url}: HTTP ${response.status}.`);
+        }
+        try {
+          rejectOversizedContentLength(response, expectedSize, url);
+        } catch (error) {
+          await response.body.cancel();
+          throw error;
+        }
+        source = Readable.fromWeb(response.body);
+        break;
       }
-      rejectOversizedContentLength(response, expectedSize, url);
-      source = Readable.fromWeb(response.body);
     }
     const meter = createDownloadMeter(expectedSize, url);
     await pipeline(source, meter.stream, fs.createWriteStream(temporaryPath, { mode: 0o644 }));

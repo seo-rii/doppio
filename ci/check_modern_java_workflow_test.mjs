@@ -16,6 +16,7 @@ const realWorkflow = fs.readFileSync(path.join(repoRoot, '.github', 'workflows',
 const realCompilerLock = JSON.parse(
   fs.readFileSync(path.join(repoRoot, 'ci', 'modern_java_compiler_inputs.lock.json'), 'utf8')
 );
+const realCompilerInputTool = fs.readFileSync(compilerInputToolPath, 'utf8');
 
 function smokeScript(language, suffix, compileSeconds = 300) {
   const prefix = `${language}_${suffix}`.toUpperCase();
@@ -71,13 +72,25 @@ function writeCheckerFixture(options = {}) {
   const workflowPath = path.join(root, 'modern-java.yml');
   const manifestPath = path.join(root, 'modern_java_smoke_shards.json');
   const compilerLockPath = path.join(root, 'modern_java_compiler_inputs.lock.json');
+  const compilerInputToolFixturePath = path.join(root, 'prepare_modern_java_compiler_inputs.mjs');
   fs.writeFileSync(workflowPath, options.workflow || realWorkflow);
   fs.writeFileSync(manifestPath, `${JSON.stringify(options.manifest || baseManifest(), null, 2)}\n`);
   fs.writeFileSync(
     compilerLockPath,
     `${JSON.stringify(options.compilerLock || realCompilerLock, null, 2)}\n`
   );
-  return { root, ciDir, workflowPath, manifestPath, compilerLockPath };
+  fs.writeFileSync(
+    compilerInputToolFixturePath,
+    options.compilerInputTool || realCompilerInputTool
+  );
+  return {
+    root,
+    ciDir,
+    workflowPath,
+    manifestPath,
+    compilerLockPath,
+    compilerInputToolFixturePath,
+  };
 }
 
 function runChecker(options = {}) {
@@ -90,6 +103,7 @@ function runChecker(options = {}) {
       MODERN_JAVA_WORKFLOW_PATH: fixture.workflowPath,
       MODERN_JAVA_WORKFLOW_MANIFEST_PATH: fixture.manifestPath,
       MODERN_JAVA_WORKFLOW_COMPILER_LOCK_PATH: fixture.compilerLockPath,
+      MODERN_JAVA_WORKFLOW_COMPILER_INPUT_TOOL_PATH: fixture.compilerInputToolFixturePath,
     },
   });
   fs.rmSync(fixture.root, { recursive: true, force: true });
@@ -585,6 +599,30 @@ expectCheckerFailure(
   );
 }
 
+expectCheckerFailure(
+  'automatic compiler input redirects',
+  {
+    compilerInputTool: replaceRequired(
+      realCompilerInputTool,
+      "redirect: 'manual'",
+      "redirect: 'follow'"
+    ),
+  },
+  'compiler input downloads must use finite manually validated redirects'
+);
+
+expectCheckerFailure(
+  'unbounded compiler input redirects',
+  {
+    compilerInputTool: replaceRequired(
+      realCompilerInputTool,
+      'const maximumDownloadRedirects = 5;',
+      'const maximumDownloadRedirects = 50;'
+    ),
+  },
+  'compiler input downloads must use finite manually validated redirects'
+);
+
 const compilerInputRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'doppio-compiler-inputs-'));
 try {
   const sourceRoot = path.join(compilerInputRoot, 'source');
@@ -658,10 +696,20 @@ try {
     '--scala-cache', 'build/scala-cache',
     '--marker', 'build/marker.json',
   ];
-  const runPrepare = () => spawnSync(process.execPath, [compilerInputToolPath, ...prepareArguments], {
-    encoding: 'utf8',
-    env: { ...process.env, MODERN_JAVA_COMPILER_INPUT_ALLOW_FILE_URLS: '1' },
-  });
+  const runPrepare = (extraEnvironment = {}, allowFileUrls = true) => spawnSync(
+    process.execPath,
+    [compilerInputToolPath, ...prepareArguments],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        MODERN_JAVA_COMPILER_INPUT_ALLOW_FILE_URLS: allowFileUrls ? '1' : '0',
+        ...extraEnvironment,
+      },
+      timeout: 30_000,
+      killSignal: 'SIGKILL',
+    }
+  );
   const firstPrepare = runPrepare();
   if (firstPrepare.status !== 0) {
     throw new Error(`Verified compiler input preparation should pass:\n${firstPrepare.stderr}`);
@@ -779,6 +827,263 @@ try {
       overLimitPrepare.stderr
     );
   }
+  fs.writeFileSync(lockPath, `${JSON.stringify(fixtureLock, null, 2)}\n`);
+
+  const redirectFetchPreload = path.join(compilerInputRoot, 'redirect-fetch.cjs');
+  fs.writeFileSync(redirectFetchPreload, [
+    "'use strict';",
+    "const fs = require('node:fs');",
+    'const scenario = JSON.parse(process.env.MODERN_JAVA_COMPILER_REDIRECT_SCENARIO);',
+    'const recordPath = process.env.MODERN_JAVA_COMPILER_REDIRECT_RECORD;',
+    'const calls = [];',
+    'const cancellations = [];',
+    'let sharedSignal;',
+    'let sameSignal = true;',
+    'function record() {',
+    '  fs.writeFileSync(recordPath, JSON.stringify({ calls, cancellations, sameSignal }));',
+    '}',
+    'function responseBody(label, contents, linger = false) {',
+    '  let sent = false;',
+    '  return new ReadableStream({',
+    '    pull(controller) {',
+    '      if (sent) return;',
+    '      sent = true;',
+    '      controller.enqueue(contents);',
+    '      if (!linger) controller.close();',
+    '    },',
+    '    cancel() {',
+    '      cancellations.push(label);',
+    '      record();',
+    '    },',
+    '  });',
+    '}',
+    'function redirect(status, location, label) {',
+    '  const headers = location === undefined ? {} : { location };',
+    "  return new Response(responseBody(label, Buffer.from('redirect'), true), { status, headers });",
+    '}',
+    'function terminal(contents, { status = 200, headers = {}, linger = false } = {}) {',
+    "  return new Response(responseBody('terminal', contents, linger), { status, headers });",
+    '}',
+    'globalThis.fetch = async (input, options) => {',
+    "  const url = typeof input === 'string' ? input : input.href;",
+    '  if (calls.length === 0) {',
+    '    sharedSignal = options.signal;',
+    '  } else {',
+    '    sameSignal &&= sharedSignal === options.signal;',
+    '  }',
+    '  calls.push({ url, redirect: options.redirect, hasSignal: Boolean(options.signal) });',
+    '  record();',
+    "  const body = Buffer.from(scenario.bodyBase64, 'base64');",
+    "  if (scenario.mode === 'valid') {",
+    "    if (calls.length === 1) return redirect(301, '/compiler/one', 'redirect-1');",
+    "    if (calls.length === 2) return redirect(302, 'two', 'redirect-2');",
+    "    if (calls.length === 3) return redirect(303, 'https://repo1.maven.org/compiler/three', 'redirect-3');",
+    "    if (calls.length === 4) return redirect(307, '/compiler/four', 'redirect-4');",
+    "    if (calls.length === 5) return redirect(308, 'final.tgz', 'redirect-5');",
+    "    if (calls.length === 6) return terminal(body, { headers: { 'content-length': String(body.length) } });",
+    "    throw new Error('Unexpected request after the valid redirect chain.');",
+    '  }',
+    "  if (scenario.mode === 'missing') return redirect(302, undefined, 'redirect-1');",
+    "  if (scenario.mode === 'excess') {",
+    "    return redirect(302, '/compiler/hop-' + calls.length, 'redirect-' + calls.length);",
+    '  }',
+    "  if (scenario.mode === 'http-error') return terminal(body, { status: scenario.status, linger: true });",
+    "  if (scenario.mode === 'content-length') {",
+    "    return terminal(body, { headers: { 'content-length': String(scenario.contentLength) }, linger: true });",
+    '  }',
+    "  if (scenario.mode === 'too-long') return terminal(Buffer.concat([body, Buffer.from('x')]), { linger: true });",
+    "  if (scenario.mode === 'short') {",
+    "    if (calls.length === 1) return redirect(303, '/compiler/short-final', 'redirect-1');",
+    "    return terminal(body.subarray(0, body.length - 1), { headers: { 'content-length': String(body.length - 1) } });",
+    '  }',
+    "  return redirect(302, scenario.location, 'redirect-1');",
+    '};',
+    '',
+  ].join('\n'));
+  const redirectRecordPath = path.join(compilerInputRoot, 'redirect-record.json');
+  const kotlinArchiveCache = path.join(kotlinCache, fixtureLock.kotlin.archiveName);
+  const redirectLock = structuredClone(fixtureLock);
+  redirectLock.kotlin.url = 'https://registry.npmjs.org/compiler/start';
+  redirectLock.scala.files = redirectLock.scala.files.map((file) => ({
+    ...file,
+    url: `https://repo1.maven.org/compiler/${file.name}`,
+  }));
+  const runRedirectScenario = (scenario, existingContents = null) => {
+    if (existingContents === null) {
+      fs.rmSync(kotlinArchiveCache, { force: true });
+    } else {
+      fs.writeFileSync(kotlinArchiveCache, existingContents);
+    }
+    fs.rmSync(redirectRecordPath, { force: true });
+    fs.writeFileSync(lockPath, `${JSON.stringify(redirectLock, null, 2)}\n`);
+    const result = runPrepare({
+      NODE_OPTIONS: [process.env.NODE_OPTIONS, `--require=${redirectFetchPreload}`]
+        .filter(Boolean)
+        .join(' '),
+      MODERN_JAVA_COMPILER_REDIRECT_SCENARIO: JSON.stringify({
+        ...scenario,
+        bodyBase64: fs.readFileSync(kotlinArchiveSource).toString('base64'),
+      }),
+      MODERN_JAVA_COMPILER_REDIRECT_RECORD: redirectRecordPath,
+    }, false);
+    const record = fs.existsSync(redirectRecordPath)
+      ? JSON.parse(fs.readFileSync(redirectRecordPath, 'utf8'))
+      : { calls: [], cancellations: [], sameSignal: false };
+    return { result, record };
+  };
+
+  const validRedirect = runRedirectScenario({ mode: 'valid' });
+  if (
+    validRedirect.result.status !== 0 ||
+    sha256(fs.readFileSync(kotlinArchiveCache)) !== fixtureLock.kotlin.sha256 ||
+    JSON.stringify(validRedirect.record.calls.map((call) => call.url)) !== JSON.stringify([
+      'https://registry.npmjs.org/compiler/start',
+      'https://registry.npmjs.org/compiler/one',
+      'https://registry.npmjs.org/compiler/two',
+      'https://repo1.maven.org/compiler/three',
+      'https://repo1.maven.org/compiler/four',
+      'https://repo1.maven.org/compiler/final.tgz',
+    ]) ||
+    validRedirect.record.calls.some((call) => call.redirect !== 'manual' || !call.hasSignal) ||
+    !validRedirect.record.sameSignal ||
+    JSON.stringify(validRedirect.record.cancellations) !==
+      JSON.stringify(['redirect-1', 'redirect-2', 'redirect-3', 'redirect-4', 'redirect-5'])
+  ) {
+    throw new Error(
+      `Approved compiler redirects must share one manual download chain:\n` +
+      `${validRedirect.result.stderr}`
+    );
+  }
+
+  for (const rejectedRedirect of [
+    {
+      label: 'unapproved host',
+      mode: 'location',
+      location: 'https://example.invalid/compiler.tgz',
+      expectedMessage: 'must use an approved HTTPS compiler repository',
+    },
+    {
+      label: 'non-HTTPS URL',
+      mode: 'location',
+      location: 'http://registry.npmjs.org/compiler.tgz',
+      expectedMessage: 'must use an approved HTTPS compiler repository',
+    },
+    {
+      label: 'missing Location',
+      mode: 'missing',
+      expectedMessage: 'redirect is missing a Location header',
+    },
+    {
+      label: 'malformed Location',
+      mode: 'location',
+      location: 'https://[invalid',
+      expectedMessage: 'redirect has an invalid Location header',
+    },
+  ]) {
+    const { result, record } = runRedirectScenario(rejectedRedirect);
+    if (
+      result.status === 0 ||
+      !result.stderr.includes(rejectedRedirect.expectedMessage) ||
+      record.calls.length !== 1 ||
+      record.calls[0].redirect !== 'manual' ||
+      !record.calls[0].hasSignal ||
+      !record.sameSignal ||
+      JSON.stringify(record.cancellations) !== JSON.stringify(['redirect-1']) ||
+      fs.existsSync(kotlinArchiveCache)
+    ) {
+      throw new Error(
+        `Compiler input ${rejectedRedirect.label} redirect must fail before a destination request:\n` +
+        `${result.stderr}`
+      );
+    }
+  }
+
+  const excessiveRedirect = runRedirectScenario({ mode: 'excess' });
+  if (
+    excessiveRedirect.result.status === 0 ||
+    !excessiveRedirect.result.stderr.includes('exceeded 5 redirects') ||
+    excessiveRedirect.record.calls.length !== 6 ||
+    excessiveRedirect.record.calls.some((call) => call.redirect !== 'manual' || !call.hasSignal) ||
+    !excessiveRedirect.record.sameSignal ||
+    JSON.stringify(excessiveRedirect.record.cancellations) !== JSON.stringify([
+      'redirect-1',
+      'redirect-2',
+      'redirect-3',
+      'redirect-4',
+      'redirect-5',
+      'redirect-6',
+    ]) ||
+    fs.existsSync(kotlinArchiveCache)
+  ) {
+    throw new Error(
+      `Compiler input downloads must stop after five redirects:\n` +
+      `${excessiveRedirect.result.stderr}`
+    );
+  }
+
+  const previousInvalidArchive = Buffer.from('previous invalid compiler archive\n');
+  const assertTerminalDownloadFailure = ({
+    label,
+    scenario,
+    expectedMessage,
+    expectedCalls,
+    expectedCancellations,
+  }) => {
+    const { result, record } = runRedirectScenario(scenario, previousInvalidArchive);
+    if (
+      result.status === 0 ||
+      !result.stderr.includes(expectedMessage) ||
+      record.calls.length !== expectedCalls ||
+      record.calls.some((call) => call.redirect !== 'manual' || !call.hasSignal) ||
+      !record.sameSignal ||
+      JSON.stringify(record.cancellations) !== JSON.stringify(expectedCancellations) ||
+      !fs.readFileSync(kotlinArchiveCache).equals(previousInvalidArchive) ||
+      fs.readdirSync(kotlinCache).some((name) => name.includes('.download-'))
+    ) {
+      throw new Error(
+        `${label} must fail closed, cancel unread bodies, and preserve the prior cache target:\n` +
+        `${result.stderr}`
+      );
+    }
+  };
+
+  for (const status of [300, 503]) {
+    assertTerminalDownloadFailure({
+      label: `HTTP ${status} compiler input response`,
+      scenario: { mode: 'http-error', status },
+      expectedMessage: `HTTP ${status}`,
+      expectedCalls: 1,
+      expectedCancellations: ['terminal'],
+    });
+  }
+  assertTerminalDownloadFailure({
+    label: 'Oversized Content-Length compiler input response',
+    scenario: { mode: 'content-length', contentLength: fixtureLock.kotlin.size + 1 },
+    expectedMessage: `Content-Length exceeds locked size ${fixtureLock.kotlin.size} bytes`,
+    expectedCalls: 1,
+    expectedCancellations: ['terminal'],
+  });
+  assertTerminalDownloadFailure({
+    label: 'Absolutely oversized Content-Length compiler input response',
+    scenario: { mode: 'content-length', contentLength: 128 * 1024 * 1024 + 1 },
+    expectedMessage: 'Content-Length exceeds the 128 MiB compiler input limit',
+    expectedCalls: 1,
+    expectedCancellations: ['terminal'],
+  });
+  assertTerminalDownloadFailure({
+    label: 'Metered oversized compiler input response',
+    scenario: { mode: 'too-long' },
+    expectedMessage: `exceeds locked size ${fixtureLock.kotlin.size} bytes`,
+    expectedCalls: 1,
+    expectedCancellations: ['terminal'],
+  });
+  assertTerminalDownloadFailure({
+    label: 'Redirected short compiler input response',
+    scenario: { mode: 'short' },
+    expectedMessage: `size mismatch: expected ${fixtureLock.kotlin.size} bytes, got ${fixtureLock.kotlin.size - 1}`,
+    expectedCalls: 2,
+    expectedCancellations: ['redirect-1'],
+  });
   fs.writeFileSync(lockPath, `${JSON.stringify(fixtureLock, null, 2)}\n`);
 
   const oversizedScalaLock = structuredClone(fixtureLock);
