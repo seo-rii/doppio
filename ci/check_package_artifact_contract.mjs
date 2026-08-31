@@ -128,6 +128,7 @@ export function checkPackageArtifactContract(sources) {
     /const JDK_SHA256 = 'bee079d16b8631ff56d3bdc66b4d03e0ecbf9ee46baeef9b041c0bc497f25c34';/
   );
   assert.match(sources.downloaderSource, /const MAX_REDIRECTS = 5;/);
+  assert.match(sources.downloaderSource, /const DOWNLOAD_DEADLINE_MS = 10 \* 60 \* 1000;/);
   assert.match(sources.downloaderSource, /\[301, 302, 303, 307, 308\]/);
   assert.match(sources.downloaderSource, /statusCode !== 200/);
   assert.match(sources.downloaderSource, /Refusing (?:non-HTTPS JDK URL|JDK redirect to non-HTTPS URL)/);
@@ -149,6 +150,9 @@ export function checkPackageArtifactContract(sources) {
   assert.match(sources.downloaderSource, /fs\.renameSync\(stagedJdkHome, finalJdkHome\)/);
   assert.match(sources.downloaderSource, /fs\.renameSync\(backupJdkHome, finalJdkHome\)/);
   assert.match(sources.downloaderSource, /DOPPIO_JDK_TEST_FAIL_REPLACE/);
+  assert.match(sources.downloaderSource, /deadlineTimer = setTimeout\(\(\) => abortHttpsDownload\(state\), deadlineMs\)/);
+  assert.match(sources.downloaderSource, /request\.destroy\(error\)/);
+  assert.match(sources.downloaderSource, /response\.destroy\(error\)/);
   const stagedMetadataIndex = sources.downloaderSource.indexOf('writeMetadata(stagedJdkHome, config)');
   const replaceJdkIndex = sources.downloaderSource.indexOf('replaceJdk(stagedJdkHome, config, workDirectory)');
   assert.ok(stagedMetadataIndex !== -1 && stagedMetadataIndex < replaceJdkIndex);
@@ -161,6 +165,7 @@ export function checkPackageArtifactContract(sources) {
     "'symlink'",
     "'hardlink'",
     "'rollback'",
+    "'absolute-deadline'",
     "'fail-closed'"
   ]) {
     assert.ok(sources.downloaderTestSource.includes(fixtureCase), `missing downloader fixture case ${fixtureCase}`);
@@ -170,7 +175,8 @@ export function checkPackageArtifactContract(sources) {
   assert.match(sources.downloaderTestSource, /JDK is up-to-date and passed integrity checks/);
   assert.match(sources.downloaderTestSource, /assertFailedRunPreservesInstall/);
   assert.match(sources.downloaderTestSource, /DOPPIO_JDK_TEST_FAIL_REPLACE: 'after-backup'/);
-  assert.match(sources.downloaderTestSource, /assert\.equal\(completedCases, 12\)/);
+  assert.match(sources.downloaderTestSource, /body progress must occur repeatedly before the absolute deadline/);
+  assert.match(sources.downloaderTestSource, /assert\.equal\(completedCases, 13\)/);
 
   assert.match(
     sources.supportSource,
