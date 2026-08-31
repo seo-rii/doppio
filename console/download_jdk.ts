@@ -30,6 +30,7 @@ const MAX_ARCHIVE_BYTES = 256 * 1024 * 1024;
 const MAX_EXTRACTED_BYTES = 512 * 1024 * 1024;
 const MAX_ARCHIVE_ENTRIES = 4096;
 const REQUEST_TIMEOUT_MS = 30 * 1000;
+const DOWNLOAD_DEADLINE_MS = 10 * 60 * 1000;
 const TEST_MARKER = '.doppio-jdk-download-test-fixture';
 const TEST_MARKER_CONTENT = 'doppio-jdk-download-test-fixture-v1\n';
 
@@ -333,52 +334,97 @@ function copyLocalArchive(config: DownloadConfig, archivePath: string, callback:
   }
 }
 
-function downloadHttpsArchive(
+interface HttpsDownloadState {
+  activeRequest: any;
+  activeResponse: any;
+  callback: (error?: Error) => void;
+  deadlineAt: number;
+  deadlineMs: number;
+  deadlineTimer: any;
+  settled: boolean;
+  streamingResponse: boolean;
+}
+
+function finishHttpsDownload(state: HttpsDownloadState, error?: Error): void {
+  if (state.settled) {
+    return;
+  }
+  state.settled = true;
+  clearTimeout(state.deadlineTimer);
+  state.activeRequest = null;
+  state.activeResponse = null;
+  state.callback(error);
+}
+
+function abortHttpsDownload(state: HttpsDownloadState): void {
+  if (state.settled) {
+    return;
+  }
+  const error = new Error(`JDK download exceeded its absolute deadline of ${state.deadlineMs}ms.`);
+  const request = state.activeRequest;
+  const response = state.activeResponse;
+  if (request !== null) {
+    request.destroy(error);
+  }
+  if (response !== null) {
+    response.destroy(error);
+  }
+  if (!state.streamingResponse) {
+    finishHttpsDownload(state, error);
+  }
+}
+
+function downloadHttpsArchiveAttempt(
   downloadUrl: string,
   redirects: number,
   archivePath: string,
   expectedSha256: string,
-  callback: (error?: Error) => void
+  state: HttpsDownloadState
 ): void {
-  const parsed = url.parse(downloadUrl);
-  if (parsed.protocol !== 'https:') {
-    callback(new Error(`Refusing non-HTTPS JDK URL: ${downloadUrl}`));
+  if (Date.now() >= state.deadlineAt) {
+    abortHttpsDownload(state);
     return;
   }
-  let settled = false;
-  function finish(error?: Error): void {
-    if (!settled) {
-      settled = true;
-      callback(error);
-    }
+  const parsed = url.parse(downloadUrl);
+  if (parsed.protocol !== 'https:') {
+    finishHttpsDownload(state, new Error(`Refusing non-HTTPS JDK URL: ${downloadUrl}`));
+    return;
   }
 
   let request: any;
   try {
     request = (https as any).get(downloadUrl, (response: any) => {
+      if (state.settled || request !== state.activeRequest) {
+        response.destroy();
+        return;
+      }
+      state.activeResponse = response;
       const statusCode = response.statusCode;
       if ([301, 302, 303, 307, 308].indexOf(statusCode) !== -1) {
         const location = response.headers.location;
-        response.resume();
+        response.destroy();
         if (redirects >= MAX_REDIRECTS) {
-          finish(new Error(`JDK download exceeded ${MAX_REDIRECTS} redirects.`));
+          finishHttpsDownload(state, new Error(`JDK download exceeded ${MAX_REDIRECTS} redirects.`));
           return;
         }
         if (typeof location !== 'string' || location.length === 0) {
-          finish(new Error(`JDK redirect ${statusCode} is missing Location.`));
+          finishHttpsDownload(state, new Error(`JDK redirect ${statusCode} is missing Location.`));
           return;
         }
         const redirectedUrl = url.resolve(downloadUrl, location);
         if (url.parse(redirectedUrl).protocol !== 'https:') {
-          finish(new Error(`Refusing JDK redirect to non-HTTPS URL: ${redirectedUrl}`));
+          finishHttpsDownload(state, new Error(`Refusing JDK redirect to non-HTTPS URL: ${redirectedUrl}`));
           return;
         }
-        downloadHttpsArchive(redirectedUrl, redirects + 1, archivePath, expectedSha256, finish);
+        request.destroy();
+        state.activeRequest = null;
+        state.activeResponse = null;
+        downloadHttpsArchiveAttempt(redirectedUrl, redirects + 1, archivePath, expectedSha256, state);
         return;
       }
       if (statusCode !== 200) {
-        response.resume();
-        finish(new Error(`JDK download returned HTTP ${statusCode}.`));
+        response.destroy();
+        finishHttpsDownload(state, new Error(`JDK download returned HTTP ${statusCode}.`));
         return;
       }
 
@@ -386,27 +432,66 @@ function downloadHttpsArchive(
       let expectedLength: number | null = null;
       if (lengthHeader !== undefined) {
         if (!/^[0-9]+$/.test(String(lengthHeader))) {
-          response.resume();
-          finish(new Error('JDK download returned an invalid Content-Length header.'));
+          response.destroy();
+          finishHttpsDownload(state, new Error('JDK download returned an invalid Content-Length header.'));
           return;
         }
         expectedLength = parseInt(String(lengthHeader), 10);
         if (expectedLength > MAX_ARCHIVE_BYTES) {
-          response.resume();
-          finish(new Error(`JDK archive exceeds ${MAX_ARCHIVE_BYTES} bytes.`));
+          response.destroy();
+          finishHttpsDownload(state, new Error(`JDK archive exceeds ${MAX_ARCHIVE_BYTES} bytes.`));
           return;
         }
       }
-      streamVerifiedArchive(response, archivePath, expectedSha256, expectedLength, finish);
+      state.streamingResponse = true;
+      streamVerifiedArchive(response, archivePath, expectedSha256, expectedLength, (error?: Error) => {
+        state.streamingResponse = false;
+        if (request === state.activeRequest) {
+          state.activeRequest = null;
+          state.activeResponse = null;
+        }
+        finishHttpsDownload(state, error);
+      });
+    });
+    state.activeRequest = request;
+    request.setTimeout(REQUEST_TIMEOUT_MS, () => {
+      request.destroy(new Error(`JDK download timed out after ${REQUEST_TIMEOUT_MS}ms.`));
+    });
+    request.on('error', (error: Error) => {
+      if (state.settled || request !== state.activeRequest) {
+        return;
+      }
+      if (state.streamingResponse && state.activeResponse !== null) {
+        state.activeResponse.destroy(error);
+        return;
+      }
+      finishHttpsDownload(state, error);
     });
   } catch (error) {
-    finish(<Error> error);
+    finishHttpsDownload(state, <Error> error);
     return;
   }
-  request.setTimeout(REQUEST_TIMEOUT_MS, () => {
-    request.destroy(new Error(`JDK download timed out after ${REQUEST_TIMEOUT_MS}ms.`));
-  });
-  request.on('error', finish);
+}
+
+function downloadHttpsArchive(
+  downloadUrl: string,
+  archivePath: string,
+  expectedSha256: string,
+  deadlineMs: number,
+  callback: (error?: Error) => void
+): void {
+  const state: HttpsDownloadState = {
+    activeRequest: null,
+    activeResponse: null,
+    callback,
+    deadlineAt: Date.now() + deadlineMs,
+    deadlineMs,
+    deadlineTimer: null,
+    settled: false,
+    streamingResponse: false
+  };
+  state.deadlineTimer = setTimeout(() => abortHttpsDownload(state), deadlineMs);
+  downloadHttpsArchiveAttempt(downloadUrl, 0, archivePath, expectedSha256, state);
 }
 
 function normalizeArchiveEntry(name: string): string {
@@ -668,7 +753,13 @@ function installJdk(config: DownloadConfig, callback: (error?: Error) => void): 
   if (config.localArchive) {
     copyLocalArchive(config, archivePath, downloaded);
   } else {
-    downloadHttpsArchive(config.sourceUrl, 0, archivePath, config.expectedSha256, downloaded);
+    downloadHttpsArchive(
+      config.sourceUrl,
+      archivePath,
+      config.expectedSha256,
+      DOWNLOAD_DEADLINE_MS,
+      downloaded
+    );
   }
 }
 

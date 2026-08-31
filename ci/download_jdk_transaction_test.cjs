@@ -32,8 +32,8 @@ function writeJson(filePath, value) {
   fs.writeFileSync(filePath, `${JSON.stringify(value)}\n`);
 }
 
-function compileDownloader(outputPath) {
-  const source = fs.readFileSync(downloaderSourcePath, 'utf8');
+function compileDownloader(outputPath, transformSource = (source) => source) {
+  const source = transformSource(fs.readFileSync(downloaderSourcePath, 'utf8'));
   const result = typescript.transpileModule(source, {
     compilerOptions: {
       module: typescript.ModuleKind.CommonJS,
@@ -47,6 +47,146 @@ function compileDownloader(outputPath) {
   );
   assert.deepEqual(errors, [], 'download_jdk.ts must transpile without syntax errors');
   fs.writeFileSync(outputPath, result.outputText, {mode: 0o600});
+}
+
+function compileDeadlineDownloader(outputPath, destinationRoot) {
+  compileDownloader(outputPath, (source) => {
+    const replacements = [
+      [
+        "const JDK_URL = 'https://github.com/plasma-umass/doppio_jcl/releases/download/v3.2/java_home.tar.gz';",
+        "const JDK_URL = 'https://jdk-deadline.test/start';"
+      ],
+      [
+        "const JDK_SHA256 = 'bee079d16b8631ff56d3bdc66b4d03e0ecbf9ee46baeef9b041c0bc497f25c34';",
+        `const JDK_SHA256 = '${'0'.repeat(64)}';`
+      ],
+      [
+        "const JDK_PATH = path.resolve(__dirname, '..', '..', '..', 'vendor');",
+        `const JDK_PATH = ${JSON.stringify(destinationRoot)};`
+      ],
+      [
+        'const DOWNLOAD_DEADLINE_MS = 10 * 60 * 1000;',
+        'const DOWNLOAD_DEADLINE_MS = 600;'
+      ]
+    ];
+    for (const [original, replacement] of replacements) {
+      assert.equal(source.split(original).length, 2, `missing unique downloader test seam: ${original}`);
+      source = source.replace(original, replacement);
+    }
+    return source;
+  });
+}
+
+function writeHttpsProgressMock(outputPath) {
+  fs.writeFileSync(outputPath, `'use strict';
+const fs = require('node:fs');
+const {EventEmitter} = require('node:events');
+const Module = require('node:module');
+const {Readable} = require('node:stream');
+
+const originalLoad = Module._load;
+const logPath = process.env.DOPPIO_JDK_TEST_NETWORK_LOG;
+
+function log(message) {
+  fs.appendFileSync(logPath, \`${'${message}'}\\n\`);
+}
+
+class MockRequest extends EventEmitter {
+  constructor() {
+    super();
+    this.destroyed = false;
+  }
+
+  setTimeout(milliseconds) {
+    log(\`request-timeout:${'${milliseconds}'}\`);
+    return this;
+  }
+
+  destroy(error) {
+    if (this.destroyed) {
+      return this;
+    }
+    this.destroyed = true;
+    log(\`request-destroy:${'${error === undefined ? \'none\' : error.message}'}\`);
+    if (error !== undefined) {
+      process.nextTick(() => this.emit('error', error));
+    }
+    return this;
+  }
+}
+
+class MockResponse extends Readable {
+  constructor(statusCode, headers, progressive) {
+    super();
+    this.statusCode = statusCode;
+    this.headers = headers;
+    this.progressive = progressive;
+    this.progressTimer = null;
+  }
+
+  _read() {
+    if (!this.progressive) {
+      this.push(null);
+      return;
+    }
+    if (this.progressTimer === null) {
+      log('body-chunk');
+      this.push(Buffer.from('initial-progress-1\\n'));
+      log('body-chunk');
+      this.push(Buffer.from('initial-progress-2\\n'));
+      this.progressTimer = setInterval(() => {
+        log('body-chunk');
+        this.push(Buffer.from('progress\\n'));
+      }, 5);
+    }
+  }
+
+  _destroy(error, callback) {
+    if (this.progressTimer !== null) {
+      clearInterval(this.progressTimer);
+      this.progressTimer = null;
+    }
+    log(\`response-destroy:${'${error === null ? \'none\' : error.message}'}\`);
+    if (error !== null && error.message.includes('absolute deadline')) {
+      log(\`deadline-at:${'${Date.now()}'}\`);
+    }
+    callback(error);
+  }
+}
+
+function get(downloadUrl, callback) {
+  const request = new MockRequest();
+  process.nextTick(() => {
+    if (request.destroyed) {
+      return;
+    }
+    const pathname = new URL(downloadUrl).pathname;
+    if (pathname === '/start') {
+      setTimeout(() => {
+        if (!request.destroyed) {
+          log('redirect');
+          callback(new MockResponse(302, {location: '/body'}, false));
+        }
+      }, 250);
+      return;
+    }
+    if (pathname === '/body') {
+      log(\`body-at:${'${Date.now()}'}\`);
+      callback(new MockResponse(200, {}, true));
+      return;
+    }
+    request.emit('error', new Error(\`Unexpected mock URL: ${'${downloadUrl}'}\`));
+  });
+  return request;
+}
+
+Module._load = function(request) {
+  if (request === 'https' && process.env.DOPPIO_JDK_TEST_HTTPS_MOCK === '1') {
+    return {get};
+  }
+  return originalLoad.apply(this, arguments);
+};
+`, {mode: 0o600});
 }
 
 async function writeArchive(archivePath, entries) {
@@ -165,6 +305,36 @@ function runDownloader(compiledDownloader, fixture, archivePath, expectedSha256,
     env: environment,
     maxBuffer: 8 * 1024 * 1024,
     timeout: 30 * 1000
+  });
+}
+
+function runNetworkDeadlineDownloader(compiledDownloader, fixture, preloadPath, logPath) {
+  const nodeOptions = [process.env.NODE_OPTIONS, `--require=${preloadPath}`].filter(Boolean).join(' ');
+  const environment = {
+    ...process.env,
+    DOPPIO_JDK_TEST_HTTPS_MOCK: '1',
+    DOPPIO_JDK_TEST_NETWORK_LOG: logPath,
+    NODE_OPTIONS: nodeOptions,
+    NODE_PATH: process.env.NODE_PATH === undefined
+      ? path.join(repoRoot, 'node_modules')
+      : `${path.join(repoRoot, 'node_modules')}${path.delimiter}${process.env.NODE_PATH}`
+  };
+  for (const key of [
+    'DOPPIO_JDK_DOWNLOAD_TEST_ONLY',
+    'DOPPIO_JDK_TEST_ARCHIVE',
+    'DOPPIO_JDK_TEST_DESTINATION',
+    'DOPPIO_JDK_TEST_FAIL_REPLACE',
+    'DOPPIO_JDK_TEST_ROOT',
+    'DOPPIO_JDK_TEST_SHA256'
+  ]) {
+    delete environment[key];
+  }
+  return childProcess.spawnSync(process.execPath, [compiledDownloader], {
+    cwd: fixture.caseRoot,
+    encoding: 'utf8',
+    env: environment,
+    maxBuffer: 8 * 1024 * 1024,
+    timeout: 5 * 1000
   });
 }
 
@@ -319,6 +489,65 @@ async function main() {
     assertFailedRunPreservesInstall(failedReplacement, rollback.destinationRoot, beforeRollback);
     completedCases += 1;
 
+    const absoluteDeadline = createCaseRoot(suiteRoot, 'absolute-deadline');
+    writePreviousValidInstall(absoluteDeadline.destinationRoot);
+    const beforeAbsoluteDeadline = snapshotTree(path.join(absoluteDeadline.destinationRoot, 'java_home'));
+    const httpsMockPath = path.join(absoluteDeadline.caseRoot, 'https-progress-mock.cjs');
+    const networkLogPath = path.join(absoluteDeadline.caseRoot, 'network.log');
+    const deadlineDownloader = path.join(absoluteDeadline.caseRoot, 'download_jdk.js');
+    compileDeadlineDownloader(deadlineDownloader, absoluteDeadline.destinationRoot);
+    writeHttpsProgressMock(httpsMockPath);
+    fs.writeFileSync(networkLogPath, '');
+    const deadlineStartedAt = Date.now();
+    const deadlineFailure = runNetworkDeadlineDownloader(
+      deadlineDownloader,
+      absoluteDeadline,
+      httpsMockPath,
+      networkLogPath
+    );
+    const deadlineElapsedMs = Date.now() - deadlineStartedAt;
+    assertFailedRunPreservesInstall(
+      deadlineFailure,
+      absoluteDeadline.destinationRoot,
+      beforeAbsoluteDeadline
+    );
+    assert.match(deadlineFailure.stderr, /absolute deadline of 600ms/);
+    assert.equal(
+      (deadlineFailure.stderr.match(/Failed to install verified JDK:/g) ?? []).length,
+      1,
+      'the absolute deadline must settle the install callback exactly once'
+    );
+    assert.ok(deadlineElapsedMs < 5 * 1000, `deadline case took ${deadlineElapsedMs}ms`);
+    const networkEvents = fs.readFileSync(networkLogPath, 'utf8').trim().split('\n');
+    assert.equal(networkEvents.filter((event) => event === 'redirect').length, 1);
+    const bodyAt = Number(networkEvents.find((event) => event.startsWith('body-at:'))?.slice('body-at:'.length));
+    const deadlineAt = Number(
+      networkEvents.find((event) => event.startsWith('deadline-at:'))?.slice('deadline-at:'.length)
+    );
+    assert.ok(Number.isFinite(bodyAt) && Number.isFinite(deadlineAt));
+    assert.ok(
+      deadlineAt - bodyAt < 475,
+      `redirect reset the shared deadline: body=${bodyAt}, deadline=${deadlineAt}`
+    );
+    assert.equal(
+      networkEvents.filter((event) => event === 'request-timeout:30000').length,
+      2,
+      'each request must retain the independent socket inactivity timeout'
+    );
+    assert.ok(
+      networkEvents.filter((event) => event === 'body-chunk').length >= 2,
+      `body progress must occur repeatedly before the absolute deadline: ${JSON.stringify(networkEvents)}`
+    );
+    assert.ok(
+      networkEvents.includes('request-destroy:JDK download exceeded its absolute deadline of 600ms.'),
+      'the deadline must abort the active request'
+    );
+    assert.ok(
+      networkEvents.includes('response-destroy:JDK download exceeded its absolute deadline of 600ms.'),
+      'the deadline must abort the active response'
+    );
+    completedCases += 1;
+
     const failClosed = createCaseRoot(suiteRoot, 'fail-closed');
     const failClosedArchive = path.join(failClosed.caseRoot, 'java_home.tar.gz');
     await writeArchive(failClosedArchive, safeArchiveEntries());
@@ -343,7 +572,7 @@ async function main() {
     assertFailedRunPreservesInstall(rejectedOverride, failClosed.destinationRoot, beforeFailClosed);
     completedCases += 1;
 
-    assert.equal(completedCases, 12);
+    assert.equal(completedCases, 13);
     console.log(`download-jdk-transaction:${completedCases}:ok`);
   } finally {
     fs.rmSync(suiteRoot, {recursive: true, force: true});
