@@ -533,6 +533,36 @@ expectCheckerFailure(
 
 {
   const compilerLock = structuredClone(realCompilerLock);
+  delete compilerLock.kotlin.size;
+  expectCheckerFailure(
+    'missing Kotlin compiler archive size',
+    { compilerLock },
+    'must pin a positive safe-integer size at or below 128 MiB'
+  );
+}
+
+{
+  const compilerLock = structuredClone(realCompilerLock);
+  compilerLock.scala.files[0].size = 1.5;
+  expectCheckerFailure(
+    'invalid Scala compiler input size',
+    { compilerLock },
+    'invalidly sized file'
+  );
+}
+
+{
+  const compilerLock = structuredClone(realCompilerLock);
+  compilerLock.kotlin.size = 128 * 1024 * 1024 + 1;
+  expectCheckerFailure(
+    'compiler input above absolute size limit',
+    { compilerLock },
+    'must pin a positive safe-integer size at or below 128 MiB'
+  );
+}
+
+{
+  const compilerLock = structuredClone(realCompilerLock);
   compilerLock.scala.files.push({
     name: 'scala-unknown-2.13.18.jar',
     url: 'https://repo1.maven.org/maven2/org/scala-lang/scala-unknown/2.13.18/scala-unknown-2.13.18.jar',
@@ -590,12 +620,13 @@ try {
   }
 
   const fixtureLock = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     kotlin: {
       version: '9.9.9',
       url: pathToFileURL(kotlinArchiveSource).href,
       archiveName: 'kotlin-compiler-9.9.9.tgz',
       sha256: sha256(fs.readFileSync(kotlinArchiveSource)),
+      size: fs.statSync(kotlinArchiveSource).size,
       extractedDirectory: 'kotlin-compiler-9.9.9',
       jars: Object.fromEntries(
         [...kotlinContents.keys()].sort().map((name) => [
@@ -610,6 +641,7 @@ try {
         name,
         url: pathToFileURL(path.join(sourceRoot, name)).href,
         sha256: sha256(fs.readFileSync(path.join(sourceRoot, name))),
+        size: fs.statSync(path.join(sourceRoot, name)).size,
       })),
     },
   };
@@ -664,6 +696,90 @@ try {
   ) {
     throw new Error('Compiler input preparation must rehash and restore cache hits from locked sources.');
   }
+
+  const sizeBoundaryFile = fixtureLock.scala.files[0];
+  const sizeBoundaryTarget = path.join(scalaCache, sizeBoundaryFile.name);
+  const verifiedTargetContents = fs.readFileSync(sizeBoundaryTarget);
+  const assertSizeFailureCleanup = (label) => {
+    if (!fs.readFileSync(sizeBoundaryTarget).equals(verifiedTargetContents)) {
+      throw new Error(`${label} must preserve the previously verified cache target.`);
+    }
+    if (fs.readdirSync(scalaCache).some((name) => name.includes('.download-'))) {
+      throw new Error(`${label} must remove partial compiler input downloads.`);
+    }
+  };
+
+  const tooLongLock = structuredClone(fixtureLock);
+  tooLongLock.scala.files[0].size -= 1;
+  fs.writeFileSync(lockPath, `${JSON.stringify(tooLongLock, null, 2)}\n`);
+  const tooLongPrepare = runPrepare();
+  if (
+    tooLongPrepare.status === 0 ||
+    !tooLongPrepare.stderr.includes(`exceeds locked size ${tooLongLock.scala.files[0].size} bytes`)
+  ) {
+    throw new Error(
+      `Compiler input preparation must reject a stream longer than its locked size:\n` +
+      tooLongPrepare.stderr
+    );
+  }
+  assertSizeFailureCleanup('Too-long compiler input rejection');
+
+  const tooShortLock = structuredClone(fixtureLock);
+  tooShortLock.scala.files[0].size += 1;
+  fs.writeFileSync(lockPath, `${JSON.stringify(tooShortLock, null, 2)}\n`);
+  const tooShortPrepare = runPrepare();
+  if (
+    tooShortPrepare.status === 0 ||
+    !tooShortPrepare.stderr.includes(
+      `size mismatch: expected ${tooShortLock.scala.files[0].size} bytes, got ${sizeBoundaryFile.size}`
+    )
+  ) {
+    throw new Error(
+      `Compiler input preparation must reject a stream shorter than its locked size:\n` +
+      tooShortPrepare.stderr
+    );
+  }
+  assertSizeFailureCleanup('Too-short compiler input rejection');
+  fs.writeFileSync(lockPath, `${JSON.stringify(fixtureLock, null, 2)}\n`);
+
+  const zeroSizeLock = structuredClone(fixtureLock);
+  zeroSizeLock.kotlin.size = 0;
+  fs.writeFileSync(lockPath, `${JSON.stringify(zeroSizeLock, null, 2)}\n`);
+  const zeroSizePrepare = runPrepare();
+  if (
+    zeroSizePrepare.status === 0 ||
+    !zeroSizePrepare.stderr.includes('size must be a positive safe integer')
+  ) {
+    throw new Error(`Compiler input preparation must reject a zero locked size:\n${zeroSizePrepare.stderr}`);
+  }
+
+  const fractionalSizeLock = structuredClone(fixtureLock);
+  fractionalSizeLock.scala.files[0].size = 1.5;
+  fs.writeFileSync(lockPath, `${JSON.stringify(fractionalSizeLock, null, 2)}\n`);
+  const fractionalSizePrepare = runPrepare();
+  if (
+    fractionalSizePrepare.status === 0 ||
+    !fractionalSizePrepare.stderr.includes('size must be a positive safe integer')
+  ) {
+    throw new Error(
+      `Compiler input preparation must reject a fractional locked size:\n${fractionalSizePrepare.stderr}`
+    );
+  }
+
+  const overLimitLock = structuredClone(fixtureLock);
+  overLimitLock.kotlin.size = 128 * 1024 * 1024 + 1;
+  fs.writeFileSync(lockPath, `${JSON.stringify(overLimitLock, null, 2)}\n`);
+  const overLimitPrepare = runPrepare();
+  if (
+    overLimitPrepare.status === 0 ||
+    !overLimitPrepare.stderr.includes('must not exceed the 128 MiB compiler input limit')
+  ) {
+    throw new Error(
+      `Compiler input preparation must reject a locked size above its absolute cap:\n` +
+      overLimitPrepare.stderr
+    );
+  }
+  fs.writeFileSync(lockPath, `${JSON.stringify(fixtureLock, null, 2)}\n`);
 
   const oversizedScalaLock = structuredClone(fixtureLock);
   oversizedScalaLock.scala.files.push({
@@ -721,6 +837,7 @@ try {
     const unsafeLock = structuredClone(fixtureLock);
     unsafeLock.kotlin.url = pathToFileURL(unsafeArchive).href;
     unsafeLock.kotlin.sha256 = sha256(fs.readFileSync(unsafeArchive));
+    unsafeLock.kotlin.size = fs.statSync(unsafeArchive).size;
     fs.writeFileSync(lockPath, `${JSON.stringify(unsafeLock, null, 2)}\n`);
     fs.writeFileSync(
       path.join(kotlinCache, 'kotlin-compiler-9.9.9', 'package', 'lib', 'kotlin-compiler.jar'),

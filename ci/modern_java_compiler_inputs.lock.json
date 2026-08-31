@@ -1,10 +1,11 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "kotlin": {
     "version": "2.4.0",
     "url": "https://registry.npmjs.org/kotlin-compiler/-/kotlin-compiler-2.4.0.tgz",
     "archiveName": "kotlin-compiler-2.4.0.tgz",
     "sha256": "bd4f02e30c727f0ef183eda41d33c69e904b2a613d586083a04c34ef6d7f6ace",
+    "size": 86971852,
     "extractedDirectory": "kotlin-compiler-2.4.0",
     "jars": {
       "package/lib/allopen-compiler-plugin.jar": "4521ff8ac1493ac5fda01bc0a80a37c961e19e54692989a71974811a1d596a83",
@@ -69,27 +70,32 @@
       {
         "name": "java-diff-utils-4.16.jar",
         "url": "https://repo1.maven.org/maven2/io/github/java-diff-utils/java-diff-utils/4.16/java-diff-utils-4.16.jar",
-        "sha256": "620403030d676a4a27f780a3acec7438dee1b1651a1c804fa6bb11bb07399a6f"
+        "sha256": "620403030d676a4a27f780a3acec7438dee1b1651a1c804fa6bb11bb07399a6f",
+        "size": 78743
       },
       {
         "name": "jline-3.29.0-jdk8.jar",
         "url": "https://repo1.maven.org/maven2/org/jline/jline/3.29.0/jline-3.29.0-jdk8.jar",
-        "sha256": "ed2680487642df95379f220c09c0f77e25095713387e2bc00c2d6581bb79c804"
+        "sha256": "ed2680487642df95379f220c09c0f77e25095713387e2bc00c2d6581bb79c804",
+        "size": 1371851
       },
       {
         "name": "scala-compiler-2.13.18.jar",
         "url": "https://repo1.maven.org/maven2/org/scala-lang/scala-compiler/2.13.18/scala-compiler-2.13.18.jar",
-        "sha256": "2f15891fcae7aad30a3892194fb2abb6224cf7ce5d2bd90fba7f1c48682fca21"
+        "sha256": "2f15891fcae7aad30a3892194fb2abb6224cf7ce5d2bd90fba7f1c48682fca21",
+        "size": 12343847
       },
       {
         "name": "scala-library-2.13.18.jar",
         "url": "https://repo1.maven.org/maven2/org/scala-lang/scala-library/2.13.18/scala-library-2.13.18.jar",
-        "sha256": "4e85d96ff7bc7dc627985523c3541b9917aaa08e956391380c42db21a2c4e5a0"
+        "sha256": "4e85d96ff7bc7dc627985523c3541b9917aaa08e956391380c42db21a2c4e5a0",
+        "size": 5940741
       },
       {
         "name": "scala-reflect-2.13.18.jar",
         "url": "https://repo1.maven.org/maven2/org/scala-lang/scala-reflect/2.13.18/scala-reflect-2.13.18.jar",
-        "sha256": "6935ff1982b2ac93d695f15aa66921be2f602921277afe002f018fd8c7d6e29b"
+        "sha256": "6935ff1982b2ac93d695f15aa66921be2f602921277afe002f018fd8c7d6e29b",
+        "size": 3814367
       }
     ]
   }

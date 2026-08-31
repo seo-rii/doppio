@@ -2,12 +2,13 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
-import { Readable } from 'node:stream';
+import { Readable, Transform } from 'node:stream';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const defaultRepoRoot = path.resolve(path.dirname(__filename), '..');
+const maximumCompilerInputBytes = 128 * 1024 * 1024;
 
 function fail(message) {
   throw new Error(message);
@@ -70,6 +71,15 @@ function requireHash(value, label) {
   }
 }
 
+function requireSize(value, label) {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    fail(`${label} size must be a positive safe integer.`);
+  }
+  if (value > maximumCompilerInputBytes) {
+    fail(`${label} size must not exceed the 128 MiB compiler input limit.`);
+  }
+}
+
 function requireDownloadUrl(value, label) {
   const parsed = new URL(value);
   const allowedHttpsHost =
@@ -85,8 +95,8 @@ function requireDownloadUrl(value, label) {
 }
 
 function validateLock(lock) {
-  if (lock?.schemaVersion !== 1 || !lock.kotlin || !lock.scala) {
-    fail('Compiler input lock must use schemaVersion 1 with Kotlin and Scala inputs.');
+  if (lock?.schemaVersion !== 2 || !lock.kotlin || !lock.scala) {
+    fail('Compiler input lock must use schemaVersion 2 with Kotlin and Scala inputs.');
   }
   if (
     !/^[0-9]+\.[0-9]+\.[0-9]+$/.test(lock.kotlin.version || '') ||
@@ -97,6 +107,7 @@ function validateLock(lock) {
   }
   requireDownloadUrl(lock.kotlin.url, 'Kotlin compiler archive URL');
   requireHash(lock.kotlin.sha256, 'Kotlin compiler archive');
+  requireSize(lock.kotlin.size, 'Kotlin compiler archive');
   if (!lock.kotlin.jars || typeof lock.kotlin.jars !== 'object' || Array.isArray(lock.kotlin.jars)) {
     fail('Kotlin compiler lock must contain extracted JAR hashes.');
   }
@@ -137,6 +148,7 @@ function validateLock(lock) {
     }
     requireDownloadUrl(file.url, `Scala ${file.name} URL`);
     requireHash(file.sha256, `Scala ${file.name}`);
+    requireSize(file.size, `Scala ${file.name}`);
     scalaNames.push(file.name);
   }
   if (
@@ -178,7 +190,54 @@ function replaceAtomically(temporaryPath, targetPath) {
   }
 }
 
-async function downloadVerified(url, expectedHash, targetPath) {
+function createDownloadMeter(expectedSize, label) {
+  const hash = crypto.createHash('sha256');
+  let bytesRead = 0;
+  const stream = new Transform({
+    transform(chunk, encoding, callback) {
+      bytesRead += chunk.length;
+      if (bytesRead > maximumCompilerInputBytes) {
+        callback(new Error(`${label} exceeds the 128 MiB compiler input limit.`));
+        return;
+      }
+      if (bytesRead > expectedSize) {
+        callback(new Error(`${label} exceeds locked size ${expectedSize} bytes.`));
+        return;
+      }
+      hash.update(chunk);
+      callback(null, chunk);
+    },
+    flush(callback) {
+      if (bytesRead !== expectedSize) {
+        callback(new Error(
+          `${label} size mismatch: expected ${expectedSize} bytes, got ${bytesRead}.`
+        ));
+        return;
+      }
+      callback();
+    },
+  });
+  return {
+    stream,
+    digest: () => hash.digest('hex'),
+  };
+}
+
+function rejectOversizedContentLength(response, expectedSize, label) {
+  const value = response.headers.get('content-length');
+  if (value === null || !/^[0-9]+$/.test(value)) {
+    return;
+  }
+  const contentLength = Number(value);
+  if (!Number.isSafeInteger(contentLength) || contentLength > maximumCompilerInputBytes) {
+    fail(`${label} Content-Length exceeds the 128 MiB compiler input limit.`);
+  }
+  if (contentLength > expectedSize) {
+    fail(`${label} Content-Length exceeds locked size ${expectedSize} bytes.`);
+  }
+}
+
+async function downloadVerified(url, expectedHash, expectedSize, targetPath) {
   fs.mkdirSync(path.dirname(targetPath), { recursive: true });
   const temporaryPath = path.join(
     path.dirname(targetPath),
@@ -186,8 +245,9 @@ async function downloadVerified(url, expectedHash, targetPath) {
   );
   try {
     const parsedUrl = requireDownloadUrl(url, path.basename(targetPath));
+    let source;
     if (parsedUrl.protocol === 'file:') {
-      fs.copyFileSync(fileURLToPath(parsedUrl), temporaryPath);
+      source = fs.createReadStream(fileURLToPath(parsedUrl));
     } else {
       const response = await fetch(parsedUrl, {
         redirect: 'follow',
@@ -197,9 +257,12 @@ async function downloadVerified(url, expectedHash, targetPath) {
       if (!response.ok || !response.body) {
         fail(`Unable to download ${url}: HTTP ${response.status}.`);
       }
-      await pipeline(Readable.fromWeb(response.body), fs.createWriteStream(temporaryPath, { mode: 0o644 }));
+      rejectOversizedContentLength(response, expectedSize, url);
+      source = Readable.fromWeb(response.body);
     }
-    const actualHash = sha256File(temporaryPath);
+    const meter = createDownloadMeter(expectedSize, url);
+    await pipeline(source, meter.stream, fs.createWriteStream(temporaryPath, { mode: 0o644 }));
+    const actualHash = meter.digest();
     if (actualHash !== expectedHash) {
       fail(`Compiler input SHA-256 mismatch for ${url}: expected ${expectedHash}, got ${actualHash}.`);
     }
@@ -211,11 +274,15 @@ async function downloadVerified(url, expectedHash, targetPath) {
 
 async function ensureVerifiedFile(file, cacheRoot, label) {
   const targetPath = path.join(cacheRoot, file.name);
-  if (isRegularFile(targetPath) && sha256File(targetPath) === file.sha256) {
+  if (
+    isRegularFile(targetPath) &&
+    fs.statSync(targetPath).size === file.size &&
+    sha256File(targetPath) === file.sha256
+  ) {
     console.log(`${label} cache verified: ${file.name}`);
     return targetPath;
   }
-  await downloadVerified(file.url, file.sha256, targetPath);
+  await downloadVerified(file.url, file.sha256, file.size, targetPath);
   console.log(`${label} cache restored: ${file.name}`);
   return targetPath;
 }
@@ -360,6 +427,7 @@ try {
       name: lock.kotlin.archiveName,
       url: lock.kotlin.url,
       sha256: lock.kotlin.sha256,
+      size: lock.kotlin.size,
     },
     kotlinCacheRoot,
     'Kotlin archive'

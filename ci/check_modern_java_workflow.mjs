@@ -12,6 +12,7 @@ const manifestPath = process.env.MODERN_JAVA_WORKFLOW_MANIFEST_PATH ||
 const compilerLockPath = process.env.MODERN_JAVA_WORKFLOW_COMPILER_LOCK_PATH ||
   path.join(repoRoot, 'ci', 'modern_java_compiler_inputs.lock.json');
 const smokeScriptPattern = /^(?:kotlin|scala)[A-Za-z0-9_]*_smoke\.sh$/;
+const maximumCompilerInputBytes = 128 * 1024 * 1024;
 
 function stripUnquotedComments(text) {
   return text.split('\n').map((line) => {
@@ -139,6 +140,10 @@ function countLiteral(text, literal) {
     offset += literal.length;
   }
   return count;
+}
+
+function isAllowedCompilerInputSize(value) {
+  return Number.isSafeInteger(value) && value > 0 && value <= maximumCompilerInputBytes;
 }
 
 function scriptBudgetSeconds(scriptPath) {
@@ -285,7 +290,7 @@ try {
   fail(`Unable to read Modern Java compiler input lock: ${error.message}`);
 }
 if (
-  compilerLock?.schemaVersion !== 1 ||
+  compilerLock?.schemaVersion !== 2 ||
   compilerLock.kotlin?.version !== '2.4.0' ||
   compilerLock.scala?.version !== '2.13.18' ||
   !/^https:\/\/registry\.npmjs\.org\//.test(compilerLock.kotlin?.url || '') ||
@@ -294,6 +299,9 @@ if (
   !Array.isArray(compilerLock.scala?.files)
 ) {
   fail('Modern Java compiler input lock metadata is incomplete or unpinned.');
+}
+if (!isAllowedCompilerInputSize(compilerLock.kotlin.size)) {
+  fail('Modern Java Kotlin compiler archive must pin a positive safe-integer size at or below 128 MiB.');
 }
 if (compilerLock.scala.files.length !== 5) {
   fail('Modern Java Scala compiler input lock must contain exactly five JARs.');
@@ -325,9 +333,10 @@ for (const file of compilerLock.scala.files) {
   if (
     !/^[A-Za-z0-9_.-]+\.jar$/.test(file?.name || '') ||
     !/^https:\/\/repo1\.maven\.org\//.test(file?.url || '') ||
-    !/^[0-9a-f]{64}$/.test(file?.sha256 || '')
+    !/^[0-9a-f]{64}$/.test(file?.sha256 || '') ||
+    !isAllowedCompilerInputSize(file?.size)
   ) {
-    fail('Modern Java Scala compiler input lock contains an unsafe or unhashed file.');
+    fail('Modern Java Scala compiler input lock contains an unsafe or unhashed file, or an invalidly sized file.');
   }
   scalaNames.push(file.name);
 }
