@@ -449,6 +449,39 @@ if (!/\.\/ci\/modern_bootstrap_overlay_smoke\.sh\b/.test(overlayStep)) {
   fail('Modern Java workflow must run the compiler bootstrap overlay smoke.');
 }
 
+const mesaStep = extractStep(runtimeJob, 'Check Mesa fixture scheduling');
+const mesaTimeoutFields = mesaStep.match(
+  /^        (?:(?:"timeout-minutes"|'timeout-minutes')|timeout-minutes)\s*:/gm
+) || [];
+const mesaTimeoutMatch = mesaStep.match(/^        timeout-minutes:\s*(\d+)\s*$/m);
+if (mesaTimeoutFields.length !== 1 || !mesaTimeoutMatch) {
+  fail('Modern Java workflow Mesa scheduling check must set exactly one numeric timeout-minutes.');
+}
+const mesaTimeoutMinutes = Number(mesaTimeoutMatch[1]);
+if (mesaTimeoutMinutes < 1 || mesaTimeoutMinutes > 3) {
+  fail('Modern Java workflow Mesa scheduling check timeout must be between 1 and 3 minutes.');
+}
+const mesaRunFields = mesaStep.match(/^        (?:(?:"run"|'run')|run)\s*:/gm) || [];
+if (
+  mesaRunFields.length !== 1 ||
+  !/^        run:[ \t]*node[ \t]+ci\/mesa_test_regression_test\.cjs[ \t]*$/m.test(mesaStep)
+) {
+  fail('Modern Java workflow Mesa scheduling check must run node ci/mesa_test_regression_test.cjs directly.');
+}
+for (const [pattern, field] of [
+  [/^        (?:(?:"if"|'if')|if)\s*:/m, 'if'],
+  [/^        (?:(?:"continue-on-error"|'continue-on-error')|continue-on-error)\s*:/m, 'continue-on-error'],
+  [/^        (?:(?:"shell"|'shell')|shell)\s*:/m, 'shell'],
+]) {
+  if (pattern.test(mesaStep)) {
+    fail(`Modern Java workflow Mesa scheduling check must not set ${field}.`);
+  }
+}
+const mesaFields = mesaStep.split('\n').filter((line) => line.trim().length > 0);
+if (mesaFields.length !== 2) {
+  fail('Modern Java workflow Mesa scheduling check may contain only timeout-minutes and run.');
+}
+
 const legacyStep = extractStep(runtimeJob, 'Run Java 17 legacy compatibility tests');
 for (const task of [
   'check_jdk',
@@ -541,12 +574,19 @@ const runtimeOrder = [
   'Build release CLI runner',
   'Verify compiler bootstrap overlay',
   'Bundle deterministic compiler runtime inputs',
+  'Check Mesa fixture scheduling',
   'Run Java 17 legacy compatibility tests',
   'Run modern Java compatibility tests',
   'Run core array compatibility smoke',
   'Verify compiler runtime input snapshot',
   'Upload compiler runtime inputs',
-].map((name) => requireIndex(runtimeJob, `- name: ${name}`, `the ${name} step`));
+].map((name) => {
+  const header = `      - name: ${name}\n`;
+  if (countLiteral(runtimeJob, header) !== 1) {
+    fail(`Modern Java workflow must contain the ${name} step exactly once.`);
+  }
+  return requireIndex(runtimeJob, header, `the ${name} step`);
+});
 if (runtimeOrder.some((index, position) => position > 0 && index <= runtimeOrder[position - 1])) {
   fail('Modern Java runtime gates and artifact publication must remain in dependency order.');
 }
