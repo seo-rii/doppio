@@ -106,6 +106,56 @@ function extractStep(job, stepName) {
   return match.groups.body;
 }
 
+function requireExactSchedulingStep(step, fixtureName, command) {
+  const timeoutFields = step.match(
+    /^        (?:(?:"timeout-minutes"|'timeout-minutes')|timeout-minutes)\s*:/gm
+  ) || [];
+  const timeoutMatch = step.match(/^        timeout-minutes:\s*(\d+)\s*$/m);
+  if (timeoutFields.length !== 1 || !timeoutMatch) {
+    fail(
+      `Modern Java workflow ${fixtureName} scheduling check must set exactly one numeric ` +
+      'timeout-minutes.'
+    );
+  }
+  const timeoutMinutes = Number(timeoutMatch[1]);
+  if (timeoutMinutes < 1 || timeoutMinutes > 3) {
+    fail(
+      `Modern Java workflow ${fixtureName} scheduling check timeout must be between 1 and ` +
+      '3 minutes.'
+    );
+  }
+
+  const runFields = step.match(/^        (?:(?:"run"|'run')|run)\s*:/gm) || [];
+  const escapedCommand = command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (
+    runFields.length !== 1 ||
+    !new RegExp(`^        run:[ \\t]*${escapedCommand}[ \\t]*$`, 'm').test(step)
+  ) {
+    fail(
+      `Modern Java workflow ${fixtureName} scheduling check must run ${command} directly.`
+    );
+  }
+
+  for (const [pattern, field] of [
+    [/^        (?:(?:"if"|'if')|if)\s*:/m, 'if'],
+    [/^        (?:(?:"continue-on-error"|'continue-on-error')|continue-on-error)\s*:/m,
+      'continue-on-error'],
+    [/^        (?:(?:"shell"|'shell')|shell)\s*:/m, 'shell'],
+  ]) {
+    if (pattern.test(step)) {
+      fail(`Modern Java workflow ${fixtureName} scheduling check must not set ${field}.`);
+    }
+  }
+
+  const fields = step.split('\n').filter((line) => line.trim().length > 0);
+  if (fields.length !== 2) {
+    fail(
+      `Modern Java workflow ${fixtureName} scheduling check may contain only ` +
+      'timeout-minutes and run.'
+    );
+  }
+}
+
 function requireJobTimeout(job, jobName) {
   const match = requireMatch(
     job,
@@ -450,37 +500,18 @@ if (!/\.\/ci\/modern_bootstrap_overlay_smoke\.sh\b/.test(overlayStep)) {
 }
 
 const mesaStep = extractStep(runtimeJob, 'Check Mesa fixture scheduling');
-const mesaTimeoutFields = mesaStep.match(
-  /^        (?:(?:"timeout-minutes"|'timeout-minutes')|timeout-minutes)\s*:/gm
-) || [];
-const mesaTimeoutMatch = mesaStep.match(/^        timeout-minutes:\s*(\d+)\s*$/m);
-if (mesaTimeoutFields.length !== 1 || !mesaTimeoutMatch) {
-  fail('Modern Java workflow Mesa scheduling check must set exactly one numeric timeout-minutes.');
-}
-const mesaTimeoutMinutes = Number(mesaTimeoutMatch[1]);
-if (mesaTimeoutMinutes < 1 || mesaTimeoutMinutes > 3) {
-  fail('Modern Java workflow Mesa scheduling check timeout must be between 1 and 3 minutes.');
-}
-const mesaRunFields = mesaStep.match(/^        (?:(?:"run"|'run')|run)\s*:/gm) || [];
-if (
-  mesaRunFields.length !== 1 ||
-  !/^        run:[ \t]*node[ \t]+ci\/mesa_test_regression_test\.cjs[ \t]*$/m.test(mesaStep)
-) {
-  fail('Modern Java workflow Mesa scheduling check must run node ci/mesa_test_regression_test.cjs directly.');
-}
-for (const [pattern, field] of [
-  [/^        (?:(?:"if"|'if')|if)\s*:/m, 'if'],
-  [/^        (?:(?:"continue-on-error"|'continue-on-error')|continue-on-error)\s*:/m, 'continue-on-error'],
-  [/^        (?:(?:"shell"|'shell')|shell)\s*:/m, 'shell'],
-]) {
-  if (pattern.test(mesaStep)) {
-    fail(`Modern Java workflow Mesa scheduling check must not set ${field}.`);
-  }
-}
-const mesaFields = mesaStep.split('\n').filter((line) => line.trim().length > 0);
-if (mesaFields.length !== 2) {
-  fail('Modern Java workflow Mesa scheduling check may contain only timeout-minutes and run.');
-}
+requireExactSchedulingStep(
+  mesaStep,
+  'Mesa',
+  'node ci/mesa_test_regression_test.cjs'
+);
+
+const waitStep = extractStep(runtimeJob, 'Check Wait fixture scheduling');
+requireExactSchedulingStep(
+  waitStep,
+  'Wait',
+  'node ci/wait_test_regression_test.cjs'
+);
 
 const legacyStep = extractStep(runtimeJob, 'Run Java 17 legacy compatibility tests');
 for (const task of [
@@ -575,6 +606,7 @@ const runtimeOrder = [
   'Verify compiler bootstrap overlay',
   'Bundle deterministic compiler runtime inputs',
   'Check Mesa fixture scheduling',
+  'Check Wait fixture scheduling',
   'Run Java 17 legacy compatibility tests',
   'Run modern Java compatibility tests',
   'Run core array compatibility smoke',
