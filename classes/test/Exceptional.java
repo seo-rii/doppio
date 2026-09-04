@@ -73,5 +73,9 @@ public class Exceptional {
       catch (Exception e) {
         System.out.println("We should never reach this -- Error is not a subclass of Exception");
       }
+      catch (Error e) {
+        System.err.print("Exception in thread \"main\" ");
+        e.printStackTrace(System.err);
+      }
   }
 }
