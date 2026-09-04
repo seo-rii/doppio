@@ -40,11 +40,11 @@ class WaitTest {
     Foo c = new Foo();
     Foo d = new Foo();
     Foo e = new Foo();
-    // Wait for a and b to be in the waiting state.
-    while (a.thread.getState() != Thread.State.WAITING &&
-      b.thread.getState() != Thread.State.WAITING &&
-      c.thread.getState() != Thread.State.WAITING &&
-      d.thread.getState() != Thread.State.WAITING &&
+    // Wait for all five worker threads to be in the waiting state.
+    while (a.thread.getState() != Thread.State.WAITING ||
+      b.thread.getState() != Thread.State.WAITING ||
+      c.thread.getState() != Thread.State.WAITING ||
+      d.thread.getState() != Thread.State.WAITING ||
       e.thread.getState() != Thread.State.WAITING) {
       Thread.currentThread().sleep(50);
     }
