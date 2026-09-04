@@ -87,6 +87,10 @@ jobs:
         timeout-minutes: 2
         run: node ci/mesa_test_regression_test.cjs
 
+      - name: Check Wait fixture scheduling
+        timeout-minutes: 2
+        run: node ci/wait_test_regression_test.cjs
+
       - name: Run Java 17 legacy compatibility tests
         run: >-
           ./node_modules/.bin/grunt --stack

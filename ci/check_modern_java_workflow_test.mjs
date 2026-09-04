@@ -260,6 +260,214 @@ expectCheckerFailure(
 );
 
 expectCheckerFailure(
+  'replaced Wait scheduling marker',
+  {
+    workflow: replaceRequired(
+      realWorkflow,
+      '      - name: Check Wait fixture scheduling',
+      '      - name: Check Wait fixture scheduling removed'
+    ),
+  },
+  'missing the "Check Wait fixture scheduling" step'
+);
+
+expectCheckerFailure(
+  'comment-only Wait scheduling marker',
+  {
+    workflow: replaceRequired(
+      realWorkflow,
+      '      - name: Check Wait fixture scheduling',
+      '      - name: Check Wait fixture scheduling removed\n' +
+        '      # - name: Check Wait fixture scheduling'
+    ),
+  },
+  'missing the "Check Wait fixture scheduling" step'
+);
+
+expectCheckerFailure(
+  'replaced Wait scheduling command',
+  {
+    workflow: replaceRequired(
+      realWorkflow,
+      '        run: node ci/wait_test_regression_test.cjs',
+      '        run: true'
+    ),
+  },
+  'Wait scheduling check must run node ci/wait_test_regression_test.cjs directly'
+);
+
+expectCheckerFailure(
+  'comment-only Wait scheduling command',
+  {
+    workflow: replaceRequired(
+      realWorkflow,
+      '        run: node ci/wait_test_regression_test.cjs',
+      '        run: true # node ci/wait_test_regression_test.cjs'
+    ),
+  },
+  'Wait scheduling check must run node ci/wait_test_regression_test.cjs directly'
+);
+
+expectCheckerFailure(
+  'missing Wait scheduling command',
+  {
+    workflow: replaceRequired(
+      realWorkflow,
+      '        run: node ci/wait_test_regression_test.cjs\n',
+      ''
+    ),
+  },
+  'Wait scheduling check must run node ci/wait_test_regression_test.cjs directly'
+);
+
+expectCheckerFailure(
+  'quoted Wait scheduling run key',
+  {
+    workflow: replaceRequired(
+      realWorkflow,
+      '        run: node ci/wait_test_regression_test.cjs',
+      '        "run": node ci/wait_test_regression_test.cjs'
+    ),
+  },
+  'Wait scheduling check must run node ci/wait_test_regression_test.cjs directly'
+);
+
+expectCheckerFailure(
+  'duplicate Wait scheduling command',
+  {
+    workflow: replaceRequired(
+      realWorkflow,
+      '        run: node ci/wait_test_regression_test.cjs',
+      '        run: node ci/wait_test_regression_test.cjs\n        run: true'
+    ),
+  },
+  'Wait scheduling check must run node ci/wait_test_regression_test.cjs directly'
+);
+
+expectCheckerFailure(
+  'missing Wait scheduling timeout',
+  {
+    workflow: replaceRequired(
+      realWorkflow,
+      '      - name: Check Wait fixture scheduling\n        timeout-minutes: 2',
+      '      - name: Check Wait fixture scheduling'
+    ),
+  },
+  'Wait scheduling check must set exactly one numeric timeout-minutes'
+);
+
+expectCheckerFailure(
+  'nonnumeric Wait scheduling timeout',
+  {
+    workflow: replaceRequired(
+      realWorkflow,
+      '      - name: Check Wait fixture scheduling\n        timeout-minutes: 2',
+      '      - name: Check Wait fixture scheduling\n        timeout-minutes: two'
+    ),
+  },
+  'Wait scheduling check must set exactly one numeric timeout-minutes'
+);
+
+expectCheckerFailure(
+  'quoted Wait scheduling timeout value',
+  {
+    workflow: replaceRequired(
+      realWorkflow,
+      '      - name: Check Wait fixture scheduling\n        timeout-minutes: 2',
+      '      - name: Check Wait fixture scheduling\n        timeout-minutes: "2"'
+    ),
+  },
+  'Wait scheduling check must set exactly one numeric timeout-minutes'
+);
+
+expectCheckerFailure(
+  'quoted Wait scheduling timeout key',
+  {
+    workflow: replaceRequired(
+      realWorkflow,
+      '      - name: Check Wait fixture scheduling\n        timeout-minutes: 2',
+      '      - name: Check Wait fixture scheduling\n        "timeout-minutes": 2'
+    ),
+  },
+  'Wait scheduling check must set exactly one numeric timeout-minutes'
+);
+
+expectCheckerFailure(
+  'duplicate Wait scheduling timeout',
+  {
+    workflow: replaceRequired(
+      realWorkflow,
+      '      - name: Check Wait fixture scheduling\n        timeout-minutes: 2',
+      '      - name: Check Wait fixture scheduling\n' +
+        '        timeout-minutes: 2\n' +
+        '        timeout-minutes: 1'
+    ),
+  },
+  'Wait scheduling check must set exactly one numeric timeout-minutes'
+);
+
+expectCheckerFailure(
+  'excessive Wait scheduling timeout',
+  {
+    workflow: replaceRequired(
+      realWorkflow,
+      '      - name: Check Wait fixture scheduling\n        timeout-minutes: 2',
+      '      - name: Check Wait fixture scheduling\n        timeout-minutes: 4'
+    ),
+  },
+  'Wait scheduling check timeout must be between 1 and 3 minutes'
+);
+
+for (const [label, field, expectedField] of [
+  ['conditional Wait scheduling step', '        if: false\n', 'if'],
+  ['quoted conditional Wait scheduling step', '        "if": false\n', 'if'],
+  ['non-failing Wait scheduling step', '        continue-on-error: true\n', 'continue-on-error'],
+  ['quoted non-failing Wait scheduling step', '        "continue-on-error": true\n',
+    'continue-on-error'],
+  ['custom-shell Wait scheduling step', '        shell: /bin/true {0}\n', 'shell'],
+  ['quoted custom-shell Wait scheduling step', '        "shell": /bin/true {0}\n', 'shell'],
+]) {
+  expectCheckerFailure(
+    label,
+    {
+      workflow: replaceRequired(
+        realWorkflow,
+        '      - name: Check Wait fixture scheduling\n',
+        `      - name: Check Wait fixture scheduling\n${field}`
+      ),
+    },
+    `Wait scheduling check must not set ${expectedField}`
+  );
+}
+
+expectCheckerFailure(
+  'additional Wait scheduling field',
+  {
+    workflow: replaceRequired(
+      realWorkflow,
+      '      - name: Check Wait fixture scheduling\n',
+      '      - name: Check Wait fixture scheduling\n        working-directory: .\n'
+    ),
+  },
+  'Wait scheduling check may contain only timeout-minutes and run'
+);
+
+expectCheckerFailure(
+  'duplicate Wait scheduling marker',
+  {
+    workflow: replaceRequired(
+      realWorkflow,
+      '      - name: Run Java 17 legacy compatibility tests',
+      '      - name: Check Wait fixture scheduling\n' +
+        '        timeout-minutes: 2\n' +
+        '        run: node ci/wait_test_regression_test.cjs\n\n' +
+        '      - name: Run Java 17 legacy compatibility tests'
+    ),
+  },
+  'must contain the Check Wait fixture scheduling step exactly once'
+);
+
+expectCheckerFailure(
   'missing legacy oracle task',
   { workflow: replaceRequired(realWorkflow, 'run_java:default', 'run_java_removed:default') },
   'legacy gate must run run_java:default'
@@ -435,6 +643,18 @@ expectCheckerFailure(
     workflow: swapAdjacentSteps(
       realWorkflow,
       'Check Mesa fixture scheduling',
+      'Check Wait fixture scheduling'
+    ),
+  },
+  'runtime gates and artifact publication must remain in dependency order'
+);
+
+expectCheckerFailure(
+  'Wait scheduling ordering',
+  {
+    workflow: swapAdjacentSteps(
+      realWorkflow,
+      'Check Wait fixture scheduling',
       'Run Java 17 legacy compatibility tests'
     ),
   },
@@ -442,16 +662,18 @@ expectCheckerFailure(
 );
 
 expectCheckerFailure(
-  'spoofed Mesa scheduling ordering',
+  'spoofed Wait scheduling ordering',
   {
     workflow: replaceRequired(
       swapAdjacentSteps(
         realWorkflow,
-        'Check Mesa fixture scheduling',
+        'Check Wait fixture scheduling',
         'Run Java 17 legacy compatibility tests'
       ),
       '        id: bundle_runtime\n',
-      '        id: bundle_runtime\n        env:\n          SPOOFED_STEP: "- name: Check Mesa fixture scheduling"\n'
+      '        id: bundle_runtime\n' +
+        '        env:\n' +
+        '          SPOOFED_STEP: "- name: Check Wait fixture scheduling"\n'
     ),
   },
   'runtime gates and artifact publication must remain in dependency order'
