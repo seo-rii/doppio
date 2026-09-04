@@ -8,6 +8,8 @@ package classes.test;
 class MesaTest {
 
   static Object obj = new Object();
+  static boolean fooWaiting = false;
+  static boolean fooNotified = false;
 
   static class Foo implements Runnable {
     Thread thread;
@@ -20,10 +22,14 @@ class MesaTest {
     public void run() {
       synchronized(obj) {
         System.out.println("1: Running " + thread.getName());
-        try {
-          obj.wait();
+        fooWaiting = true;
+        obj.notifyAll();
+        while (!fooNotified) {
+          try {
+            obj.wait();
+          }
+          catch (InterruptedException e) {}
         }
-        catch (InterruptedException e) {}
         System.out.println("4: Finishing " + thread.getName());
       }
     }
@@ -40,16 +46,19 @@ class MesaTest {
     public void run() {
       synchronized(obj) {
         System.out.println("2: Running " + thread.getName());
+        fooNotified = true;
         obj.notify();
         System.out.println("3: Finishing " + thread.getName());
       }
     }
   }
 
-  public static void main(String[] args) {
+  public static void main(String[] args) throws InterruptedException {
     new Foo();
     synchronized(obj) {
-      Thread.currentThread().yield();
+      while (!fooWaiting) {
+        obj.wait();
+      }
     }
     new Bar();
   }
