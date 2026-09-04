@@ -181,6 +181,85 @@ expectCheckerFailure(
 );
 
 expectCheckerFailure(
+  'replaced Mesa scheduling command',
+  {
+    workflow: replaceRequired(
+      realWorkflow,
+      '        run: node ci/mesa_test_regression_test.cjs',
+      '        run: true'
+    ),
+  },
+  'Mesa scheduling check must run node ci/mesa_test_regression_test.cjs directly'
+);
+
+expectCheckerFailure(
+  'comment-only Mesa scheduling command',
+  {
+    workflow: replaceRequired(
+      realWorkflow,
+      '        run: node ci/mesa_test_regression_test.cjs',
+      '        run: true # node ci/mesa_test_regression_test.cjs'
+    ),
+  },
+  'Mesa scheduling check must run node ci/mesa_test_regression_test.cjs directly'
+);
+
+expectCheckerFailure(
+  'excessive Mesa scheduling timeout',
+  {
+    workflow: replaceRequired(
+      realWorkflow,
+      '      - name: Check Mesa fixture scheduling\n        timeout-minutes: 2',
+      '      - name: Check Mesa fixture scheduling\n        timeout-minutes: 4'
+    ),
+  },
+  'Mesa scheduling check timeout must be between 1 and 3 minutes'
+);
+
+for (const [label, field, expectedField] of [
+  ['conditional Mesa scheduling step', '        if: false\n', 'if'],
+  ['quoted conditional Mesa scheduling step', '        "if": false\n', 'if'],
+  ['non-failing Mesa scheduling step', '        continue-on-error: true\n', 'continue-on-error'],
+  ['custom-shell Mesa scheduling step', '        shell: /bin/true {0}\n', 'shell'],
+]) {
+  expectCheckerFailure(
+    label,
+    {
+      workflow: replaceRequired(
+        realWorkflow,
+        '      - name: Check Mesa fixture scheduling\n',
+        `      - name: Check Mesa fixture scheduling\n${field}`
+      ),
+    },
+    `Mesa scheduling check must not set ${expectedField}`
+  );
+}
+
+expectCheckerFailure(
+  'additional Mesa scheduling field',
+  {
+    workflow: replaceRequired(
+      realWorkflow,
+      '      - name: Check Mesa fixture scheduling\n',
+      '      - name: Check Mesa fixture scheduling\n        working-directory: .\n'
+    ),
+  },
+  'Mesa scheduling check may contain only timeout-minutes and run'
+);
+
+expectCheckerFailure(
+  'duplicate Mesa scheduling command',
+  {
+    workflow: replaceRequired(
+      realWorkflow,
+      '        run: node ci/mesa_test_regression_test.cjs',
+      '        run: node ci/mesa_test_regression_test.cjs\n        run: true'
+    ),
+  },
+  'Mesa scheduling check must run node ci/mesa_test_regression_test.cjs directly'
+);
+
+expectCheckerFailure(
   'missing legacy oracle task',
   { workflow: replaceRequired(realWorkflow, 'run_java:default', 'run_java_removed:default') },
   'legacy gate must run run_java:default'
@@ -345,6 +424,34 @@ expectCheckerFailure(
       realWorkflow,
       'Verify compiler bootstrap overlay',
       'Bundle deterministic compiler runtime inputs'
+    ),
+  },
+  'runtime gates and artifact publication must remain in dependency order'
+);
+
+expectCheckerFailure(
+  'Mesa scheduling ordering',
+  {
+    workflow: swapAdjacentSteps(
+      realWorkflow,
+      'Check Mesa fixture scheduling',
+      'Run Java 17 legacy compatibility tests'
+    ),
+  },
+  'runtime gates and artifact publication must remain in dependency order'
+);
+
+expectCheckerFailure(
+  'spoofed Mesa scheduling ordering',
+  {
+    workflow: replaceRequired(
+      swapAdjacentSteps(
+        realWorkflow,
+        'Check Mesa fixture scheduling',
+        'Run Java 17 legacy compatibility tests'
+      ),
+      '        id: bundle_runtime\n',
+      '        id: bundle_runtime\n        env:\n          SPOOFED_STEP: "- name: Check Mesa fixture scheduling"\n'
     ),
   },
   'runtime gates and artifact publication must remain in dependency order'
