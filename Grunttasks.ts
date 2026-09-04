@@ -1298,6 +1298,7 @@ export function setup(grunt: IGrunt) {
     'unit_test_legacy_access_owner_bits',
     'unit_test_legacy_fd_generation',
     'unit_test_legacy_fd_leases',
+    'unit_test_run_java_fail_closed',
     'unit_test_test_runner_args',
     'unit_test_default_disable_assertions',
     'unit_test_bootclasspath_defaults',
