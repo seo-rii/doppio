@@ -2256,6 +2256,49 @@ function addJavaLangStringBuilderModernOverlays(data: Buffer, typeStr: string): 
   ]);
 }
 
+function addSplitWithDelimitersModernOverlay(data: Buffer, typeStr: string): Buffer {
+  var cp = constantPoolEnd(data),
+    stringReceiver = typeStr === 'Ljava/lang/String;',
+    argumentType = stringReceiver ? 'Ljava/lang/String;' : 'Ljava/lang/CharSequence;',
+    descriptor = '(' + argumentType + 'I)[Ljava/lang/String;',
+    nameIndex = cp.count,
+    descriptorIndex = cp.count + 1,
+    helperNameIndex = cp.count + 2,
+    helperClassIndex = cp.count + 3,
+    helperDescriptorIndex = cp.count + 4,
+    codeNameIndex = cp.count + 5,
+    nameAndTypeIndex = cp.count + 6,
+    helperMethodIndex = cp.count + 7,
+    extraConstants = Buffer.concat([
+      utf8Constant('splitWithDelimiters'),
+      utf8Constant(descriptor),
+      utf8Constant('java/util/regex/DoppioPattern'),
+      Buffer.concat([Buffer.from([7]), u2(helperNameIndex)]),
+      utf8Constant('(' + typeStr + argumentType + 'I)[Ljava/lang/String;'),
+      utf8Constant('Code'),
+      Buffer.concat([Buffer.from([12]), u2(nameIndex), u2(helperDescriptorIndex)]),
+      Buffer.concat([Buffer.from([10]), u2(helperClassIndex), u2(nameAndTypeIndex)])
+    ]),
+    withConstants = Buffer.concat([
+      data.slice(0, 8), u2(cp.count + 8), data.slice(10, cp.offset),
+      extraConstants, data.slice(cp.offset)
+    ]),
+    methods = methodsInfo(withConstants, cp.offset + extraConstants.length),
+    code = Buffer.concat([
+      Buffer.from([0x2a, 0x2b, 0x1c, 0xb8]), u2(helperMethodIndex), Buffer.from([0xb0])
+    ]),
+    method = Buffer.concat([
+      u2(0x0001), u2(nameIndex), u2(descriptorIndex), u2(1),
+      u2(codeNameIndex), u4(12 + code.length), u2(3), u2(3),
+      u4(code.length), code, u2(0), u2(0)
+    ]);
+  return Buffer.concat([
+    withConstants.slice(0, methods.countOffset), u2(methods.count + 1),
+    withConstants.slice(methods.countOffset + 2, methods.endOffset),
+    method, withConstants.slice(methods.endOffset)
+  ]);
+}
+
 function addJavaLangMathModernOverlays(data: Buffer): Buffer {
   var cp = constantPoolEnd(data),
     overlays = [
@@ -3209,6 +3252,9 @@ export function applyModernBootstrapOverlays(typeStr: string, data: Buffer): Buf
   if (typeStr === 'Ljava/lang/AbstractStringBuilder;' ||
       typeStr === 'Ljava/lang/StringBuilder;' || typeStr === 'Ljava/lang/StringBuffer;') {
     data = addJavaLangStringBuilderModernOverlays(data, typeStr);
+  }
+  if (typeStr === 'Ljava/lang/String;' || typeStr === 'Ljava/util/regex/Pattern;') {
+    data = addSplitWithDelimitersModernOverlay(data, typeStr);
   }
   if (typeStr === 'Ljava/util/concurrent/TimeUnit;') {
     data = addJavaUtilConcurrentTimeUnitModernOverlays(data);

@@ -28,7 +28,7 @@ run.
 | 18 | 62 | UTF-8-by-default expectations, simple web server tooling output, `Math`/`StrictMath` unsigned multiplication and integer division helpers | Partial: simple class-file container, selected UTF-8 default charset behavior for `file.encoding`, `Charset.defaultCharset()`, default `String` byte conversion, and default `InputStreamReader`/`OutputStreamWriter` byte conversion, direct and reflection-visible `Math.unsignedMultiplyHigh(long, long)` and `StrictMath.unsignedMultiplyHigh(long, long)` behavior for zero, power-of-two, negative-bit-pattern, `Long.MIN_VALUE`, and mixed-sign unsigned products, plus direct and reflection-visible support for all Java 18 `Math`/`StrictMath` `ceilDiv`, `ceilMod`, `divideExact`, `floorDivExact`, and `ceilDivExact` overloads with tested metadata, sign, mixed-width, zero-divisor, and integer-overflow behavior | Medium |
 | 19 | 63 | virtual threads preview dependencies, record pattern preview output, `Thread.threadId()`, `Thread.sleep(Duration)` | Partial: simple class-file container, selected `Thread.threadId()` current-thread behavior matching the existing positive `Thread.getId()` identifier, and selected `Thread.sleep(Duration)` behavior for negative no-op, zero duration, short positive duration, null rejection, and interrupt delivery | High |
 | 20 | 64 | scoped values preview dependencies, pattern matching output | Partial: simple class-file container plus runnable print fixture | High |
-| 21 | 65 | virtual threads, sequenced collections, `Math`/`StrictMath.clamp`, `StringBuilder`/`StringBuffer.repeat`, string templates preview | Partial: simple class-file container, runnable print fixture, selected `Thread.isVirtual()` platform-thread behavior for current, unstarted, and started platform threads, direct and reflection-visible integer/floating-point `Math.clamp` and `StrictMath.clamp` overloads, Unicode/sequence repetition with covariant reflection bridges and synchronized `StringBuffer` calls, and selected `SequencedCollection`/`List`/`Deque`/`SequencedSet`/`SequencedMap` endpoint, view, and reverse-view behavior | Very high |
+| 21 | 65 | virtual threads, sequenced collections, `Math`/`StrictMath.clamp`, `StringBuilder`/`StringBuffer.repeat`, `String`/`Pattern.splitWithDelimiters`, string templates preview | Partial: simple class-file container, runnable print fixture, selected `Thread.isVirtual()` platform-thread behavior for current, unstarted, and started platform threads, direct and reflection-visible integer/floating-point `Math.clamp` and `StrictMath.clamp` overloads, Unicode/sequence repetition with covariant reflection bridges and synchronized `StringBuffer` calls, delimiter-preserving regex splitting with direct/reflection/MethodHandle calls, and selected `SequencedCollection`/`List`/`Deque`/`SequencedSet`/`SequencedMap` endpoint, view, and reverse-view behavior | Very high |
 | 22 | 66 | class-file API ecosystem expectations, unnamed variables | Partial: simple class-file container plus runnable print fixture | Medium |
 | 23 | 67 | primitive patterns preview, module/JDK library drift | Partial: simple class-file container plus runnable print fixture | High |
 | 24 | 68 | stream gatherers, compact object headers ecosystem assumptions | Partial: simple class-file container plus runnable print fixture | High |
@@ -53,7 +53,7 @@ all eight direct-call descriptors and compare host/Doppio output using only the
 generated Doppio compiler bootstrap overlay. Difficulty: medium.
 
 Compiler bootstrap note: `modern-ci-release-cli` generates a deterministic
-compiler-only JAR containing the 34 Java 8 bootstrap classes changed by the
+compiler-only JAR containing the 36 Java 8 bootstrap classes changed by the
 shared parsed-overlay dispatch. Kotlin and Scala put this artifact before
 `doppio.jar` and `rt.jar` for source analysis, eliminating host JDK metadata
 from the main compiler, broad modern interop, duration, diagnostic, Kotlin
@@ -1744,6 +1744,22 @@ expanded.
 
 ## Known Regex Gaps
 
+- Java 21 `String.splitWithDelimiters(String, int)` and
+  `Pattern.splitWithDelimiters(CharSequence, int)` are parsed bootstrap methods
+  sharing a delimiter-preserving split implementation. The major-65 fixture
+  covers positive match limits, zero/negative limits, trailing empty tokens and
+  delimiters, leading zero-width matches, capture groups, Unicode delimiters,
+  pattern flags, custom and mutable `CharSequence` inputs, validation failures,
+  reflection metadata and wrapped exceptions, and unreflected method handles.
+  Matching uses the original sequence; tokens and delimiters are copied from
+  its subsequences, without an eager `toString()` conversion. The CI fixture
+  is built with Java 17 against the transformed runtime signatures. Expected
+  results were verified against native Corretto 25.0.3 and Doppio executions
+  of genuine `--release 21` output; CI does not require that newer JDK.
+  The underlying Java 8-era regex engine is retained;
+  this does not claim every Java 21 regex syntax or matching-rule change, or
+  support for concurrent mutation of an input sequence. See the
+  [Java 21 Pattern API](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/regex/Pattern.html#splitWithDelimiters(java.lang.CharSequence,int)).
 - `java.util.regex.Pattern` now exposes selected Java 11
   `asMatchPredicate()` behavior through a small predicate shim. Coverage
   includes full-match semantics, captured pattern reuse, null input rejection,
