@@ -31,6 +31,7 @@ jobs:
 
       - name: Check Pages workflow settings
         run: |
+          node ci/pages_browser_smoke_retry_test.mjs
           node ci/check_pages_workflow_test.mjs
           node ci/check_pages_workflow.mjs
 
@@ -130,4 +131,4 @@ jobs:
       - name: Run browser playground smoke
         env:
           DOPPIO_PAGES_URL: ${{ needs.deploy.outputs.page_url }}
-        run: yarn site:browser-test
+        run: node ci/run_pages_browser_smoke_with_retry.mjs

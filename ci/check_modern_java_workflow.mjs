@@ -481,6 +481,13 @@ for (const command of [
   }
 }
 
+const pagesRetryStep = extractStep(runtimeJob, 'Check Pages smoke retry');
+requireExactSchedulingStep(
+  pagesRetryStep,
+  'Pages smoke retry',
+  'node ci/pages_browser_smoke_retry_test.mjs'
+);
+
 const releaseStep = extractStep(runtimeJob, 'Build release CLI runner');
 const releaseTimeout = requireMatch(
   releaseStep,
@@ -602,6 +609,7 @@ if (/^          name:/m.test(uploadStep)) {
 const runtimeOrder = [
   'Check TypeScript compiler compatibility',
   'Check compiler smoke workflow coverage',
+  'Check Pages smoke retry',
   'Build release CLI runner',
   'Verify compiler bootstrap overlay',
   'Bundle deterministic compiler runtime inputs',

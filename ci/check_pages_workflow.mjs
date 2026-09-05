@@ -443,10 +443,13 @@ if (
   browserNeeds !== 'deploy' ||
   !browserSmokeStep ||
   browserPageUrl !== '${{ needs.deploy.outputs.page_url }}' ||
-  !/^yarn\s+site:browser-test\b/.test(browserSmokeCommand || '') ||
+  browserSmokeCommand !== 'node ci/run_pages_browser_smoke_with_retry.mjs' ||
   browserDeploymentActions.length !== 0
 ) {
-  fail('Pages workflow browser-smoke job must consume only the deploy job page_url.');
+  fail(
+    'Pages workflow browser-smoke job must consume only the deploy job page_url ' +
+    'through the bounded retry runner.'
+  );
 }
 
 console.log('Pages workflow deployment settings checks passed.');
