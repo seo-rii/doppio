@@ -92,7 +92,7 @@ jobs:
       - name: Run browser playground smoke
         env:
           DOPPIO_PAGES_URL: \${{ needs.deploy.outputs.page_url }}
-        run: yarn site:browser-test
+        run: node ci/run_pages_browser_smoke_with_retry.mjs
 `;
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'doppio-pages-workflow-'));
@@ -385,9 +385,27 @@ try {
   expectFailure(
     root,
     completeWorkflow.replace(
-      '        run: yarn site:browser-test',
+      'run: node ci/run_pages_browser_smoke_with_retry.mjs',
+      'run: yarn site:browser-test'
+    ),
+    'bounded retry runner',
+    'browser smoke without bounded retry'
+  );
+  expectFailure(
+    root,
+    completeWorkflow.replace(
+      'run: node ci/run_pages_browser_smoke_with_retry.mjs',
+      'run: node ci/run_pages_browser_smoke_with_retry.mjs || yarn site:browser-test'
+    ),
+    'bounded retry runner',
+    'browser smoke retry bypass'
+  );
+  expectFailure(
+    root,
+    completeWorkflow.replace(
+      '        run: node ci/run_pages_browser_smoke_with_retry.mjs',
       `        uses: actions/upload-pages-artifact@v5
-        run: yarn site:browser-test`
+        run: node ci/run_pages_browser_smoke_with_retry.mjs`
     ),
     'consume only the deploy job page_url',
     'deployment action in browser smoke'

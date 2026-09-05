@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
+import {
+  reportRetryablePagesFailure,
+} from './pages_browser_smoke_retry.mjs';
 
 const baseUrl = (process.env.DOPPIO_PAGES_URL || 'http://127.0.0.1:4173').replace(/\/+$/, '');
 const executablePath = process.env.DOPPIO_CHROMIUM_EXECUTABLE || undefined;
@@ -7,6 +10,7 @@ const browser = await chromium.launch({
   executablePath,
   headless: true
 });
+const browserErrors = [];
 
 try {
   const desktop = await browser.newContext({
@@ -20,7 +24,6 @@ try {
   }]);
   const page = await desktop.newPage();
   page.setDefaultTimeout(900_000);
-  const browserErrors = [];
   page.on('console', (message) => {
     if (message.type() === 'error') {
       browserErrors.push(message.text());
@@ -604,6 +607,12 @@ public class Main {
   await mobile.close();
 
   console.log('Pages Chromium smoke passed for docs, mobile layout, Java, Kotlin, Scala, provider file mutations, owner-mode access checks, and the event-loop-deferred BrowserFS descriptor lease canary.');
+} catch (error) {
+  const failureExitCode = reportRetryablePagesFailure(error, browserErrors);
+  if (failureExitCode === null) {
+    throw error;
+  }
+  process.exitCode = failureExitCode;
 } finally {
   await browser.close();
 }

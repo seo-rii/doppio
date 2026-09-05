@@ -145,6 +145,56 @@ if (completeResult.status !== 0) {
 }
 
 expectCheckerFailure(
+  'missing Pages smoke retry step',
+  {
+    workflow: replaceRequired(
+      realWorkflow,
+      '      - name: Check Pages smoke retry',
+      '      - name: Check Pages smoke retry removed'
+    ),
+  },
+  'missing the "Check Pages smoke retry" step'
+);
+
+for (const [label, replacement, expectedMessage] of [
+  [
+    'non-failing Pages smoke retry command',
+    '        timeout-minutes: 1\n' +
+      '        run: node ci/pages_browser_smoke_retry_test.mjs || true',
+    'must run node ci/pages_browser_smoke_retry_test.mjs directly',
+  ],
+  [
+    'echo-only Pages smoke retry command',
+    '        timeout-minutes: 1\n' +
+      '        run: echo node ci/pages_browser_smoke_retry_test.mjs',
+    'must run node ci/pages_browser_smoke_retry_test.mjs directly',
+  ],
+  [
+    'excessive Pages smoke retry timeout',
+    '        timeout-minutes: 4\n        run: node ci/pages_browser_smoke_retry_test.mjs',
+    'timeout must be between 1 and 3 minutes',
+  ],
+  [
+    'continue-on-error Pages smoke retry step',
+    '        timeout-minutes: 1\n        continue-on-error: true\n' +
+      '        run: node ci/pages_browser_smoke_retry_test.mjs',
+    'must not set continue-on-error',
+  ],
+]) {
+  expectCheckerFailure(
+    label,
+    {
+      workflow: replaceRequired(
+        realWorkflow,
+        '        timeout-minutes: 1\n        run: node ci/pages_browser_smoke_retry_test.mjs',
+        replacement
+      ),
+    },
+    expectedMessage
+  );
+}
+
+expectCheckerFailure(
   'workflow write permission',
   { workflow: replaceRequired(realWorkflow, 'permissions:\n  contents: read', 'permissions:\n  contents: write') },
   'permissions must be exactly contents: read'

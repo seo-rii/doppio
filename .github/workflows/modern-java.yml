@@ -65,6 +65,10 @@ jobs:
           yarn ci:check-scala-modern-source-guards:test
           yarn ci:check-scala-modern-source-guards
 
+      - name: Check Pages smoke retry
+        timeout-minutes: 1
+        run: node ci/pages_browser_smoke_retry_test.mjs
+
       - name: Build release CLI runner
         timeout-minutes: 20
         run: ./node_modules/.bin/grunt --stack modern-ci-release-cli --grunt-ignore-compile-errors
