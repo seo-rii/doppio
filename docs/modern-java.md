@@ -28,7 +28,7 @@ run.
 | 18 | 62 | UTF-8-by-default expectations, simple web server tooling output, `Math`/`StrictMath` unsigned multiplication and integer division helpers | Partial: simple class-file container, selected UTF-8 default charset behavior for `file.encoding`, `Charset.defaultCharset()`, default `String` byte conversion, and default `InputStreamReader`/`OutputStreamWriter` byte conversion, direct and reflection-visible `Math.unsignedMultiplyHigh(long, long)` and `StrictMath.unsignedMultiplyHigh(long, long)` behavior for zero, power-of-two, negative-bit-pattern, `Long.MIN_VALUE`, and mixed-sign unsigned products, plus direct and reflection-visible support for all Java 18 `Math`/`StrictMath` `ceilDiv`, `ceilMod`, `divideExact`, `floorDivExact`, and `ceilDivExact` overloads with tested metadata, sign, mixed-width, zero-divisor, and integer-overflow behavior | Medium |
 | 19 | 63 | virtual threads preview dependencies, record pattern preview output, `Thread.threadId()`, `Thread.sleep(Duration)` | Partial: simple class-file container, selected `Thread.threadId()` current-thread behavior matching the existing positive `Thread.getId()` identifier, and selected `Thread.sleep(Duration)` behavior for negative no-op, zero duration, short positive duration, null rejection, and interrupt delivery | High |
 | 20 | 64 | scoped values preview dependencies, pattern matching output | Partial: simple class-file container plus runnable print fixture | High |
-| 21 | 65 | virtual threads, sequenced collections, `Math`/`StrictMath.clamp`, string templates preview | Partial: simple class-file container, runnable print fixture, selected `Thread.isVirtual()` platform-thread behavior for current, unstarted, and started platform threads, direct and reflection-visible integer/floating-point `Math.clamp` and `StrictMath.clamp` overloads, and selected `SequencedCollection`/`List`/`Deque`/`SequencedSet`/`SequencedMap` endpoint, view, and reverse-view behavior | Very high |
+| 21 | 65 | virtual threads, sequenced collections, `Math`/`StrictMath.clamp`, `StringBuilder`/`StringBuffer.repeat`, string templates preview | Partial: simple class-file container, runnable print fixture, selected `Thread.isVirtual()` platform-thread behavior for current, unstarted, and started platform threads, direct and reflection-visible integer/floating-point `Math.clamp` and `StrictMath.clamp` overloads, Unicode/sequence repetition with covariant reflection bridges and synchronized `StringBuffer` calls, and selected `SequencedCollection`/`List`/`Deque`/`SequencedSet`/`SequencedMap` endpoint, view, and reverse-view behavior | Very high |
 | 22 | 66 | class-file API ecosystem expectations, unnamed variables | Partial: simple class-file container plus runnable print fixture | Medium |
 | 23 | 67 | primitive patterns preview, module/JDK library drift | Partial: simple class-file container plus runnable print fixture | High |
 | 24 | 68 | stream gatherers, compact object headers ecosystem assumptions | Partial: simple class-file container plus runnable print fixture | High |
@@ -53,7 +53,7 @@ all eight direct-call descriptors and compare host/Doppio output using only the
 generated Doppio compiler bootstrap overlay. Difficulty: medium.
 
 Compiler bootstrap note: `modern-ci-release-cli` generates a deterministic
-compiler-only JAR containing the 31 Java 8 bootstrap classes changed by the
+compiler-only JAR containing the 34 Java 8 bootstrap classes changed by the
 shared parsed-overlay dispatch. Kotlin and Scala put this artifact before
 `doppio.jar` and `rt.jar` for source analysis, eliminating host JDK metadata
 from the main compiler, broad modern interop, duration, diagnostic, Kotlin
@@ -1691,6 +1691,22 @@ expanded.
   hierarchy updates, insertion-order map hierarchy updates, and fully
   specified reverse-view mutation semantics beyond the tested
   list/deque/sorted-set/sorted-map paths, are not implemented.
+- Java 21 `StringBuilder.repeat(int, int)` / `repeat(CharSequence, int)` and
+  the corresponding `StringBuffer` methods are parsed bootstrap methods,
+  including the two `AbstractStringBuilder` base methods and four covariant
+  bridges. The focused major-65 fixture covers receiver identity, BMP and
+  supplementary code points, isolated surrogates, null/empty/custom/self
+  sequences, zero-count short-circuiting, negative-count validation order,
+  length overflow, cached string refresh, reflection enumeration and wrapped
+  failures, and `MethodHandles.Lookup.unreflect` calls. `StringBuffer` concrete
+  methods hold the receiver monitor throughout the operation; its bridges
+  delegate through those synchronized methods. The same fixture is compiled
+  with Java 17 against the runtime's transformed bootstrap signatures for CI.
+  Its expected output was verified against native Corretto 25.0.3 and Doppio
+  executions of the same fixture compiled using `--release 21`; CI does not
+  require that newer host JDK. This is a targeted Java 21 API claim, not full Java 21 or
+  Java 25 compatibility. Semantics follow the
+  [Java 21 API](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/StringBuilder.html#repeat(int,int)).
 - Selected Java 11 `String` additions are covered for `isBlank`, `strip`,
   `stripLeading`, `stripTrailing`, `repeat`, and `lines`, including negative
   repeat count validation and line splitting for LF, CRLF, CR, empty input,

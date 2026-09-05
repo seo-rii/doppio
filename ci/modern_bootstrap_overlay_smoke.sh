@@ -27,8 +27,8 @@ fi
 
 entries_output="$(jar tf "$artifact")"
 mapfile -t entries <<<"$entries_output"
-if [ "${#entries[@]}" -ne 31 ]; then
-  echo "Expected 31 compiler bootstrap classes, found ${#entries[@]}." >&2
+if [ "${#entries[@]}" -ne 34 ]; then
+  echo "Expected 34 compiler bootstrap classes, found ${#entries[@]}." >&2
   exit 1
 fi
 for entry in "${entries[@]}"; do
@@ -38,7 +38,10 @@ for entry in "${entries[@]}"; do
   fi
 done
 for required_entry in \
+    java/lang/AbstractStringBuilder.class \
     java/lang/Runtime.class \
+    java/lang/StringBuffer.class \
+    java/lang/StringBuilder.class \
     java/lang/invoke/MethodHandle.class \
     java/lang/invoke/MethodHandles.class \
     'java/lang/invoke/MethodHandles$Lookup.class' \

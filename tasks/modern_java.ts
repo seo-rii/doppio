@@ -446,6 +446,85 @@ function modernJava(grunt: IGrunt) {
       methodDeclarations, expectedOutput, done);
   });
 
+  grunt.registerTask('generate_java21_string_builder_repeat', 'Generate the Java 21 StringBuilder/StringBuffer.repeat fixture.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      fixturePath = 'classes/modern_fixture/Java21StringBuilderRepeat.java',
+      classPath = 'classes/modern_test/Java21StringBuilderRepeat.class',
+      runoutPath = 'classes/modern_test/Java21StringBuilderRepeat.runout',
+      workDir = 'build/tmp/java21-string-builder-repeat',
+      patchDir = path.join(workDir, 'patch'),
+      runtimeJar = 'vendor/java_home/lib/rt.jar',
+      compiledTransformer = path.resolve('build/dev-cli/src/ClassLoader.js'),
+      bootstrapClasses = [
+        'java/lang/AbstractStringBuilder.class',
+        'java/lang/StringBuffer.class',
+        'java/lang/StringBuilder.class'
+      ],
+      expectedOutput = [
+        'code-points=true,true',
+        'sequences=true,true',
+        'self-empty=true,true',
+        'monitor-cache=true,true',
+        'exceptions=true,true',
+        'overflow=true,true',
+        'reflection-handles=true,true'
+      ].join('\n') + '\n';
+
+    grunt.config.requires('build.javac');
+    if (!fs.existsSync(compiledTransformer)) {
+      grunt.fail.fatal('Compiled bootstrap overlay transformer is missing: ' + compiledTransformer);
+    }
+    if (fs.existsSync(workDir)) {
+      grunt.file.delete(workDir);
+    }
+    grunt.file.mkdir(patchDir);
+    var jarTool = path.join(path.dirname(grunt.config('build.javac')),
+        os.platform() === 'win32' ? 'jar.exe' : 'jar'),
+      extraction = child_process.spawnSync(jarTool,
+        ['xf', path.resolve(runtimeJar)].concat(bootstrapClasses), {cwd: patchDir, encoding: 'utf8'});
+    if (extraction.status !== 0) {
+      grunt.fail.fatal('Unable to extract Java 21 repeat compile support:\n' +
+        extraction.stdout + extraction.stderr);
+    }
+    var transformer: {
+        applyModernBootstrapOverlays: (typeStr: string, data: Buffer) => Buffer;
+      } = require(compiledTransformer);
+    bootstrapClasses.forEach(function(relativePath: string): void {
+      var inputPath = path.join(patchDir, relativePath),
+        input = fs.readFileSync(inputPath),
+        typeStr = 'L' + relativePath.slice(0, -'.class'.length) + ';',
+        transformed = transformer.applyModernBootstrapOverlays(typeStr, input);
+      if (transformed.equals(input)) {
+        grunt.fail.fatal('Java 21 repeat bootstrap overlay is missing for ' + typeStr);
+      }
+      fs.writeFileSync(inputPath, transformed);
+    });
+
+    child_process.exec(shellEscape(grunt.config('build.javac')) +
+        ' -J-Dfile.encoding=UTF8 -source 17 -target 17 -implicit:none --patch-module java.base=' +
+        shellEscape(patchDir) + ' -d . ' + shellEscape(fixturePath),
+      function(err?: any, stdout?: Buffer, stderr?: Buffer): void {
+        if (err) {
+          grunt.fail.fatal('Error compiling Java 21 repeat fixture: ' + err + '\n' +
+            stdout.toString() + stderr.toString());
+        }
+        if (!fs.existsSync(classPath)) {
+          grunt.fail.fatal('Java 21 repeat fixture compilation did not produce ' + classPath);
+        }
+        grunt.file.expand(['classes/modern_test/Java21StringBuilderRepeat*.class'])
+          .forEach(function(outputPath: string): void {
+            var classBytes = fs.readFileSync(outputPath);
+            classBytes.writeUInt16BE(65, 6);
+            fs.writeFileSync(outputPath, classBytes);
+            grunt.log.ok('Generated ' + outputPath);
+          });
+        grunt.file.write(runoutPath, expectedOutput);
+        grunt.file.delete(workDir);
+        grunt.log.ok('Generated ' + runoutPath);
+        done();
+      });
+  });
+
   grunt.registerTask('generate_java18_default_charset', 'Generate a Java 18 UTF-8 default charset fixture.', function() {
     var done: (status?: boolean) => void = this.async(),
       sourcePath = 'classes/modern_test/Java18DefaultCharset.java',
@@ -4974,12 +5053,15 @@ function modernJava(grunt: IGrunt) {
 
     transformedClasses.sort();
     var expectedTransformedClasses = [
+      'java/lang/AbstractStringBuilder.class',
       'java/lang/Character.class',
       'java/lang/Class.class',
       'java/lang/ClassLoader.class',
       'java/lang/Math.class',
       'java/lang/Runtime.class',
       'java/lang/StrictMath.class',
+      'java/lang/StringBuffer.class',
+      'java/lang/StringBuilder.class',
       'java/lang/System.class',
       'java/lang/Thread.class',
       'java/lang/invoke/MethodHandle.class',
@@ -5327,6 +5409,22 @@ function modernJava(grunt: IGrunt) {
           grunt.fail.fatal('Java 21 Math.clamp Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
         }
         grunt.log.ok('Java 21 Math.clamp output matched expected output.');
+        done();
+      });
+  });
+
+  grunt.registerTask('unit_test_java21_string_builder_repeat', 'Run the Java 21 StringBuilder/StringBuffer.repeat fixture on Doppio.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      mainClass = 'classes.modern_test.Java21StringBuilderRepeat',
+      outPath = 'classes/modern_test/Java21StringBuilderRepeat.runout';
+    child_process.exec('node --no-deprecation build/release-cli/console/runner.js -classpath . ' + mainClass,
+      function(err?: any, stdout?: Buffer, stderr?: Buffer) {
+        var actual = stdout.toString() + stderr.toString(),
+          expected = fs.readFileSync(outPath, 'utf8');
+        if (err || actual !== expected) {
+          grunt.fail.fatal('Java 21 repeat Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
+        }
+        grunt.log.ok('Java 21 StringBuilder/StringBuffer.repeat output matched expected output.');
         done();
       });
   });

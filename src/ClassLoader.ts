@@ -2190,6 +2190,72 @@ function addJavaLangSystemModernOverlays(data: Buffer): Buffer {
   ]);
 }
 
+function addJavaLangStringBuilderModernOverlays(data: Buffer, typeStr: string): Buffer {
+  var cp = constantPoolEnd(data),
+    constants: Buffer[] = [],
+    methodData: Buffer[] = [],
+    baseType = 'Ljava/lang/AbstractStringBuilder;',
+    concrete = typeStr !== baseType;
+
+  function constant(value: Buffer): number {
+    constants.push(value);
+    return cp.count + constants.length - 1;
+  }
+
+  var helperNameIndex = constant(utf8Constant('java/lang/DoppioStringBuilder')),
+    helperClassIndex = constant(Buffer.concat([Buffer.from([7]), u2(helperNameIndex)])),
+    ownerNameIndex = constant(utf8Constant(typeStr.slice(1, -1))),
+    ownerClassIndex = constant(Buffer.concat([Buffer.from([7]), u2(ownerNameIndex)])),
+    codeNameIndex = constant(utf8Constant('Code')),
+    nameIndex = constant(utf8Constant('repeat'));
+
+  function methodRef(owner: number, descriptorIndex: number): number {
+    var nameAndTypeIndex = constant(Buffer.concat([
+      Buffer.from([12]), u2(nameIndex), u2(descriptorIndex)
+    ]));
+    return constant(Buffer.concat([Buffer.from([10]), u2(owner), u2(nameAndTypeIndex)]));
+  }
+
+  function method(descriptorIndex: number, flags: number, code: Buffer): void {
+    methodData.push(Buffer.concat([
+      u2(flags), u2(nameIndex), u2(descriptorIndex), u2(1),
+      u2(codeNameIndex), u4(12 + code.length), u2(3), u2(3),
+      u4(code.length), code, u2(0), u2(0)
+    ]));
+  }
+
+  ['II', 'Ljava/lang/CharSequence;I'].forEach((parameters: string, index: number) => {
+    var descriptorIndex = constant(utf8Constant('(' + parameters + ')' + typeStr)),
+      helperDescriptorIndex = constant(utf8Constant('(' + baseType + parameters + ')V')),
+      helperMethodIndex = methodRef(helperClassIndex, helperDescriptorIndex),
+      loadArguments = Buffer.from([0x2a, index === 0 ? 0x1b : 0x2b, 0x1c]);
+    method(descriptorIndex, typeStr === 'Ljava/lang/StringBuffer;' ? 0x0021 : 0x0001,
+      Buffer.concat([loadArguments, Buffer.from([0xb8]), u2(helperMethodIndex),
+        Buffer.from([0x2a, 0xb0])]));
+    if (concrete) {
+      // Covariant bridges must dispatch through the concrete overload, which
+      // acquires the StringBuffer monitor even though the bridge itself does not.
+      var bridgeDescriptorIndex = constant(utf8Constant('(' + parameters + ')' + baseType)),
+        concreteMethodIndex = methodRef(ownerClassIndex, descriptorIndex);
+      method(bridgeDescriptorIndex, 0x1041,
+        Buffer.concat([loadArguments, Buffer.from([0xb6]), u2(concreteMethodIndex),
+          Buffer.from([0xb0])]));
+    }
+  });
+
+  var extraConstants = Buffer.concat(constants),
+    withConstants = Buffer.concat([
+      data.slice(0, 8), u2(cp.count + constants.length),
+      data.slice(10, cp.offset), extraConstants, data.slice(cp.offset)
+    ]),
+    methods = methodsInfo(withConstants, cp.offset + extraConstants.length);
+  return Buffer.concat([
+    withConstants.slice(0, methods.countOffset), u2(methods.count + methodData.length),
+    withConstants.slice(methods.countOffset + 2, methods.endOffset),
+    Buffer.concat(methodData), withConstants.slice(methods.endOffset)
+  ]);
+}
+
 function addJavaLangMathModernOverlays(data: Buffer): Buffer {
   var cp = constantPoolEnd(data),
     overlays = [
@@ -3139,6 +3205,10 @@ export function applyModernBootstrapOverlays(typeStr: string, data: Buffer): Buf
   }
   if (typeStr === 'Ljava/lang/Math;' || typeStr === 'Ljava/lang/StrictMath;') {
     data = addJavaLangMathModernOverlays(data);
+  }
+  if (typeStr === 'Ljava/lang/AbstractStringBuilder;' ||
+      typeStr === 'Ljava/lang/StringBuilder;' || typeStr === 'Ljava/lang/StringBuffer;') {
+    data = addJavaLangStringBuilderModernOverlays(data, typeStr);
   }
   if (typeStr === 'Ljava/util/concurrent/TimeUnit;') {
     data = addJavaUtilConcurrentTimeUnitModernOverlays(data);

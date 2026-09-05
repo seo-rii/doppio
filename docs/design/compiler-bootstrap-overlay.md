@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented for all 31 bootstrap classes currently changed by Doppio's parsed
+Implemented for all 34 bootstrap classes currently changed by Doppio's parsed
 overlay dispatch. Difficulty: medium-high.
 
 ## Problem
@@ -65,7 +65,7 @@ generator imports the compiled function and calls it for every `.class` entry
 extracted from Java 8 `rt.jar`.
 
 The exported function is the only class-to-transform dispatch. The build task
-does not use its expected 31-class postcondition as a selection list and does
+does not use its expected 34-class postcondition as a selection list and does
 not call individual overlay helpers. This keeps runtime metadata and
 compiler-visible metadata synchronized when a parsed overlay is added,
 removed, or reordered.
@@ -90,7 +90,7 @@ The generator visits every regular `.class` entry extracted from the pinned
 `rt.jar`, but eligibility remains inside the shared dispatch. For each entry
 `p.class`, it derives `L${p};` after normalizing platform separators to `/`.
 After transformation, an independent expected-set assertion requires the exact
-31 changed class paths listed by the pinned baseline contract.
+34 changed class paths listed by the pinned baseline contract.
 
 The initial Java 8 baseline has these descriptor gates:
 
@@ -112,6 +112,7 @@ The initial Java 8 baseline has these descriptor gates:
 | `java/lang/Runtime.class` | `Ljava/lang/Runtime;` |
 | `java/lang/Character.class` | `Ljava/lang/Character;` |
 | `java/lang/Math.class`, `java/lang/StrictMath.class` | `Ljava/lang/Math;`, `Ljava/lang/StrictMath;` |
+| `java/lang/AbstractStringBuilder.class`, `java/lang/StringBuilder.class`, `java/lang/StringBuffer.class` | `Ljava/lang/AbstractStringBuilder;`, `Ljava/lang/StringBuilder;`, `Ljava/lang/StringBuffer;` |
 | `java/util/concurrent/TimeUnit.class` | `Ljava/util/concurrent/TimeUnit;` |
 | `java/time/Duration.class` | `Ljava/time/Duration;` |
 | `java/lang/invoke/MethodHandles.class` | `Ljava/lang/invoke/MethodHandles;` |
@@ -156,7 +157,7 @@ At least `java/lang/Runtime.class`, the three transformed
 `java/lang/invoke/MethodHandle*` consumer classes, `java/time/Duration.class`,
 and `java/util/concurrent/TimeUnit.class` are required outputs because the broad
 and focused compiler smokes depend on their direct modern methods. More
-generally, a test records the complete 31-class expected changed-entry set for
+generally, a test records the complete 34-class expected changed-entry set for
 the pinned Java 8 baseline; changing that set requires an intentional
 parsed-overlay review.
 
@@ -172,10 +173,11 @@ again.
 
 `ci/modern_bootstrap_overlay_smoke.sh` performs two independent forced clean
 generations and compares the final JAR SHA-256 values. It then checks the stored
-artifact hash, exact 31-entry count, canonical class-only names, and required
+artifact hash, exact 34-entry count, canonical class-only names, and required
 `Runtime`, `MethodHandle`, `MethodHandles`, `MethodHandles$Lookup`, `Duration`,
-and `TimeUnit` entries. The generator itself compares the complete sorted
-31-class set before packaging, so an added, removed, or unexpectedly unchanged
+`TimeUnit`, `AbstractStringBuilder`, `StringBuilder`, and `StringBuffer` entries.
+The generator itself compares the complete sorted 34-class set before
+packaging, so an added, removed, or unexpectedly unchanged
 parsed overlay requires an intentional contract update.
 
 A same-input hash mismatch fails CI and reports both hashes. The task must not
