@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "platform": "linux-x64",
+  "toolchains": [
+    {
+      "id": "jdk21",
+      "feature": 21,
+      "vendor": "Amazon Corretto",
+      "version": "21.0.11",
+      "build": "21.0.11.10.1",
+      "source": "https://github.com/corretto/corretto-21/releases/tag/21.0.11.10.1",
+      "url": "https://corretto.aws/downloads/resources/21.0.11.10.1/amazon-corretto-21.0.11.10.1-linux-x64.tar.gz",
+      "archiveRoot": "amazon-corretto-21.0.11.10.1-linux-x64",
+      "archiveSize": 209008617,
+      "archiveSha256": "5b4dc8817df13f88f9bfc434e5d018adb535889ff2fe0ccf758bcebcc216f394",
+      "treeSha256": "cd0db18f9cb742dde2e108e644c19a0cd15e10c7cf0417ecb74d92c27c7a8bd5"
+    },
+    {
+      "id": "jdk25",
+      "feature": 25,
+      "vendor": "Amazon Corretto",
+      "version": "25.0.3",
+      "build": "25.0.3.9.1",
+      "source": "https://github.com/corretto/corretto-25/releases/tag/25.0.3.9.1",
+      "url": "https://corretto.aws/downloads/resources/25.0.3.9.1/amazon-corretto-25.0.3.9.1-linux-x64.tar.gz",
+      "archiveRoot": "amazon-corretto-25.0.3.9.1-linux-x64",
+      "archiveSize": 227455282,
+      "archiveSha256": "00486fa402136f8d40512b101c645dd4db9be2b5535171530ad241cd96c1223d",
+      "treeSha256": "1631db0be3d1f81d99f4246c4fa3e9045d820b123cac9eb20da6eb8987d27c68"
+    }
+  ]
+}
