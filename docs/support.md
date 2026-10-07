@@ -29,6 +29,10 @@ and compiler probes are recorded in [the compatibility matrix](modern-java.md).
 An unlisted Java 9+ API must pass a focused native-oracle fixture before it is
 counted as supported.
 
+The [repository compatibility roadmap](https://github.com/seo-rii/doppio/blob/modern/docs/compatibility-roadmap.md)
+proposes Java 21/25 workload milestones and records remaining work with
+completion criteria. Those planning targets do not expand this release profile.
+
 ## Explicit boundaries
 
 The following are intentional platform boundaries rather than incomplete

@@ -18,6 +18,7 @@ and Scala playground that compiles and runs source inside Doppio.
 To learn more, read the [developer guide](docs), the
 [support policy](docs/support.md), the
 [modern Java compatibility matrix](docs/modern-java.md), the
+[compatibility roadmap](https://github.com/seo-rii/doppio/blob/modern/docs/compatibility-roadmap.md), the
 [0.6.0 release notes](CHANGELOG.md), or the original
 [academic paper](http://dl.acm.org/citation.cfm?id=2594293) [(alt. link w/ no paywall)](https://plasma-umass.github.io/doppio-demo/paper.pdf)
 published at [PLDI 2014](http://conferences.inf.ed.ac.uk/pldi2014/).
