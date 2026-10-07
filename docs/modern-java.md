@@ -5,7 +5,7 @@ Doppio's Java 8-era runtime and class library. A row marked "not implemented"
 means no compatibility claim is made yet, even if a trivial class happens to
 run.
 
-For proposed Java 21/25 targets, required workloads and remaining work with
+For approved Java 21/25 development targets, required workloads and remaining work with
 completion criteria, see the
 [repository compatibility roadmap](https://github.com/seo-rii/doppio/blob/modern/docs/compatibility-roadmap.md).
 It distinguishes workload compatibility from full Java SE conformance; this

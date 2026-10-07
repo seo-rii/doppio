@@ -9,21 +9,21 @@ The inventory was checked on 2026-10-08 against implementation baseline
 the [compatibility matrix](modern-java.md) records individual implemented
 surfaces. No runtime or release gate was changed by this document.
 
-## Proposed target and decisions
+## Approved target and decisions
 
-The proposed destination is **Java 25 LTS**, with **Java 21** as the intermediate
-workload milestone. Both are LTS releases in the
+The approved destination is **Java 25 LTS**, with **Java 21** as the intermediate
+workload milestone. The maintainer accepted the recommended scope on 2026-10-08.
+Both are LTS releases in the
 [Java support roadmap](https://www.oracle.com/java/technologies/java-se-support-roadmap.html).
-The version choice and required application set still need maintainer confirmation.
-Until then, use these as planning assumptions, not an expanded release promise.
+These are development targets, not claims that their requirements already pass.
 
-| Decision | Proposed default | What still needs confirmation |
+| Decision | Approved scope | Boundary |
 | --- | --- | --- |
-| Target Java version | Final Java 25 features, through an intermediate Java 21 profile | Java 21 only, Java 25, or a different target |
-| Required applications | Existing Java, Kotlin 2.4.0 and Scala 2.13.18 compiler/runtime workloads, plus the editable browser playground | Names, versions, inputs and expected outputs of any additional CLI or server applications |
-| Execution hosts | Ubuntu/Node 24 and Chromium, with separate results | Whether additional operating systems or browsers are release requirements |
-| Java compiler inside Doppio | Preserve the current Java 8 javac workload | Whether running javac 21/25 itself is required; executing its externally compiled output is a different goal |
-| Platform-dependent facilities | Record limitations separately for each host | Feasibility and requirements for native calls, processes, sockets, filesystem guarantees and desktop facilities |
+| Target Java version | Final Java 25 features, through an intermediate Java 21 profile | Preview/incubator features are not part of the baseline |
+| Required applications | Existing Java, Kotlin 2.4.0 and Scala 2.13.18 compiler/runtime workloads, plus the editable browser playground | No additional CLI application or server framework is selected |
+| Execution hosts | Ubuntu/Node 24 and Chromium, with separate results | Other operating systems and browsers are outside the initial workload profile |
+| Java compiler inside Doppio | Preserve the current Java 8 javac workload | Hosted javac 21/25 is deferred; executing its externally compiled output remains required |
+| Platform-dependent facilities | Record limitations separately for each host | Native calls, processes, sockets, filesystem guarantees and desktop facilities need feasibility decisions; they remain open against broader Java SE compatibility |
 
 There are three different completion claims:
 
@@ -60,7 +60,7 @@ percentage. A small string overload and a module system are not equal work.
 
 ## Required workload gates
 
-The following seven IDs define the proposed acceptance structure. The first
+The following seven IDs define the approved acceptance structure. The first
 five map existing gates; the last two need new manifests and automation. An
 existing gate is not marked passed here without a result tied to a commit.
 
@@ -112,7 +112,7 @@ stable; a split should retain links to its parent.
 
 | ID | Priority and current state | Required work and exit evidence |
 | --- | --- | --- |
-| PLAN-001 | P0; complete requirements inventory absent | Confirm target versions, hosts and application manifests. Enumerate applicable JLS/JVMS requirements and all target Java SE modules, exported public/protected types and members, service/provider contracts and behavioral changes, including inherited Java 8 behavior. Map each to an owner package, specification, status and tests, with no unclassified entries. Classify preview/incubator/JDK-specific features separately; preserve exclusions in the ledger. |
+| PLAN-001 | P0; target/workload scope approved, complete requirements inventory absent | Version the approved target, host and application manifests. Enumerate applicable JLS/JVMS requirements and all target Java SE modules, exported public/protected types and members, service/provider contracts and behavioral changes, including inherited Java 8 behavior. Map each to an owner package, specification, status and tests, with no unclassified entries. Classify preview/incubator/JDK-specific features separately; preserve exclusions in the ledger. |
 
 ### JVM and language execution
 
@@ -173,20 +173,20 @@ JDK-specific modules.
 
 | ID | Priority and current evidence | Exit evidence and main dependencies |
 | --- | --- | --- |
-| TOOL-001 | Decision pending; current [playground](../website/src/playground.mjs) runs Java 8 javac, not modern javac | If selected, run pinned javac 21/25 inside Doppio with its required runtime image/module and compiler services, compile agreed source programs and execute their output. This is separate from W-JAVA21/25, which use external native compilers. Depends on workload-specific APIs and JVM-011 as required by the selected tool distribution. |
+| TOOL-001 | Deferred outside the initial workload profile; current [playground](../website/src/playground.mjs) runs Java 8 javac, not modern javac | If later selected, run pinned javac 21/25 inside Doppio with its required runtime image/module and compiler services, compile agreed source programs and execute their output. This is separate from W-JAVA21/25, which use external native compilers. Depends on workload-specific APIs and JVM-011 as required by the selected tool distribution. |
 
 ## Milestones and first implementation sequence
 
 | Milestone | Deliverable | Exit rule |
 | --- | --- | --- |
-| M0: measurable baseline | Confirm scope; complete PLAN-001 inventory; pin JVM-001 toolchains; check in manifests and host-separated result format | Every selected requirement is classified with provenance; required workload list and exclusions are explicit; baseline results are reproducible. An initial failing baseline is useful evidence, not milestone compatibility completion. |
+| M0: measurable baseline | Scope approved; complete PLAN-001 inventory; pin JVM-001 toolchains; check in manifests and host-separated result format | Every selected requirement is classified with provenance; required workload list and exclusions are explicit; baseline results are reproducible. An initial failing baseline is useful evidence, not milestone compatibility completion. |
 | M1: Java 21 workload profile | Resolve failures for the agreed Java 21 applications/features, using JVM/LIB dependencies above | W-JAVA21 and all retained existing gates pass on one commit for every required host; no unaccounted skip or unsupported requirement in the selected profile. |
 | M2: Java 25 workload profile | Add final Java 22–25 requirements and resolve their failures | W-JAVA25, W-JAVA21 and retained gates pass on one commit, with named applications and deviations published. Do not imply full Java SE from this result. |
 | M3: broader Java SE conformance | Resolve the remaining spec/module inventory and host boundaries beyond the workload profiles | No required entry is partial, missing or unassessed; applicable conformance evidence is recorded. Any permitted platform exclusions need specification justification. Certification is a separate claim. |
 
 The next coherent implementation units should be:
 
-1. Freeze the proposed target/workload choices and add the versioned requirement
+1. Encode the approved target/workload choices in a versioned requirement
    manifest. Keep unknowns visible instead of inventing a coverage denominator.
 2. Pin native Java 21/25 toolchains and add genuine compile/native/Doppio probes
    for the already implemented repeat, split and bounded-indexOf fixtures.

@@ -30,8 +30,9 @@ An unlisted Java 9+ API must pass a focused native-oracle fixture before it is
 counted as supported.
 
 The [repository compatibility roadmap](https://github.com/seo-rii/doppio/blob/modern/docs/compatibility-roadmap.md)
-proposes Java 21/25 workload milestones and records remaining work with
-completion criteria. Those planning targets do not expand this release profile.
+records the approved Java 21/25 development targets and remaining work with
+completion criteria. Those targets do not expand this release profile until
+their required gates pass.
 
 ## Explicit boundaries
 
