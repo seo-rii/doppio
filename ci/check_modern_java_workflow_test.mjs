@@ -144,6 +144,45 @@ if (completeResult.status !== 0) {
   throw new Error(`Complete sharded workflow should pass:\n${completeResult.stderr}`);
 }
 
+for (const name of [
+  'Check Java compatibility baseline tooling',
+  'Prepare pinned Java compatibility toolchains',
+  'Run genuine Java 21 and 25 seed fixtures',
+  'Upload Java compatibility baseline ledger',
+]) {
+  expectCheckerFailure(
+    `missing ${name}`,
+    { workflow: replaceRequired(realWorkflow, `      - name: ${name}\n`, `      - name: ${name} removed\n`) },
+    `missing the "${name}" step`
+  );
+  expectCheckerFailure(
+    `non-failing ${name}`,
+    { workflow: replaceRequired(realWorkflow, `      - name: ${name}\n`, `      - name: ${name}\n        continue-on-error: true\n`) },
+    'exact bounded, fail-closed baseline command or artifact contract'
+  );
+}
+
+for (const [original, replacement] of [
+  ['run: node ci/run_java_compatibility.mjs\n', 'run: node ci/run_java_compatibility.mjs --release 21\n'],
+  ['run: node ci/prepare_java_compatibility_toolchains.mjs\n', 'run: node ci/prepare_java_compatibility_toolchains.mjs || true\n'],
+  ['timeout-minutes: 25\n', 'timeout-minutes: 250\n'],
+  ["if: always() && steps.java_compatibility.outcome != 'skipped'", 'if: success()'],
+  ['path: build/java-compatibility-results.json', 'path: build/missing-java-ledger.json'],
+  ['retention-days: 7', 'retention-days: 1'],
+]) {
+  expectCheckerFailure(
+    `changed Java compatibility baseline contract: ${original.trim()}`,
+    { workflow: replaceRequired(realWorkflow, original, replacement) },
+    'exact bounded, fail-closed baseline command or artifact contract'
+  );
+}
+
+expectCheckerFailure(
+  'Java compatibility execution before toolchain preparation',
+  { workflow: swapAdjacentSteps(realWorkflow, 'Prepare pinned Java compatibility toolchains', 'Run genuine Java 21 and 25 seed fixtures') },
+  'remain in dependency order'
+);
+
 expectCheckerFailure(
   'missing Pages smoke retry step',
   {
@@ -556,7 +595,7 @@ expectCheckerFailure(
 
 expectCheckerFailure(
   'old upload action',
-  { workflow: replaceRequired(realWorkflow, 'actions/upload-artifact@v7', 'actions/upload-artifact@v6') },
+  { workflow: replaceRequired(realWorkflow, 'id: upload_runtime\n        uses: actions/upload-artifact@v7', 'id: upload_runtime\n        uses: actions/upload-artifact@v6') },
   'upload one raw deterministic runtime tar with upload-artifact@v7'
 );
 
@@ -565,8 +604,8 @@ expectCheckerFailure(
   {
     workflow: replaceRequired(
       realWorkflow,
-      '        uses: actions/upload-artifact@v7',
-      '        uses: actions/upload-artifact@v6\n        # uses: actions/upload-artifact@v7'
+      '        id: upload_runtime\n        uses: actions/upload-artifact@v7',
+      '        id: upload_runtime\n        uses: actions/upload-artifact@v6\n        # uses: actions/upload-artifact@v7'
     ),
   },
   'upload one raw deterministic runtime tar with upload-artifact@v7'
@@ -577,8 +616,8 @@ expectCheckerFailure(
   {
     workflow: replaceRequired(
       realWorkflow,
-      '        uses: actions/upload-artifact@v7',
-      '        uses: actions/upload-artifact@v6 # uses: actions/upload-artifact@v7'
+      '        id: upload_runtime\n        uses: actions/upload-artifact@v7',
+      '        id: upload_runtime\n        uses: actions/upload-artifact@v6 # uses: actions/upload-artifact@v7'
     ),
   },
   'upload one raw deterministic runtime tar with upload-artifact@v7'
@@ -773,7 +812,13 @@ expectCheckerFailure(
 
 expectCheckerFailure(
   'short runtime artifact retention',
-  { workflow: replaceRequired(realWorkflow, 'retention-days: 7', 'retention-days: 1') },
+  {
+    workflow: replaceRequired(
+      realWorkflow,
+      'path: ${{ steps.bundle_runtime.outputs.archive_path }}\n          archive: false\n          if-no-files-found: error\n          retention-days: 7',
+      'path: ${{ steps.bundle_runtime.outputs.archive_path }}\n          archive: false\n          if-no-files-found: error\n          retention-days: 1'
+    ),
+  },
   'upload one raw deterministic runtime tar'
 );
 

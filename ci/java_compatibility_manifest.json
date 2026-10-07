@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "profile": "java21-to-java25-seed",
+  "approvedTarget": {
+    "approvedAt": "2026-10-08",
+    "intermediateRelease": 21,
+    "targetRelease": 25,
+    "featurePolicy": "final-only",
+    "hostedJavaCompiler": "existing-java8-javac",
+    "hostedModernJavacRequired": false,
+    "additionalApplications": [],
+    "requiredHosts": [
+      { "id": "ubuntu-node24", "os": "ubuntu", "runtime": "node", "majorVersion": 24 },
+      { "id": "chromium", "runtime": "chromium", "browserProvider": "playwright", "playwrightVersion": "1.57.0" }
+    ],
+    "retainedWorkloads": [
+      { "id": "W-JAVA-BASE", "description": "Current legacy and modern runtime suites" },
+      { "id": "W-KOTLIN", "compilerVersion": "2.4.0", "manifest": "ci/modern_java_smoke_shards.json", "inputLock": "ci/modern_java_compiler_inputs.lock.json" },
+      { "id": "W-SCALA", "compilerVersion": "2.13.18", "manifest": "ci/modern_java_smoke_shards.json", "inputLock": "ci/modern_java_compiler_inputs.lock.json" },
+      { "id": "W-BROWSER", "description": "Editable Java, Kotlin and Scala playground in Chromium" },
+      { "id": "W-PACKAGE", "description": "Existing isolated package-consumer gate, separate from guest compatibility" }
+    ],
+    "newWorkloads": [
+      { "id": "W-JAVA21", "release": 21, "compiler": "external-native-javac", "requiredHosts": ["ubuntu-node24", "chromium"] },
+      { "id": "W-JAVA25", "release": 25, "compiler": "external-native-javac", "requiredHosts": ["ubuntu-node24", "chromium"] }
+    ]
+  },
+  "inventory": {
+    "state": "seed-partial",
+    "completeJavaSeInventory": false,
+    "packageIds": ["PLAN-001", "JVM-001", "LIB-008"],
+    "roadmap": "docs/compatibility-roadmap.md",
+    "scope": "Three existing standalone fixtures covering selected behavior of eight Java 21 API overloads, recompiled by matching native Java 21 and 25 toolchains.",
+    "unassessedScope": "Remaining Java SE language, VM, module, library and host requirements have not been enumerated by this manifest. Final Java 22-25 features are not covered by these Java 21 seeds.",
+    "hostAutomation": {
+      "ubuntu-node24": "seed-runner",
+      "chromium": "not-yet-automated"
+    },
+    "resultPolicy": "Every listed fixture is mandatory for each listed release. A passing Node seed run does not complete W-JAVA21, W-JAVA25, either required-host profile, or PLAN-001. Runtime verification results belong to per-run artifacts, not this inventory."
+  },
+  "releases": [21, 25],
+  "timeouts": {
+    "compileMs": 60000,
+    "nativeMs": 30000,
+    "doppioMs": 120000
+  },
+  "requirements": [
+    {
+      "id": "API-STRINGBUILDER-REPEAT-CODEPOINT",
+      "signature": "java.lang.StringBuilder java.lang.StringBuilder.repeat(int,int)",
+      "introducedIn": 21,
+      "featureStatus": "final",
+      "packageId": "LIB-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": {
+        "21": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/StringBuilder.html#repeat(int,int)",
+        "25": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/StringBuilder.html#repeat(int,int)"
+      }
+    },
+    {
+      "id": "API-STRINGBUILDER-REPEAT-SEQUENCE",
+      "signature": "java.lang.StringBuilder java.lang.StringBuilder.repeat(java.lang.CharSequence,int)",
+      "introducedIn": 21,
+      "featureStatus": "final",
+      "packageId": "LIB-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": {
+        "21": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/StringBuilder.html#repeat(java.lang.CharSequence,int)",
+        "25": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/StringBuilder.html#repeat(java.lang.CharSequence,int)"
+      }
+    },
+    {
+      "id": "API-STRINGBUFFER-REPEAT-CODEPOINT",
+      "signature": "java.lang.StringBuffer java.lang.StringBuffer.repeat(int,int)",
+      "introducedIn": 21,
+      "featureStatus": "final",
+      "packageId": "LIB-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": {
+        "21": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/StringBuffer.html#repeat(int,int)",
+        "25": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/StringBuffer.html#repeat(int,int)"
+      }
+    },
+    {
+      "id": "API-STRINGBUFFER-REPEAT-SEQUENCE",
+      "signature": "java.lang.StringBuffer java.lang.StringBuffer.repeat(java.lang.CharSequence,int)",
+      "introducedIn": 21,
+      "featureStatus": "final",
+      "packageId": "LIB-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": {
+        "21": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/StringBuffer.html#repeat(java.lang.CharSequence,int)",
+        "25": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/StringBuffer.html#repeat(java.lang.CharSequence,int)"
+      }
+    },
+    {
+      "id": "API-STRING-SPLIT-WITH-DELIMITERS",
+      "signature": "java.lang.String[] java.lang.String.splitWithDelimiters(java.lang.String,int)",
+      "introducedIn": 21,
+      "featureStatus": "final",
+      "packageId": "LIB-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": {
+        "21": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html#splitWithDelimiters(java.lang.String,int)",
+        "25": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html#splitWithDelimiters(java.lang.String,int)"
+      }
+    },
+    {
+      "id": "API-PATTERN-SPLIT-WITH-DELIMITERS",
+      "signature": "java.lang.String[] java.util.regex.Pattern.splitWithDelimiters(java.lang.CharSequence,int)",
+      "introducedIn": 21,
+      "featureStatus": "final",
+      "packageId": "LIB-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": {
+        "21": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/regex/Pattern.html#splitWithDelimiters(java.lang.CharSequence,int)",
+        "25": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/regex/Pattern.html#splitWithDelimiters(java.lang.CharSequence,int)"
+      }
+    },
+    {
+      "id": "API-STRING-INDEXOF-RANGE-CODEPOINT",
+      "signature": "int java.lang.String.indexOf(int,int,int)",
+      "introducedIn": 21,
+      "featureStatus": "final",
+      "packageId": "LIB-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": {
+        "21": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html#indexOf(int,int,int)",
+        "25": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html#indexOf(int,int,int)"
+      }
+    },
+    {
+      "id": "API-STRING-INDEXOF-RANGE-SUBSTRING",
+      "signature": "int java.lang.String.indexOf(java.lang.String,int,int)",
+      "introducedIn": 21,
+      "featureStatus": "final",
+      "packageId": "LIB-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": {
+        "21": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html#indexOf(java.lang.String,int,int)",
+        "25": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html#indexOf(java.lang.String,int,int)"
+      }
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "string-builder-repeat",
+      "source": "classes/modern_fixture/Java21StringBuilderRepeat.java",
+      "mainClass": "classes.modern_test.Java21StringBuilderRepeat",
+      "releases": [21, 25],
+      "workloadIds": ["W-JAVA21", "W-JAVA25"],
+      "packageIds": ["JVM-001", "JVM-003", "LIB-008"],
+      "requirementIds": ["API-STRINGBUILDER-REPEAT-CODEPOINT", "API-STRINGBUILDER-REPEAT-SEQUENCE", "API-STRINGBUFFER-REPEAT-CODEPOINT", "API-STRINGBUFFER-REPEAT-SEQUENCE"],
+      "arguments": [],
+      "comparison": "successful-native-oracle-stdout-stderr",
+      "coverage": ["code-points", "sequences", "self-empty", "monitor-cache", "exceptions", "overflow", "reflection-handles"],
+      "limitations": "Retains implementation-sensitive native regression assertions, including exact exception text and bridge metadata. Native agreement is not proof that every assertion is a universal Java SE requirement."
+    },
+    {
+      "id": "split-with-delimiters",
+      "source": "classes/modern_fixture/Java21SplitWithDelimiters.java",
+      "mainClass": "classes.modern_test.Java21SplitWithDelimiters",
+      "releases": [21, 25],
+      "workloadIds": ["W-JAVA21", "W-JAVA25"],
+      "packageIds": ["JVM-001", "JVM-003", "LIB-008"],
+      "requirementIds": ["API-STRING-SPLIT-WITH-DELIMITERS", "API-PATTERN-SPLIT-WITH-DELIMITERS"],
+      "arguments": [],
+      "comparison": "successful-native-oracle-stdout-stderr",
+      "coverage": ["limits", "boundaries", "regex", "sequences", "exceptions", "reflection", "method-handles", "legacy-split"],
+      "limitations": "Selected deterministic regression cases, not an exhaustive regex, reflection or method-handle conformance suite."
+    },
+    {
+      "id": "string-index-of-range",
+      "source": "classes/modern_fixture/Java21StringIndexOfRange.java",
+      "mainClass": "classes.modern_test.Java21StringIndexOfRange",
+      "releases": [21, 25],
+      "workloadIds": ["W-JAVA21", "W-JAVA25"],
+      "packageIds": ["JVM-001", "JVM-003", "LIB-008"],
+      "requirementIds": ["API-STRING-INDEXOF-RANGE-CODEPOINT", "API-STRING-INDEXOF-RANGE-SUBSTRING"],
+      "arguments": [],
+      "comparison": "successful-native-oracle-stdout-stderr",
+      "coverage": ["code-points", "substrings", "boundaries", "range-matrix", "exceptions", "reflection", "method-handles", "legacy-indexof"],
+      "limitations": "Selected deterministic regression cases, not an exhaustive string, reflection or method-handle conformance suite."
+    }
+  ]
+}

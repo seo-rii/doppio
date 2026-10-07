@@ -11,6 +11,7 @@ implemented.
 | --- | --- |
 | CLI host | Ubuntu Linux with Node.js 24.x |
 | Source build and native oracle | Java 17 JDK |
+| Newer native-oracle seed | Locked Corretto 21.0.11 and 25.0.3 on Linux x64 for three selected fixtures, separate from full Java 21/25 support |
 | Browser | Chromium through Playwright 1.57.0 |
 | Browser filesystem | BrowserFS 1.3.0, with read-only XHR runtime data and InMemory writable mounts |
 | Java runtime surface | Java 8 bootstrap image plus the Java 9–26 classfile and class-library surfaces listed in the compatibility matrix |
@@ -74,6 +75,14 @@ artifact. Eight compiler shards consume that exact artifact and the locked
 Kotlin/Scala compiler inputs, execute the complete 73-script inventory with
 per-script and outer timeouts, and upload raw completion ledgers. A stable
 terminal job fails unless both the producer and every shard succeed.
+
+The producer also runs three selected Java 21 API fixtures with genuinely pinned
+javac 21 and 25 output, comparing each against its matching native runtime and
+the same Doppio release CLI. The six required comparisons verify class versions
+and unchanged byte hashes and retain a provenance/result ledger on failure.
+They are a CLI seed only: they do not establish full Java 21/25 compatibility
+or equivalent Chromium coverage. The repository roadmap describes the seed
+manifest and local `yarn ci:java-compatibility:*` commands.
 
 The `Pages` workflow owns the browser gate. It builds the deployable artifact,
 runs the complete Chromium acceptance suite locally before upload, deploys only

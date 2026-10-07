@@ -7,7 +7,8 @@ planning inventory, not a new support claim or a test-result report.
 The inventory was checked on 2026-10-08 against implementation baseline
 `a944e52fd`. The [support policy](support.md) remains authoritative for releases;
 the [compatibility matrix](modern-java.md) records individual implemented
-surfaces. No runtime or release gate was changed by this document.
+surfaces. The seed harness below extends the verification baseline without
+claiming broader runtime implementation.
 
 ## Approved target and decisions
 
@@ -53,6 +54,7 @@ specification, not assumed from a successful native example.
 | [Core-language fixture notes](modern-java.md#known-core-lang-gaps) | Recent repeat, bounded indexOf and delimiter-preserving split fixtures include local Corretto 25.0.3 comparisons of genuine `--release 21` output | Reproducible native Java 21/25 release gates or broad modern language coverage |
 | [Playground launcher](../website/src/playground.mjs) and [browser suite](../ci/pages_browser_smoke.mjs) | Java 8 tools.jar javac and pinned Kotlin/Scala compile and execute in Doppio | Running modern javac or a modern JDK module image inside Doppio |
 | [Package smoke](../ci/package_artifact_smoke.mjs) | Isolated installation/rebuild, CLI help contracts, API types and bundle import | Java application compatibility; the isolated consumer uses an offline dummy runtime fixture |
+| [Seed manifest](../ci/java_compatibility_manifest.json), [toolchain lock](../ci/java_compatibility_toolchains.lock.json) and [comparison runner](../ci/run_java_compatibility.mjs) | Three existing fixtures are genuinely compiled and compared on matching Java 21 and 25 toolchains, with emitted-class and runtime hashes | A complete requirement inventory, final Java 22–25 feature coverage or Chromium execution of those fixtures |
 
 The version matrix currently labels every Java 9–26 row partial. Its rows and
 the 73 compiler scripts are not a valid denominator for an overall completion
@@ -61,8 +63,9 @@ percentage. A small string overload and a module system are not equal work.
 ## Required workload gates
 
 The following seven IDs define the approved acceptance structure. The first
-five map existing gates; the last two need new manifests and automation. An
-existing gate is not marked passed here without a result tied to a commit.
+five map existing gates; the last two have a CLI seed gate but still need broad
+manifests and browser automation. A gate is not marked passed here without a
+result tied to a commit.
 
 | ID | Workload and entry point | Completion condition |
 | --- | --- | --- |
@@ -80,11 +83,45 @@ For existing local commands and the same-commit release contract, see
 [compiler shard runner](../ci/run_modern_java_smoke_shard.mjs) already records
 per-script completion; extend that provenance model to new Java gates.
 
-W-JAVA21/25 are **planned**, not current CI jobs. Toolchain vendor, patch release,
-archive digest and acquisition policy must be pinned before results are
-reproducible. New external application requirements need exact artifacts,
-inputs and expected behavior before entering the manifest. No server framework
-has been selected merely by writing this plan.
+W-JAVA21/25 remain incomplete. Their initial CLI seed runs in the `Modern Java`
+runtime job using Corretto 21.0.11.10.1 and 25.0.3.9.1, with archive sizes,
+SHA-256 digests and extracted-tree hashes pinned in the toolchain lock. A
+passing seed run is not a passing workload profile. New external application
+requirements need exact artifacts, inputs and expected behavior before entering
+the manifest. No server framework is selected.
+
+### Reproducible CLI seed
+
+The seed manifest maps eight API overload requirements to the existing repeat,
+delimiter-preserving split and bounded-indexOf fixtures. Each is compiled with
+matching javac `--release 21` and `--release 25`, producing six required runs.
+Both native Java and Doppio must successfully execute the same unmodified class
+bytes with matching stdout/stderr; only CRLF line endings are normalized.
+Class versions must be 65.0 or 69.0 respectively, not version-patched Java 17
+output. Existing implementation-sensitive assertions are identified in the
+manifest rather than treated as universal specification requirements.
+
+On Linux x64 with the existing Node 24/Java 17 build prerequisites:
+
+```sh
+yarn ci:java-compatibility:test
+yarn ci:java-compatibility:prepare
+./node_modules/.bin/grunt --stack modern-ci-release-cli --grunt-ignore-compile-errors
+yarn ci:java-compatibility
+```
+
+Preparation verifies official versioned archives before extraction, then checks
+the full extracted tree and java/javac versions. Verified caches can be reused;
+corrupt caches fail without being recursively replaced. The runner uses private
+temporary class directories, bounded commands and a fail-closed per-case ledger
+at `build/java-compatibility-results.json`. Results include source/manifest,
+toolchain, emitted-class and runtime provenance. CI retains the ledger even
+when a comparison fails. `--release 21` or `--release 25` can focus a local run;
+the CI command always runs both.
+
+The ledger explicitly records Chromium as not run. These seeds do not complete
+PLAN-001, M0, W-JAVA21 or W-JAVA25; the full language/VM/library census, additional
+source-feature probes and equivalent browser execution remain open.
 
 ## Remaining work inventory
 
@@ -112,13 +149,13 @@ stable; a split should retain links to its parent.
 
 | ID | Priority and current state | Required work and exit evidence |
 | --- | --- | --- |
-| PLAN-001 | P0; target/workload scope approved, complete requirements inventory absent | Version the approved target, host and application manifests. Enumerate applicable JLS/JVMS requirements and all target Java SE modules, exported public/protected types and members, service/provider contracts and behavioral changes, including inherited Java 8 behavior. Map each to an owner package, specification, status and tests, with no unclassified entries. Classify preview/incubator/JDK-specific features separately; preserve exclusions in the ledger. |
+| PLAN-001 | P0; target/workload scope approved and seed manifest checked in; complete requirements inventory absent | Expand the versioned manifest beyond its eight seed requirements. Enumerate applicable JLS/JVMS requirements and all target Java SE modules, exported public/protected types and members, service/provider contracts and behavioral changes, including inherited Java 8 behavior. Map each to an owner package, specification, status and tests, with no unclassified entries. Classify preview/incubator/JDK-specific features separately; preserve exclusions in the ledger. |
 
 ### JVM and language execution
 
 | ID | Priority and current evidence | Exit evidence and main dependencies |
 | --- | --- | --- |
-| JVM-001 | P0; partial version probes in [fixture generator](../tasks/modern_java.ts), with only selected true newer-javac comparisons | Pinned javac 21/25 and matching native runtimes produce reproducible, unmodified class files. Add positive/negative version and preview-minor cases, host-separated results and CI artifact provenance. Foundation for W-JAVA21/25. |
+| JVM-001 | P0; pinned true-javac 21/25 CLI seed and provenance ledger added alongside [existing generated probes](../tasks/modern_java.ts) | Expand beyond the three seeds, add positive/negative version and preview-minor cases, and automate Chromium with host-separated results. Retain unmodified class files and CI artifact provenance. Foundation for W-JAVA21/25 remains partial. |
 | JVM-002 | P1; verifier coverage unassessed; default-method superinterface initialization excluded in [invoke design](design/java-lang-invoke.md#lookup-class-initialization) | Spec-mapped valid/malformed corpus for format, stack maps, operand/local types, branches, linking/default resolution and initialization order/failure caching, including exact specified errors. Depends on JVM-001; module access also needs JVM-011. |
 | JVM-003 | P1; selected handles/lookups, but full conversions and executable VarHandles unclaimed in [implemented invoke slices](design/java-lang-invoke.md#implemented-slices) | Matrices for lookup/access, invocation/adaptation/combinators and field/array VarHandle read/write/CAS/update semantics. Verify memory-order requirements separately. Depends on JVM-001/002; module cases on JVM-011. |
 | JVM-004 | P1; selected indy/condy paths, with unsupported general bootstraps in [constant pool](../src/ConstantPool.ts) and [open questions](design/java-lang-invoke.md#open-design-questions) | User bootstrap handles, nested dynamic arguments, adaptation/access, success/failure caching and specified exceptions; retain lambda, concat, record and compiler probes. Depends on JVM-003. |
@@ -186,11 +223,11 @@ JDK-specific modules.
 
 The next coherent implementation units should be:
 
-1. Encode the approved target/workload choices in a versioned requirement
-   manifest. Keep unknowns visible instead of inventing a coverage denominator.
-2. Pin native Java 21/25 toolchains and add genuine compile/native/Doppio probes
-   for the already implemented repeat, split and bounded-indexOf fixtures.
-   These are small, known seeds for JVM-001, not proof of a whole release.
+1. Expand the approved target/workload seed manifest into the full requirement
+   inventory. Keep unknowns visible instead of inventing a coverage denominator.
+2. Extend the pinned native Java 21/25 seed runner to Chromium, with separate
+   host results. The repeat, split and bounded-indexOf CLI seeds establish the
+   first reproducible measurement unit, not proof of a whole release.
 3. Add source-feature probes for record/type patterns and switches, then the
    final Java 25 constructs. Classify observed failures before choosing fixes.
 4. Define module, scheduler/virtual-thread and host-native feasibility decisions
@@ -199,8 +236,8 @@ The next coherent implementation units should be:
 5. Fix one measured requirement at a time, retain native and host regressions,
    and commit each independently reviewable unit.
 
-This document does not itself create CI jobs, download toolchains, open issues,
-deploy infrastructure or implement any of these future units.
+Infrastructure deployment and new external application targets remain separate
+decisions; the seed work does not authorize them.
 
 ## Result ledger and progress reporting
 

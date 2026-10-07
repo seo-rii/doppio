@@ -542,6 +542,38 @@ if (!/grunt\s+--stack\s+test-modern-java-runtime\b/.test(modernRuntimeStep)) {
   fail('Modern Java workflow must run test-modern-java-runtime.');
 }
 
+for (const [name, fields] of [
+  ['Check Java compatibility baseline tooling', [
+    'timeout-minutes: 3',
+    'run: node --test ci/prepare_java_compatibility_toolchains_test.mjs ci/run_java_compatibility_test.mjs',
+  ]],
+  ['Prepare pinned Java compatibility toolchains', [
+    'timeout-minutes: 25',
+    'run: node ci/prepare_java_compatibility_toolchains.mjs',
+  ]],
+  ['Run genuine Java 21 and 25 seed fixtures', [
+    'id: java_compatibility',
+    'timeout-minutes: 25',
+    'run: node ci/run_java_compatibility.mjs',
+  ]],
+  ['Upload Java compatibility baseline ledger', [
+    "if: always() && steps.java_compatibility.outcome != 'skipped'",
+    'uses: actions/upload-artifact@v7',
+    'with:',
+    '  path: build/java-compatibility-results.json',
+    '  archive: false',
+    '  if-no-files-found: error',
+    '  retention-days: 7',
+  ]],
+]) {
+  const step = extractStep(runtimeJob, name);
+  const actualFields = step.split('\n').filter(line => line.trim()).join('\n');
+  const expectedFields = fields.map(field => `        ${field}`).join('\n');
+  if (actualFields !== expectedFields) {
+    fail(`Modern Java workflow ${name} must retain its exact bounded, fail-closed baseline command or artifact contract.`);
+  }
+}
+
 const arrayStep = extractStep(runtimeJob, 'Run core array compatibility smoke');
 if (!/grunt\s+--stack\s+modern-ci-array-runout\b/.test(arrayStep)) {
   fail('Modern Java workflow must generate the ArrayOps runout with modern-ci-array-runout.');
@@ -610,6 +642,7 @@ const runtimeOrder = [
   'Check TypeScript compiler compatibility',
   'Check compiler smoke workflow coverage',
   'Check Pages smoke retry',
+  'Check Java compatibility baseline tooling',
   'Build release CLI runner',
   'Verify compiler bootstrap overlay',
   'Bundle deterministic compiler runtime inputs',
@@ -617,6 +650,9 @@ const runtimeOrder = [
   'Check Wait fixture scheduling',
   'Run Java 17 legacy compatibility tests',
   'Run modern Java compatibility tests',
+  'Prepare pinned Java compatibility toolchains',
+  'Run genuine Java 21 and 25 seed fixtures',
+  'Upload Java compatibility baseline ledger',
   'Run core array compatibility smoke',
   'Verify compiler runtime input snapshot',
   'Upload compiler runtime inputs',

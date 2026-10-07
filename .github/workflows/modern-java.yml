@@ -69,6 +69,10 @@ jobs:
         timeout-minutes: 1
         run: node ci/pages_browser_smoke_retry_test.mjs
 
+      - name: Check Java compatibility baseline tooling
+        timeout-minutes: 3
+        run: node --test ci/prepare_java_compatibility_toolchains_test.mjs ci/run_java_compatibility_test.mjs
+
       - name: Build release CLI runner
         timeout-minutes: 20
         run: ./node_modules/.bin/grunt --stack modern-ci-release-cli --grunt-ignore-compile-errors
@@ -104,6 +108,24 @@ jobs:
 
       - name: Run modern Java compatibility tests
         run: ./node_modules/.bin/grunt --stack test-modern-java-runtime --grunt-ignore-compile-errors
+
+      - name: Prepare pinned Java compatibility toolchains
+        timeout-minutes: 25
+        run: node ci/prepare_java_compatibility_toolchains.mjs
+
+      - name: Run genuine Java 21 and 25 seed fixtures
+        id: java_compatibility
+        timeout-minutes: 25
+        run: node ci/run_java_compatibility.mjs
+
+      - name: Upload Java compatibility baseline ledger
+        if: always() && steps.java_compatibility.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-compatibility-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Run core array compatibility smoke
         run: |
