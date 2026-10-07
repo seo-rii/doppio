@@ -554,6 +554,24 @@ function modernJava(grunt: IGrunt) {
       'Java21SplitWithDelimiters', 65, bootstrapClasses, expectedOutput, done);
   });
 
+  grunt.registerTask('generate_java21_string_indexof_range', 'Generate the Java 21 String.indexOf range fixture.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      bootstrapClasses = ['java/lang/String.class'],
+      expectedOutput = [
+        'string-indexof-range-code-points=true',
+        'string-indexof-range-substrings=true',
+        'string-indexof-range-boundaries=true',
+        'string-indexof-range-range-matrix=true',
+        'string-indexof-range-exceptions=true',
+        'string-indexof-range-reflection=true',
+        'string-indexof-range-method-handles=true',
+        'string-indexof-range-legacy-indexof=true'
+      ].join('\n') + '\n';
+
+    generatePatchedBootstrapFixture('java21-string-indexof-range',
+      'Java21StringIndexOfRange', 65, bootstrapClasses, expectedOutput, done);
+  });
+
   grunt.registerTask('generate_java18_default_charset', 'Generate a Java 18 UTF-8 default charset fixture.', function() {
     var done: (status?: boolean) => void = this.async(),
       sourcePath = 'classes/modern_test/Java18DefaultCharset.java',
@@ -5472,6 +5490,22 @@ function modernJava(grunt: IGrunt) {
           grunt.fail.fatal('Java 21 splitWithDelimiters Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
         }
         grunt.log.ok('Java 21 String/Pattern.splitWithDelimiters output matched expected output.');
+        done();
+      });
+  });
+
+  grunt.registerTask('unit_test_java21_string_indexof_range', 'Run the Java 21 String.indexOf range fixture on Doppio.', function() {
+    var done: (status?: boolean) => void = this.async(),
+      mainClass = 'classes.modern_test.Java21StringIndexOfRange',
+      outPath = 'classes/modern_test/Java21StringIndexOfRange.runout';
+    child_process.exec('node --no-deprecation build/release-cli/console/runner.js -classpath . ' + mainClass,
+      function(err?: any, stdout?: Buffer, stderr?: Buffer) {
+        var actual = stdout.toString() + stderr.toString(),
+          expected = fs.readFileSync(outPath, 'utf8');
+        if (err || actual !== expected) {
+          grunt.fail.fatal('Java 21 String.indexOf range Doppio output does not match expected output.\nDoppio:\n' + actual + '\nExpected:\n' + expected);
+        }
+        grunt.log.ok('Java 21 String.indexOf range output matched expected output.');
         done();
       });
   });

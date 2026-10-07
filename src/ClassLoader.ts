@@ -2299,6 +2299,55 @@ function addSplitWithDelimitersModernOverlay(data: Buffer, typeStr: string): Buf
   ]);
 }
 
+function addJavaLangStringIndexOfRangeOverlays(data: Buffer): Buffer {
+  var cp = constantPoolEnd(data),
+    helperNameIndex = cp.count,
+    helperClassIndex = cp.count + 1,
+    codeNameIndex = cp.count + 2,
+    nameIndex = cp.count + 3,
+    parameters = ['III', 'Ljava/lang/String;II'],
+    extraConstants = Buffer.concat([
+      utf8Constant('java/lang/DoppioString'),
+      Buffer.concat([Buffer.from([7]), u2(helperNameIndex)]),
+      utf8Constant('Code'),
+      utf8Constant('indexOf')
+    ].concat(parameters.reduce((constants: Buffer[], args: string, index: number) => {
+      var descriptorIndex = cp.count + 4 + index * 4,
+        helperDescriptorIndex = descriptorIndex + 1,
+        nameAndTypeIndex = descriptorIndex + 2;
+      constants.push(
+        utf8Constant('(' + args + ')I'),
+        utf8Constant('(Ljava/lang/String;' + args + ')I'),
+        Buffer.concat([Buffer.from([12]), u2(nameIndex), u2(helperDescriptorIndex)]),
+        Buffer.concat([Buffer.from([10]), u2(helperClassIndex), u2(nameAndTypeIndex)])
+      );
+      return constants;
+    }, []))),
+    withConstants = Buffer.concat([
+      data.slice(0, 8), u2(cp.count + 12), data.slice(10, cp.offset),
+      extraConstants, data.slice(cp.offset)
+    ]),
+    methods = methodsInfo(withConstants, cp.offset + extraConstants.length),
+    methodData = Buffer.concat(parameters.map((args: string, index: number) => {
+      var descriptorIndex = cp.count + 4 + index * 4,
+        helperMethodIndex = descriptorIndex + 3,
+        code = Buffer.concat([
+          Buffer.from([0x2a, index === 0 ? 0x1b : 0x2b, 0x1c, 0x1d, 0xb8]),
+          u2(helperMethodIndex), Buffer.from([0xac])
+        ]);
+      return Buffer.concat([
+        u2(0x0001), u2(nameIndex), u2(descriptorIndex), u2(1),
+        u2(codeNameIndex), u4(12 + code.length), u2(4), u2(4),
+        u4(code.length), code, u2(0), u2(0)
+      ]);
+    }));
+  return Buffer.concat([
+    withConstants.slice(0, methods.countOffset), u2(methods.count + 2),
+    withConstants.slice(methods.countOffset + 2, methods.endOffset),
+    methodData, withConstants.slice(methods.endOffset)
+  ]);
+}
+
 function addJavaLangMathModernOverlays(data: Buffer): Buffer {
   var cp = constantPoolEnd(data),
     overlays = [
@@ -3255,6 +3304,9 @@ export function applyModernBootstrapOverlays(typeStr: string, data: Buffer): Buf
   }
   if (typeStr === 'Ljava/lang/String;' || typeStr === 'Ljava/util/regex/Pattern;') {
     data = addSplitWithDelimitersModernOverlay(data, typeStr);
+  }
+  if (typeStr === 'Ljava/lang/String;') {
+    data = addJavaLangStringIndexOfRangeOverlays(data);
   }
   if (typeStr === 'Ljava/util/concurrent/TimeUnit;') {
     data = addJavaUtilConcurrentTimeUnitModernOverlays(data);
