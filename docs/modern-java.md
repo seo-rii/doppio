@@ -959,14 +959,18 @@ expanded.
   then compares the generated class's output on the host JVM and Doppio.
   Clojure compiler execution inside Doppio and full dynamic Clojure runtime
   compatibility are not part of this gate.
-- Both smokes run in the manifest-backed Modern Java compiler matrix with
+- `ci/jruby_smoke.sh` pins and verifies JRuby 9.4.15.0, syntax-checks a Ruby
+  fixture on the host JVM, and compares interpreted Ruby blocks plus a small
+  `java.util.ArrayList` interop path on the host JVM and Doppio. JRuby 9.4 is
+  an EOL line; JRuby 10 and broader Ruby compatibility are not claimed.
+- All three smokes run in the manifest-backed Modern Java compiler matrix with
   bounded per-command and shard timeouts.
 
 ## Current Test Targets
 
 - `yarn ci:check-modern-java-workflow:test` covers the workflow checker itself,
-  and `yarn ci:check-modern-java-workflow` verifies that every
-  Kotlin, Scala, Groovy, and Clojure smoke scripts are referenced by the
+  and `yarn ci:check-modern-java-workflow` verifies that every Kotlin, Scala,
+  Groovy, Clojure, and JRuby smoke script is referenced by the
   Modern Java workflow, so newly added compiler smokes fail fast if they are not
   wired into CI.
 - `grunt --grunt-ignore-compile-errors test-modern-java` compiles and checks the

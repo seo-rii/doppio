@@ -20,6 +20,7 @@ implemented.
 | Scala | Scala compiler 2.13.18 smoke inventory |
 | Groovy | Apache Groovy 4.0.33 focused Doppio compiler and runtime smoke |
 | Clojure | Clojure 1.12.6 host AOT output running on Doppio, focused smoke only |
+| JRuby | JRuby 9.4.15.0 focused interpreter/Java interop smoke; pinned 9.4 is an EOL line |
 | TypeScript | TypeScript 6 plus the repository's TypeScript 7 RC compatibility check |
 
 Linux is the release-gated CLI platform. macOS and Windows may continue to
@@ -75,9 +76,9 @@ The `Modern Java` workflow owns the Node/Java runtime gate. Its producer job
 runs both TypeScript checks, builds a fresh release CLI, runs the Java 17 legacy
 and modern runtime fixtures, and emits a deterministic, source-verified runtime
 artifact. Eight compiler shards consume that exact artifact and the locked
-Kotlin/Scala compiler inputs. They also verify pinned Groovy/Clojure JAR hashes
-and execute the complete 75-script inventory with
-per-script and outer timeouts, and upload raw completion ledgers. A stable
+Kotlin/Scala compiler inputs. They also verify pinned Groovy/Clojure/JRuby JAR
+hashes, execute the complete 76-script inventory with per-script and outer
+timeouts, and upload raw completion ledgers. A stable
 terminal job fails unless both the producer and every shard succeed.
 
 The producer also runs twenty selected string API, binary32 instruction, final-language,
@@ -191,6 +192,6 @@ grunt --stack test-modern-java17 --grunt-ignore-compile-errors
 ./ci/run_pages_browser_smoke.sh
 ```
 
-The compiler manifest enumerates the full Kotlin, Scala, Groovy, and Clojure
-script set; use it rather than a hand-maintained partial list when certifying
-a release.
+The compiler manifest enumerates the full Kotlin, Scala, Groovy, Clojure, and
+JRuby script set; use it rather than a hand-maintained partial list when
+certifying a release.

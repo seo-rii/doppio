@@ -46,6 +46,7 @@ function baseManifest() {
       };
     }),
   };
+  manifest.shards[2].scripts.unshift('ci/jruby_smoke.sh');
   manifest.shards[5].scripts.unshift('ci/groovy_smoke.sh');
   manifest.shards[6].scripts.unshift('ci/clojure_smoke.sh');
   return manifest;
@@ -68,7 +69,7 @@ function writeCheckerFixture(options = {}) {
       }
     }
   }
-  for (const language of ['clojure', 'groovy']) {
+  for (const language of ['clojure', 'groovy', 'jruby']) {
     fs.writeFileSync(path.join(ciDir, `${language}_smoke.sh`), smokeScript(language, 'gate'));
   }
   for (const [name, contents] of Object.entries(options.extraScripts || {})) {
@@ -988,7 +989,7 @@ expectCheckerFailure(
   'shard manifest is missing smoke scripts'
 );
 
-for (const [language, shardIndex] of [['groovy', 5], ['clojure', 6]]) {
+for (const [language, shardIndex] of [['jruby', 2], ['groovy', 5], ['clojure', 6]]) {
   const manifest = baseManifest();
   manifest.shards[shardIndex].scripts.shift();
   expectCheckerFailure(
@@ -1704,6 +1705,10 @@ ${body}
     timedScript('GROOVY_GATE', 'printf "groovy\\n" >> "$SHARD_ORDER_FILE"')
   );
   fs.writeFileSync(
+    path.join(shardRunnerCi, 'jruby_gate_smoke.sh'),
+    timedScript('JRUBY_GATE', 'printf "jruby\\n" >> "$SHARD_ORDER_FILE"')
+  );
+  fs.writeFileSync(
     path.join(shardRunnerCi, 'kotlin_timeout_smoke.sh'),
     timedScript(
       'KOTLIN_TIMEOUT',
@@ -1754,7 +1759,7 @@ ${body}
         scripts: ['ci/scala_inventory_mutate_smoke.sh'],
       }, {
         id: 'compiler-07',
-        scripts: ['ci/clojure_gate_smoke.sh', 'ci/groovy_gate_smoke.sh'],
+        scripts: ['ci/clojure_gate_smoke.sh', 'ci/groovy_gate_smoke.sh', 'ci/jruby_gate_smoke.sh'],
       }],
     })
   );
@@ -1871,9 +1876,9 @@ ${body}
   });
   if (
     languageResult.status !== 0 ||
-    fs.readFileSync(orderPath, 'utf8') !== 'first\nsecond\nclojure\ngroovy\n'
+    fs.readFileSync(orderPath, 'utf8') !== 'first\nsecond\nclojure\ngroovy\njruby\n'
   ) {
-    throw new Error(`Compiler shard runner must accept Clojure and Groovy scripts:\n${languageResult.stderr}`);
+    throw new Error(`Compiler shard runner must accept Clojure, Groovy, and JRuby scripts:\n${languageResult.stderr}`);
   }
 
   const compilerMarker = JSON.parse(fs.readFileSync(compilerMarkerPath, 'utf8'));

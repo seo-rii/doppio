@@ -13,7 +13,7 @@ const compilerLockPath = process.env.MODERN_JAVA_WORKFLOW_COMPILER_LOCK_PATH ||
   path.join(repoRoot, 'ci', 'modern_java_compiler_inputs.lock.json');
 const compilerInputToolPath = process.env.MODERN_JAVA_WORKFLOW_COMPILER_INPUT_TOOL_PATH ||
   path.join(repoRoot, 'ci', 'prepare_modern_java_compiler_inputs.mjs');
-const smokeScriptPattern = /^(?:clojure|groovy|kotlin|scala)[A-Za-z0-9_]*_smoke\.sh$/;
+const smokeScriptPattern = /^(?:clojure|groovy|jruby|kotlin|scala)[A-Za-z0-9_]*_smoke\.sh$/;
 const maximumCompilerInputBytes = 128 * 1024 * 1024;
 
 function stripUnquotedComments(text) {
@@ -243,7 +243,7 @@ if (manifest.shards.length !== 8) {
 
 const candidateScriptNames = fs.readdirSync(ciDir)
   .filter((name) =>
-    /^(?:clojure|groovy|kotlin|scala)/.test(name) && name.endsWith('_smoke.sh')
+    /^(?:clojure|groovy|jruby|kotlin|scala)/.test(name) && name.endsWith('_smoke.sh')
   )
   .sort();
 for (const name of candidateScriptNames) {
@@ -285,7 +285,7 @@ for (const shard of manifest.shards) {
   for (const scriptPath of shard.scripts) {
     if (
       typeof scriptPath !== 'string' ||
-      !/^ci\/(?:clojure|groovy|kotlin|scala)[A-Za-z0-9_]*_smoke\.sh$/.test(scriptPath) ||
+      !/^ci\/(?:clojure|groovy|jruby|kotlin|scala)[A-Za-z0-9_]*_smoke\.sh$/.test(scriptPath) ||
       path.posix.normalize(scriptPath) !== scriptPath
     ) {
       fail(`Modern Java shard ${shard.id} contains an unsafe script path: ${String(scriptPath)}`);
@@ -828,7 +828,7 @@ if (
 ) {
   fail('Modern Java compiler job must run exactly the selected manifest shard.');
 }
-if (/\.\/ci\/(?:clojure|groovy|kotlin|scala)[A-Za-z0-9_]*_smoke\.sh\b/.test(workflow)) {
+if (/\.\/ci\/(?:clojure|groovy|jruby|kotlin|scala)[A-Za-z0-9_]*_smoke\.sh\b/.test(workflow)) {
   fail('Modern Java workflow must execute compiler smokes only through the checked-in shard runner.');
 }
 

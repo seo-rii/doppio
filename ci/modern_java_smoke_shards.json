@@ -33,6 +33,7 @@
     {
       "id": "compiler-03",
       "scripts": [
+        "ci/jruby_smoke.sh",
         "ci/kotlin_collection_builder_smoke.sh",
         "ci/kotlin_extension_variance_smoke.sh",
         "ci/kotlin_multifile_facade_smoke.sh",
