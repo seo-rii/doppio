@@ -153,6 +153,9 @@ for (const name of [
   'Run final Java 25 launcher compatibility',
   'Check class-file version admission',
   'Run Java class-file version compatibility',
+  'Check evolved switch ledger contract',
+  'Run evolved enum and sealed switch compatibility',
+  'Upload evolved switch compatibility ledger',
   'Upload Java compatibility baseline ledger',
 ]) {
   expectCheckerFailure(
@@ -179,6 +182,12 @@ for (const [original, replacement] of [
   ['run: node ci/java_class_version_test.mjs --browser\n', 'run: node ci/java_class_version_test.mjs --native-only\n'],
   ['run: node ci/java_class_version_test.mjs --browser\n', 'run: node ci/java_class_version_test.mjs\n'],
   ['timeout-minutes: 50\n', 'timeout-minutes: 5\n'],
+  ['run: node --test ci/java_pattern_evolution_contract_test.mjs\n', 'run: echo evolved switch contract checked\n'],
+  ['run: node ci/java_pattern_evolution_test.mjs --browser\n', 'run: node ci/java_pattern_evolution_test.mjs\n'],
+  ['run: node ci/java_pattern_evolution_test.mjs --browser\n', 'run: node ci/java_pattern_evolution_test.mjs --browser || true\n'],
+  ['timeout-minutes: 45\n', 'timeout-minutes: 4\n'],
+  ["if: always() && steps.pattern_evolution.outcome != 'skipped'", 'if: success()'],
+  ['path: build/java-pattern-evolution-results.json', 'path: build/missing-evolved-switch-ledger.json'],
   ["if: always() && steps.java_compatibility.outcome != 'skipped'", 'if: success()'],
   ['path: build/java-compatibility-results.json', 'path: build/missing-java-ledger.json'],
   ['retention-days: 7', 'retention-days: 1'],
@@ -211,6 +220,12 @@ expectCheckerFailure(
 expectCheckerFailure(
   'class version host gate before the parser/loader admission check',
   { workflow: swapAdjacentSteps(realWorkflow, 'Check class-file version admission', 'Run Java class-file version compatibility') },
+  'remain in dependency order'
+);
+
+expectCheckerFailure(
+  'evolved switch gate before the class-version admission dependency',
+  { workflow: swapAdjacentSteps(realWorkflow, 'Check evolved switch ledger contract', 'Run evolved enum and sealed switch compatibility') },
   'remain in dependency order'
 );
 

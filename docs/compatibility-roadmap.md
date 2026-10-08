@@ -121,7 +121,18 @@ The 31 bootstrap-contract assertions exercise string/integer labels, numeric
 conversion failures, restart bounds before null handling and malformed inputs
 with `BootstrapMethodError`/`IllegalArgumentException` causes. This is a selected
 compiler-generated fast path, not the public `SwitchBootstraps` API, full
-language conformance, preview primitive conversions or evolved-binary coverage.
+language conformance or preview primitive conversions.
+
+The separate evolved-binary gate compiles enum, sealed-class and sealed-interface
+callers with javac 21 and 25, then selectively recompiles the declarations for
+added/reordered enum constants or newly permitted implementations. All callers
+and synthetic helpers retain identical bytes. Fourteen native-compared cases
+produce twenty-eight Node/Chromium checks for known values, nulls, guards and
+`MatchException` on the selected new values; the legacy enum statement still
+completes without a match. Compiler operations, replacement hashes, class
+inventories and host results are recorded in `build/java-pattern-evolution-results.json`.
+CI retains that ledger on success or failure. This selected slice does not
+establish general binary compatibility.
 
 The six IO modes cover all five `java.lang.IO` methods: current standard-output
 delegation and print flushing, line terminators and EOF, a cached input decoder,
@@ -193,6 +204,8 @@ yarn ci:java-compatibility:browser
 yarn ci:java25-main
 yarn ci:class-file-version:test
 yarn ci:class-file-version
+yarn ci:java-pattern-evolution:test
+yarn ci:java-pattern-evolution
 ```
 
 Preparation verifies official versioned archives before extraction, then checks
@@ -251,7 +264,7 @@ stable; a split should retain links to its parent.
 | JVM-005 | P2; hidden definition/discovery explicitly missing in [core gaps](modern-java.md#known-core-lang-gaps) | Hidden class and class-data definitions, initialization, lookup privileges, nestmate options, names/descriptors and discovery restrictions match native contracts. Depends on JVM-002/003; module cases on JVM-011. |
 | JVM-006 | P1; [record gaps](modern-java.md#known-record-gaps): raw generic fallbacks, nested annotation gaps and restricted ObjectMethods fast path | Genuine javac records with generic/annotated components, constructors/accessors, object methods and reflection/handles pass; general bootstrap forms have explicit tests. Depends on JVM-001/003/004. |
 | JVM-007 | P1; [sealed-class gaps](modern-java.md#known-sealed-class-gaps): direct enforcement exists, reflective error fidelity remains partial | Direct and reflective custom-loader cases cover permitted parents, invalid metadata, package/module constraints and exact errors. Depends on JVM-002; module cases on JVM-011. |
-| JVM-008 | P1; selected genuine 21/25 patterns/switches/bootstrap contracts, final unnamed forms, module imports, flexible constructors and compact/instance-main startup covered on Node/Chromium; three pinned launcher differences remain explicit | Expand the selected corpus, including separately evolved sealed/enum binaries and public bootstrap access. Resolve oracle differences without equating native behavior with specification requirements. Distinguish compile-time syntax from runtime/launcher obligations. Depends on JVM-001/004/006/007. |
+| JVM-008 | P1; selected genuine 21/25 patterns/switches/bootstrap contracts, separately evolved sealed/enum binaries, final unnamed forms, module imports, flexible constructors and compact/instance-main startup covered on Node/Chromium; three pinned launcher differences remain explicit | Expand the selected corpus beyond these evolved-binary cases, including public bootstrap access. Resolve oracle differences without equating native behavior with specification requirements. Distinguish compile-time syntax from runtime/launcher obligations. Depends on JVM-001/004/006/007. |
 | JVM-009 | P0 scheduler design, then P1 selected profile; virtual threads explicitly missing in [core gaps](modern-java.md#known-core-lang-gaps) | Thread builders/start, lifecycle/join/interrupt, sleep/park, locals, executors, blocking-I/O and monitor interactions work on each required host. Do not replace virtual-thread semantics with an isVirtual flag. Depends on JVM-010 and host I/O. |
 | JVM-010 | P0 execution/memory-model design; [concurrent gaps](modern-java.md#known-concurrent-gaps) explicitly exclude broader scheduling/backpressure/memory-safety | Defined execution model plus synchronization, visibility/atomics, cancellation/completion and scheduling contracts tested without timing-only assertions or demanding one nondeterministic ordering. Shared foundation for JVM-009 and LIB-002/003; depends on JVM-003. |
 | JVM-011 | P0 design, P2 implementation; [boundary](support.md#explicit-boundaries): named modules and strong encapsulation absent | Module resolution/layers, ownership, services, readability and qualified exports/opens have positive and negative reflection/lookup fixtures. Publish expanded support only after those pass. Depends on JVM-002/003. |
@@ -318,8 +331,9 @@ The next coherent implementation units should be:
    version-admission gate, retaining separate host results and explicit
    generated/mutated inputs for each requirement.
 3. Expand the selected final-language/launcher corpus into remaining positive,
-   negative and evolved-binary cases. Preserve the three pinned launcher
-   differences; classify observed failures before choosing fixes.
+   negative and evolved-binary cases beyond the selected enum/sealed gate.
+   Preserve the three pinned launcher differences; classify observed failures
+   before choosing fixes.
 4. Define module, scheduler/virtual-thread and host-native feasibility decisions
    in parallel with independent library work. They can change the critical path
    and cannot be estimated as a series of small API overlays.

@@ -110,6 +110,14 @@ failed definitions, application-loader propagation and deferred launch shutdown.
 Historical header mutations are structural probes, not language compatibility
 claims; the existing major range 45–70 remains partial.
 
+The `yarn ci:java-pattern-evolution` gate separately recompiles enum and sealed
+declarations without changing their javac 21/25 callers or synthetic helpers.
+Fourteen native-compared cases on Node and Chromium (twenty-eight guest checks)
+cover added/reordered enum constants, new permitted sealed-class/interface
+implementations, known values, nulls, guards and selected exhaustive-switch
+`MatchException` behavior. Its ledger preserves compilation and replacement
+hashes. This is a selected evolved-binary corpus, not full binary compatibility.
+
 The `Pages` workflow owns the browser gate. It builds the deployable artifact,
 runs the complete Chromium acceptance suite locally before upload, deploys only
 after that succeeds, and repeats the acceptance suite against the deployed URL.

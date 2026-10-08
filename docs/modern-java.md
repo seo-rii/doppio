@@ -59,10 +59,21 @@ after javac; all final bytes are identical across native, Node and Chromium.
 See the [Java 21](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/runtime/SwitchBootstraps.html)
 and [Java 25](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/runtime/SwitchBootstraps.html)
 bootstrap contracts and [record-pattern semantics](https://docs.oracle.com/javase/specs/jls/se21/html/jls-14.html#jls-14.30.2).
-The public `SwitchBootstraps` class/API, preview primitive conversions, complete
-language conformance and separately evolved sealed/enum binaries are not
-implemented by this slice. The remaining Java 21/25 language and library surface
-is still partial.
+The public `SwitchBootstraps` class/API, preview primitive conversions and complete
+language conformance are not implemented by this slice. The remaining Java
+21/25 language and library surface is still partial.
+
+The separate [evolved-binary gate](../ci/java_pattern_evolution_test.mjs) compiles
+enum, sealed-class and sealed-interface callers with genuine javac 21 and 25,
+then recompiles only the enum or permitted-type declaration. It covers added
+and reordered enum constants and newly permitted sealed implementations while
+preserving caller and synthetic-helper bytes. Fourteen cases compare native,
+Node and Chromium results (twenty-eight guest checks). Known values, nulls and
+guards retain their behavior; new values cause `MatchException` in the selected
+exhaustive expressions and enhanced statements, while the legacy enum statement
+continues without a match. The ledger records compiler operations, replacement
+hashes and unchanged callers. This selected corpus is not general binary
+compatibility or complete pattern-language conformance.
 
 Java 25 IO note: the [IO fixture](../classes/modern_fixture/Java25IO.java)
 compares six isolated modes against native Java 25 on Node and Chromium.
