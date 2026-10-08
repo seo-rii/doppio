@@ -839,8 +839,15 @@ export class Opcodes {
   }
 
   public static f2l(thread: JVMThread, frame: BytecodeStackFrame) {
-    var opStack = frame.opStack;
-    opStack.pushWithNull(gLong.fromNumber(opStack.pop()));
+    var opStack = frame.opStack,
+      f_val: number = opStack.pop();
+    if (f_val === Number.POSITIVE_INFINITY) {
+      opStack.pushWithNull(gLong.MAX_VALUE);
+    } else if (f_val === Number.NEGATIVE_INFINITY) {
+      opStack.pushWithNull(gLong.MIN_VALUE);
+    } else {
+      opStack.pushWithNull(gLong.fromNumber(f_val));
+    }
     frame.pc++;
   }
 
