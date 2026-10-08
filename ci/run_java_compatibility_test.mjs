@@ -105,16 +105,50 @@ function environment(context) {
     runtimeRoot, calls, execute, run, save };
 }
 
-test('checked-in inventory has nineteen fixtures covering twenty-five final requirements', () => {
+test('checked-in inventory has twenty fixtures covering twenty-six final requirements', () => {
   const spec = validateManifest(JSON.parse(fs.readFileSync(path.join(repoRoot, 'ci/java_compatibility_manifest.json'))));
-  assert.equal(spec.fixtures.length, 19);
-  assert.equal(spec.requirements.length, 25);
+  assert.equal(spec.fixtures.length, 20);
+  assert.equal(spec.requirements.length, 26);
   assert.deepEqual(spec.releases, [21, 25]);
-  assert.equal(spec.fixtures.filter(fixture => fixture.releases.includes(21)).length, 6);
-  assert.equal(spec.fixtures.filter(fixture => fixture.releases.includes(25)).length, 19);
+  assert.equal(spec.fixtures.filter(fixture => fixture.releases.includes(21)).length, 7);
+  assert.equal(spec.fixtures.filter(fixture => fixture.releases.includes(25)).length, 20);
   const requiredCases = spec.fixtures.reduce((count, fixture) => count + fixture.releases.length, 0);
-  assert.equal(requiredCases, 25);
-  assert.equal(requiredCases * spec.approvedTarget.requiredHosts.length, 50);
+  assert.equal(requiredCases, 27);
+  assert.equal(requiredCases * spec.approvedTarget.requiredHosts.length, 54);
+});
+
+test('binary32 opcode precision is mandatory on Java 21 and 25 without claiming full floating-point conformance', () => {
+  const spec = validateManifest(JSON.parse(fs.readFileSync(path.join(repoRoot, 'ci/java_compatibility_manifest.json'))));
+  const fixture = spec.fixtures.find(entry => entry.id === 'float-precision');
+  assert.ok(fixture);
+  assert.equal(fixture.source, 'classes/modern_fixture/Java21FloatPrecision.java');
+  assert.equal(fixture.mainClass, 'classes.modern_test.Java21FloatPrecision');
+  assert.deepEqual(fixture.releases, [21, 25]);
+  assert.deepEqual(fixture.workloadIds, ['W-JAVA21', 'W-JAVA25']);
+  assert.deepEqual(fixture.packageIds, ['JVM-001', 'JVM-002']);
+  assert.deepEqual(fixture.requirementIds, ['JVM-FLOAT-PRECISION']);
+  assert.deepEqual(fixture.arguments, []);
+  assert.equal(fixture.comparison, 'successful-native-oracle-stdout-stderr');
+  assert.deepEqual(fixture.coverage, ['i2f-l2f-d2f-rounding', 'long-midpoints-without-double-rounding',
+    'fadd-fsub-fmul-fdiv-frem-fneg', 'ties-to-even', 'positive-and-negative-zero',
+    'subnormals-and-underflow', 'overflow-NaN-and-infinities', 'hot-loop-arithmetic']);
+  assert.match(fixture.limitations, /genuine javac 21 and 25 without preview flags/);
+  assert.match(fixture.limitations, /64-bit integer conversion midpoint controls/);
+  assert.match(fixture.limitations, /interpreter\/JIT execution/);
+  assert.match(fixture.limitations, /Not complete floating-point conformance/);
+  assert.match(fixture.limitations, /excludes Math\/StrictMath native functions/);
+  assert.match(fixture.limitations, /bootstrap\/constant long -> double -> float adapters in src\/ConstantPool\.ts/);
+  assert.match(fixture.limitations, /broader boxed\/native adaptation audit/);
+  const requirement = spec.requirements.find(entry => entry.id === 'JVM-FLOAT-PRECISION');
+  assert.equal(requirement.introducedIn, 1);
+  assert.equal(requirement.featureStatus, 'final');
+  assert.equal(requirement.packageId, 'JVM-002');
+  assert.equal(requirement.implementationState, 'implemented-slice');
+  for (const release of [21, 25]) assert.equal(requirement.specificationRefs[release],
+    `https://docs.oracle.com/javase/specs/jvms/se${release}/html/jvms-2.html#jvms-2.8`);
+  assert.ok(spec.inventory.packageIds.includes('JVM-002'));
+  assert.match(spec.inventory.scope, /selected binary32 JVM conversion and arithmetic opcode precision/);
+  assert.match(spec.inventory.unassessedScope, /selected binary32 opcode slice is not complete floating-point conformance/);
 });
 
 test('public primitive switch slice is mandatory only on Java 25 and reuses the common typeSwitch requirement', () => {

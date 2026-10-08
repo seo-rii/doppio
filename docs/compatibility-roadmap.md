@@ -92,15 +92,16 @@ the manifest. No server framework is selected.
 
 ### Reproducible seed on Node and Chromium
 
-The seed manifest maps eight string API overloads, four language/runtime
+The seed manifest maps eight string API overloads, one binary32 instruction
+requirement, four language/runtime
 requirements, two public switch bootstrap APIs, two unnamed-variable/pattern requirements, module imports,
 flexible constructors, compact sources/instance mains and five Java 25 IO methods
-to nineteen fixtures (twenty-five requirements). Six
-drivers cover repeat, delimiter-preserving split, bounded indexOf, final pattern
+to twenty fixtures (twenty-six requirements). Seven
+drivers cover binary32 numeric instructions, repeat, delimiter-preserving split, bounded indexOf, final pattern
 switches/record patterns, bootstrap contracts and public bootstrap calls on matching javac `--release 21`
 and `--release 25`. Six isolated IO modes, five final-source/launcher drivers and
 the identity and exact-conversion primitive-switch API fixtures use `--release 25` only.
-Together they produce twenty-five cases and fifty
+Together they produce twenty-seven cases and fifty-four
 required host comparisons. The contract fixture explicitly
 replaces only its companion with deterministic generated call sites that Java
 source cannot express; generator source/hash and execution are recorded before
@@ -149,6 +150,17 @@ they do not establish a universal reference-oriented API contract. Cross-numeric
 conversions for declared reference/boxed selectors, preview constant labels,
 primitive source patterns and complete public API conformance remain outside
 the selected slices.
+
+The binary32 instruction fixture contributes 471 native-compared assertions
+under both javac 21 and 25. Selected float arithmetic and conversion boundaries
+cover rounding, underflow, overflow, signed zeros, NaN, infinities and direct
+long-to-float midpoint controls. Float-to-long conversion saturates infinities
+and out-of-range values. Raw bits and widened double values prevent a final
+float conversion from hiding excess precision. The fixture exercises 4,096-call
+hot paths; separate 48-case rounding and 17-case float-to-long contracts check
+interpreter operand stacks and selected emitted JIT code. This opcode slice
+does not establish native math library or universal floating-point conformance.
+Explicit bootstrap/constant long-to-double-to-float adapters remain outside it.
 
 The separate evolved-binary gate compiles enum, sealed-class and sealed-interface
 callers with javac 21 and 25, then selectively recompiles the declarations for
@@ -293,7 +305,7 @@ stable; a split should retain links to its parent.
 
 | ID | Priority and current state | Required work and exit evidence |
 | --- | --- | --- |
-| PLAN-001 | P0; target/workload scope approved and 25-requirement seed manifest checked in; complete requirements inventory absent | Expand the versioned manifest beyond the selected seed requirements. Enumerate applicable JLS/JVMS requirements and all target Java SE modules, exported public/protected types and members, service/provider contracts and behavioral changes, including inherited Java 8 behavior. Map each to an owner package, specification, status and tests, with no unclassified entries. Classify preview/incubator/JDK-specific features separately; preserve exclusions in the ledger. |
+| PLAN-001 | P0; target/workload scope approved and 26-requirement seed manifest checked in; complete requirements inventory absent | Expand the versioned manifest beyond the selected seed requirements. Enumerate applicable JLS/JVMS requirements and all target Java SE modules, exported public/protected types and members, service/provider contracts and behavioral changes, including inherited Java 8 behavior. Map each to an owner package, specification, status and tests, with no unclassified entries. Classify preview/incubator/JDK-specific features separately; preserve exclusions in the ledger. |
 
 ### JVM and language execution
 

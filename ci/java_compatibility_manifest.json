@@ -28,10 +28,10 @@
   "inventory": {
     "state": "seed-partial",
     "completeJavaSeInventory": false,
-    "packageIds": ["PLAN-001", "JVM-001", "JVM-008", "LIB-008"],
+    "packageIds": ["PLAN-001", "JVM-001", "JVM-002", "JVM-008", "LIB-008"],
     "roadmap": "docs/compatibility-roadmap.md",
-    "scope": "Nineteen fixtures covering eight Java 21 string API overloads, selected public switch bootstrap APIs including Java 25 identity primitive-selector/Class-label behavior and all 49 numeric primitive-selector/Class-label exact conversion pairs, final patterns/MatchException behavior, final Java 22 unnamed variables/patterns, Java 25 module imports/flexible constructors/compact sources/instance mains and five Java 25 IO methods, compiled by matching native Java 21 and 25 toolchains. Primitive-selector cases are implementation-sensitive pinned native Java 25 comparisons, not a general Java SE primitive-selector contract. One bootstrap-contract companion is explicitly generated after javac; its generator and resulting bytes are recorded.",
-    "unassessedScope": "Remaining Java SE language, VM, module, library and host requirements have not been enumerated by this manifest. Only the explicitly listed final Java 22-25 requirements are represented. Public typeSwitch cross conversions for declared reference/boxed selectors, preview constant labels and primitive source patterns remain excluded; the selected numeric primitive API slice does not establish complete latest Java conformance.",
+    "scope": "Twenty fixtures covering eight Java 21 string API overloads, selected binary32 JVM conversion and arithmetic opcode precision, selected public switch bootstrap APIs including Java 25 identity primitive-selector/Class-label behavior and all 49 numeric primitive-selector/Class-label exact conversion pairs, final patterns/MatchException behavior, final Java 22 unnamed variables/patterns, Java 25 module imports/flexible constructors/compact sources/instance mains and five Java 25 IO methods, compiled by matching native Java 21 and 25 toolchains. Primitive-selector cases are implementation-sensitive pinned native Java 25 comparisons, not a general Java SE primitive-selector contract. One bootstrap-contract companion is explicitly generated after javac; its generator and resulting bytes are recorded.",
+    "unassessedScope": "Remaining Java SE language, VM, module, library and host requirements have not been enumerated by this manifest. Only the explicitly listed final Java 22-25 requirements are represented. The selected binary32 opcode slice is not complete floating-point conformance or a Math/StrictMath or boxed/native adaptation audit. Public typeSwitch cross conversions for declared reference/boxed selectors, preview constant labels and primitive source patterns remain excluded; the selected numeric primitive API slice does not establish complete latest Java conformance.",
     "hostAutomation": {
       "ubuntu-node24": "seed-runner",
       "chromium": "seed-runner-with-browser"
@@ -45,6 +45,17 @@
     "doppioMs": 120000
   },
   "requirements": [
+    {
+      "id": "JVM-FLOAT-PRECISION",
+      "introducedIn": 1,
+      "featureStatus": "final",
+      "packageId": "JVM-002",
+      "implementationState": "implemented-slice",
+      "specificationRefs": {
+        "21": "https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-2.html#jvms-2.8",
+        "25": "https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-2.html#jvms-2.8"
+      }
+    },
     {
       "id": "LANG-INSTANCE-MAIN",
       "introducedIn": 25,
@@ -305,6 +316,19 @@
     }
   ],
   "fixtures": [
+    {
+      "id": "float-precision",
+      "source": "classes/modern_fixture/Java21FloatPrecision.java",
+      "mainClass": "classes.modern_test.Java21FloatPrecision",
+      "releases": [21, 25],
+      "workloadIds": ["W-JAVA21", "W-JAVA25"],
+      "packageIds": ["JVM-001", "JVM-002"],
+      "requirementIds": ["JVM-FLOAT-PRECISION"],
+      "arguments": [],
+      "comparison": "successful-native-oracle-stdout-stderr",
+      "coverage": ["i2f-l2f-d2f-rounding", "long-midpoints-without-double-rounding", "fadd-fsub-fmul-fdiv-frem-fneg", "ties-to-even", "positive-and-negative-zero", "subnormals-and-underflow", "overflow-NaN-and-infinities", "hot-loop-arithmetic"],
+      "limitations": "Selected binary32 JVM conversion and arithmetic opcode assertions compiled by genuine javac 21 and 25 without preview flags. Includes 64-bit integer conversion midpoint controls and hot-loop arithmetic to exercise interpreter/JIT execution. Not complete floating-point conformance; excludes Math/StrictMath native functions, bootstrap/constant long -> double -> float adapters in src/ConstantPool.ts, and a broader boxed/native adaptation audit."
+    },
     {
       "id": "instance-main",
       "source": "classes/modern_fixture/Java25InstanceMain.java",

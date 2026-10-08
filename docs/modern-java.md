@@ -98,6 +98,21 @@ types, preview constant labels and primitive source patterns remain outside
 these selected slices; neither fixture establishes complete public API or
 language conformance.
 
+The [binary32 instruction fixture](../classes/modern_fixture/Java21FloatPrecision.java)
+adds 471 native-compared assertions on genuine javac 21/25 output for `i2f`,
+`l2f`, `d2f`, float arithmetic and selected `f2i`/`f2l`/`f2d` controls on Node
+and Chromium. Raw bits and widened double values expose unrounded intermediates.
+Selected ties-to-even, subnormal, signed-zero, NaN, infinity and overflow
+boundaries follow the
+[JVM floating-point rules](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-2.html#jvms-2.8).
+Direct `long` conversion avoids double rounding at midpoint-adjacent integers;
+`f2l` saturates positive and negative infinity to the corresponding `long`
+endpoint. The fixture exercises 4,096-call hot paths. Separate opcode contracts
+check 48 interpreter/JIT rounding cases and 17 float-to-long conversion cases,
+including operand stack effects. Native math libraries, universal floating-point
+conformance and explicit long-to-double-to-float bootstrap/constant adapters
+remain outside this slice.
+
 The separate [evolved-binary gate](../ci/java_pattern_evolution_test.mjs) compiles
 enum, sealed-class and sealed-interface callers with genuine javac 21 and 25,
 then recompiles only the enum or permitted-type declaration. It covers added

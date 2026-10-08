@@ -11,7 +11,7 @@ implemented.
 | --- | --- |
 | CLI host | Ubuntu Linux with Node.js 24.x |
 | Source build and native oracle | Java 17 JDK |
-| Newer native-oracle seed | Locked Corretto 21.0.11 and 25.0.3 on Linux x64 for nineteen selected fixtures plus a launcher gate, separate from full Java 21/25 support |
+| Newer native-oracle seed | Locked Corretto 21.0.11 and 25.0.3 on Linux x64 for twenty selected fixtures plus a launcher gate, separate from full Java 21/25 support |
 | Browser | Chromium through Playwright 1.57.0 |
 | Browser filesystem | BrowserFS 1.3.0, with read-only XHR runtime data and InMemory writable mounts |
 | Java runtime surface | Java 8 bootstrap image plus the Java 9–26 classfile and class-library surfaces listed in the compatibility matrix |
@@ -77,12 +77,12 @@ Kotlin/Scala compiler inputs, execute the complete 73-script inventory with
 per-script and outer timeouts, and upload raw completion ledgers. A stable
 terminal job fails unless both the producer and every shard succeed.
 
-The producer also runs nineteen selected string API, final-language,
+The producer also runs twenty selected string API, binary32 instruction, final-language,
 public switch API, bootstrap-contract and Java 25 `java.lang.IO` fixtures with pinned javac 21 and 25
 drivers, comparing each against its matching native runtime and the same Doppio
 release CLI and Chromium browser bundle. The
 contract fixture's companion is explicitly generated after javac with its
-generator hash and execution recorded. Twenty-five cases produce fifty host
+generator hash and execution recorded. Twenty-seven cases produce fifty-four host
 comparisons that verify class versions, identical finite UTF-8 standard input and
 unchanged execution-input byte hashes, retaining a provenance/result ledger on
 failure. These selected fixtures are the initial verification corpus for Java
@@ -97,6 +97,14 @@ assertions for all 49 numeric primitive selector/Class-label pairs, including
 range, precision, signed-zero and saturation boundaries. Declared reference/boxed selectors with
 cross-numeric conversions, preview constant labels and primitive source patterns
 remain outside the corpus; this is not complete public API conformance.
+
+The binary32 fixture adds 471 assertions per release for selected float numeric
+instructions on Java 21/25, including midpoint rounding, signed zeros,
+subnormal/overflow boundaries and float-to-long saturation. Widened values
+expose excess intermediate precision. Hot loops and separate 48-case rounding
+and 17-case float-to-long contracts cover selected interpreter/JIT behavior.
+Explicit bootstrap/constant long-to-double-to-float adapters, native math
+libraries and complete floating-point conformance remain outside this slice.
 
 An additional `yarn ci:java25-main` gate exercises twelve successful Java 25
 launches, six failure cases and two legacy Java 21 launches on Node and Chromium.
