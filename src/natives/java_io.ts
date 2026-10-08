@@ -132,6 +132,12 @@ export default function (): any {
         // buffer.
         bytes = <Buffer> process.stdin.read();
       }
+      // A finite redirected input stays at EOF on every subsequent read.
+      // BrowserFS exposes the same state through its readable stream internals.
+      if (bytes === null && ((<any> process.stdin).readableEnded ||
+          ((<any> process.stdin)._readableState && (<any> process.stdin)._readableState.ended))) {
+        bytes = new Buffer(0);
+      }
       // \0 => EOF.
       if (bytes !== null && bytes.length === 1 && bytes[0] === 0) {
         bytes = new Buffer(0);

@@ -168,7 +168,7 @@ for (const [original, replacement] of [
   ['run: node ci/run_java_compatibility.mjs --browser\n', 'run: node ci/run_java_compatibility.mjs --browser --release 21\n'],
   ['run: node ci/run_java_compatibility.mjs --browser\n', 'run: node ci/run_java_compatibility.mjs\n'],
   ['run: node ci/prepare_java_compatibility_toolchains.mjs\n', 'run: node ci/prepare_java_compatibility_toolchains.mjs || true\n'],
-  ['timeout-minutes: 70\n', 'timeout-minutes: 700\n'],
+  ['timeout-minutes: 115\n', 'timeout-minutes: 1150\n'],
   ["if: always() && steps.java_compatibility.outcome != 'skipped'", 'if: success()'],
   ['path: build/java-compatibility-results.json', 'path: build/missing-java-ledger.json'],
   ['retention-days: 7', 'retention-days: 1'],
@@ -268,13 +268,15 @@ expectCheckerFailure(
 
 expectCheckerFailure(
   'short runtime timeout',
-  { workflow: replaceRequired(realWorkflow, '  runtime:\n', '  runtime:\n').replace('    timeout-minutes: 150', '    timeout-minutes: 90') },
+  { workflow: replaceRequired(realWorkflow, '  runtime:\n', '  runtime:\n').replace('    timeout-minutes: 180', '    timeout-minutes: 90') },
   'runtime job timeout must be between 120 and 180 minutes'
 );
 
 expectCheckerFailure(
   'insufficient compiler setup headroom',
-  { workflow: replaceRequired(realWorkflow, '    timeout-minutes: 180', '    timeout-minutes: 150') },
+  { workflow: replaceRequired(realWorkflow,
+    '    needs: runtime\n    runs-on: ubuntu-latest\n    timeout-minutes: 180',
+    '    needs: runtime\n    runs-on: ubuntu-latest\n    timeout-minutes: 150') },
   'must be 180 minutes and leave at least 45 minutes beyond the maximum declared outer shard budget'
 );
 

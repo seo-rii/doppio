@@ -11,7 +11,7 @@ implemented.
 | --- | --- |
 | CLI host | Ubuntu Linux with Node.js 24.x |
 | Source build and native oracle | Java 17 JDK |
-| Newer native-oracle seed | Locked Corretto 21.0.11 and 25.0.3 on Linux x64 for five selected fixtures, separate from full Java 21/25 support |
+| Newer native-oracle seed | Locked Corretto 21.0.11 and 25.0.3 on Linux x64 for eleven selected fixtures, separate from full Java 21/25 support |
 | Browser | Chromium through Playwright 1.57.0 |
 | Browser filesystem | BrowserFS 1.3.0, with read-only XHR runtime data and InMemory writable mounts |
 | Java runtime surface | Java 8 bootstrap image plus the Java 9–26 classfile and class-library surfaces listed in the compatibility matrix |
@@ -76,12 +76,12 @@ Kotlin/Scala compiler inputs, execute the complete 73-script inventory with
 per-script and outer timeouts, and upload raw completion ledgers. A stable
 terminal job fails unless both the producer and every shard succeed.
 
-The producer also runs five selected string API, pattern and bootstrap-contract
-fixtures with pinned javac 21 and 25 drivers, comparing each against its matching
+The producer also runs eleven selected string API, pattern, bootstrap-contract
+and Java 25 `java.lang.IO` fixtures with pinned javac 21 and 25 drivers, comparing each against its matching
 native runtime and the same Doppio release CLI and Chromium browser bundle. The
 contract fixture's companion is explicitly generated after javac with its
-generator hash and execution recorded. Ten cases produce twenty host comparisons
-that verify class versions and unchanged execution-input byte
+generator hash and execution recorded. Sixteen cases produce thirty-two host comparisons
+that verify class versions, identical finite UTF-8 standard input and unchanged execution-input byte
 hashes and retain a provenance/result ledger on failure. These selected fixtures
 are the initial verification corpus for Java 21/25. The repository roadmap describes the seed
 manifest and local `yarn ci:java-compatibility:*` commands.

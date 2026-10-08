@@ -11,6 +11,7 @@ const defaultRepoRoot = path.resolve(path.dirname(scriptPath), '..');
 const sha256Pattern = /^[0-9a-f]{64}$/;
 const supportedReleases = [21, 25];
 const outputLimitBytes = 4 * 1024 * 1024;
+const inputLimitBytes = 1024 * 1024;
 const resultScope = 'Mandatory Java compatibility fixtures on selected hosts; the full Java SE inventory remains incomplete.';
 const legacyResultScope = 'Mandatory CLI seed fixtures only; not full Java SE or browser compatibility.';
 
@@ -85,13 +86,19 @@ export function validateManifest(manifest) {
         fixture.classGenerator.split('/').every((part) => part !== '' && part !== '.' && part !== '..'),
       `Invalid classGenerator path for fixture ${fixture.id}.`);
     }
-    const identity = `${fixture.source}:${fixture.mainClass}`;
-    requireCondition(!sourceIdentities.has(identity), `Duplicate fixture source/mainClass: ${identity}.`);
+    const identity = JSON.stringify([fixture.source, fixture.mainClass, fixture.arguments, fixture.standardInput || '']);
+    requireCondition(!sourceIdentities.has(identity), `Duplicate fixture source/mainClass/inputs: ${identity}.`);
     sourceIdentities.add(identity);
     uniqueNonempty(fixture.releases, (value) => manifest.releases.includes(value), `${fixture.id} releases`);
     uniqueNonempty(fixture.requirementIds, (value) => requirementIds.has(value), `${fixture.id} requirement IDs`);
     requireCondition(Array.isArray(fixture.arguments) && fixture.arguments.every((value) =>
       typeof value === 'string' && !value.includes('\0')), `Invalid arguments for fixture ${fixture.id}.`);
+    requireCondition(fixture.standardInput === undefined || typeof fixture.standardInput === 'string' &&
+      Buffer.byteLength(fixture.standardInput, 'utf8') <= inputLimitBytes,
+    `Invalid or oversized standardInput for fixture ${fixture.id}.`);
+    requireCondition(fixture.releases.every(release => fixture.requirementIds.every(id =>
+      manifest.requirements.find(requirement => requirement.id === id).introducedIn <= release)),
+    `Fixture ${fixture.id} cannot select a release before its required final features.`);
     requireCondition(fixture.comparison === 'successful-native-oracle-stdout-stderr' &&
       fixture.required !== false && fixture.skip !== true,
     `Fixture ${fixture.id} must require successful native/Doppio output comparison.`);
@@ -151,8 +158,10 @@ function controlledEnvironment() {
 // Kill the process group as well as the direct child. A hung descendant must not
 // keep the pipes open forever after its compiler or VM parent has been killed.
 export function runCommand(command, args, { cwd, timeoutMs, maxOutputBytes = outputLimitBytes,
-  environment = controlledEnvironment() }) {
+  standardInput = '', environment = controlledEnvironment() }) {
   requireCondition(Number.isSafeInteger(timeoutMs) && timeoutMs > 0, 'A positive process timeout is required.');
+  requireCondition(typeof standardInput === 'string' && Buffer.byteLength(standardInput, 'utf8') <= inputLimitBytes,
+    'Process standard input must be a UTF-8 string of at most 1048576 bytes.');
   return new Promise((resolve) => {
     const started = Date.now();
     const record = { command: [command, ...args], cwd, timeoutMs, status: 'running', exitCode: null,
@@ -162,7 +171,7 @@ export function runCommand(command, args, { cwd, timeoutMs, maxOutputBytes = out
     let finished = false;
     let timer;
     let drainTimer;
-    const child = spawn(command, args, { cwd, env: environment, stdio: ['ignore', 'pipe', 'pipe'],
+    const child = spawn(command, args, { cwd, env: environment, stdio: ['pipe', 'pipe', 'pipe'],
       detached: process.platform !== 'win32', windowsHide: true });
     const finish = () => {
       if (finished) return;
@@ -213,6 +222,11 @@ export function runCommand(command, args, { cwd, timeoutMs, maxOutputBytes = out
       });
     }
     child.on('error', (error) => { record.error = error.message; });
+    child.stdin.on('error', (error) => {
+      // Programs without input may close the pipe before it is written.
+      if (error.code !== 'EPIPE') { record.error = error.message; kill(); }
+    });
+    child.stdin.end(standardInput, 'utf8');
     child.on('close', (code, signal) => {
       record.exitCode = code;
       record.signal = signal;
@@ -383,6 +397,8 @@ export async function runCompatibility({ repoRoot = defaultRepoRoot,
       for (const fixture of manifest.fixtures.filter((entry) => entry.releases.includes(feature))) {
         ledger.cases.push({ id: `${fixture.id}:jdk${feature}`, fixtureId: fixture.id, release: feature,
           requirementIds: fixture.requirementIds, source: { path: fixture.source }, mainClass: fixture.mainClass,
+          standardInput: { bytes: Buffer.byteLength(fixture.standardInput || '', 'utf8'),
+            sha256: sha256(Buffer.from(fixture.standardInput || '', 'utf8')) },
           ...(fixture.classGenerator ? { classGenerator: { path: fixture.classGenerator,
             execution: notRun('Compilation has not completed.') } } : {}),
           status: 'not-run', classes: [], compile: notRun('Preflight has not completed.'),
@@ -469,15 +485,16 @@ export async function runCompatibility({ repoRoot = defaultRepoRoot,
         result.classes = inspectClassFiles(classesPath, result.release, fixture.mainClass);
         result.native = await execute(toolchain.executables.java.path,
           ['-cp', classesPath, fixture.mainClass, ...fixture.arguments],
-          { cwd: caseRoot, timeoutMs: manifest.timeouts.nativeMs });
+          { cwd: caseRoot, timeoutMs: manifest.timeouts.nativeMs, standardInput: fixture.standardInput || '' });
         sameClasses(result.classes, inspectClassFiles(classesPath, result.release, fixture.mainClass));
         result.doppio = await execute(process.execPath,
           ['--no-deprecation', runtimePath, '-cp', classesPath, fixture.mainClass, ...fixture.arguments],
-          { cwd: caseRoot, timeoutMs: manifest.timeouts.doppioMs });
+          { cwd: caseRoot, timeoutMs: manifest.timeouts.doppioMs, standardInput: fixture.standardInput || '' });
         sameClasses(result.classes, inspectClassFiles(classesPath, result.release, fixture.mainClass));
         if (browser) {
           result.browser = await browserSession.execute({ classesPath, mainClass: fixture.mainClass,
-            arguments: fixture.arguments, timeoutMs: manifest.timeouts.doppioMs });
+            arguments: fixture.arguments, timeoutMs: manifest.timeouts.doppioMs,
+            standardInput: fixture.standardInput || '' });
           sameClasses(result.classes, inspectClassFiles(classesPath, result.release, fixture.mainClass));
         }
         const normalize = (output) => output.replaceAll('\r\n', '\n');

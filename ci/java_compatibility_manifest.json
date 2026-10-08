@@ -30,8 +30,8 @@
     "completeJavaSeInventory": false,
     "packageIds": ["PLAN-001", "JVM-001", "JVM-008", "LIB-008"],
     "roadmap": "docs/compatibility-roadmap.md",
-    "scope": "Five fixtures covering eight Java 21 string API overloads and selected final instanceof/pattern-switch/record-pattern/MatchException behavior, compiled by matching native Java 21 and 25 toolchains. One bootstrap-contract companion is explicitly generated after javac; its generator and resulting bytes are recorded.",
-    "unassessedScope": "Remaining Java SE language, VM, module, library and host requirements have not been enumerated by this manifest. Final Java 22-25 features are not covered by these Java 21 seeds.",
+    "scope": "Eleven fixtures covering eight Java 21 string API overloads, selected final patterns/MatchException behavior and five Java 25 IO methods, compiled by matching native Java 21 and 25 toolchains. One bootstrap-contract companion is explicitly generated after javac; its generator and resulting bytes are recorded.",
+    "unassessedScope": "Remaining Java SE language, VM, module, library and host requirements have not been enumerated by this manifest. Only the explicitly listed final Java 22-25 requirements are represented.",
     "hostAutomation": {
       "ubuntu-node24": "seed-runner",
       "chromium": "seed-runner-with-browser"
@@ -45,6 +45,51 @@
     "doppioMs": 120000
   },
   "requirements": [
+    {
+      "id": "API-IO-PRINT",
+      "signature": "void java.lang.IO.print(java.lang.Object)",
+      "introducedIn": 25,
+      "featureStatus": "final",
+      "packageId": "LIB-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": { "25": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IO.html#print(java.lang.Object)" }
+    },
+    {
+      "id": "API-IO-PRINTLN-OBJECT",
+      "signature": "void java.lang.IO.println(java.lang.Object)",
+      "introducedIn": 25,
+      "featureStatus": "final",
+      "packageId": "LIB-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": { "25": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IO.html#println(java.lang.Object)" }
+    },
+    {
+      "id": "API-IO-PRINTLN",
+      "signature": "void java.lang.IO.println()",
+      "introducedIn": 25,
+      "featureStatus": "final",
+      "packageId": "LIB-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": { "25": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IO.html#println()" }
+    },
+    {
+      "id": "API-IO-READLN",
+      "signature": "java.lang.String java.lang.IO.readln()",
+      "introducedIn": 25,
+      "featureStatus": "final",
+      "packageId": "LIB-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": { "25": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IO.html#readln()" }
+    },
+    {
+      "id": "API-IO-READLN-PROMPT",
+      "signature": "java.lang.String java.lang.IO.readln(java.lang.String)",
+      "introducedIn": 25,
+      "featureStatus": "final",
+      "packageId": "LIB-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": { "25": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IO.html#readln(java.lang.String)" }
+    },
     {
       "id": "LANG-INSTANCEOF-BINDING",
       "introducedIn": 16,
@@ -188,6 +233,69 @@
     }
   ],
   "fixtures": [
+    {
+      "id": "io-output",
+      "source": "classes/modern_fixture/Java25IO.java",
+      "mainClass": "classes.modern_test.Java25IO",
+      "releases": [25],
+      "requirementIds": ["API-IO-PRINT", "API-IO-PRINTLN-OBJECT", "API-IO-PRINTLN"],
+      "arguments": ["output"],
+      "comparison": "successful-native-oracle-stdout-stderr",
+      "coverage": ["null-and-object-conversion", "current-System-out", "explicit-print-flush", "PrintStream-error-state"],
+      "limitations": "Selected standard-stream output behavior; no terminal/console implementation claim."
+    },
+    {
+      "id": "io-input",
+      "source": "classes/modern_fixture/Java25IO.java",
+      "mainClass": "classes.modern_test.Java25IO",
+      "releases": [25],
+      "requirementIds": ["API-IO-READLN", "API-IO-READLN-PROMPT"],
+      "arguments": ["input"],
+      "standardInput": "first\r\nβeta\rtail\n",
+      "comparison": "successful-native-oracle-stdout-stderr",
+      "coverage": ["UTF8", "CRLF-CR-LF", "prompt-and-null-prompt", "cached-initial-charset", "persistent-EOF"],
+      "limitations": "Finite scripted input on both hosts; interactive terminal input is not covered."
+    },
+    {
+      "id": "io-fallback-charset",
+      "source": "classes/modern_fixture/Java25IO.java",
+      "mainClass": "classes.modern_test.Java25IO",
+      "releases": [25],
+      "requirementIds": ["API-IO-READLN"],
+      "arguments": ["fallback"],
+      "comparison": "successful-native-oracle-stdout-stderr",
+      "coverage": ["unsupported-stdin-encoding", "malformed-UTF8-replacement", "EOF"]
+    },
+    {
+      "id": "io-illegal-charset",
+      "source": "classes/modern_fixture/Java25IO.java",
+      "mainClass": "classes.modern_test.Java25IO",
+      "releases": [25],
+      "requirementIds": ["API-IO-READLN"],
+      "arguments": ["illegal-charset"],
+      "comparison": "successful-native-oracle-stdout-stderr",
+      "coverage": ["illegal-stdin-encoding", "UTF8-fallback", "EOF"]
+    },
+    {
+      "id": "io-missing-charset",
+      "source": "classes/modern_fixture/Java25IO.java",
+      "mainClass": "classes.modern_test.Java25IO",
+      "releases": [25],
+      "requirementIds": ["API-IO-READLN"],
+      "arguments": ["missing-charset"],
+      "comparison": "successful-native-oracle-stdout-stderr",
+      "coverage": ["missing-stdin-encoding", "UTF8-fallback", "EOF"]
+    },
+    {
+      "id": "io-error",
+      "source": "classes/modern_fixture/Java25IO.java",
+      "mainClass": "classes.modern_test.Java25IO",
+      "releases": [25],
+      "requirementIds": ["API-IO-READLN", "API-IO-READLN-PROMPT"],
+      "arguments": ["ioerror"],
+      "comparison": "successful-native-oracle-stdout-stderr",
+      "coverage": ["IOException-to-IOError", "cause-identity", "prompt-before-read-failure"]
+    },
     {
       "id": "pattern-switch",
       "source": "classes/modern_fixture/Java21PatternSwitch.java",

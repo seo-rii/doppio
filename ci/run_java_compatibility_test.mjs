@@ -105,11 +105,12 @@ function environment(context) {
     runtimeRoot, calls, execute, run, save };
 }
 
-test('checked-in inventory has five fixtures covering twelve mandatory requirements on both releases', () => {
+test('checked-in inventory has eleven fixtures covering seventeen final requirements', () => {
   const spec = validateManifest(JSON.parse(fs.readFileSync(path.join(repoRoot, 'ci/java_compatibility_manifest.json'))));
-  assert.equal(spec.fixtures.length, 5);
-  assert.equal(spec.requirements.length, 12);
+  assert.equal(spec.fixtures.length, 11);
+  assert.equal(spec.requirements.length, 17);
   assert.deepEqual(spec.releases, [21, 25]);
+  assert.equal(spec.fixtures.filter(fixture => fixture.releases.includes(21)).length, 5);
 });
 
 test('manifest rejects missing, duplicate, skipped or unrepresented required cases', () => {
@@ -121,6 +122,7 @@ test('manifest rejects missing, duplicate, skipped or unrepresented required cas
     (spec) => { spec.fixtures[0].source = '/outside.java'; },
     ...['../generator.mjs', 'ci/../generator.mjs', '/ci/generator.mjs', 'ci//generator.mjs',
       'ci/generator.js', true].map(value => (spec) => { spec.fixtures[0].classGenerator = value; }),
+    ...[null, 1, 'x'.repeat(1024 * 1024 + 1)].map(value => (spec) => { spec.fixtures[0].standardInput = value; }),
     (spec) => { spec.fixtures[0].mainClass = '-version'; },
     (spec) => { spec.fixtures[0].required = false; },
     (spec) => { spec.fixtures[0].skip = true; },
@@ -151,6 +153,59 @@ test('CLI options are explicit and reject duplicate, unknown, missing and unsupp
     ['--release', '21', '--release', '25']]) assert.throws(() => parseOptions(args));
   assert.deepEqual(parseOptions(['--browser', '--release', '25']), { browser: true, release: 25 });
   assert.throws(() => parseOptions(['--browser', '--browser']), /Duplicate/);
+});
+
+test('later final features run only on applicable releases while retaining the Java 21 profile', async (context) => {
+  const fixture = environment(context);
+  const later = { id: 'LANG-LATER', introducedIn: 25, featureStatus: 'final',
+    specificationRefs: { 25: 'https://example.test/25' } };
+  fixture.spec.requirements.push(later);
+  fixture.spec.fixtures.push({ ...fixture.spec.fixtures[0], id: 'later', mainClass: 'fixture.Later',
+    releases: [25], requirementIds: [later.id] });
+  fixture.save();
+  const result = await fixture.run({ execute: async (command, args, options) => {
+    const record = await fixture.execute(command, args, options);
+    if (args[0] === '--release') writeFile(path.join(args[args.indexOf('-d') + 1], 'fixture/Later.class'),
+      classFile(Number(args[1]) + 44));
+    return record;
+  } });
+  assert.equal(result.status, 'passed');
+  assert.deepEqual(result.cases.map(entry => entry.id), ['first:jdk21', 'first:jdk25', 'later:jdk25']);
+  fixture.spec.fixtures[1].releases = [21, 25];
+  assert.throws(() => validateManifest(fixture.spec), /before its required final features/);
+});
+
+test('scripted UTF-8 stdin is identical on native, CLI and Chromium with input provenance', async (context) => {
+  const fixture = environment(context);
+  const input = 'first\r\nβeta\rtail\n';
+  fixture.spec.fixtures[0].standardInput = input;
+  fixture.save();
+  const browserInputs = [];
+  const result = await fixture.run({ browser: true, createBrowserSession: async () => ({ provenance: {},
+    execute: async (options) => {
+      browserInputs.push(options.standardInput);
+      return { status: 'passed', exitCode: 0, stdout: 'one\ntwo\n', stderr: '', signal: null,
+        error: null, timedOut: false, outputLimitExceeded: false };
+    }, verifyIntegrity: async () => {}, close: async () => {},
+  }) });
+  assert.equal(result.status, 'passed');
+  assert.deepEqual(browserInputs, [input, input]);
+  for (const entry of result.cases) {
+    assert.deepEqual(entry.standardInput, { bytes: Buffer.byteLength(input), sha256: digest(Buffer.from(input)) });
+  }
+  const runtimeCalls = fixture.calls.filter(call => call.args[0] === '-cp' || call.command === process.execPath);
+  assert.ok(runtimeCalls.every(call => call.standardInput === input));
+});
+
+test('process adapter feeds finite Unicode input and EOF without hanging', async () => {
+  const input = 'first\r\nβeta\rtail\n';
+  const record = await runCommand(process.execPath, ['-e',
+    "process.stdin.setEncoding('utf8'); let input=''; process.stdin.on('data',chunk=>input+=chunk); process.stdin.on('end',()=>process.stdout.write(input));"],
+  { cwd: repoRoot, timeoutMs: 3000, standardInput: input });
+  assert.equal(record.status, 'passed');
+  assert.equal(record.stdout, input);
+  assert.throws(() => runCommand(process.execPath, [], { cwd: repoRoot, timeoutMs: 1000,
+    standardInput: 'x'.repeat(1024 * 1024 + 1) }), /at most 1048576/);
 });
 
 test('generated switch companion is deterministic with the selected final class version', () => {

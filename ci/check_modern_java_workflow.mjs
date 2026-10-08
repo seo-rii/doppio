@@ -561,7 +561,7 @@ for (const [name, fields] of [
   ]],
   ['Run genuine Java 21 and 25 seed fixtures', [
     'id: java_compatibility',
-    'timeout-minutes: 70',
+    'timeout-minutes: 115',
     'run: node ci/run_java_compatibility.mjs --browser',
   ]],
   ['Upload Java compatibility baseline ledger', [

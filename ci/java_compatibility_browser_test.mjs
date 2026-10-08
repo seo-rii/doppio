@@ -104,6 +104,13 @@ const fakeRuntime = `window.Doppio = { VM: { CLI(args, options, done) {
   if (mode === 'hang') return;
   if (mode === 'output-limit') { process.stdout.write('x'.repeat(200)); done(0); return; }
   if (mode === 'invalid-utf8') { process.stdout.write(new Buffer([255])); done(0); return; }
+  if (mode === 'input') {
+    let input = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', chunk => input += chunk);
+    process.stdin.on('end', () => { process.stdout.write(input); done(0); });
+    return;
+  }
   process.stdout.write('héllo\\n');
   process.stderr.write('diagnostic\\n');
   if (mode === 'arguments') process.stdout.write(JSON.stringify({
@@ -134,6 +141,12 @@ test('Chromium adapter captures streams, arguments and errors and recovers after
     assert.equal(captured.cwd, '/work');
     assert.equal(captured.timezone, 'UTC');
     assert.equal(captured.classBytes, 'cafebabe');
+    const input = 'first\r\nβeta\rtail\n';
+    const scripted = await execute('input', { standardInput: input });
+    assert.equal(scripted.status, 'passed');
+    assert.equal(scripted.stdout, input);
+    assert.equal((await execute('input', { standardInput: '' })).stdout, '');
+    await assert.rejects(execute('input', { standardInput: 'x'.repeat(1024 * 1024 + 1) }), /at most 1048576/);
     assert.equal(captured.writable, 'written');
     assert.ok(captured.cookieNames.includes('dev_bypass_waf'));
     assert.equal((await execute('nonzero')).exitCode, 7);

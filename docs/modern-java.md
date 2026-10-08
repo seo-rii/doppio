@@ -38,7 +38,7 @@ matrix continues to describe the current implementation.
 | 22 | 66 | class-file API ecosystem expectations, unnamed variables | Partial: simple class-file container plus runnable print fixture | Medium |
 | 23 | 67 | primitive patterns preview, module/JDK library drift | Partial: simple class-file container plus runnable print fixture | High |
 | 24 | 68 | stream gatherers, compact object headers ecosystem assumptions | Partial: simple class-file container plus runnable print fixture | High |
-| 25 | 69 | current LTS class-file and library surface | Partial: simple class-file container, runnable print fixture and selected final pattern/record lowering recompiled by genuine javac 25 (see note below) | Very high |
+| 25 | 69 | current LTS class-file and library surface | Partial: simple class-file container, runnable print fixture, selected final pattern/record lowering recompiled by genuine javac 25, and five `java.lang.IO` methods (see notes below) | Very high |
 | 26 | 70 | current feature-release class-file and library surface | Partial: simple class-file container plus runnable print fixture | Very high |
 
 Java 21/25 final pattern note: the native-oracle
@@ -63,6 +63,19 @@ The public `SwitchBootstraps` class/API, preview primitive conversions, complete
 language conformance and separately evolved sealed/enum binaries are not
 implemented by this slice. The remaining Java 21/25 language and library surface
 is still partial.
+
+Java 25 IO note: the [IO fixture](../classes/modern_fixture/Java25IO.java)
+compares six isolated modes against native Java 25 on Node and Chromium.
+`print(Object)`, both `println` overloads, and both `readln` overloads delegate
+to standard streams. Coverage includes null/object rendering, explicit print
+flushing and retained `PrintStream` error state, prompt output, CRLF/CR/LF lines,
+EOF, a cached decoder with UTF-8 fallback for invalid or missing `stdin.encoding`,
+malformed-byte replacement, and `IOError` cause identity. The native input bridge
+also preserves EOF across subsequent reads of a finite redirected stream.
+The comparison runner records the identical UTF-8 input bytes and hash for
+native, CLI and browser executions. Interactive console/TTY behavior and full
+Java 25 library compatibility are not established by these tests. See the
+[Java 25 IO API](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IO.html).
 
 Java 9/11 `TimeUnit` note: `toChronoUnit()`, `of(ChronoUnit)`, and
 `convert(Duration)` are implemented as ordinary parsed methods on the retained

@@ -217,11 +217,13 @@ export async function createBrowserSession({ repoRoot = defaultRepoRoot,
           adapterSha256: provenance.adapter.sha256 };
       },
       async execute({ classesPath, mainClass, arguments: programArguments = [], timeoutMs,
-        maxOutputBytes = outputLimitBytes }) {
+        standardInput = '', maxOutputBytes = outputLimitBytes }) {
         requireCondition(!closed && !active, 'Browser sessions require one active execution at a time.');
         requireCondition(typeof mainClass === 'string' && mainClass.length > 0 &&
           Array.isArray(programArguments) && programArguments.every((argument) => typeof argument === 'string'),
         'A main class and string program arguments are required.');
+        requireCondition(typeof standardInput === 'string' && Buffer.byteLength(standardInput, 'utf8') <= 1024 * 1024,
+          'Browser standard input must be a UTF-8 string of at most 1048576 bytes.');
         requireCondition(Number.isSafeInteger(timeoutMs) && timeoutMs > 0 &&
           Number.isSafeInteger(maxOutputBytes) && maxOutputBytes > 0,
         'Positive execution timeout and output limits are required.');
@@ -264,7 +266,7 @@ export async function createBrowserSession({ repoRoot = defaultRepoRoot,
           const execution = (async () => {
             await page.goto(assets.baseUrl, { waitUntil: 'load', timeout: timeoutMs });
             record.exitCode = await page.evaluate(async ({ baseUrl, registered, mainClass, programArguments,
-              maxOutputBytes }) => {
+              standardInput, maxOutputBytes }) => {
               const BFS = window.BrowserFS;
               const load = (listingUrl, fileBaseUrl) => new Promise((resolve, reject) => {
                 BFS.FileSystem.XmlHttpRequest.FromURL(listingUrl,
@@ -280,6 +282,10 @@ export async function createBrowserSession({ repoRoot = defaultRepoRoot,
               filesystem.mount('/work', new BFS.FileSystem.InMemory());
               const process = BFS.BFSRequire('process');
               process.initializeTTYs();
+              // Feed the same finite UTF-8 stream as the native/Node oracle.
+              // push(null) closes the readable side, unlike TTY.end().
+              if (standardInput.length) process.stdin.push(new (BFS.BFSRequire('buffer').Buffer)(standardInput, 'utf8'));
+              process.stdin.push(null);
               process.chdir('/work');
               process.env.LANG = 'C.UTF-8';
               process.env.LC_ALL = 'C.UTF-8';
@@ -308,7 +314,7 @@ export async function createBrowserSession({ repoRoot = defaultRepoRoot,
                       .then(() => outputDelivery).then(() => resolve(exitCode), reject));
                 } catch (error) { reject(error); }
               });
-            }, { baseUrl: assets.baseUrl, registered, mainClass, programArguments, maxOutputBytes });
+            }, { baseUrl: assets.baseUrl, registered, mainClass, programArguments, standardInput, maxOutputBytes });
           })();
           const settled = execution.catch((error) => { record.error = error.message; });
           await Promise.race([settled, stopped]);
