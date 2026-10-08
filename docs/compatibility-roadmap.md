@@ -54,7 +54,7 @@ specification, not assumed from a successful native example.
 | [Core-language fixture notes](modern-java.md#known-core-lang-gaps) | Recent repeat, bounded indexOf and delimiter-preserving split fixtures include local Corretto 25.0.3 comparisons of genuine `--release 21` output | Reproducible native Java 21/25 release gates or broad modern language coverage |
 | [Playground launcher](../website/src/playground.mjs) and [browser suite](../ci/pages_browser_smoke.mjs) | Java 8 tools.jar javac and pinned Kotlin/Scala compile and execute in Doppio | Running modern javac or a modern JDK module image inside Doppio |
 | [Package smoke](../ci/package_artifact_smoke.mjs) | Isolated installation/rebuild, CLI help contracts, API types and bundle import | Java application compatibility; the isolated consumer uses an offline dummy runtime fixture |
-| [Seed manifest](../ci/java_compatibility_manifest.json), [toolchain lock](../ci/java_compatibility_toolchains.lock.json) and [comparison runner](../ci/run_java_compatibility.mjs) | Twelve fixtures are compared on matching Java 21 and 25 toolchains, Node and Chromium, including genuine pattern/unnamed-variable lowering, Java 25 IO and one explicitly generated bootstrap-contract companion, with input/runtime hashes | A complete requirement inventory or full final Java 22–25 feature coverage |
+| [Seed manifest](../ci/java_compatibility_manifest.json), [toolchain lock](../ci/java_compatibility_toolchains.lock.json) and [comparison runner](../ci/run_java_compatibility.mjs) | Thirteen fixtures are compared on matching Java 21 and 25 toolchains, Node and Chromium, including genuine pattern/unnamed-variable/module-import lowering, Java 25 IO and one explicitly generated bootstrap-contract companion, with input/runtime hashes | A complete requirement inventory or full final Java 22–25 feature coverage |
 
 The version matrix currently labels every Java 9–26 row partial. Its rows and
 the 73 compiler scripts are not a valid denominator for an overall completion
@@ -93,11 +93,11 @@ the manifest. No server framework is selected.
 ### Reproducible seed on Node and Chromium
 
 The seed manifest maps eight string API overloads, four language/runtime
-requirements, two unnamed-variable/pattern requirements and five Java 25 IO methods to twelve fixtures. The original five
+requirements, two unnamed-variable/pattern requirements, module imports and five Java 25 IO methods to thirteen fixtures. The original five
 drivers cover repeat, delimiter-preserving split, bounded indexOf, final pattern
 switches/record patterns and bootstrap contracts on matching javac `--release 21`
-and `--release 25`. Six isolated IO modes and the unnamed-variable/pattern driver use `--release 25` only. Together they
-produce seventeen cases and thirty-four required host comparisons. The contract fixture explicitly
+and `--release 25`. Six isolated IO modes, unnamed-variable/pattern and module-import drivers use `--release 25` only. Together they
+produce eighteen cases and thirty-six required host comparisons. The contract fixture explicitly
 replaces only its companion with deterministic generated call sites that Java
 source cannot express; generator source/hash and execution are recorded before
 the final emitted-class inventory. Native Java and Doppio then execute the same class
@@ -132,6 +132,12 @@ initializer effects, loop/catch/lambda/resource variables, close/finally order,
 nested typed and match-all patterns, nulls and guards. Ignored record components
 still evaluate accessors and preserve their `MatchException` causes. This gate
 uses genuine javac 25 without preview; it does not add a separate Java 22 JDK.
+
+The module-import fixture adds ten assertions over existing classes imported
+from `java.base`, `java.desktop` and `java.sql`, including duplicate imports and
+single-type/package-import precedence. This is a compiler-resolved source
+feature: its class-path output does not implement JPMS runtime resolution,
+readability, exports/opens or strong encapsulation.
 
 On Linux x64 with the existing Node 24/Java 17 build prerequisites:
 

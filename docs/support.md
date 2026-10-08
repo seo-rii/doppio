@@ -11,7 +11,7 @@ implemented.
 | --- | --- |
 | CLI host | Ubuntu Linux with Node.js 24.x |
 | Source build and native oracle | Java 17 JDK |
-| Newer native-oracle seed | Locked Corretto 21.0.11 and 25.0.3 on Linux x64 for twelve selected fixtures, separate from full Java 21/25 support |
+| Newer native-oracle seed | Locked Corretto 21.0.11 and 25.0.3 on Linux x64 for thirteen selected fixtures, separate from full Java 21/25 support |
 | Browser | Chromium through Playwright 1.57.0 |
 | Browser filesystem | BrowserFS 1.3.0, with read-only XHR runtime data and InMemory writable mounts |
 | Java runtime surface | Java 8 bootstrap image plus the Java 9–26 classfile and class-library surfaces listed in the compatibility matrix |
@@ -42,7 +42,8 @@ release work:
 
 - Doppio does not model named-module exports, opens, readability edges, or
   strong encapsulation. Reflection and method-handle access are supported only
-  for the documented class-path/unnamed-module shapes.
+  for the documented class-path/unnamed-module shapes. Java 25 module-import
+  source lowering does not expand this runtime module model.
 - BrowserFS is a single-user filesystem. Doppio evaluates its stored owner
   permission bits, but does not model multiple users or groups.
 - BrowserFS 1.3 cannot provide Linux-compatible read handles for directories,
@@ -76,11 +77,11 @@ Kotlin/Scala compiler inputs, execute the complete 73-script inventory with
 per-script and outer timeouts, and upload raw completion ledgers. A stable
 terminal job fails unless both the producer and every shard succeed.
 
-The producer also runs twelve selected string API, pattern, bootstrap-contract
+The producer also runs thirteen selected string API, pattern, module-import, bootstrap-contract
 and Java 25 `java.lang.IO` fixtures with pinned javac 21 and 25 drivers, comparing each against its matching
 native runtime and the same Doppio release CLI and Chromium browser bundle. The
 contract fixture's companion is explicitly generated after javac with its
-generator hash and execution recorded. Seventeen cases produce thirty-four host comparisons
+generator hash and execution recorded. Eighteen cases produce thirty-six host comparisons
 that verify class versions, identical finite UTF-8 standard input and unchanged execution-input byte
 hashes and retain a provenance/result ledger on failure. These selected fixtures
 are the initial verification corpus for Java 21/25. The repository roadmap describes the seed
