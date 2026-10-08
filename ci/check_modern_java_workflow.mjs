@@ -545,7 +545,15 @@ if (!/grunt\s+--stack\s+test-modern-java-runtime\b/.test(modernRuntimeStep)) {
 for (const [name, fields] of [
   ['Check Java compatibility baseline tooling', [
     'timeout-minutes: 3',
-    'run: node --test ci/prepare_java_compatibility_toolchains_test.mjs ci/run_java_compatibility_test.mjs',
+    'run: node --test ci/prepare_java_compatibility_toolchains_test.mjs ci/run_java_compatibility_test.mjs ci/java_compatibility_browser_test.mjs',
+  ]],
+  ['Build Java compatibility browser runtime', [
+    'timeout-minutes: 10',
+    'run: ./node_modules/.bin/grunt --stack make_build_dir:release vite-release listings:release --grunt-ignore-compile-errors',
+  ]],
+  ['Install Java compatibility Chromium', [
+    'timeout-minutes: 10',
+    'run: ./node_modules/.bin/playwright install --with-deps chromium',
   ]],
   ['Prepare pinned Java compatibility toolchains', [
     'timeout-minutes: 25',
@@ -553,8 +561,8 @@ for (const [name, fields] of [
   ]],
   ['Run genuine Java 21 and 25 seed fixtures', [
     'id: java_compatibility',
-    'timeout-minutes: 25',
-    'run: node ci/run_java_compatibility.mjs',
+    'timeout-minutes: 55',
+    'run: node ci/run_java_compatibility.mjs --browser',
   ]],
   ['Upload Java compatibility baseline ledger', [
     "if: always() && steps.java_compatibility.outcome != 'skipped'",
@@ -642,8 +650,10 @@ const runtimeOrder = [
   'Check TypeScript compiler compatibility',
   'Check compiler smoke workflow coverage',
   'Check Pages smoke retry',
+  'Install Java compatibility Chromium',
   'Check Java compatibility baseline tooling',
   'Build release CLI runner',
+  'Build Java compatibility browser runtime',
   'Verify compiler bootstrap overlay',
   'Bundle deterministic compiler runtime inputs',
   'Check Mesa fixture scheduling',

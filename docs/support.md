@@ -78,10 +78,10 @@ terminal job fails unless both the producer and every shard succeed.
 
 The producer also runs three selected Java 21 API fixtures with genuinely pinned
 javac 21 and 25 output, comparing each against its matching native runtime and
-the same Doppio release CLI. The six required comparisons verify class versions
-and unchanged byte hashes and retain a provenance/result ledger on failure.
-They are a CLI seed only: they do not establish full Java 21/25 compatibility
-or equivalent Chromium coverage. The repository roadmap describes the seed
+the same Doppio release CLI and Chromium browser bundle. Six compiled cases
+produce twelve host comparisons that verify class versions and unchanged byte
+hashes and retain a provenance/result ledger on failure. These selected fixtures
+are the initial verification corpus for Java 21/25. The repository roadmap describes the seed
 manifest and local `yarn ci:java-compatibility:*` commands.
 
 The `Pages` workflow owns the browser gate. It builds the deployable artifact,

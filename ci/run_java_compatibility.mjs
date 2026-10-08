@@ -11,7 +11,8 @@ const defaultRepoRoot = path.resolve(path.dirname(scriptPath), '..');
 const sha256Pattern = /^[0-9a-f]{64}$/;
 const supportedReleases = [21, 25];
 const outputLimitBytes = 4 * 1024 * 1024;
-const resultScope = 'Mandatory CLI seed fixtures only; not full Java SE or browser compatibility.';
+const resultScope = 'Mandatory Java compatibility fixtures on selected hosts; the full Java SE inventory remains incomplete.';
+const legacyResultScope = 'Mandatory CLI seed fixtures only; not full Java SE or browser compatibility.';
 
 function requireCondition(condition, message) {
   if (!condition) throw new Error(message);
@@ -328,7 +329,7 @@ function validateOutputPath(repoRoot, outputPath, inputPaths, runtimePath, toolc
   if (fs.existsSync(outputPath)) {
     requireCondition(fs.lstatSync(outputPath).isFile(), 'Results output must be a regular file, not a link.');
     const previous = JSON.parse(fs.readFileSync(outputPath, 'utf8'));
-    requireCondition(previous?.schemaVersion === 1 && previous.scope === resultScope,
+    requireCondition(previous?.schemaVersion === 1 && [resultScope, legacyResultScope].includes(previous.scope),
       'Refusing to overwrite a file that is not a Java compatibility result ledger.');
   }
 }
@@ -339,6 +340,7 @@ export async function runCompatibility({ repoRoot = defaultRepoRoot,
   lockPath = 'ci/java_compatibility_toolchains.lock.json',
   runtimePath = 'build/release-cli/console/runner.js',
   outputPath = 'build/java-compatibility-results.json', release,
+  browser = false, createBrowserSession,
   execute = runCommand, repositoryState = readRepositoryState } = {}) {
   repoRoot = fs.realpathSync(repoRoot);
   [manifestPath, toolchainsPath, lockPath, runtimePath, outputPath] =
@@ -354,10 +356,12 @@ export async function runCompatibility({ repoRoot = defaultRepoRoot,
     toolchainLock: { path: lockPath }, toolchainMarker: { path: toolchainsPath },
     toolchains: [], runtime: null, selectedReleases: [], cases: [], errors: [],
     inputIntegrity: { status: 'not-verified' },
-    browser: notRun('These fixtures are not yet automated in Chromium; CLI success is not browser success.') };
+    browser: browser ? { status: 'not-run', required: true } :
+      notRun('Chromium was not selected; use --browser to verify both required hosts.') };
   let workRoot;
   let initialSnapshot;
   let manifest;
+  let browserSession;
   try {
     const manifestBytes = fs.readFileSync(manifestPath);
     ledger.manifest.sha256 = sha256(manifestBytes);
@@ -375,6 +379,7 @@ export async function runCompatibility({ repoRoot = defaultRepoRoot,
           requirementIds: fixture.requirementIds, source: { path: fixture.source }, mainClass: fixture.mainClass,
           status: 'not-run', classes: [], compile: notRun('Preflight has not completed.'),
           native: notRun('Compilation has not completed.'), doppio: notRun('Compilation has not completed.'),
+          browser: notRun(browser ? 'Compilation has not completed.' : 'Chromium was not selected.'),
           comparison: notRun('Execution has not completed.') });
       }
     }
@@ -390,6 +395,13 @@ export async function runCompatibility({ repoRoot = defaultRepoRoot,
       ledger.toolchainLock.sha256, ledger.selectedReleases);
     initialSnapshot = runtimeSnapshot(repoRoot, runtimePath);
     ledger.runtime = initialSnapshot;
+    if (browser) {
+      const factory = createBrowserSession || (await import('./java_compatibility_browser.mjs')).createBrowserSession;
+      browserSession = await factory({ repoRoot,
+        runtimePath: path.resolve(path.dirname(runtimePath), '..', '..', 'release', 'doppio.js') });
+      ledger.browser.provenance = browserSession.provenance;
+      ledger.browser.status = 'running';
+    }
     for (const toolchain of toolchains) {
       const locked = lock.toolchains.find((entry) => entry.id === toolchain.id);
       const record = { ...toolchain, treeSha256: treeDigest(toolchain.home), executables: {}, probes: {} };
@@ -447,14 +459,27 @@ export async function runCompatibility({ repoRoot = defaultRepoRoot,
           ['--no-deprecation', runtimePath, '-cp', classesPath, fixture.mainClass, ...fixture.arguments],
           { cwd: caseRoot, timeoutMs: manifest.timeouts.doppioMs });
         sameClasses(result.classes, inspectClassFiles(classesPath, result.release, fixture.mainClass));
+        if (browser) {
+          result.browser = await browserSession.execute({ classesPath, mainClass: fixture.mainClass,
+            arguments: fixture.arguments, timeoutMs: manifest.timeouts.doppioMs });
+          sameClasses(result.classes, inspectClassFiles(classesPath, result.release, fixture.mainClass));
+        }
         const normalize = (output) => output.replaceAll('\r\n', '\n');
         result.comparison = { status: 'failed', normalization: 'CRLF to LF only',
           nativeSucceeded: successful(result.native), doppioSucceeded: successful(result.doppio),
           stdoutEqual: normalize(result.native.stdout) === normalize(result.doppio.stdout),
           stderrEqual: normalize(result.native.stderr) === normalize(result.doppio.stderr) };
+        if (browser) {
+          result.comparison.browserSucceeded = successful(result.browser);
+          result.comparison.browserStdoutEqual = normalize(result.native.stdout) === normalize(result.browser.stdout);
+          result.comparison.browserStderrEqual = normalize(result.native.stderr) === normalize(result.browser.stderr);
+        }
         requireCondition(result.comparison.nativeSucceeded && result.comparison.doppioSucceeded &&
           result.comparison.stdoutEqual && result.comparison.stderrEqual,
         'Native and Doppio must both exit successfully with matching stdout and stderr.');
+        requireCondition(!browser || result.comparison.browserSucceeded && result.comparison.browserStdoutEqual &&
+          result.comparison.browserStderrEqual,
+        'Chromium must exit successfully with stdout and stderr matching native Java.');
         result.comparison.status = 'passed';
         result.status = 'passed';
       } catch (error) {
@@ -474,10 +499,18 @@ export async function runCompatibility({ repoRoot = defaultRepoRoot,
       for (const executable of Object.values(toolchain.executables)) requireCondition(hashFile(executable.path) === executable.sha256,
         `Toolchain executable changed during comparison: ${executable.path}.`);
     }
+    if (browserSession) await browserSession.verifyIntegrity();
     ledger.inputIntegrity.status = 'passed';
   } catch (error) {
     ledger.errors.push(error.message);
   } finally {
+    if (browserSession) {
+      try {
+        await browserSession.close();
+      } catch (error) {
+        ledger.errors.push(`Chromium comparison cleanup failed: ${error.message}`);
+      }
+    }
     if (workRoot) {
       try {
         fs.rmSync(workRoot, { recursive: true, force: true });
@@ -499,6 +532,17 @@ export async function runCompatibility({ repoRoot = defaultRepoRoot,
     notRun: ledger.cases.filter((entry) => entry.status === 'not-run').length };
   ledger.status = ledger.errors.length === 0 && ledger.summary.required > 0 &&
     ledger.summary.passed === ledger.summary.required ? 'passed' : 'failed';
+  if (browser) {
+    const browserPassed = (entry) => ledger.errors.length === 0 &&
+      entry.comparison.nativeSucceeded && entry.comparison.browserSucceeded &&
+      entry.comparison.browserStdoutEqual && entry.comparison.browserStderrEqual;
+    ledger.browser.summary = { required: ledger.cases.length,
+      passed: ledger.cases.filter(browserPassed).length,
+      failed: ledger.cases.filter(entry => entry.browser.status !== 'not-run' &&
+        !browserPassed(entry)).length,
+      notRun: ledger.cases.filter(entry => entry.browser.status === 'not-run').length };
+    ledger.browser.status = ledger.browser.summary.passed === ledger.browser.summary.required ? 'passed' : 'failed';
+  }
   ledger.finishedAt = new Date().toISOString();
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   const temporaryOutput = `${outputPath}.${process.pid}.${crypto.randomUUID()}.tmp`;
@@ -515,11 +559,18 @@ export function parseOptions(argv) {
   const options = {};
   const names = { '--manifest': 'manifestPath', '--toolchains': 'toolchainsPath', '--lock': 'lockPath',
     '--runtime': 'runtimePath', '--output': 'outputPath', '--release': 'release' };
-  for (let index = 0; index < argv.length; index += 2) {
+  for (let index = 0; index < argv.length;) {
+    if (argv[index] === '--browser') {
+      requireCondition(!options.browser, 'Duplicate --browser option.');
+      options.browser = true;
+      index++;
+      continue;
+    }
     const name = names[argv[index]];
     requireCondition(name && argv[index + 1] && !argv[index + 1].startsWith('--') && !(name in options),
       `Invalid, missing or duplicate argument near ${argv[index]}.`);
     options[name] = argv[index + 1];
+    index += 2;
   }
   if ('release' in options) {
     requireCondition(/^(21|25)$/.test(options.release), '--release must be 21 or 25.');
@@ -532,8 +583,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === scriptPath) {
   try {
     const options = parseOptions(process.argv.slice(2));
     const ledger = await runCompatibility(options);
-    console.log(`Java compatibility CLI seeds: ${ledger.summary.passed}/${ledger.summary.required} passed; ` +
-      `${ledger.summary.failed} failed, ${ledger.summary.notRun} not run. Chromium: not run.`);
+    console.log(`Java compatibility selected-host cases: ${ledger.summary.passed}/${ledger.summary.required} passed; ` +
+      `${ledger.summary.failed} failed, ${ledger.summary.notRun} not run. Chromium: ${ledger.browser.status}.`);
     console.log(`Result: ${path.resolve(defaultRepoRoot, options.outputPath || 'build/java-compatibility-results.json')}`);
     for (const error of ledger.errors) console.error(error);
     for (const entry of ledger.cases.filter((result) => result.error)) console.error(`${entry.id}: ${entry.error}`);

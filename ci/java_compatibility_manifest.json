@@ -34,9 +34,9 @@
     "unassessedScope": "Remaining Java SE language, VM, module, library and host requirements have not been enumerated by this manifest. Final Java 22-25 features are not covered by these Java 21 seeds.",
     "hostAutomation": {
       "ubuntu-node24": "seed-runner",
-      "chromium": "not-yet-automated"
+      "chromium": "seed-runner-with-browser"
     },
-    "resultPolicy": "Every listed fixture is mandatory for each listed release. A passing Node seed run does not complete W-JAVA21, W-JAVA25, either required-host profile, or PLAN-001. Runtime verification results belong to per-run artifacts, not this inventory."
+    "resultPolicy": "Every listed fixture is mandatory for each listed release and selected host. CI selects Node and Chromium. Seed success does not complete W-JAVA21, W-JAVA25 or PLAN-001. Runtime verification results belong to per-run artifacts, not this inventory."
   },
   "releases": [21, 25],
   "timeouts": {

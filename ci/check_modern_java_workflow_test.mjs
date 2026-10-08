@@ -146,6 +146,8 @@ if (completeResult.status !== 0) {
 
 for (const name of [
   'Check Java compatibility baseline tooling',
+  'Build Java compatibility browser runtime',
+  'Install Java compatibility Chromium',
   'Prepare pinned Java compatibility toolchains',
   'Run genuine Java 21 and 25 seed fixtures',
   'Upload Java compatibility baseline ledger',
@@ -163,9 +165,10 @@ for (const name of [
 }
 
 for (const [original, replacement] of [
-  ['run: node ci/run_java_compatibility.mjs\n', 'run: node ci/run_java_compatibility.mjs --release 21\n'],
+  ['run: node ci/run_java_compatibility.mjs --browser\n', 'run: node ci/run_java_compatibility.mjs --browser --release 21\n'],
+  ['run: node ci/run_java_compatibility.mjs --browser\n', 'run: node ci/run_java_compatibility.mjs\n'],
   ['run: node ci/prepare_java_compatibility_toolchains.mjs\n', 'run: node ci/prepare_java_compatibility_toolchains.mjs || true\n'],
-  ['timeout-minutes: 25\n', 'timeout-minutes: 250\n'],
+  ['timeout-minutes: 55\n', 'timeout-minutes: 550\n'],
   ["if: always() && steps.java_compatibility.outcome != 'skipped'", 'if: success()'],
   ['path: build/java-compatibility-results.json', 'path: build/missing-java-ledger.json'],
   ['retention-days: 7', 'retention-days: 1'],
@@ -176,6 +179,12 @@ for (const [original, replacement] of [
     'exact bounded, fail-closed baseline command or artifact contract'
   );
 }
+
+expectCheckerFailure(
+  'Java compatibility tooling before Chromium installation',
+  { workflow: swapAdjacentSteps(realWorkflow, 'Install Java compatibility Chromium', 'Check Java compatibility baseline tooling') },
+  'remain in dependency order'
+);
 
 expectCheckerFailure(
   'Java compatibility execution before toolchain preparation',

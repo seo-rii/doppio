@@ -146,6 +146,90 @@ test('CLI options are explicit and reject duplicate, unknown, missing and unsupp
     { release: 21, outputPath: 'build/report.json' });
   for (const args of [['--release', '17'], ['--release', '025'], ['--release'], ['--unknown', 'value'],
     ['--release', '21', '--release', '25']]) assert.throws(() => parseOptions(args));
+  assert.deepEqual(parseOptions(['--browser', '--release', '25']), { browser: true, release: 25 });
+  assert.throws(() => parseOptions(['--browser', '--browser']), /Duplicate/);
+});
+
+test('Chromium compares the same class directory on both releases and records host provenance', async (context) => {
+  const fixture = environment(context);
+  const calls = [];
+  let closed = false;
+  let verified = false;
+  const result = await fixture.run({ browser: true, createBrowserSession: async () => ({
+    provenance: { browserVersion: 'test-chromium', bundleSha256: 'a'.repeat(64) },
+    execute: async (options) => {
+      calls.push(options);
+      return { status: 'passed', exitCode: 0, stdout: 'one\ntwo\n', stderr: '', signal: null,
+        timedOut: false, outputLimitExceeded: false, error: null };
+    },
+    verifyIntegrity: async () => { verified = true; },
+    close: async () => { closed = true; },
+  }) });
+  assert.equal(result.status, 'passed');
+  assert.equal(result.browser.status, 'passed');
+  assert.equal(result.browser.provenance.browserVersion, 'test-chromium');
+  assert.deepEqual(result.browser.summary, { required: 2, passed: 2, failed: 0, notRun: 0 });
+  assert.equal(calls.length, 2);
+  for (const [index, item] of result.cases.entries()) {
+    assert.equal(calls[index].classesPath, item.native.command[2]);
+    assert.equal(calls[index].mainClass, item.mainClass);
+    assert.equal(calls[index].timeoutMs, 120000);
+    assert.equal(item.comparison.browserSucceeded, true);
+  }
+  assert.equal(verified, true);
+  assert.equal(closed, true);
+});
+
+test('Chromium results remain independently visible when only the CLI output differs', async (context) => {
+  const fixture = environment(context);
+  const result = await fixture.run({ browser: true,
+    execute: async (command, args, options) => {
+      const record = await fixture.execute(command, args, options);
+      if (command === process.execPath) record.stdout = 'CLI mismatch\n';
+      return record;
+    },
+    createBrowserSession: async () => ({ provenance: {},
+      execute: async () => ({ status: 'passed', exitCode: 0, stdout: 'one\ntwo\n', stderr: '',
+        signal: null, timedOut: false, outputLimitExceeded: false, error: null }),
+      verifyIntegrity: async () => {}, close: async () => {},
+    }),
+  });
+  assert.equal(result.status, 'failed');
+  assert.equal(result.summary.passed, 0);
+  assert.equal(result.browser.status, 'passed');
+  assert.equal(result.browser.summary.passed, 2);
+});
+
+test('Chromium errors, output differences, timeouts and integrity failures invalidate required host results', async (context) => {
+  const fixture = environment(context);
+  for (const failure of ['stdout', 'stderr', 'error', 'timeout', 'integrity', 'cleanup']) {
+    let closed = false;
+    const result = await fixture.run({ browser: true, createBrowserSession: async () => ({
+      provenance: {},
+      execute: async () => ({ status: failure === 'error' || failure === 'timeout' ? 'failed' : 'passed',
+        exitCode: 0, signal: null, error: failure === 'error' ? 'page failure' : null,
+        timedOut: failure === 'timeout', outputLimitExceeded: false,
+        stdout: failure === 'stdout' ? 'changed\n' : 'one\ntwo\n',
+        stderr: failure === 'stderr' ? 'changed\n' : '' }),
+      verifyIntegrity: async () => { if (failure === 'integrity') throw new Error('Browser bundle changed.'); },
+      close: async () => { closed = true; if (failure === 'cleanup') throw new Error('Browser did not close.'); },
+    }) });
+    assert.equal(result.status, 'failed', failure);
+    assert.equal(result.browser.status, 'failed', failure);
+    assert.equal(result.summary.passed, 0, failure);
+    assert.equal(result.browser.summary.passed, 0, failure);
+    assert.equal(closed, true, failure);
+  }
+});
+
+test('Chromium launch failure retains every required case as unrun in the failed ledger', async (context) => {
+  const fixture = environment(context);
+  const result = await fixture.run({ browser: true,
+    createBrowserSession: async () => { throw new Error('No Chromium executable.'); } });
+  assert.equal(result.status, 'failed');
+  assert.deepEqual(result.summary, { required: 2, passed: 0, failed: 0, notRun: 2 });
+  assert.deepEqual(result.browser.summary, result.summary);
+  assert.match(result.errors[0], /No Chromium/);
 });
 
 test('real class headers must include every generated nested class with non-preview matching major', (context) => {

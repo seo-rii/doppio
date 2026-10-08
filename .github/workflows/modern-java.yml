@@ -69,13 +69,21 @@ jobs:
         timeout-minutes: 1
         run: node ci/pages_browser_smoke_retry_test.mjs
 
+      - name: Install Java compatibility Chromium
+        timeout-minutes: 10
+        run: ./node_modules/.bin/playwright install --with-deps chromium
+
       - name: Check Java compatibility baseline tooling
         timeout-minutes: 3
-        run: node --test ci/prepare_java_compatibility_toolchains_test.mjs ci/run_java_compatibility_test.mjs
+        run: node --test ci/prepare_java_compatibility_toolchains_test.mjs ci/run_java_compatibility_test.mjs ci/java_compatibility_browser_test.mjs
 
       - name: Build release CLI runner
         timeout-minutes: 20
         run: ./node_modules/.bin/grunt --stack modern-ci-release-cli --grunt-ignore-compile-errors
+
+      - name: Build Java compatibility browser runtime
+        timeout-minutes: 10
+        run: ./node_modules/.bin/grunt --stack make_build_dir:release vite-release listings:release --grunt-ignore-compile-errors
 
       - name: Verify compiler bootstrap overlay
         run: ./ci/modern_bootstrap_overlay_smoke.sh
@@ -115,8 +123,8 @@ jobs:
 
       - name: Run genuine Java 21 and 25 seed fixtures
         id: java_compatibility
-        timeout-minutes: 25
-        run: node ci/run_java_compatibility.mjs
+        timeout-minutes: 55
+        run: node ci/run_java_compatibility.mjs --browser
 
       - name: Upload Java compatibility baseline ledger
         if: always() && steps.java_compatibility.outcome != 'skipped'
