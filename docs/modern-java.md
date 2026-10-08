@@ -83,9 +83,20 @@ Declared primitive `boolean` selectors match only `boolean.class` and
 checks without preview flags: the
 [Java 25 implementation](https://raw.githubusercontent.com/openjdk/jdk/jdk-25-ga/src/java.base/share/classes/java/lang/runtime/SwitchBootstraps.java)
 accepts these primitive call sites while the API description remains
-reference-oriented. Cross-primitive Class conversions and preview constant
-labels are not included; this does not add primitive source-pattern support or
-complete public API conformance.
+reference-oriented. This identity fixture does not cover cross-primitive Class
+conversions or preview constant labels.
+
+The separate Java 25-only [exact-conversion fixture](../classes/modern_fixture/Java25SwitchBootstrapExactConversions.java)
+adds 2,926 assertions across 140 fixed-mask values for all 49 pairs of seven
+numeric primitive selector types and seven numeric primitive Class labels.
+Matching requires a lossless conversion, with selected
+integral range and floating precision boundaries, fractions, signed zeros, NaN,
+infinities and subnormals. Typed handles, label snapshots, duplicates and restart
+selection are checked against the same pinned native implementation without
+preview flags. Cross-numeric conversions for declared reference/boxed selector
+types, preview constant labels and primitive source patterns remain outside
+these selected slices; neither fixture establishes complete public API or
+language conformance.
 
 The separate [evolved-binary gate](../ci/java_pattern_evolution_test.mjs) compiles
 enum, sealed-class and sealed-interface callers with genuine javac 21 and 25,

@@ -11,7 +11,7 @@ implemented.
 | --- | --- |
 | CLI host | Ubuntu Linux with Node.js 24.x |
 | Source build and native oracle | Java 17 JDK |
-| Newer native-oracle seed | Locked Corretto 21.0.11 and 25.0.3 on Linux x64 for eighteen selected fixtures plus a launcher gate, separate from full Java 21/25 support |
+| Newer native-oracle seed | Locked Corretto 21.0.11 and 25.0.3 on Linux x64 for nineteen selected fixtures plus a launcher gate, separate from full Java 21/25 support |
 | Browser | Chromium through Playwright 1.57.0 |
 | Browser filesystem | BrowserFS 1.3.0, with read-only XHR runtime data and InMemory writable mounts |
 | Java runtime surface | Java 8 bootstrap image plus the Java 9–26 classfile and class-library surfaces listed in the compatibility matrix |
@@ -77,12 +77,12 @@ Kotlin/Scala compiler inputs, execute the complete 73-script inventory with
 per-script and outer timeouts, and upload raw completion ledgers. A stable
 terminal job fails unless both the producer and every shard succeed.
 
-The producer also runs eighteen selected string API, final-language,
+The producer also runs nineteen selected string API, final-language,
 public switch API, bootstrap-contract and Java 25 `java.lang.IO` fixtures with pinned javac 21 and 25
 drivers, comparing each against its matching native runtime and the same Doppio
 release CLI and Chromium browser bundle. The
 contract fixture's companion is explicitly generated after javac with its
-generator hash and execution recorded. Twenty-four cases produce forty-eight host
+generator hash and execution recorded. Twenty-five cases produce fifty host
 comparisons that verify class versions, identical finite UTF-8 standard input and
 unchanged execution-input byte hashes, retaining a provenance/result ledger on
 failure. These selected fixtures are the initial verification corpus for Java
@@ -92,8 +92,11 @@ failure. These selected fixtures are the initial verification corpus for Java
 The Java 25-only public primitive-switch fixture adds 651 assertions for eight
 selector types and corresponding primitive/wrapper Class labels, including typed
 handles, restarts, snapshots and Boolean restrictions. This is selected pinned
-native behavior; cross-primitive conversions and preview constant labels remain
-outside the corpus.
+native behavior. A separate Java 25-only exact-conversion fixture adds 2,926
+assertions for all 49 numeric primitive selector/Class-label pairs, including
+range, precision, signed-zero and saturation boundaries. Declared reference/boxed selectors with
+cross-numeric conversions, preview constant labels and primitive source patterns
+remain outside the corpus; this is not complete public API conformance.
 
 An additional `yarn ci:java25-main` gate exercises twelve successful Java 25
 launches, six failure cases and two legacy Java 21 launches on Node and Chromium.

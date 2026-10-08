@@ -105,16 +105,16 @@ function environment(context) {
     runtimeRoot, calls, execute, run, save };
 }
 
-test('checked-in inventory has eighteen fixtures covering twenty-five final requirements', () => {
+test('checked-in inventory has nineteen fixtures covering twenty-five final requirements', () => {
   const spec = validateManifest(JSON.parse(fs.readFileSync(path.join(repoRoot, 'ci/java_compatibility_manifest.json'))));
-  assert.equal(spec.fixtures.length, 18);
+  assert.equal(spec.fixtures.length, 19);
   assert.equal(spec.requirements.length, 25);
   assert.deepEqual(spec.releases, [21, 25]);
   assert.equal(spec.fixtures.filter(fixture => fixture.releases.includes(21)).length, 6);
-  assert.equal(spec.fixtures.filter(fixture => fixture.releases.includes(25)).length, 18);
+  assert.equal(spec.fixtures.filter(fixture => fixture.releases.includes(25)).length, 19);
   const requiredCases = spec.fixtures.reduce((count, fixture) => count + fixture.releases.length, 0);
-  assert.equal(requiredCases, 24);
-  assert.equal(requiredCases * spec.approvedTarget.requiredHosts.length, 48);
+  assert.equal(requiredCases, 25);
+  assert.equal(requiredCases * spec.approvedTarget.requiredHosts.length, 50);
 });
 
 test('public primitive switch slice is mandatory only on Java 25 and reuses the common typeSwitch requirement', () => {
@@ -146,6 +146,42 @@ test('public primitive switch slice is mandatory only on Java 25 and reuses the 
   assert.ok(common.requirementIds.includes(requirement.id));
   assert.match(common.limitations, /169 selected common final API assertions/);
   assert.match(common.limitations, /Excludes primitive selectors\/class labels/);
+});
+
+test('numeric exact switch conversions are a Java 25-only implementation-sensitive primitive API slice', () => {
+  const spec = validateManifest(JSON.parse(fs.readFileSync(path.join(repoRoot, 'ci/java_compatibility_manifest.json'))));
+  const fixture = spec.fixtures.find(entry => entry.id === 'switch-bootstrap-exact-conversions');
+  assert.ok(fixture);
+  assert.equal(fixture.source, 'classes/modern_fixture/Java25SwitchBootstrapExactConversions.java');
+  assert.equal(fixture.mainClass, 'classes.modern_test.Java25SwitchBootstrapExactConversions');
+  assert.deepEqual(fixture.releases, [25]);
+  assert.deepEqual(fixture.workloadIds, ['W-JAVA25']);
+  assert.deepEqual(fixture.requirementIds, ['API-TYPE-SWITCH']);
+  assert.deepEqual(fixture.arguments, []);
+  assert.equal(fixture.comparison, 'successful-native-oracle-stdout-stderr');
+  assert.deepEqual(fixture.coverage, ['all-49-numeric-primitive-selector-Class-label-pairs',
+    'exact-typed-calls', 'integral-range-boundaries', 'binary-floating-precision-boundaries',
+    'fractional-values', 'positive-and-negative-zero', 'NaN-and-infinities',
+    'integral-saturation-boundaries', 'restart-selection']);
+  assert.match(fixture.limitations, /B\/C\/S\/I\/J\/F\/D declared primitive selectors/);
+  assert.match(fixture.limitations, /Implementation-sensitive exact conversion cases from pinned native Java 25 without preview flags/);
+  assert.match(fixture.limitations, /API description remains reference-oriented/);
+  assert.match(fixture.limitations, /49 numeric primitive pairs/);
+  assert.match(fixture.limitations, /cross conversions for declared reference\/boxed selectors/);
+  assert.match(fixture.limitations, /Boolean conversions/);
+  assert.match(fixture.limitations, /preview Long\/Float\/Double\/Boolean constant labels and primitive source patterns/);
+  assert.match(fixture.limitations, /reduced lookups\/hidden helper classes/);
+  assert.match(fixture.limitations, /complete public API or language conformance/);
+  const requirement = spec.requirements.find(entry => entry.id === 'API-TYPE-SWITCH');
+  assert.equal(requirement.introducedIn, 21);
+  const identity = spec.fixtures.find(entry => entry.id === 'switch-bootstrap-primitives');
+  assert.match(identity.limitations, /This identity fixture excludes cross-primitive conversions/);
+  assert.match(identity.limitations, /Numeric primitive exact conversions have a separate fixture/);
+  assert.match(spec.inventory.scope, /all 49 numeric primitive-selector\/Class-label exact conversion pairs/);
+  assert.match(spec.inventory.scope, /implementation-sensitive pinned native Java 25 comparisons/);
+  assert.match(spec.inventory.unassessedScope, /declared reference\/boxed selectors/);
+  assert.match(spec.inventory.unassessedScope, /preview constant labels and primitive source patterns/);
+  assert.match(spec.inventory.unassessedScope, /does not establish complete latest Java conformance/);
 });
 
 test('manifest rejects missing, duplicate, skipped or unrepresented required cases', () => {

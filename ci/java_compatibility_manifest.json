@@ -30,8 +30,8 @@
     "completeJavaSeInventory": false,
     "packageIds": ["PLAN-001", "JVM-001", "JVM-008", "LIB-008"],
     "roadmap": "docs/compatibility-roadmap.md",
-    "scope": "Eighteen fixtures covering eight Java 21 string API overloads, selected public switch bootstrap APIs including Java 25 identity primitive-selector/Class-label behavior and final patterns/MatchException behavior, final Java 22 unnamed variables/patterns, Java 25 module imports/flexible constructors/compact sources/instance mains and five Java 25 IO methods, compiled by matching native Java 21 and 25 toolchains. One bootstrap-contract companion is explicitly generated after javac; its generator and resulting bytes are recorded.",
-    "unassessedScope": "Remaining Java SE language, VM, module, library and host requirements have not been enumerated by this manifest. Only the explicitly listed final Java 22-25 requirements are represented.",
+    "scope": "Nineteen fixtures covering eight Java 21 string API overloads, selected public switch bootstrap APIs including Java 25 identity primitive-selector/Class-label behavior and all 49 numeric primitive-selector/Class-label exact conversion pairs, final patterns/MatchException behavior, final Java 22 unnamed variables/patterns, Java 25 module imports/flexible constructors/compact sources/instance mains and five Java 25 IO methods, compiled by matching native Java 21 and 25 toolchains. Primitive-selector cases are implementation-sensitive pinned native Java 25 comparisons, not a general Java SE primitive-selector contract. One bootstrap-contract companion is explicitly generated after javac; its generator and resulting bytes are recorded.",
+    "unassessedScope": "Remaining Java SE language, VM, module, library and host requirements have not been enumerated by this manifest. Only the explicitly listed final Java 22-25 requirements are represented. Public typeSwitch cross conversions for declared reference/boxed selectors, preview constant labels and primitive source patterns remain excluded; the selected numeric primitive API slice does not establish complete latest Java conformance.",
     "hostAutomation": {
       "ubuntu-node24": "seed-runner",
       "chromium": "seed-runner-with-browser"
@@ -484,7 +484,20 @@
       "arguments": [],
       "comparison": "successful-native-oracle-stdout-stderr",
       "coverage": ["all-eight-primitive-selector-descriptors", "exact-typed-calls", "identity-primitive-and-wrapper-Class-labels", "boxed-Object-selectors", "restart-bounds-before-null", "wide-long-double-arguments", "empty-labels", "label-array-snapshot", "target-adaptation"],
-      "limitations": "Implementation-sensitive identity cases from pinned native Java 25 without preview flags, for Z/B/C/S/I/J/F/D targets and corresponding primitive/wrapper Class labels with a full-access caller lookup. The Java 25 API description remains reference-oriented; these cases do not establish a general Java SE primitive-selector contract. Excludes cross-primitive conversions, preview Long/Float/Double/Boolean constant labels, reduced lookups/hidden helper classes, narrow-reference target types, and complete public API or language conformance."
+      "limitations": "Implementation-sensitive identity cases from pinned native Java 25 without preview flags, for Z/B/C/S/I/J/F/D targets and corresponding primitive/wrapper Class labels with a full-access caller lookup. The Java 25 API description remains reference-oriented; these cases do not establish a general Java SE primitive-selector contract. This identity fixture excludes cross-primitive conversions, preview Long/Float/Double/Boolean constant labels, reduced lookups/hidden helper classes, narrow-reference target types, and complete public API or language conformance. Numeric primitive exact conversions have a separate fixture."
+    },
+    {
+      "id": "switch-bootstrap-exact-conversions",
+      "source": "classes/modern_fixture/Java25SwitchBootstrapExactConversions.java",
+      "mainClass": "classes.modern_test.Java25SwitchBootstrapExactConversions",
+      "releases": [25],
+      "workloadIds": ["W-JAVA25"],
+      "packageIds": ["JVM-003", "JVM-006", "JVM-008"],
+      "requirementIds": ["API-TYPE-SWITCH"],
+      "arguments": [],
+      "comparison": "successful-native-oracle-stdout-stderr",
+      "coverage": ["all-49-numeric-primitive-selector-Class-label-pairs", "exact-typed-calls", "integral-range-boundaries", "binary-floating-precision-boundaries", "fractional-values", "positive-and-negative-zero", "NaN-and-infinities", "integral-saturation-boundaries", "restart-selection"],
+      "limitations": "Implementation-sensitive exact conversion cases from pinned native Java 25 without preview flags, for B/C/S/I/J/F/D declared primitive selectors and numeric primitive Class labels with a full-access caller lookup. The Java 25 API description remains reference-oriented; these 49 numeric primitive pairs do not establish a general Java SE primitive-selector contract. Excludes cross conversions for declared reference/boxed selectors, Boolean conversions, preview Long/Float/Double/Boolean constant labels and primitive source patterns, reduced lookups/hidden helper classes, and complete public API or language conformance."
     },
     {
       "id": "string-builder-repeat",

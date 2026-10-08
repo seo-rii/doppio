@@ -9,7 +9,7 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.Objects;
 
-/** Public call sites for selected reference, identity primitive and enum switches. */
+/** Public call sites for selected reference, numeric primitive and enum switches. */
 public final class SwitchBootstraps {
   private SwitchBootstraps() {}
 
@@ -131,9 +131,12 @@ public final class SwitchBootstraps {
       if (selectorType == boolean.class && label != boolean.class && label != Boolean.class) {
         return false;
       }
-      // asType boxes primitive selectors before entering select. Match the
-      // corresponding primitive label without enabling cross-primitive
-      // exact conversions, which remain outside this selected API slice.
+      // asType boxes selectors, but exact numeric conversion depends on the
+      // declared primitive type. Reference selectors retain identity matching.
+      if (selectorType.isPrimitive() && selectorType != boolean.class
+          && label.isPrimitive() && label != boolean.class && label != void.class) {
+        return matchesNumericClass(label, selector);
+      }
       if (label == boolean.class) label = Boolean.class;
       else if (label == byte.class) label = Byte.class;
       else if (label == char.class) label = Character.class;
@@ -143,6 +146,55 @@ public final class SwitchBootstraps {
       else if (label == float.class) label = Float.class;
       else if (label == double.class) label = Double.class;
       return label.isInstance(selector);
+    }
+
+    private boolean matchesNumericClass(Class<?> label, Object selector) {
+      if (selectorType != float.class && selectorType != double.class) {
+        long value = selectorType == char.class ? ((Character) selector).charValue()
+            : ((Number) selector).longValue();
+        if (label == byte.class) return value >= Byte.MIN_VALUE && value <= Byte.MAX_VALUE;
+        if (label == char.class) return value >= Character.MIN_VALUE && value <= Character.MAX_VALUE;
+        if (label == short.class) return value >= Short.MIN_VALUE && value <= Short.MAX_VALUE;
+        if (label == int.class) return value >= Integer.MIN_VALUE && value <= Integer.MAX_VALUE;
+        if (label == long.class) return true;
+        return fitsBinaryPrecision(value, label == float.class ? 24 : 53);
+      }
+
+      double value = ((Number) selector).doubleValue();
+      if (label == double.class) return true;
+      if (label == float.class) return selectorType == float.class || fitsFloat(value);
+
+      double lower;
+      double upper;
+      if (label == byte.class) { lower = -128.0; upper = 128.0; }
+      else if (label == char.class) { lower = 0.0; upper = 65536.0; }
+      else if (label == short.class) { lower = -32768.0; upper = 32768.0; }
+      else if (label == int.class) { lower = -0x1p31; upper = 0x1p31; }
+      else { lower = -0x1p63; upper = 0x1p63; }
+      // Upper-exclusive bounds reject saturating casts at 2^31 and 2^63.
+      // Negative zero cannot be represented by an integral target.
+      return value >= lower && value < upper && !(value == 0.0 && 1.0 / value < 0.0)
+          && value == (double) (long) value;
+    }
+
+    private static boolean fitsBinaryPrecision(long value, int precision) {
+      if (value == 0) return true;
+      // Treat the overflowing magnitude of Long.MIN_VALUE as unsigned.
+      // Removing powers of two leaves the bits needed by the significand.
+      long magnitude = value < 0 ? -value : value;
+      while ((magnitude & 1L) == 0) magnitude >>>= 1;
+      return (magnitude >>> precision) == 0;
+    }
+
+    private static boolean fitsFloat(double value) {
+      long bits = Double.doubleToRawLongBits(value);
+      int exponent = (int) ((bits >>> 52) & 0x7ffL);
+      if (exponent == 0x7ff || value == 0.0) return true; // NaN, infinity, signed zero.
+      // Binary32 finite nonzero values have unbiased exponents -149 through 127.
+      if (exponent < 874 || exponent > 1150) return false;
+      // Normal floats keep 24 significand bits; subnormals have fewer.
+      int discardedBits = 29 + Math.max(0, 897 - exponent);
+      return (bits & ((1L << discardedBits) - 1)) == 0;
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

@@ -95,12 +95,12 @@ the manifest. No server framework is selected.
 The seed manifest maps eight string API overloads, four language/runtime
 requirements, two public switch bootstrap APIs, two unnamed-variable/pattern requirements, module imports,
 flexible constructors, compact sources/instance mains and five Java 25 IO methods
-to eighteen fixtures (twenty-five requirements). Six
+to nineteen fixtures (twenty-five requirements). Six
 drivers cover repeat, delimiter-preserving split, bounded indexOf, final pattern
 switches/record patterns, bootstrap contracts and public bootstrap calls on matching javac `--release 21`
 and `--release 25`. Six isolated IO modes, five final-source/launcher drivers and
-the identity primitive-switch API fixture use `--release 25` only.
-Together they produce twenty-four cases and forty-eight
+the identity and exact-conversion primitive-switch API fixtures use `--release 25` only.
+Together they produce twenty-five cases and fifty
 required host comparisons. The contract fixture explicitly
 replaces only its companion with deterministic generated call sites that Java
 source cannot express; generator source/hash and execution are recorded before
@@ -136,9 +136,19 @@ The Java 25-only public primitive-switch fixture adds 651 assertions for all
 eight selector descriptors and corresponding primitive/wrapper Class labels.
 It checks exact/adapted handles, boxed Object selectors, wide argument slots,
 snapshots, empty labels, restarts and declared-Boolean restrictions against the
-pinned native implementation without preview flags. Cross-primitive Class
-conversions, preview constant labels and complete public API conformance remain
-outside this selected slice; the existing common Java 21/25 corpus is unchanged.
+pinned native implementation without preview flags. Its scope is identity
+matching; the existing common Java 21/25 corpus is unchanged.
+
+The separate Java 25-only exact-conversion fixture adds 2,926 assertions for all
+49 numeric primitive selector/Class-label pairs across 140 static expected
+matching-mask values with typed handles. Selected range/precision boundaries,
+fractions, signed zeros, NaN, infinities, subnormals and integral saturation endpoints are native-compared,
+along with snapshots, duplicate labels and restart selection. These primitive
+Class-label calls need no preview flags in the pinned native implementation;
+they do not establish a universal reference-oriented API contract. Cross-numeric
+conversions for declared reference/boxed selectors, preview constant labels,
+primitive source patterns and complete public API conformance remain outside
+the selected slices.
 
 The separate evolved-binary gate compiles enum, sealed-class and sealed-interface
 callers with javac 21 and 25, then selectively recompiles the declarations for
