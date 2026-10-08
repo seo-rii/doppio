@@ -35,7 +35,7 @@ matrix continues to describe the current implementation.
 | 19 | 63 | virtual threads preview dependencies, record pattern preview output, `Thread.threadId()`, `Thread.sleep(Duration)` | Partial: simple class-file container, selected `Thread.threadId()` current-thread behavior matching the existing positive `Thread.getId()` identifier, and selected `Thread.sleep(Duration)` behavior for negative no-op, zero duration, short positive duration, null rejection, and interrupt delivery | High |
 | 20 | 64 | scoped values preview dependencies, pattern matching output | Partial: simple class-file container plus runnable print fixture | High |
 | 21 | 65 | final record patterns and pattern switches, virtual threads, sequenced collections, `Math`/`StrictMath.clamp`, `StringBuilder`/`StringBuffer.repeat`, `String`/`Pattern.splitWithDelimiters`, bounded `String.indexOf`, string templates preview | Partial: selected genuine final pattern-switch/record-pattern lowering and bootstrap contracts (see note below), simple class-file container, runnable print fixture, selected `Thread.isVirtual()` platform-thread behavior for current, unstarted, and started platform threads, direct and reflection-visible integer/floating-point `Math.clamp` and `StrictMath.clamp` overloads, Unicode/sequence repetition with covariant reflection bridges and synchronized `StringBuffer` calls, delimiter-preserving regex splitting and range-bounded string/code-point searches with direct/reflection/MethodHandle calls, and selected `SequencedCollection`/`List`/`Deque`/`SequencedSet`/`SequencedMap` endpoint, view, and reverse-view behavior | Very high |
-| 22 | 66 | class-file API ecosystem expectations, unnamed variables | Partial: simple class-file container plus runnable print fixture | Medium |
+| 22 | 66 | class-file API ecosystem expectations, unnamed variables and patterns | Partial: simple class-file container, runnable print fixture and selected final unnamed-variable/pattern forms compiled by genuine javac 25 (see note below) | Medium |
 | 23 | 67 | primitive patterns preview, module/JDK library drift | Partial: simple class-file container plus runnable print fixture | High |
 | 24 | 68 | stream gatherers, compact object headers ecosystem assumptions | Partial: simple class-file container plus runnable print fixture | High |
 | 25 | 69 | current LTS class-file and library surface | Partial: simple class-file container, runnable print fixture, selected final pattern/record lowering recompiled by genuine javac 25, and five `java.lang.IO` methods (see notes below) | Very high |
@@ -76,6 +76,16 @@ The comparison runner records the identical UTF-8 input bytes and hash for
 native, CLI and browser executions. Interactive console/TTY behavior and full
 Java 25 library compatibility are not established by these tests. See the
 [Java 25 IO API](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IO.html).
+
+Java 22 unnamed-variable/pattern note: the
+[fixture](../classes/modern_fixture/Java22UnnamedPatterns.java) checks 33 selected
+assertions for local/loop/catch/lambda/resource variables, initializer and close
+effects, nested typed/match-all patterns, nulls and guards. Ignored record
+components still invoke accessors; failures retain their `MatchException`
+causes. The gate compares genuine non-preview `--release 25` output with native
+Java 25 on Node and Chromium, not version-patched Java 17 output. It establishes
+these final source-lowering cases, not full Java 22 runtime/API conformance or a
+separate native Java 22 gate.
 
 Java 9/11 `TimeUnit` note: `toChronoUnit()`, `of(ChronoUnit)`, and
 `convert(Duration)` are implemented as ordinary parsed methods on the retained

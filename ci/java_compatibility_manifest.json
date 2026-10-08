@@ -30,7 +30,7 @@
     "completeJavaSeInventory": false,
     "packageIds": ["PLAN-001", "JVM-001", "JVM-008", "LIB-008"],
     "roadmap": "docs/compatibility-roadmap.md",
-    "scope": "Eleven fixtures covering eight Java 21 string API overloads, selected final patterns/MatchException behavior and five Java 25 IO methods, compiled by matching native Java 21 and 25 toolchains. One bootstrap-contract companion is explicitly generated after javac; its generator and resulting bytes are recorded.",
+    "scope": "Twelve fixtures covering eight Java 21 string API overloads, selected final patterns/MatchException behavior, final Java 22 unnamed variables/patterns and five Java 25 IO methods, compiled by matching native Java 21 and 25 toolchains. One bootstrap-contract companion is explicitly generated after javac; its generator and resulting bytes are recorded.",
     "unassessedScope": "Remaining Java SE language, VM, module, library and host requirements have not been enumerated by this manifest. Only the explicitly listed final Java 22-25 requirements are represented.",
     "hostAutomation": {
       "ubuntu-node24": "seed-runner",
@@ -45,6 +45,22 @@
     "doppioMs": 120000
   },
   "requirements": [
+    {
+      "id": "LANG-UNNAMED-VARIABLES",
+      "introducedIn": 22,
+      "featureStatus": "final",
+      "packageId": "JVM-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": { "25": "https://docs.oracle.com/javase/specs/jls/se25/html/jls-14.html#jls-14.4" }
+    },
+    {
+      "id": "LANG-UNNAMED-PATTERNS",
+      "introducedIn": 22,
+      "featureStatus": "final",
+      "packageId": "JVM-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": { "25": "https://docs.oracle.com/javase/specs/jls/se25/html/jls-14.html#jls-14.30" }
+    },
     {
       "id": "API-IO-PRINT",
       "signature": "void java.lang.IO.print(java.lang.Object)",
@@ -233,6 +249,19 @@
     }
   ],
   "fixtures": [
+    {
+      "id": "unnamed-variables-patterns",
+      "source": "classes/modern_fixture/Java22UnnamedPatterns.java",
+      "mainClass": "classes.modern_test.Java22UnnamedPatterns",
+      "releases": [25],
+      "workloadIds": ["W-JAVA25"],
+      "packageIds": ["JVM-001", "JVM-008"],
+      "requirementIds": ["LANG-UNNAMED-VARIABLES", "LANG-UNNAMED-PATTERNS"],
+      "arguments": [],
+      "comparison": "successful-native-oracle-stdout-stderr",
+      "coverage": ["locals-and-loop-initializers", "catch-and-finally", "lambda-parameters", "try-resource-order", "nested-typed-and-match-all-patterns", "null-and-guards", "ignored-accessor-evaluation-and-MatchException"],
+      "limitations": "33 selected assertions for final Java 22 source forms, compiled by genuine javac 25 without preview; no separate Java 22 toolchain or complete language-conformance claim."
+    },
     {
       "id": "io-output",
       "source": "classes/modern_fixture/Java25IO.java",
