@@ -54,7 +54,7 @@ specification, not assumed from a successful native example.
 | [Core-language fixture notes](modern-java.md#known-core-lang-gaps) | Recent repeat, bounded indexOf and delimiter-preserving split fixtures include local Corretto 25.0.3 comparisons of genuine `--release 21` output | Reproducible native Java 21/25 release gates or broad modern language coverage |
 | [Playground launcher](../website/src/playground.mjs) and [browser suite](../ci/pages_browser_smoke.mjs) | Java 8 tools.jar javac and pinned Kotlin/Scala compile and execute in Doppio | Running modern javac or a modern JDK module image inside Doppio |
 | [Package smoke](../ci/package_artifact_smoke.mjs) | Isolated installation/rebuild, CLI help contracts, API types and bundle import | Java application compatibility; the isolated consumer uses an offline dummy runtime fixture |
-| [Seed manifest](../ci/java_compatibility_manifest.json), [toolchain lock](../ci/java_compatibility_toolchains.lock.json) and [comparison runner](../ci/run_java_compatibility.mjs) | Sixteen fixtures are compared on matching Java 21 and 25 toolchains, Node and Chromium, including selected final-language/launcher behavior, Java 25 IO and one explicitly generated bootstrap-contract companion, with input/runtime hashes | A complete requirement inventory or full final Java 22–25 feature conformance |
+| [Seed manifest](../ci/java_compatibility_manifest.json), [toolchain lock](../ci/java_compatibility_toolchains.lock.json) and [comparison runner](../ci/run_java_compatibility.mjs) | Seventeen fixtures are compared on matching Java 21 and 25 toolchains, Node and Chromium, including selected public switch APIs, final-language/launcher behavior, Java 25 IO and one explicitly generated bootstrap-contract companion, with input/runtime hashes | A complete requirement inventory or full final Java 22–25 feature conformance |
 
 The version matrix currently labels every Java 9–26 row partial. Its rows and
 the 73 compiler scripts are not a valid denominator for an overall completion
@@ -93,13 +93,13 @@ the manifest. No server framework is selected.
 ### Reproducible seed on Node and Chromium
 
 The seed manifest maps eight string API overloads, four language/runtime
-requirements, two unnamed-variable/pattern requirements, module imports,
+requirements, two public switch bootstrap APIs, two unnamed-variable/pattern requirements, module imports,
 flexible constructors, compact sources/instance mains and five Java 25 IO methods
-to sixteen fixtures (twenty-three requirements). The original five
+to seventeen fixtures (twenty-five requirements). Six
 drivers cover repeat, delimiter-preserving split, bounded indexOf, final pattern
-switches/record patterns and bootstrap contracts on matching javac `--release 21`
+switches/record patterns, bootstrap contracts and public bootstrap calls on matching javac `--release 21`
 and `--release 25`. Six isolated IO modes and five final-source/launcher drivers
-use `--release 25` only. Together they produce twenty-one cases and forty-two
+use `--release 25` only. Together they produce twenty-three cases and forty-six
 required host comparisons. The contract fixture explicitly
 replaces only its companion with deterministic generated call sites that Java
 source cannot express; generator source/hash and execution are recorded before
@@ -120,8 +120,16 @@ This does not add preview cross-primitive patterns.
 The 31 bootstrap-contract assertions exercise string/integer labels, numeric
 conversion failures, restart bounds before null handling and malformed inputs
 with `BootstrapMethodError`/`IllegalArgumentException` causes. This is a selected
-compiler-generated fast path, not the public `SwitchBootstraps` API, full
-language conformance or preview primitive conversions.
+compiler-generated fast path, not full language conformance or preview primitive
+conversions. The separate public API fixture directly calls `typeSwitch` and
+`enumSwitch` with 169 selected common final API assertions: real `ConstantCallSite`
+targets/dynamic invokers, handle adaptation and varargs metadata, label snapshots,
+duplicates/restarts, numeric accessor effects/failures, lazy enum initialization,
+enum descriptors and invalid arguments/names. It uses Object and concrete-enum
+targets with a full-access caller lookup. Primitive selectors/class labels,
+version-dependent narrow-reference target types and String equality direction,
+reduced lookup/hidden-class behavior and cross-loader enum resolution remain
+outside this public API corpus.
 
 The separate evolved-binary gate compiles enum, sealed-class and sealed-interface
 callers with javac 21 and 25, then selectively recompiles the declarations for
@@ -251,7 +259,7 @@ stable; a split should retain links to its parent.
 
 | ID | Priority and current state | Required work and exit evidence |
 | --- | --- | --- |
-| PLAN-001 | P0; target/workload scope approved and 23-requirement seed manifest checked in; complete requirements inventory absent | Expand the versioned manifest beyond the selected seed requirements. Enumerate applicable JLS/JVMS requirements and all target Java SE modules, exported public/protected types and members, service/provider contracts and behavioral changes, including inherited Java 8 behavior. Map each to an owner package, specification, status and tests, with no unclassified entries. Classify preview/incubator/JDK-specific features separately; preserve exclusions in the ledger. |
+| PLAN-001 | P0; target/workload scope approved and 25-requirement seed manifest checked in; complete requirements inventory absent | Expand the versioned manifest beyond the selected seed requirements. Enumerate applicable JLS/JVMS requirements and all target Java SE modules, exported public/protected types and members, service/provider contracts and behavioral changes, including inherited Java 8 behavior. Map each to an owner package, specification, status and tests, with no unclassified entries. Classify preview/incubator/JDK-specific features separately; preserve exclusions in the ledger. |
 
 ### JVM and language execution
 
@@ -264,7 +272,7 @@ stable; a split should retain links to its parent.
 | JVM-005 | P2; hidden definition/discovery explicitly missing in [core gaps](modern-java.md#known-core-lang-gaps) | Hidden class and class-data definitions, initialization, lookup privileges, nestmate options, names/descriptors and discovery restrictions match native contracts. Depends on JVM-002/003; module cases on JVM-011. |
 | JVM-006 | P1; [record gaps](modern-java.md#known-record-gaps): raw generic fallbacks, nested annotation gaps and restricted ObjectMethods fast path | Genuine javac records with generic/annotated components, constructors/accessors, object methods and reflection/handles pass; general bootstrap forms have explicit tests. Depends on JVM-001/003/004. |
 | JVM-007 | P1; [sealed-class gaps](modern-java.md#known-sealed-class-gaps): direct enforcement exists, reflective error fidelity remains partial | Direct and reflective custom-loader cases cover permitted parents, invalid metadata, package/module constraints and exact errors. Depends on JVM-002; module cases on JVM-011. |
-| JVM-008 | P1; selected genuine 21/25 patterns/switches/bootstrap contracts, separately evolved sealed/enum binaries, final unnamed forms, module imports, flexible constructors and compact/instance-main startup covered on Node/Chromium; three pinned launcher differences remain explicit | Expand the selected corpus beyond these evolved-binary cases, including public bootstrap access. Resolve oracle differences without equating native behavior with specification requirements. Distinguish compile-time syntax from runtime/launcher obligations. Depends on JVM-001/004/006/007. |
+| JVM-008 | P1; selected genuine 21/25 patterns/switches/bootstrap contracts and public APIs, separately evolved sealed/enum binaries, final unnamed forms, module imports, flexible constructors and compact/instance-main startup covered on Node/Chromium; three pinned launcher differences remain explicit | Expand the selected language and public-bootstrap corpus beyond these reference/enum and evolved-binary cases. Resolve oracle differences without equating native behavior with specification requirements. Distinguish compile-time syntax from runtime/launcher obligations. Depends on JVM-001/004/006/007. |
 | JVM-009 | P0 scheduler design, then P1 selected profile; virtual threads explicitly missing in [core gaps](modern-java.md#known-core-lang-gaps) | Thread builders/start, lifecycle/join/interrupt, sleep/park, locals, executors, blocking-I/O and monitor interactions work on each required host. Do not replace virtual-thread semantics with an isVirtual flag. Depends on JVM-010 and host I/O. |
 | JVM-010 | P0 execution/memory-model design; [concurrent gaps](modern-java.md#known-concurrent-gaps) explicitly exclude broader scheduling/backpressure/memory-safety | Defined execution model plus synchronization, visibility/atomics, cancellation/completion and scheduling contracts tested without timing-only assertions or demanding one nondeterministic ordering. Shared foundation for JVM-009 and LIB-002/003; depends on JVM-003. |
 | JVM-011 | P0 design, P2 implementation; [boundary](support.md#explicit-boundaries): named modules and strong encapsulation absent | Module resolution/layers, ownership, services, readability and qualified exports/opens have positive and negative reflection/lookup fixtures. Publish expanded support only after those pass. Depends on JVM-002/003. |

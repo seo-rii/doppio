@@ -59,9 +59,20 @@ after javac; all final bytes are identical across native, Node and Chromium.
 See the [Java 21](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/runtime/SwitchBootstraps.html)
 and [Java 25](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/runtime/SwitchBootstraps.html)
 bootstrap contracts and [record-pattern semantics](https://docs.oracle.com/javase/specs/jls/se21/html/jls-14.html#jls-14.30.2).
-The public `SwitchBootstraps` class/API, preview primitive conversions and complete
-language conformance are not implemented by this slice. The remaining Java
-21/25 language and library surface is still partial.
+These compiler-generated tests do not establish the public API contract.
+The separate [public API fixture](../classes/modern_fixture/Java21SwitchBootstrapAPI.java)
+checks 169 selected common final Java 21/25 API assertions through direct `typeSwitch` and
+`enumSwitch` calls. They return real `ConstantCallSite` objects with invocable
+targets/dynamic invokers. Tests cover exact/inexact/adapted handles, public varargs
+metadata and bootstrap lookup, label snapshots, duplicates/restarts, numeric
+accessor effects/failures, enum descriptors, lazy initialization, constant-specific
+enum subclasses and invalid arguments/names. Object type-switch and concrete-enum
+targets use a full-access caller lookup. Primitive selectors/class labels,
+version-dependent narrow-reference targets, asymmetric String equality, reduced
+lookups/hidden helper classes, cross-loader enum resolution and null enum selectors
+with invalid restarts on the all-string path are outside this public API corpus.
+Preview primitive conversions and complete language conformance remain
+unimplemented; the remaining Java 21/25 language and library surface is partial.
 
 The separate [evolved-binary gate](../ci/java_pattern_evolution_test.mjs) compiles
 enum, sealed-class and sealed-interface callers with genuine javac 21 and 25,

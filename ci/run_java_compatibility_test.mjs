@@ -105,12 +105,12 @@ function environment(context) {
     runtimeRoot, calls, execute, run, save };
 }
 
-test('checked-in inventory has sixteen fixtures covering twenty-three final requirements', () => {
+test('checked-in inventory has seventeen fixtures covering twenty-five final requirements', () => {
   const spec = validateManifest(JSON.parse(fs.readFileSync(path.join(repoRoot, 'ci/java_compatibility_manifest.json'))));
-  assert.equal(spec.fixtures.length, 16);
-  assert.equal(spec.requirements.length, 23);
+  assert.equal(spec.fixtures.length, 17);
+  assert.equal(spec.requirements.length, 25);
   assert.deepEqual(spec.releases, [21, 25]);
-  assert.equal(spec.fixtures.filter(fixture => fixture.releases.includes(21)).length, 5);
+  assert.equal(spec.fixtures.filter(fixture => fixture.releases.includes(21)).length, 6);
 });
 
 test('manifest rejects missing, duplicate, skipped or unrepresented required cases', () => {
