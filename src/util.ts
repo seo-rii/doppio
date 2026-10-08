@@ -359,21 +359,29 @@ export function u82i8(arr: number[] | Uint8Array | Buffer, start: number = 0, le
   }
 }
 
-// Call this ONLY on the result of two non-NaN numbers.
+/** Round to IEEE 754 binary32, including ties to even and signed underflow. */
 export function wrapFloat(a: number): number {
-  if (a > 3.40282346638528860e+38) {
-    return Number.POSITIVE_INFINITY;
+  return Math.fround(a);
+}
+
+/** Convert a Java long directly to binary32, without intermediate double rounding. */
+export function longToFloat(value: gLong): number {
+  const negative = value.isNegative();
+  const magnitude = negative ? value.negate() : value;
+  const bitCount = value.getNumBitsAbs();
+  if (bitCount <= 24) return value.toNumber();
+
+  // Long.MIN_VALUE's overflowing magnitude is handled as unsigned by the shift.
+  const shift = bitCount - 24;
+  let significand = magnitude.shiftRightUnsigned(shift).toInt();
+  // The remainder has at most 40 bits, so converting only it to double is exact.
+  const remainder = magnitude.subtract(gLong.fromInt(significand).shiftLeft(shift)).toNumber();
+  const half = Math.pow(2, shift - 1);
+  if (remainder > half || remainder === half && (significand & 1) !== 0) {
+    significand++;
   }
-  if (0 < a && a < 1.40129846432481707e-45) {
-    return 0;
-  }
-  if (a < -3.40282346638528860e+38) {
-    return Number.NEGATIVE_INFINITY;
-  }
-  if (0 > a && a > -1.40129846432481707e-45) {
-    return 0;
-  }
-  return a;
+  const result = significand * Math.pow(2, shift);
+  return negative ? -result : result;
 }
 
 // Convert :count chars starting from :offset in a Java character array into a JS string

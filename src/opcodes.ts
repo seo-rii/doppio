@@ -6,7 +6,7 @@
 // member variable opcodes without explicitly typing them as IOpcodeImplementation.
 /* tslint:disable:variable-name typedef:memberVariableDeclarator */
 import gLong from './gLong';
-import {wrapFloat, float2int, descriptor2typestr} from './util';
+import {wrapFloat, longToFloat, float2int, descriptor2typestr} from './util';
 import {ClassReference, FieldReference, MethodReference, InterfaceMethodReference, IConstantPoolItem, InvokeDynamic, ConstDouble, ConstLong, DynamicConstant} from './ConstantPool';
 import {ClassData, ArrayClassData} from './ClassData';
 import {JVMThread, BytecodeStackFrame} from './threading';
@@ -674,7 +674,7 @@ export class Opcodes {
   public static frem(thread: JVMThread, frame: BytecodeStackFrame) {
     var opStack = frame.opStack,
       b: number = opStack.pop();
-    opStack.push(opStack.pop() % b);
+    opStack.push(wrapFloat(opStack.pop() % b));
     frame.pc++;
   }
 
@@ -804,8 +804,8 @@ export class Opcodes {
   }
 
   public static i2f(thread: JVMThread, frame: BytecodeStackFrame) {
-    // NOP; we represent ints as floats anyway.
-    // @todo What about quantities unexpressable as floats?
+    var opStack = frame.opStack;
+    opStack.push(wrapFloat(opStack.pop()));
     frame.pc++;
   }
 
@@ -822,7 +822,7 @@ export class Opcodes {
 
   public static l2f(thread: JVMThread, frame: BytecodeStackFrame) {
     var opStack = frame.opStack;
-    opStack.push(opStack.pop2().toNumber());
+    opStack.push(longToFloat(opStack.pop2()));
     frame.pc++;
   }
 

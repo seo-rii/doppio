@@ -736,8 +736,8 @@ table[OpCode.I2L] = {hasBranch: false, pops: 1, pushes: 2, emit: (pops, pushes, 
   return `var ${pushes[0]}=u.gLong.fromInt(${pops[0]}),${pushes[1]}=null;${onSuccess}`;
 }};
 
-table[OpCode.I2F] = {hasBranch: false, pops: 0, pushes: 0, emit: (pops, pushes, suffix, onSuccess) => {
-  return `${onSuccess}`;
+table[OpCode.I2F] = {hasBranch: false, pops: 1, pushes: 1, emit: (pops, pushes, suffix, onSuccess) => {
+  return `var ${pushes[0]}=u.wrapFloat(${pops[0]});${onSuccess}`;
 }};
 
 table[OpCode.I2D] = {hasBranch: false, pops: 0, pushes: 1, emit: (pops, pushes, suffix, onSuccess) => {

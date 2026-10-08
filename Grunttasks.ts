@@ -1230,6 +1230,19 @@ export function setup(grunt: IGrunt) {
     ['release-cli',
      'unit_test:default',
      'unit_test_nashorn_legacy']);
+  grunt.registerTask('unit_test_float_precision', 'Verify binary32 rounding in interpreter and JIT instructions.', function() {
+    const done: (status?: boolean) => void = this.async();
+    child_process.execFile(process.execPath, ['--no-deprecation', 'ci/jvm_float_precision_test.cjs'],
+      {timeout: 30000}, function(err?: any, stdout?: string, stderr?: string): void {
+        if (err || stdout !== 'jvm-float-precision:48:ok\n' || stderr.length > 0) {
+          grunt.log.error('Binary32 instruction precision check failed.');
+          grunt.log.write(stdout + stderr);
+          return done(false);
+        }
+        grunt.log.ok('Binary32 interpreter and JIT instruction checks passed.');
+        done();
+      });
+  });
   var modernJavaRuntimeTestTasks = [
     'javac_modern_classlib',
     'generate_doppio_jar',
@@ -1298,6 +1311,7 @@ export function setup(grunt: IGrunt) {
     'run_java_modern:reflect_parameters',
     'lineending:modern_java17',
     'unit_test:modern_java17',
+    'unit_test_float_precision',
     'unit_test_filechannel_writev_partial_progress',
     'unit_test_filechannel_readv_partial_progress',
     'unit_test_file_output_stream_append_channel',
