@@ -186,6 +186,19 @@ These checks are not counted as native-equality passes. Compact source files
 are compiled by external javac; hosted javac 25 and source-file launch remain
 outside this gate.
 
+The uncaught-main exit gate separately compares sixteen cases per release
+against pinned Java 21/25 on Node and Chromium (thirty-two native executions and
+sixty-four guest checks). Legacy main exceptions and errors now record failure
+status 1 before uncaught-handler dispatch, using the same completion path as
+Java 25. Handler dispatch and normal shutdown still run: non-daemon children
+finish, and explicit `System.exit(0/7)`, including from a handler, takes precedence.
+Caught exceptions and uncaught child-thread failures do not change a successful
+main's status. Initialization/linkage failures, custom/default handlers and an
+invalid switch-bootstrap argument are also covered. The immutable-input ledger
+retains exact exit/stdout/stderr comparisons, using cleared selected throwable
+stacks rather than claiming general diagnostic or scheduling compatibility.
+A 26-scenario completion/shutdown check also covers majors 52, 65 and 69.
+
 The separate class-version admission gate adds twenty-five cases and fifty
 Node/Chromium checks: two untouched javac 21/25 controls, four labeled historical
 header controls and nineteen failures for out-of-range majors, invalid modern
@@ -210,6 +223,8 @@ yarn ci:java-compatibility:prepare
 yarn ci:java-compatibility
 yarn ci:java-compatibility:browser
 yarn ci:java25-main
+yarn ci:java-uncaught-exit:test
+yarn ci:java-uncaught-exit
 yarn ci:class-file-version:test
 yarn ci:class-file-version
 yarn ci:java-pattern-evolution:test

@@ -389,8 +389,7 @@ class JVM {
    * @param className The name of the class to run. Can be specified in either
    *   foo.bar.Baz or foo/bar/Baz format.
    * @param args Command line arguments passed to the class.
-   * @param cb Called when the JVM finishes executing. Called with 'true' if
-   *   the JVM exited normally, 'false' if there was an error.
+   * @param cb Called after JVM shutdown with the process exit status.
    */
   public runClass(className: string, args: string[], cb: (code: number) => void): void {
     if (this.status !== JVMStatus.BOOTED) {
@@ -429,6 +428,18 @@ class JVM {
         for (i = 0; i < args.length; i++) {
           jvmifiedArgs.array[i] = initString(this.bsCl, args[i]);
         }
+
+        // Record main failures before dispatching uncaught handlers. Do not
+        // halt here: handlers and surviving non-daemon threads still run,
+        // and an explicit System.exit may override the planned status.
+        var mainCompleted = (error?: JVMTypes.java_lang_Throwable): void => {
+          if (error) {
+            this.exitCode = 1;
+            thread.throwException(error);
+          } else {
+            thread.setStatus(ThreadStatus.TERMINATED);
+          }
+        };
 
         // Find the main method, and run it.
         var cdataStatics = <any> cdata.getConstructor(thread);
@@ -500,14 +511,6 @@ class JVM {
             return;
           }
           var mainArgs = mainMethod.parameterTypes.length === 1 ? [jvmifiedArgs] : [];
-          var mainCompleted = (error?: JVMTypes.java_lang_Throwable): void => {
-            if (error) {
-              this.exitCode = 1;
-              thread.throwException(error);
-            } else {
-              thread.setStatus(ThreadStatus.TERMINATED);
-            }
-          };
           if (mainMethod.isStatic) {
             (<any> mainMethod.cls.getConstructor(thread))[mainMethod.fullSignature](thread, mainArgs, mainCompleted);
           } else {
@@ -536,8 +539,9 @@ class JVM {
             });
           }
         } else if (cdataStatics['main([Ljava/lang/String;)V']) {
-          cdataStatics['main([Ljava/lang/String;)V'](thread, [jvmifiedArgs]);
+          cdataStatics['main([Ljava/lang/String;)V'](thread, [jvmifiedArgs], mainCompleted);
         } else {
+          this.exitCode = 1;
           thread.throwNewException("Ljava/lang/NoSuchMethodError;", `Could not find main method in class ${cdata.getExternalName()}.`);
         }
       } else {

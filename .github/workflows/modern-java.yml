@@ -130,6 +130,24 @@ jobs:
         timeout-minutes: 40
         run: node ci/java25_main_test.mjs --browser
 
+      - name: Check main exit status contracts
+        timeout-minutes: 1
+        run: node ci/jvm_exit_status_test.cjs && node --test ci/java_uncaught_exit_contract_test.mjs
+
+      - name: Run Java uncaught-exception exit compatibility
+        id: uncaught_exit
+        timeout-minutes: 60
+        run: node ci/java_uncaught_exit_test.mjs --browser
+
+      - name: Upload Java uncaught-exception exit ledger
+        if: always() && steps.uncaught_exit.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-uncaught-exit-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Check class-file version admission
         timeout-minutes: 1
         run: node ci/class_file_version_test.cjs && node --test ci/java_class_version_test_test.mjs

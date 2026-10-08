@@ -98,6 +98,19 @@ as oracle differences, not native-equality passes. The total is twenty-three
 launcher cases and forty-six guest checks. Compact sources are compiled
 externally; this does not add hosted javac 25 or Java source-file launching.
 
+The independent `yarn ci:java-uncaught-exit` gate compares sixteen cases against
+pinned native Java 21/25 on Node and Chromium: thirty-two native executions and
+sixty-four guest checks. Uncaught main exceptions, errors and linkage failures
+exit with status 1; caught failures and uncaught child-thread failures leave a
+successful main at status 0. Custom/default handlers, initialization failures,
+non-daemon child completion and explicit `System.exit(0/7)` are covered, including
+an exit from the main thread's handler overriding its failure status. The gate
+retains exact status/stream comparisons and unchanged-input hashes on failure.
+Selected throwables have cleared stacks for deterministic comparison; this does
+not establish general stack-trace formatting or thread-scheduling equivalence.
+A separate 26-scenario check covers main completion and shutdown for class-file
+majors 52, 65 and 69, including failure recording before handler dispatch.
+
 The class-file admission gate (`yarn ci:class-file-version`) compares twenty-five
 cases against pinned native Java and both hosts: two untouched javac 21/25
 controls, four labeled historical header controls and nineteen negative cases.

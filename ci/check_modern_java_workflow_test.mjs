@@ -151,6 +151,9 @@ for (const name of [
   'Prepare pinned Java compatibility toolchains',
   'Run genuine Java 21 and 25 seed fixtures',
   'Run final Java 25 launcher compatibility',
+  'Check main exit status contracts',
+  'Run Java uncaught-exception exit compatibility',
+  'Upload Java uncaught-exception exit ledger',
   'Check class-file version admission',
   'Run Java class-file version compatibility',
   'Check evolved switch ledger contract',
@@ -178,6 +181,13 @@ for (const [original, replacement] of [
   ['run: node ci/java25_main_test.mjs --browser\n', 'run: node ci/java25_main_test.mjs\n'],
   ['run: node ci/java25_main_test.mjs --browser\n', 'run: node ci/java25_main_test.mjs --browser || true\n'],
   ['timeout-minutes: 40\n', 'timeout-minutes: 4\n'],
+  ['run: node ci/jvm_exit_status_test.cjs && node --test ci/java_uncaught_exit_contract_test.mjs\n', 'run: node ci/jvm_exit_status_test.cjs\n'],
+  ['run: node ci/java_uncaught_exit_test.mjs --browser\n', 'run: node ci/java_uncaught_exit_test.mjs\n'],
+  ['run: node ci/java_uncaught_exit_test.mjs --browser\n', 'run: node ci/java_uncaught_exit_test.mjs --browser --release 21\n'],
+  ['run: node ci/java_uncaught_exit_test.mjs --browser\n', 'run: node ci/java_uncaught_exit_test.mjs --browser || true\n'],
+  ['timeout-minutes: 60\n', 'timeout-minutes: 6\n'],
+  ["if: always() && steps.uncaught_exit.outcome != 'skipped'", 'if: success()'],
+  ['path: build/java-uncaught-exit-results.json', 'path: build/missing-uncaught-exit-ledger.json'],
   ['run: node ci/class_file_version_test.cjs && node --test ci/java_class_version_test_test.mjs\n', 'run: node ci/class_file_version_test.cjs\n'],
   ['run: node ci/java_class_version_test.mjs --browser\n', 'run: node ci/java_class_version_test.mjs --native-only\n'],
   ['run: node ci/java_class_version_test.mjs --browser\n', 'run: node ci/java_class_version_test.mjs\n'],
@@ -214,6 +224,18 @@ expectCheckerFailure(
 expectCheckerFailure(
   'Java 25 launcher gate before the seed execution dependency',
   { workflow: swapAdjacentSteps(realWorkflow, 'Run genuine Java 21 and 25 seed fixtures', 'Run final Java 25 launcher compatibility') },
+  'remain in dependency order'
+);
+
+expectCheckerFailure(
+  'uncaught exit host gate before its completion and ledger contracts',
+  { workflow: swapAdjacentSteps(realWorkflow, 'Check main exit status contracts', 'Run Java uncaught-exception exit compatibility') },
+  'remain in dependency order'
+);
+
+expectCheckerFailure(
+  'uncaught exit upload before its native and guest executions',
+  { workflow: swapAdjacentSteps(realWorkflow, 'Run Java uncaught-exception exit compatibility', 'Upload Java uncaught-exception exit ledger') },
   'remain in dependency order'
 );
 
