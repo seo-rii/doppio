@@ -70,9 +70,22 @@ enum subclasses and invalid arguments/names. Object type-switch and concrete-enu
 targets use a full-access caller lookup. Primitive selectors/class labels,
 version-dependent narrow-reference targets, asymmetric String equality, reduced
 lookups/hidden helper classes, cross-loader enum resolution and null enum selectors
-with invalid restarts on the all-string path are outside this public API corpus.
+with invalid restarts on the all-string path are outside this common public API corpus.
 Preview primitive conversions and complete language conformance remain
 unimplemented; the remaining Java 21/25 language and library surface is partial.
+
+The Java 25-only [public primitive fixture](../classes/modern_fixture/Java25SwitchBootstrapPrimitives.java)
+adds 651 assertions for typed `Z`/`B`/`C`/`S`/`I`/`J`/`F`/`D` selectors and
+identity primitive/wrapper Class labels, including boxed Object selectors,
+wide arguments, target adaptation, snapshots, empty labels and restart bounds.
+Declared primitive `boolean` selectors match only `boolean.class` and
+`Boolean.class`, not their ordinary boxed supertypes. These are selected pinned-native implementation
+checks without preview flags: the
+[Java 25 implementation](https://raw.githubusercontent.com/openjdk/jdk/jdk-25-ga/src/java.base/share/classes/java/lang/runtime/SwitchBootstraps.java)
+accepts these primitive call sites while the API description remains
+reference-oriented. Cross-primitive Class conversions and preview constant
+labels are not included; this does not add primitive source-pattern support or
+complete public API conformance.
 
 The separate [evolved-binary gate](../ci/java_pattern_evolution_test.mjs) compiles
 enum, sealed-class and sealed-interface callers with genuine javac 21 and 25,

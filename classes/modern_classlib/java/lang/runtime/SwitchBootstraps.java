@@ -9,7 +9,7 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.Objects;
 
-/** Public call-site entry points for selected final reference and enum switches. */
+/** Public call sites for selected reference, identity primitive and enum switches. */
 public final class SwitchBootstraps {
   private SwitchBootstraps() {}
 
@@ -54,8 +54,8 @@ public final class SwitchBootstraps {
   private static void checkInvocationType(MethodType type) {
     Objects.requireNonNull(type);
     if (type.parameterCount() != 2 || type.returnType() != int.class
-        || type.parameterType(0).isPrimitive() || type.parameterType(1) != int.class) {
-      throw new IllegalArgumentException("Expected (reference, int)int invocation type");
+        || type.parameterType(1) != int.class) {
+      throw new IllegalArgumentException("Expected (selector, int)int invocation type");
     }
   }
 
@@ -63,7 +63,7 @@ public final class SwitchBootstraps {
       MethodType type, Object[] labels, boolean enumOnly) {
     Objects.requireNonNull(lookup);
     Objects.requireNonNull(invocationName);
-    State state = new State(lookup, labels, enumOnly);
+    State state = new State(lookup, labels, enumOnly, type.parameterType(0));
     try {
       // The Java 8 lookup constructor rejects this modern java.* package.
       MethodHandle target = MethodHandles.privateLookupIn(SwitchBootstraps.class, lookup)
@@ -83,7 +83,7 @@ public final class SwitchBootstraps {
     for (int index = restart; index < state.labels.length; index++) {
       Object label = state.labels[index];
       if (label instanceof Class) {
-        if (((Class<?>) label).isInstance(selector)) return index;
+        if (state.matchesClass((Class<?>) label, selector)) return index;
       } else if (label instanceof String) {
         Object value = state.enumOnly ? ((Enum<?>) selector).name() : selector;
         if (label.equals(value)) return index;
@@ -113,15 +113,36 @@ public final class SwitchBootstraps {
     final MethodHandles.Lookup lookup;
     final Object[] labels;
     final boolean enumOnly;
+    final Class<?> selectorType;
     final Enum<?>[] enumConstants;
     final boolean[] enumResolved;
 
-    State(MethodHandles.Lookup lookup, Object[] labels, boolean enumOnly) {
+    State(MethodHandles.Lookup lookup, Object[] labels, boolean enumOnly, Class<?> selectorType) {
       this.lookup = lookup;
       this.labels = labels;
       this.enumOnly = enumOnly;
+      this.selectorType = selectorType;
       this.enumConstants = new Enum<?>[labels.length];
       this.enumResolved = new boolean[labels.length];
+    }
+
+    boolean matchesClass(Class<?> label, Object selector) {
+      // Boolean primitive selectors do not match even boxed supertypes.
+      if (selectorType == boolean.class && label != boolean.class && label != Boolean.class) {
+        return false;
+      }
+      // asType boxes primitive selectors before entering select. Match the
+      // corresponding primitive label without enabling cross-primitive
+      // exact conversions, which remain outside this selected API slice.
+      if (label == boolean.class) label = Boolean.class;
+      else if (label == byte.class) label = Byte.class;
+      else if (label == char.class) label = Character.class;
+      else if (label == short.class) label = Short.class;
+      else if (label == int.class) label = Integer.class;
+      else if (label == long.class) label = Long.class;
+      else if (label == float.class) label = Float.class;
+      else if (label == double.class) label = Double.class;
+      return label.isInstance(selector);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

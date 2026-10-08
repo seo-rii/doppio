@@ -54,7 +54,7 @@ specification, not assumed from a successful native example.
 | [Core-language fixture notes](modern-java.md#known-core-lang-gaps) | Recent repeat, bounded indexOf and delimiter-preserving split fixtures include local Corretto 25.0.3 comparisons of genuine `--release 21` output | Reproducible native Java 21/25 release gates or broad modern language coverage |
 | [Playground launcher](../website/src/playground.mjs) and [browser suite](../ci/pages_browser_smoke.mjs) | Java 8 tools.jar javac and pinned Kotlin/Scala compile and execute in Doppio | Running modern javac or a modern JDK module image inside Doppio |
 | [Package smoke](../ci/package_artifact_smoke.mjs) | Isolated installation/rebuild, CLI help contracts, API types and bundle import | Java application compatibility; the isolated consumer uses an offline dummy runtime fixture |
-| [Seed manifest](../ci/java_compatibility_manifest.json), [toolchain lock](../ci/java_compatibility_toolchains.lock.json) and [comparison runner](../ci/run_java_compatibility.mjs) | Seventeen fixtures are compared on matching Java 21 and 25 toolchains, Node and Chromium, including selected public switch APIs, final-language/launcher behavior, Java 25 IO and one explicitly generated bootstrap-contract companion, with input/runtime hashes | A complete requirement inventory or full final Java 22–25 feature conformance |
+| [Seed manifest](../ci/java_compatibility_manifest.json), [toolchain lock](../ci/java_compatibility_toolchains.lock.json) and [comparison runner](../ci/run_java_compatibility.mjs) | Eighteen fixtures are compared on matching Java 21 and 25 toolchains, Node and Chromium, including selected public switch APIs, final-language/launcher behavior, Java 25 IO and one explicitly generated bootstrap-contract companion, with input/runtime hashes | A complete requirement inventory or full final Java 22–25 feature conformance |
 
 The version matrix currently labels every Java 9–26 row partial. Its rows and
 the 73 compiler scripts are not a valid denominator for an overall completion
@@ -95,11 +95,12 @@ the manifest. No server framework is selected.
 The seed manifest maps eight string API overloads, four language/runtime
 requirements, two public switch bootstrap APIs, two unnamed-variable/pattern requirements, module imports,
 flexible constructors, compact sources/instance mains and five Java 25 IO methods
-to seventeen fixtures (twenty-five requirements). Six
+to eighteen fixtures (twenty-five requirements). Six
 drivers cover repeat, delimiter-preserving split, bounded indexOf, final pattern
 switches/record patterns, bootstrap contracts and public bootstrap calls on matching javac `--release 21`
-and `--release 25`. Six isolated IO modes and five final-source/launcher drivers
-use `--release 25` only. Together they produce twenty-three cases and forty-six
+and `--release 25`. Six isolated IO modes, five final-source/launcher drivers and
+the identity primitive-switch API fixture use `--release 25` only.
+Together they produce twenty-four cases and forty-eight
 required host comparisons. The contract fixture explicitly
 replaces only its companion with deterministic generated call sites that Java
 source cannot express; generator source/hash and execution are recorded before
@@ -129,7 +130,15 @@ enum descriptors and invalid arguments/names. It uses Object and concrete-enum
 targets with a full-access caller lookup. Primitive selectors/class labels,
 version-dependent narrow-reference target types and String equality direction,
 reduced lookup/hidden-class behavior and cross-loader enum resolution remain
-outside this public API corpus.
+outside this common public API corpus.
+
+The Java 25-only public primitive-switch fixture adds 651 assertions for all
+eight selector descriptors and corresponding primitive/wrapper Class labels.
+It checks exact/adapted handles, boxed Object selectors, wide argument slots,
+snapshots, empty labels, restarts and declared-Boolean restrictions against the
+pinned native implementation without preview flags. Cross-primitive Class
+conversions, preview constant labels and complete public API conformance remain
+outside this selected slice; the existing common Java 21/25 corpus is unchanged.
 
 The separate evolved-binary gate compiles enum, sealed-class and sealed-interface
 callers with javac 21 and 25, then selectively recompiles the declarations for

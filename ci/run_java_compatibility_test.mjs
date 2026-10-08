@@ -105,12 +105,47 @@ function environment(context) {
     runtimeRoot, calls, execute, run, save };
 }
 
-test('checked-in inventory has seventeen fixtures covering twenty-five final requirements', () => {
+test('checked-in inventory has eighteen fixtures covering twenty-five final requirements', () => {
   const spec = validateManifest(JSON.parse(fs.readFileSync(path.join(repoRoot, 'ci/java_compatibility_manifest.json'))));
-  assert.equal(spec.fixtures.length, 17);
+  assert.equal(spec.fixtures.length, 18);
   assert.equal(spec.requirements.length, 25);
   assert.deepEqual(spec.releases, [21, 25]);
   assert.equal(spec.fixtures.filter(fixture => fixture.releases.includes(21)).length, 6);
+  assert.equal(spec.fixtures.filter(fixture => fixture.releases.includes(25)).length, 18);
+  const requiredCases = spec.fixtures.reduce((count, fixture) => count + fixture.releases.length, 0);
+  assert.equal(requiredCases, 24);
+  assert.equal(requiredCases * spec.approvedTarget.requiredHosts.length, 48);
+});
+
+test('public primitive switch slice is mandatory only on Java 25 and reuses the common typeSwitch requirement', () => {
+  const spec = validateManifest(JSON.parse(fs.readFileSync(path.join(repoRoot, 'ci/java_compatibility_manifest.json'))));
+  const fixture = spec.fixtures.find(entry => entry.id === 'switch-bootstrap-primitives');
+  assert.ok(fixture);
+  assert.equal(fixture.source, 'classes/modern_fixture/Java25SwitchBootstrapPrimitives.java');
+  assert.equal(fixture.mainClass, 'classes.modern_test.Java25SwitchBootstrapPrimitives');
+  assert.deepEqual(fixture.releases, [25]);
+  assert.deepEqual(fixture.workloadIds, ['W-JAVA25']);
+  assert.deepEqual(fixture.requirementIds, ['API-TYPE-SWITCH']);
+  assert.deepEqual(fixture.arguments, []);
+  assert.equal(fixture.comparison, 'successful-native-oracle-stdout-stderr');
+  assert.deepEqual(fixture.coverage, ['all-eight-primitive-selector-descriptors', 'exact-typed-calls',
+    'identity-primitive-and-wrapper-Class-labels', 'boxed-Object-selectors', 'restart-bounds-before-null',
+    'wide-long-double-arguments', 'empty-labels', 'label-array-snapshot', 'target-adaptation']);
+  assert.match(fixture.limitations, /Z\/B\/C\/S\/I\/J\/F\/D/);
+  assert.match(fixture.limitations, /Implementation-sensitive identity cases from pinned native Java 25 without preview flags/);
+  assert.match(fixture.limitations, /API description remains reference-oriented/);
+  assert.match(fixture.limitations, /cross-primitive conversions/);
+  assert.match(fixture.limitations, /preview Long\/Float\/Double\/Boolean constant labels/);
+  assert.match(fixture.limitations, /reduced lookups\/hidden helper classes/);
+  assert.match(fixture.limitations, /narrow-reference target types/);
+  assert.match(fixture.limitations, /complete public API or language conformance/);
+  const requirement = spec.requirements.find(entry => entry.id === 'API-TYPE-SWITCH');
+  assert.equal(requirement.introducedIn, 21);
+  const common = spec.fixtures.find(entry => entry.id === 'switch-bootstrap-api');
+  assert.deepEqual(common.releases, [21, 25]);
+  assert.ok(common.requirementIds.includes(requirement.id));
+  assert.match(common.limitations, /169 selected common final API assertions/);
+  assert.match(common.limitations, /Excludes primitive selectors\/class labels/);
 });
 
 test('manifest rejects missing, duplicate, skipped or unrepresented required cases', () => {
