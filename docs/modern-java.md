@@ -947,11 +947,26 @@ expanded.
   to record accessors, and the modern `java.lang.Record` class-library shim.
 - Current notes live in `docs/design/scala-compiler.md`.
 
+## Additional JVM Language Smokes
+
+- `ci/groovy_smoke.sh` pins and verifies Apache Groovy 4.0.33, compiles
+  `GroovySmoke.groovy` with Groovy's compiler running inside Doppio, checks the
+  emitted Java 8 class and closure bytecode, and compares execution on the
+  host JVM and Doppio. This is a small collection/closure slice, not general
+  Groovy compatibility.
+- `ci/clojure_smoke.sh` pins and verifies Clojure 1.12.6 and its two required
+  spec JARs, compiles a `:gen-class` fixture ahead of time on the host JVM,
+  then compares the generated class's output on the host JVM and Doppio.
+  Clojure compiler execution inside Doppio and full dynamic Clojure runtime
+  compatibility are not part of this gate.
+- Both smokes run in the manifest-backed Modern Java compiler matrix with
+  bounded per-command and shard timeouts.
+
 ## Current Test Targets
 
 - `yarn ci:check-modern-java-workflow:test` covers the workflow checker itself,
   and `yarn ci:check-modern-java-workflow` verifies that every
-  `ci/kotlin_*_smoke.sh` and `ci/scala_*_smoke.sh` script is referenced by the
+  Kotlin, Scala, Groovy, and Clojure smoke scripts are referenced by the
   Modern Java workflow, so newly added compiler smokes fail fast if they are not
   wired into CI.
 - `grunt --grunt-ignore-compile-errors test-modern-java` compiles and checks the

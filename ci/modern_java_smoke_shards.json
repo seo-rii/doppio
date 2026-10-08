@@ -20,6 +20,7 @@
       "scripts": [
         "ci/kotlin_capture_shape_smoke.sh",
         "ci/kotlin_diagnostic_smoke.sh",
+        "ci/kotlin_duration_smoke.sh",
         "ci/kotlin_enum_smoke.sh",
         "ci/kotlin_modern_construct_smoke.sh",
         "ci/kotlin_result_exception_smoke.sh",
@@ -74,9 +75,9 @@
     {
       "id": "compiler-06",
       "scripts": [
+        "ci/groovy_smoke.sh",
         "ci/kotlin_advanced_construct_smoke.sh",
         "ci/kotlin_control_flow_smoke.sh",
-        "ci/kotlin_duration_smoke.sh",
         "ci/kotlin_jvm_default_smoke.sh",
         "ci/kotlin_receiver_lambda_smoke.sh",
         "ci/kotlin_suspend_smoke.sh",
@@ -88,6 +89,7 @@
     {
       "id": "compiler-07",
       "scripts": [
+        "ci/clojure_smoke.sh",
         "ci/kotlin_bytecode_smoke.sh",
         "ci/kotlin_contract_smoke.sh",
         "ci/kotlin_delegation_bridge_smoke.sh",

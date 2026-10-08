@@ -13,7 +13,7 @@ const compilerLockPath = process.env.MODERN_JAVA_WORKFLOW_COMPILER_LOCK_PATH ||
   path.join(repoRoot, 'ci', 'modern_java_compiler_inputs.lock.json');
 const compilerInputToolPath = process.env.MODERN_JAVA_WORKFLOW_COMPILER_INPUT_TOOL_PATH ||
   path.join(repoRoot, 'ci', 'prepare_modern_java_compiler_inputs.mjs');
-const smokeScriptPattern = /^(?:kotlin|scala)[A-Za-z0-9_]*_smoke\.sh$/;
+const smokeScriptPattern = /^(?:clojure|groovy|kotlin|scala)[A-Za-z0-9_]*_smoke\.sh$/;
 const maximumCompilerInputBytes = 128 * 1024 * 1024;
 
 function stripUnquotedComments(text) {
@@ -243,7 +243,7 @@ if (manifest.shards.length !== 8) {
 
 const candidateScriptNames = fs.readdirSync(ciDir)
   .filter((name) =>
-    (name.startsWith('kotlin') || name.startsWith('scala')) && name.endsWith('_smoke.sh')
+    /^(?:clojure|groovy|kotlin|scala)/.test(name) && name.endsWith('_smoke.sh')
   )
   .sort();
 for (const name of candidateScriptNames) {
@@ -285,7 +285,7 @@ for (const shard of manifest.shards) {
   for (const scriptPath of shard.scripts) {
     if (
       typeof scriptPath !== 'string' ||
-      !/^ci\/(?:kotlin|scala)[A-Za-z0-9_]*_smoke\.sh$/.test(scriptPath) ||
+      !/^ci\/(?:clojure|groovy|kotlin|scala)[A-Za-z0-9_]*_smoke\.sh$/.test(scriptPath) ||
       path.posix.normalize(scriptPath) !== scriptPath
     ) {
       fail(`Modern Java shard ${shard.id} contains an unsafe script path: ${String(scriptPath)}`);
@@ -828,7 +828,7 @@ if (
 ) {
   fail('Modern Java compiler job must run exactly the selected manifest shard.');
 }
-if (/\.\/ci\/(?:kotlin|scala)[A-Za-z0-9_]*_smoke\.sh\b/.test(workflow)) {
+if (/\.\/ci\/(?:clojure|groovy|kotlin|scala)[A-Za-z0-9_]*_smoke\.sh\b/.test(workflow)) {
   fail('Modern Java workflow must execute compiler smokes only through the checked-in shard runner.');
 }
 
@@ -884,7 +884,7 @@ if (topLevelJobs.at(-1) !== 'test') {
 }
 
 console.log(
-  `Modern Java workflow shards ${expectedScripts.length} Kotlin/Scala smokes across ` +
+  `Modern Java workflow shards ${expectedScripts.length} compiler smokes across ` +
   `${shardIds.length} jobs (${minimumBudget}-${maximumBudget}s inner, ` +
   `${maximumOuterBudget}s maximum outer budget).`
 );

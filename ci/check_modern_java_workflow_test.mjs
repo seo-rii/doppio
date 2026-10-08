@@ -31,7 +31,7 @@ timeout -k "\${kill_after}s" -s INT "\${run_timeout}s" true
 }
 
 function baseManifest() {
-  return {
+  const manifest = {
     schemaVersion: 1,
     shards: Array.from({ length: 8 }, (_, index) => {
       const number = String(index + 1).padStart(2, '0');
@@ -46,6 +46,9 @@ function baseManifest() {
       };
     }),
   };
+  manifest.shards[5].scripts.unshift('ci/groovy_smoke.sh');
+  manifest.shards[6].scripts.unshift('ci/clojure_smoke.sh');
+  return manifest;
 }
 
 function writeCheckerFixture(options = {}) {
@@ -64,6 +67,9 @@ function writeCheckerFixture(options = {}) {
         );
       }
     }
+  }
+  for (const language of ['clojure', 'groovy']) {
+    fs.writeFileSync(path.join(ciDir, `${language}_smoke.sh`), smokeScript(language, 'gate'));
   }
   for (const [name, contents] of Object.entries(options.extraScripts || {})) {
     fs.writeFileSync(path.join(ciDir, name), contents);
@@ -982,6 +988,16 @@ expectCheckerFailure(
   'shard manifest is missing smoke scripts'
 );
 
+for (const [language, shardIndex] of [['groovy', 5], ['clojure', 6]]) {
+  const manifest = baseManifest();
+  manifest.shards[shardIndex].scripts.shift();
+  expectCheckerFailure(
+    `missing ${language} smoke`,
+    { manifest },
+    'shard manifest is missing smoke scripts'
+  );
+}
+
 expectCheckerFailure(
   'hyphenated unsafe smoke inventory name',
   { extraScripts: { 'kotlin-new_smoke.sh': smokeScript('kotlin', 'new') } },
@@ -1680,6 +1696,14 @@ ${body}
     timedScript('SCALA_SECOND', 'printf "second\\n" >> "$SHARD_ORDER_FILE"')
   );
   fs.writeFileSync(
+    path.join(shardRunnerCi, 'clojure_gate_smoke.sh'),
+    timedScript('CLOJURE_GATE', 'printf "clojure\\n" >> "$SHARD_ORDER_FILE"')
+  );
+  fs.writeFileSync(
+    path.join(shardRunnerCi, 'groovy_gate_smoke.sh'),
+    timedScript('GROOVY_GATE', 'printf "groovy\\n" >> "$SHARD_ORDER_FILE"')
+  );
+  fs.writeFileSync(
     path.join(shardRunnerCi, 'kotlin_timeout_smoke.sh'),
     timedScript(
       'KOTLIN_TIMEOUT',
@@ -1728,6 +1752,9 @@ ${body}
       }, {
         id: 'compiler-06',
         scripts: ['ci/scala_inventory_mutate_smoke.sh'],
+      }, {
+        id: 'compiler-07',
+        scripts: ['ci/clojure_gate_smoke.sh', 'ci/groovy_gate_smoke.sh'],
       }],
     })
   );
@@ -1836,6 +1863,17 @@ ${body}
     passedLedger.scripts.some((script) => script.status !== 'passed')
   ) {
     throw new Error('Compiler shard runner must write a passing per-script result ledger.');
+  }
+
+  const languageResult = spawnSync(process.execPath, [shardRunnerPath, 'compiler-07'], {
+    encoding: 'utf8',
+    env: { ...runnerEnvironment, SHARD_ORDER_FILE: orderPath },
+  });
+  if (
+    languageResult.status !== 0 ||
+    fs.readFileSync(orderPath, 'utf8') !== 'first\nsecond\nclojure\ngroovy\n'
+  ) {
+    throw new Error(`Compiler shard runner must accept Clojure and Groovy scripts:\n${languageResult.stderr}`);
   }
 
   const compilerMarker = JSON.parse(fs.readFileSync(compilerMarkerPath, 'utf8'));

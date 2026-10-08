@@ -355,7 +355,7 @@ try {
     }
     if (
       typeof scriptPath !== 'string' ||
-      !/^ci\/(?:kotlin|scala)[A-Za-z0-9_]*_smoke\.sh$/.test(scriptPath) ||
+      !/^ci\/(?:clojure|groovy|kotlin|scala)[A-Za-z0-9_]*_smoke\.sh$/.test(scriptPath) ||
       path.posix.normalize(scriptPath) !== scriptPath
     ) {
       fail(`Compiler shard ${shardId} contains an unsafe script path: ${String(scriptPath)}`);
