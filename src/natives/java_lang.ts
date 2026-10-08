@@ -1,6 +1,7 @@
 import * as Doppio from '../doppiojvm';
 import JVMThread = Doppio.VM.Threading.JVMThread;
 import ReferenceClassData = Doppio.VM.ClassFile.ReferenceClassData;
+import ClassFileVersionError = Doppio.VM.ClassFile.ClassFileVersionError;
 import logging = Doppio.Debug.Logging;
 import util = Doppio.VM.Util;
 import ArrayClassData = Doppio.VM.ClassFile.ArrayClassData;
@@ -2790,7 +2791,7 @@ export default function (): any {
         var parseError = <any> e,
           message = parseError && parseError.message ? parseError.message : String(parseError);
         thread.throwNewException(
-          message.indexOf('Major version invalid:') === 0 ?
+          parseError instanceof ClassFileVersionError ?
             'Ljava/lang/UnsupportedClassVersionError;' : 'Ljava/lang/ClassFormatError;',
           message);
         return;

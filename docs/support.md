@@ -98,6 +98,18 @@ as oracle differences, not native-equality passes. The total is twenty-three
 launcher cases and forty-six guest checks. Compact sources are compiled
 externally; this does not add hosted javac 25 or Java source-file launching.
 
+The class-file admission gate (`yarn ci:class-file-version`) compares twenty-five
+cases against pinned native Java and both hosts: two untouched javac 21/25
+controls, four labeled historical header controls and nineteen negative cases.
+Unsupported majors/minors and disabled previews produce
+`UnsupportedClassVersionError`; malformed magic and truncated headers retain
+`ClassFormatError`. Every rejected input must fail before initialization or main
+execution. Fifty guest checks preserve identical input hashes. A separate
+57-scenario check covers parser/loader/Lookup classification, recovery after
+failed definitions, application-loader propagation and deferred launch shutdown.
+Historical header mutations are structural probes, not language compatibility
+claims; the existing major range 45–70 remains partial.
+
 The `Pages` workflow owns the browser gate. It builds the deployable artifact,
 runs the complete Chromium acceptance suite locally before upload, deploys only
 after that succeeds, and repeats the acceptance suite against the deployed URL.

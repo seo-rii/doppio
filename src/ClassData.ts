@@ -22,6 +22,17 @@ const debug = logging.debug;
 const MIN_SUPPORTED_CLASSFILE_MAJOR = 45;
 const MAX_SUPPORTED_CLASSFILE_MAJOR = 70;
 
+/** Distinguishes unsupported class versions from malformed class structures. */
+export class ClassFileVersionError extends Error {
+  constructor(message: string) {
+    super(message);
+    // Release CLI builds still downlevel classes to ES5; Error returns a fresh
+    // object, so restore the subclass prototype for reliable typed dispatch.
+    Object.setPrototypeOf(this, ClassFileVersionError.prototype);
+    this.name = 'ClassFileVersionError';
+  }
+}
+
 import global from './global';
 
 declare var RELEASE: boolean;
@@ -972,8 +983,15 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     this.minorVersion = byteStream.getUint16();
     this.majorVersion = byteStream.getUint16();
     if (!(MIN_SUPPORTED_CLASSFILE_MAJOR <= this.majorVersion && this.majorVersion <= MAX_SUPPORTED_CLASSFILE_MAJOR)) {
-      throw new Error("Major version invalid: " + this.majorVersion +
+      throw new ClassFileVersionError("Major version invalid: " + this.majorVersion +
         " (supported range: " + MIN_SUPPORTED_CLASSFILE_MAJOR + "-" + MAX_SUPPORTED_CLASSFILE_MAJOR + ")");
+    }
+    // JVMS 4.1 permits arbitrary minors only for historical majors 45-55.
+    // No preview execution mode exists in this final-feature runtime profile.
+    if (this.majorVersion >= 56 && this.minorVersion !== 0) {
+      throw new ClassFileVersionError(this.minorVersion === 65535 ?
+        "Preview class files are not supported: " + this.majorVersion + ".65535" :
+        "Minor version invalid: " + this.majorVersion + "." + this.minorVersion);
     }
     this.constantPool = new ConstantPool();
     this.constantPool.parse(byteStream, cpPatches);

@@ -167,6 +167,19 @@ These checks are not counted as native-equality passes. Compact source files
 are compiled by external javac; hosted javac 25 and source-file launch remain
 outside this gate.
 
+The separate class-version admission gate adds twenty-five cases and fifty
+Node/Chromium checks: two untouched javac 21/25 controls, four labeled historical
+header controls and nineteen failures for out-of-range majors, invalid modern
+minors, disabled previews, bad magic and all header truncations of zero through
+seven bytes. Header mutations and their original/final hashes are explicit;
+they are not genuine-source compatibility evidence. General loader and
+`Lookup.defineClass` use typed classification for version errors, preserve
+structural `ClassFormatError`, and admit the historical arbitrary minor values.
+The accepted major range remains 45–70, not full Java 26 compatibility. A
+57-scenario check also covers definition recovery, application-loader error
+propagation and normal shutdown after the pending launch diagnostic. General VM
+verification and opt-in preview execution remain separate work.
+
 On Linux x64 with the existing Node 24/Java 17 build prerequisites:
 
 ```sh
@@ -178,6 +191,8 @@ yarn ci:java-compatibility:prepare
 yarn ci:java-compatibility
 yarn ci:java-compatibility:browser
 yarn ci:java25-main
+yarn ci:class-file-version:test
+yarn ci:class-file-version
 ```
 
 Preparation verifies official versioned archives before extraction, then checks
@@ -229,7 +244,7 @@ stable; a split should retain links to its parent.
 
 | ID | Priority and current evidence | Exit evidence and main dependencies |
 | --- | --- | --- |
-| JVM-001 | P0; pinned true-javac 21/25 Node and Chromium seed with provenance ledger added alongside [existing generated probes](../tasks/modern_java.ts) | Expand beyond the selected seeds and add positive/negative version and preview-minor cases with host-separated results. Retain identical execution inputs and CI artifact provenance. Foundation for W-JAVA21/25 remains partial. |
+| JVM-001 | P0; pinned true-javac 21/25 Node/Chromium seed plus twenty-five admission cases with explicit header mutations and disabled-preview rejection | Expand the selected corpus and retained provenance beyond version admission. Preserve the distinction between untouched compiler output and deliberate invalid/header controls. Foundation for W-JAVA21/25 remains partial; preview execution is outside the final-only profile. |
 | JVM-002 | P1; verifier coverage unassessed; default-method superinterface initialization excluded in [invoke design](design/java-lang-invoke.md#lookup-class-initialization) | Spec-mapped valid/malformed corpus for format, stack maps, operand/local types, branches, linking/default resolution and initialization order/failure caching, including exact specified errors. Depends on JVM-001; module access also needs JVM-011. |
 | JVM-003 | P1; selected handles/lookups, but full conversions and executable VarHandles unclaimed in [implemented invoke slices](design/java-lang-invoke.md#implemented-slices) | Matrices for lookup/access, invocation/adaptation/combinators and field/array VarHandle read/write/CAS/update semantics. Verify memory-order requirements separately. Depends on JVM-001/002; module cases on JVM-011. |
 | JVM-004 | P1; selected indy/condy paths, with unsupported general bootstraps in [constant pool](../src/ConstantPool.ts) and [open questions](design/java-lang-invoke.md#open-design-questions) | User bootstrap handles, nested dynamic arguments, adaptation/access, success/failure caching and specified exceptions; retain lambda, concat, record and compiler probes. Depends on JVM-003. |
@@ -299,9 +314,9 @@ The next coherent implementation units should be:
 
 1. Expand the approved target/workload seed manifest into the full requirement
    inventory. Keep unknowns visible instead of inventing a coverage denominator.
-2. Extend the pinned native Java 21/25 Node and Chromium seed runner with
-   positive/negative version and preview-minor cases, retaining separate host
-   results for each requirement.
+2. Expand the pinned native Java 21/25 Node and Chromium corpus beyond the
+   version-admission gate, retaining separate host results and explicit
+   generated/mutated inputs for each requirement.
 3. Expand the selected final-language/launcher corpus into remaining positive,
    negative and evolved-binary cases. Preserve the three pinned launcher
    differences; classify observed failures before choosing fixes.

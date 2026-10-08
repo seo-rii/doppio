@@ -1415,6 +1415,25 @@ expanded.
 
 ## Known Preview Gaps
 
+- Class-file admission preserves the existing major range 45–70. Majors 56–70
+  accept only minor 0; minor 65535 is rejected because this runtime has no
+  preview execution mode, and other modern minors are invalid. Majors 45–55
+  retain the JVMS-permitted arbitrary minors. Both ordinary class definition and
+  `Lookup.defineClass` distinguish `UnsupportedClassVersionError` from structural
+  `ClassFormatError` without relying on message text. This is admission policy,
+  not complete VM verification or Java 26 language/API support. See
+  [JVMS 25 class versions](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-4.html#jvms-4.1)
+  and [class derivation errors](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-5.html#jvms-5.3.5).
+- The [admission checks](../ci/class_file_version_test.cjs) cover 57 parser,
+  loader, Lookup, failed-definition recovery, application-loader propagation and
+  launch-shutdown scenarios. The
+  [native/host gate](../ci/java_class_version_test.mjs) adds two untouched javac
+  21/25 controls, four explicitly header-mutated historical controls and nineteen
+  negative cases (fifty Node/Chromium checks). Version mutations, input hashes
+  and runtime/toolchain provenance remain separate from genuine compiler output.
+  Rejected classes must not run their initializer or main body.
+  Launch failure waits for the pending Java exception diagnostic and normal
+  shutdown rather than completing the host callback prematurely.
 - Java 12 switch expressions and Java 13 text blocks were preview features.
   Current fixtures cover the final Java 14/15 forms plus Java 12/13 class-file
   runtime baselines, not historical preview encodings.

@@ -111,6 +111,8 @@
     "ci:java-compatibility": "node ci/run_java_compatibility.mjs",
     "ci:java-compatibility:browser": "node ci/run_java_compatibility.mjs --browser",
     "ci:java25-main": "node ci/java25_main_test.mjs --browser",
+    "ci:class-file-version:test": "node ci/class_file_version_test.cjs && node --test ci/java_class_version_test_test.mjs",
+    "ci:class-file-version": "node ci/java_class_version_test.mjs --browser",
     "ci:check-compiler-bootstrap-consumers": "node ci/check_compiler_bootstrap_consumers.mjs",
     "ci:check-compiler-bootstrap-consumers:test": "node ci/check_compiler_bootstrap_consumers_test.mjs",
     "ci:check-kotlin-modern-source-guards": "node ci/check_kotlin_modern_source_guards.mjs",

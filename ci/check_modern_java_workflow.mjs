@@ -568,6 +568,14 @@ for (const [name, fields] of [
     'timeout-minutes: 40',
     'run: node ci/java25_main_test.mjs --browser',
   ]],
+  ['Check class-file version admission', [
+    'timeout-minutes: 1',
+    'run: node ci/class_file_version_test.cjs && node --test ci/java_class_version_test_test.mjs',
+  ]],
+  ['Run Java class-file version compatibility', [
+    'timeout-minutes: 50',
+    'run: node ci/java_class_version_test.mjs --browser',
+  ]],
   ['Upload Java compatibility baseline ledger', [
     "if: always() && steps.java_compatibility.outcome != 'skipped'",
     'uses: actions/upload-artifact@v7',
@@ -667,6 +675,8 @@ const runtimeOrder = [
   'Prepare pinned Java compatibility toolchains',
   'Run genuine Java 21 and 25 seed fixtures',
   'Run final Java 25 launcher compatibility',
+  'Check class-file version admission',
+  'Run Java class-file version compatibility',
   'Upload Java compatibility baseline ledger',
   'Run core array compatibility smoke',
   'Verify compiler runtime input snapshot',

@@ -412,10 +412,16 @@ class JVM {
     // Convert foo.bar.Baz => Lfoo/bar/Baz;
     className = int_classname(className);
 
+    // Preserve failure if loading fails before the launch continuation runs.
+    this.exitCode = 1;
     // Initialize the class.
     this.systemClassLoader.initializeClass(thread, className, (cdata: ReferenceClassData<any>) => {
+      // Loader callbacks can temporarily leave an empty stack while awaiting
+      // more I/O. Only now may thread shutdown treat an empty stack as exit.
+      this.status = JVMStatus.RUNNING;
       // If cdata is null, there was an error that ended execution.
       if (cdata != null) {
+        this.exitCode = 0;
         // Convert the arguments.
         var strArrCons = (<ArrayClassData<JVMTypes.java_lang_String>> this.bsCl.getInitializedClass(thread, '[Ljava/lang/String;')).getConstructor(thread),
           jvmifiedArgs = new strArrCons(thread, args.length), i: number;
@@ -425,7 +431,6 @@ class JVM {
         }
 
         // Find the main method, and run it.
-        this.status = JVMStatus.RUNNING;
         var cdataStatics = <any> cdata.getConstructor(thread);
         if (cdata.majorVersion >= 69) {
           // Final Java 25 broadens the launch protocol. Do not accidentally
@@ -537,8 +542,9 @@ class JVM {
         }
       } else {
         process.stdout.write(`Error: Could not find or load main class ${ext_classname(className)}\n`);
-        // Erroneous exit.
-        this.terminationCb(1);
+        // The loader has already scheduled the Java exception. Exiting here
+        // would suppress its diagnostic and bypass normal thread shutdown.
+        this.exitCode = 1;
       }
     });
   }

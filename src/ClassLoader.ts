@@ -1,4 +1,4 @@
-import {ClassData, ReferenceClassData, ArrayClassData, PrimitiveClassData} from './ClassData';
+import {ClassData, ReferenceClassData, ArrayClassData, PrimitiveClassData, ClassFileVersionError} from './ClassData';
 import {JVMThread} from './threading';
 import ClassLock from './ClassLock';
 import {IClasspathItem, ClasspathFactory} from './classpath';
@@ -3421,7 +3421,9 @@ export abstract class ClassLoader {
         error(`JVM initialization failed: ${e}`);
         error(e.stack);
       } else {
-        thread.throwNewException('Ljava/lang/ClassFormatError;', e);
+        thread.throwNewException(e instanceof ClassFileVersionError ?
+          'Ljava/lang/UnsupportedClassVersionError;' : 'Ljava/lang/ClassFormatError;',
+          e && e.message ? e.message : String(e));
       }
       return null;
     }
@@ -3855,7 +3857,14 @@ export class CustomClassLoader extends ClassLoader {
     this.loaderObj['loadClass(Ljava/lang/String;)Ljava/lang/Class;'](thread, [initString(this.bootstrap, ext_classname(typeStr))], (e?: JVMTypes.java_lang_Throwable, jco?: JVMTypes.java_lang_Class) => {
       if (e) {
         // Exception! There was an issue defining the class.
-        this.throwClassNotFoundException(thread, typeStr, explicit);
+        // A malformed or unsupported class was found, not absent. Preserve its
+        // Java format/version error instead of hiding it as a lookup failure.
+        var formatError = this.bootstrap.getLoadedClass('Ljava/lang/ClassFormatError;');
+        if (formatError !== null && e.getClass().isCastable(formatError)) {
+          thread.throwException(e);
+        } else {
+          this.throwClassNotFoundException(thread, typeStr, explicit);
+        }
         cb(null);
       } else {
         // Add the class returned by loadClass, in case the classloader
