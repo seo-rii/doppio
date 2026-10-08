@@ -38,7 +38,7 @@ matrix continues to describe the current implementation.
 | 22 | 66 | class-file API ecosystem expectations, unnamed variables and patterns | Partial: simple class-file container, runnable print fixture and selected final unnamed-variable/pattern forms compiled by genuine javac 25 (see note below) | Medium |
 | 23 | 67 | primitive patterns preview, module/JDK library drift | Partial: simple class-file container plus runnable print fixture | High |
 | 24 | 68 | stream gatherers, compact object headers ecosystem assumptions | Partial: simple class-file container plus runnable print fixture | High |
-| 25 | 69 | current LTS class-file and library surface | Partial: simple class-file container, runnable print fixture, selected final pattern/record and module-import lowering compiled by genuine javac 25, and five `java.lang.IO` methods (see notes below) | Very high |
+| 25 | 69 | current LTS class-file and library surface | Partial: simple class-file container, runnable print fixture, selected final pattern/record, module-import and flexible-constructor lowering compiled by genuine javac 25, and five `java.lang.IO` methods (see notes below) | Very high |
 | 26 | 70 | current feature-release class-file and library surface | Partial: simple class-file container plus runnable print fixture | Very high |
 
 Java 21/25 final pattern note: the native-oracle
@@ -95,6 +95,17 @@ resolves these source imports; the resulting class-path bytecode runs on native
 Java 25, Node and Chromium. This does not implement named-module resolution,
 readability, exports/opens or strong encapsulation. See
 [JLS 25 module imports](https://docs.oracle.com/javase/specs/jls/se25/html/jls-7.html#jls-7.5.5).
+
+Java 25 flexible-constructor note: the
+[fixture](../classes/modern_fixture/Java25FlexibleConstructors.java) checks 50
+assertions for prologue computation/validation/finally, this-constructor chains,
+early own-field writes observed during super dispatch, field/instance
+initialization order, allowed captured locals, wide `long`/`double` values and
+qualified outer-super calls. Existing VM execution runs these genuine final
+`--release 25` class files with matching native, Node and Chromium results.
+General verifier coverage and full constructor-language conformance remain
+outside this slice. See
+[JLS 25 constructor bodies](https://docs.oracle.com/javase/specs/jls/se25/html/jls-8.html#jls-8.8.7).
 
 Java 9/11 `TimeUnit` note: `toChronoUnit()`, `of(ChronoUnit)`, and
 `convert(Duration)` are implemented as ordinary parsed methods on the retained

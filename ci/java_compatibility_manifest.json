@@ -30,7 +30,7 @@
     "completeJavaSeInventory": false,
     "packageIds": ["PLAN-001", "JVM-001", "JVM-008", "LIB-008"],
     "roadmap": "docs/compatibility-roadmap.md",
-    "scope": "Thirteen fixtures covering eight Java 21 string API overloads, selected final patterns/MatchException behavior, final Java 22 unnamed variables/patterns, Java 25 module-import lowering and five Java 25 IO methods, compiled by matching native Java 21 and 25 toolchains. One bootstrap-contract companion is explicitly generated after javac; its generator and resulting bytes are recorded.",
+    "scope": "Fourteen fixtures covering eight Java 21 string API overloads, selected final patterns/MatchException behavior, final Java 22 unnamed variables/patterns, Java 25 module imports/flexible constructors and five Java 25 IO methods, compiled by matching native Java 21 and 25 toolchains. One bootstrap-contract companion is explicitly generated after javac; its generator and resulting bytes are recorded.",
     "unassessedScope": "Remaining Java SE language, VM, module, library and host requirements have not been enumerated by this manifest. Only the explicitly listed final Java 22-25 requirements are represented.",
     "hostAutomation": {
       "ubuntu-node24": "seed-runner",
@@ -45,6 +45,14 @@
     "doppioMs": 120000
   },
   "requirements": [
+    {
+      "id": "LANG-FLEXIBLE-CONSTRUCTORS",
+      "introducedIn": 25,
+      "featureStatus": "final",
+      "packageId": "JVM-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": { "25": "https://docs.oracle.com/javase/specs/jls/se25/html/jls-8.html#jls-8.8.7" }
+    },
     {
       "id": "LANG-MODULE-IMPORTS",
       "introducedIn": 25,
@@ -257,6 +265,19 @@
     }
   ],
   "fixtures": [
+    {
+      "id": "flexible-constructors",
+      "source": "classes/modern_fixture/Java25FlexibleConstructors.java",
+      "mainClass": "classes.modern_test.Java25FlexibleConstructors",
+      "releases": [25],
+      "workloadIds": ["W-JAVA25"],
+      "packageIds": ["JVM-001", "JVM-008"],
+      "requirementIds": ["LANG-FLEXIBLE-CONSTRUCTORS"],
+      "arguments": [],
+      "comparison": "successful-native-oracle-stdout-stderr",
+      "coverage": ["computed-super-arguments", "prologue-validation-and-finally", "this-constructor-chains", "pre-super-own-field-writes", "declaration-and-instance-initialization-order", "local-lambda-anonymous-capture", "wide-long-double-values", "qualified-outer-super"],
+      "limitations": "50 selected assertions over genuine final javac 25 constructor lowering; no general bytecode-verifier or complete language-conformance claim."
+    },
     {
       "id": "module-imports",
       "source": "classes/modern_fixture/Java25ModuleImports.java",
