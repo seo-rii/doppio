@@ -11,7 +11,7 @@ implemented.
 | --- | --- |
 | CLI host | Ubuntu Linux with Node.js 24.x |
 | Source build and native oracle | Java 17 JDK |
-| Newer native-oracle seed | Locked Corretto 21.0.11 and 25.0.3 on Linux x64 for fourteen selected fixtures, separate from full Java 21/25 support |
+| Newer native-oracle seed | Locked Corretto 21.0.11 and 25.0.3 on Linux x64 for sixteen selected fixtures plus a launcher gate, separate from full Java 21/25 support |
 | Browser | Chromium through Playwright 1.57.0 |
 | Browser filesystem | BrowserFS 1.3.0, with read-only XHR runtime data and InMemory writable mounts |
 | Java runtime surface | Java 8 bootstrap image plus the Java 9–26 classfile and class-library surfaces listed in the compatibility matrix |
@@ -77,16 +77,26 @@ Kotlin/Scala compiler inputs, execute the complete 73-script inventory with
 per-script and outer timeouts, and upload raw completion ledgers. A stable
 terminal job fails unless both the producer and every shard succeed.
 
-The producer also runs fourteen selected string API, final-language,
+The producer also runs sixteen selected string API, final-language,
 bootstrap-contract and Java 25 `java.lang.IO` fixtures with pinned javac 21 and 25
 drivers, comparing each against its matching native runtime and the same Doppio
 release CLI and Chromium browser bundle. The
 contract fixture's companion is explicitly generated after javac with its
-generator hash and execution recorded. Nineteen cases produce thirty-eight host comparisons
-that verify class versions, identical finite UTF-8 standard input and unchanged execution-input byte
-hashes and retain a provenance/result ledger on failure. These selected fixtures
-are the initial verification corpus for Java 21/25. The repository roadmap describes the seed
-manifest and local `yarn ci:java-compatibility:*` commands.
+generator hash and execution recorded. Twenty-one cases produce forty-two host
+comparisons that verify class versions, identical finite UTF-8 standard input and
+unchanged execution-input byte hashes, retaining a provenance/result ledger on
+failure. These selected fixtures are the initial verification corpus for Java
+21/25. The repository roadmap describes the seed manifest and local
+`yarn ci:java-compatibility:*` commands.
+
+An additional `yarn ci:java25-main` gate exercises twelve successful Java 25
+launches, six failure cases and two legacy Java 21 launches on Node and Chromium.
+Three additional inherited-main cases follow JLS 25 section 12.1.4 in separate
+guest assertions: pinned Corretto 25.0.3 instead invokes private or non-inherited
+package-access superclass methods in those cases. They are explicitly reported
+as oracle differences, not native-equality passes. The total is twenty-three
+launcher cases and forty-six guest checks. Compact sources are compiled
+externally; this does not add hosted javac 25 or Java source-file launching.
 
 The `Pages` workflow owns the browser gate. It builds the deployable artifact,
 runs the complete Chromium acceptance suite locally before upload, deploys only

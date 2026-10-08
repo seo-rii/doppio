@@ -38,7 +38,7 @@ matrix continues to describe the current implementation.
 | 22 | 66 | class-file API ecosystem expectations, unnamed variables and patterns | Partial: simple class-file container, runnable print fixture and selected final unnamed-variable/pattern forms compiled by genuine javac 25 (see note below) | Medium |
 | 23 | 67 | primitive patterns preview, module/JDK library drift | Partial: simple class-file container plus runnable print fixture | High |
 | 24 | 68 | stream gatherers, compact object headers ecosystem assumptions | Partial: simple class-file container plus runnable print fixture | High |
-| 25 | 69 | current LTS class-file and library surface | Partial: simple class-file container, runnable print fixture, selected final pattern/record, module-import and flexible-constructor lowering compiled by genuine javac 25, and five `java.lang.IO` methods (see notes below) | Very high |
+| 25 | 69 | current LTS class-file and library surface | Partial: simple class-file container, runnable print fixture, selected final pattern/record, module-import, flexible-constructor and compact-source lowering compiled by genuine javac 25, non-private static/instance main startup, and five `java.lang.IO` methods (see notes below) | Very high |
 | 26 | 70 | current feature-release class-file and library surface | Partial: simple class-file container plus runnable print fixture | Very high |
 
 Java 21/25 final pattern note: the native-oracle
@@ -106,6 +106,27 @@ qualified outer-super calls. Existing VM execution runs these genuine final
 General verifier coverage and full constructor-language conformance remain
 outside this slice. See
 [JLS 25 constructor bodies](https://docs.oracle.com/javase/specs/jls/se25/html/jls-8.html#jls-8.8.7).
+
+Java 25 launch note: class files with major 69 or newer select non-private
+`void main(String[])` before `void main()`, including static and inherited
+instance/default-interface methods. Instance startup invokes a non-private
+zero-argument constructor before the selected main; failures retain a nonzero
+exit status. Older class files keep the existing static `main(String[])`
+protocol, not the Java 21–24 preview startup protocol.
+The [named](../classes/modern_fixture/Java25InstanceMain.java) and
+[compact-source](../classes/modern_fixture/Java25CompactMain.java) fixtures use
+genuine final javac 25 output. Compact-source implicit classes and `java.base`
+imports, field initialization, UTF-8 arguments and IO output run on both hosts.
+This does not add a source-file launcher or hosted javac 25.
+
+The [launcher gate](../ci/java25_main_test.mjs) checks twelve native-positive,
+six native-negative and two legacy cases, plus three explicitly separate
+JLS-only inheritance cases on Node and Chromium (forty-six guest checks).
+Corretto 25.0.3 invokes private/non-inherited superclass mains in those three
+cases; Doppio follows the candidate rule in
+[JLS 25 section 12.1.4](https://docs.oracle.com/javase/specs/jls/se25/html/jls-12.html#jls-12.1.4).
+They are not native-output equality passes. Failure diagnostics remain
+implementation-defined, and full launcher/language conformance is not claimed.
 
 Java 9/11 `TimeUnit` note: `toChronoUnit()`, `of(ChronoUnit)`, and
 `convert(Duration)` are implemented as ordinary parsed methods on the retained

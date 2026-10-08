@@ -561,8 +561,12 @@ for (const [name, fields] of [
   ]],
   ['Run genuine Java 21 and 25 seed fixtures', [
     'id: java_compatibility',
-    'timeout-minutes: 115',
+    'timeout-minutes: 130',
     'run: node ci/run_java_compatibility.mjs --browser',
+  ]],
+  ['Run final Java 25 launcher compatibility', [
+    'timeout-minutes: 40',
+    'run: node ci/java25_main_test.mjs --browser',
   ]],
   ['Upload Java compatibility baseline ledger', [
     "if: always() && steps.java_compatibility.outcome != 'skipped'",
@@ -662,6 +666,7 @@ const runtimeOrder = [
   'Run modern Java compatibility tests',
   'Prepare pinned Java compatibility toolchains',
   'Run genuine Java 21 and 25 seed fixtures',
+  'Run final Java 25 launcher compatibility',
   'Upload Java compatibility baseline ledger',
   'Run core array compatibility smoke',
   'Verify compiler runtime input snapshot',

@@ -150,6 +150,7 @@ for (const name of [
   'Install Java compatibility Chromium',
   'Prepare pinned Java compatibility toolchains',
   'Run genuine Java 21 and 25 seed fixtures',
+  'Run final Java 25 launcher compatibility',
   'Upload Java compatibility baseline ledger',
 ]) {
   expectCheckerFailure(
@@ -168,7 +169,10 @@ for (const [original, replacement] of [
   ['run: node ci/run_java_compatibility.mjs --browser\n', 'run: node ci/run_java_compatibility.mjs --browser --release 21\n'],
   ['run: node ci/run_java_compatibility.mjs --browser\n', 'run: node ci/run_java_compatibility.mjs\n'],
   ['run: node ci/prepare_java_compatibility_toolchains.mjs\n', 'run: node ci/prepare_java_compatibility_toolchains.mjs || true\n'],
-  ['timeout-minutes: 115\n', 'timeout-minutes: 1150\n'],
+  ['timeout-minutes: 130\n', 'timeout-minutes: 1300\n'],
+  ['run: node ci/java25_main_test.mjs --browser\n', 'run: node ci/java25_main_test.mjs\n'],
+  ['run: node ci/java25_main_test.mjs --browser\n', 'run: node ci/java25_main_test.mjs --browser || true\n'],
+  ['timeout-minutes: 40\n', 'timeout-minutes: 4\n'],
   ["if: always() && steps.java_compatibility.outcome != 'skipped'", 'if: success()'],
   ['path: build/java-compatibility-results.json', 'path: build/missing-java-ledger.json'],
   ['retention-days: 7', 'retention-days: 1'],
@@ -189,6 +193,12 @@ expectCheckerFailure(
 expectCheckerFailure(
   'Java compatibility execution before toolchain preparation',
   { workflow: swapAdjacentSteps(realWorkflow, 'Prepare pinned Java compatibility toolchains', 'Run genuine Java 21 and 25 seed fixtures') },
+  'remain in dependency order'
+);
+
+expectCheckerFailure(
+  'Java 25 launcher gate before the seed execution dependency',
+  { workflow: swapAdjacentSteps(realWorkflow, 'Run genuine Java 21 and 25 seed fixtures', 'Run final Java 25 launcher compatibility') },
   'remain in dependency order'
 );
 

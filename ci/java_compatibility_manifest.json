@@ -30,7 +30,7 @@
     "completeJavaSeInventory": false,
     "packageIds": ["PLAN-001", "JVM-001", "JVM-008", "LIB-008"],
     "roadmap": "docs/compatibility-roadmap.md",
-    "scope": "Fourteen fixtures covering eight Java 21 string API overloads, selected final patterns/MatchException behavior, final Java 22 unnamed variables/patterns, Java 25 module imports/flexible constructors and five Java 25 IO methods, compiled by matching native Java 21 and 25 toolchains. One bootstrap-contract companion is explicitly generated after javac; its generator and resulting bytes are recorded.",
+    "scope": "Sixteen fixtures covering eight Java 21 string API overloads, selected final patterns/MatchException behavior, final Java 22 unnamed variables/patterns, Java 25 module imports/flexible constructors/compact sources/instance mains and five Java 25 IO methods, compiled by matching native Java 21 and 25 toolchains. One bootstrap-contract companion is explicitly generated after javac; its generator and resulting bytes are recorded.",
     "unassessedScope": "Remaining Java SE language, VM, module, library and host requirements have not been enumerated by this manifest. Only the explicitly listed final Java 22-25 requirements are represented.",
     "hostAutomation": {
       "ubuntu-node24": "seed-runner",
@@ -45,6 +45,22 @@
     "doppioMs": 120000
   },
   "requirements": [
+    {
+      "id": "LANG-INSTANCE-MAIN",
+      "introducedIn": 25,
+      "featureStatus": "final",
+      "packageId": "JVM-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": { "25": "https://docs.oracle.com/javase/specs/jls/se25/html/jls-12.html#jls-12.1.4" }
+    },
+    {
+      "id": "LANG-COMPACT-SOURCE",
+      "introducedIn": 25,
+      "featureStatus": "final",
+      "packageId": "JVM-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": { "25": "https://docs.oracle.com/javase/specs/jls/se25/html/jls-7.html#jls-7.3" }
+    },
     {
       "id": "LANG-FLEXIBLE-CONSTRUCTORS",
       "introducedIn": 25,
@@ -265,6 +281,32 @@
     }
   ],
   "fixtures": [
+    {
+      "id": "instance-main",
+      "source": "classes/modern_fixture/Java25InstanceMain.java",
+      "mainClass": "classes.modern_test.Java25InstanceMain",
+      "releases": [25],
+      "workloadIds": ["W-JAVA25"],
+      "packageIds": ["JVM-001", "JVM-008"],
+      "requirementIds": ["LANG-INSTANCE-MAIN"],
+      "arguments": ["alpha", "βeta"],
+      "comparison": "successful-native-oracle-stdout-stderr",
+      "coverage": ["package-instance-main-String-array", "zero-argument-construction", "field-initialization", "UTF8-arguments"],
+      "limitations": "Expanded launcher success/failure/legacy cases run in ci/java25_main_test.mjs; three inherited-main cases use separate JLS-only assertions because the pinned native launcher differs."
+    },
+    {
+      "id": "compact-source-main",
+      "source": "classes/modern_fixture/Java25CompactMain.java",
+      "mainClass": "Java25CompactMain",
+      "releases": [25],
+      "workloadIds": ["W-JAVA25"],
+      "packageIds": ["JVM-001", "JVM-008", "LIB-008"],
+      "requirementIds": ["LANG-COMPACT-SOURCE", "LANG-INSTANCE-MAIN", "API-IO-PRINT", "API-IO-PRINTLN-OBJECT", "API-IO-PRINTLN"],
+      "arguments": ["alpha", "βeta"],
+      "comparison": "successful-native-oracle-stdout-stderr",
+      "coverage": ["implicit-class", "implicit-java-base-imports", "instance-initialization", "IO-output", "UTF8-arguments"],
+      "limitations": "Genuine final javac 25 output only; no source-file launcher or hosted javac 25 implementation."
+    },
     {
       "id": "flexible-constructors",
       "source": "classes/modern_fixture/Java25FlexibleConstructors.java",

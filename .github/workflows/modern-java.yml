@@ -123,8 +123,12 @@ jobs:
 
       - name: Run genuine Java 21 and 25 seed fixtures
         id: java_compatibility
-        timeout-minutes: 115
+        timeout-minutes: 130
         run: node ci/run_java_compatibility.mjs --browser
+
+      - name: Run final Java 25 launcher compatibility
+        timeout-minutes: 40
+        run: node ci/java25_main_test.mjs --browser
 
       - name: Upload Java compatibility baseline ledger
         if: always() && steps.java_compatibility.outcome != 'skipped'
