@@ -168,7 +168,7 @@ for (const [original, replacement] of [
   ['run: node ci/run_java_compatibility.mjs --browser\n', 'run: node ci/run_java_compatibility.mjs --browser --release 21\n'],
   ['run: node ci/run_java_compatibility.mjs --browser\n', 'run: node ci/run_java_compatibility.mjs\n'],
   ['run: node ci/prepare_java_compatibility_toolchains.mjs\n', 'run: node ci/prepare_java_compatibility_toolchains.mjs || true\n'],
-  ['timeout-minutes: 55\n', 'timeout-minutes: 550\n'],
+  ['timeout-minutes: 70\n', 'timeout-minutes: 700\n'],
   ["if: always() && steps.java_compatibility.outcome != 'skipped'", 'if: success()'],
   ['path: build/java-compatibility-results.json', 'path: build/missing-java-ledger.json'],
   ['retention-days: 7', 'retention-days: 1'],

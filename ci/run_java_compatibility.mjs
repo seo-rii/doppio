@@ -79,6 +79,12 @@ export function validateManifest(manifest) {
     requireCondition(typeof fixture.mainClass === 'string' &&
       /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/.test(fixture.mainClass),
     `Invalid mainClass for fixture ${fixture.id}.`);
+    if (fixture.classGenerator !== undefined) {
+      requireCondition(typeof fixture.classGenerator === 'string' &&
+        /^ci\/[A-Za-z0-9_./-]+\.mjs$/.test(fixture.classGenerator) &&
+        fixture.classGenerator.split('/').every((part) => part !== '' && part !== '.' && part !== '..'),
+      `Invalid classGenerator path for fixture ${fixture.id}.`);
+    }
     const identity = `${fixture.source}:${fixture.mainClass}`;
     requireCondition(!sourceIdentities.has(identity), `Duplicate fixture source/mainClass: ${identity}.`);
     sourceIdentities.add(identity);
@@ -377,6 +383,8 @@ export async function runCompatibility({ repoRoot = defaultRepoRoot,
       for (const fixture of manifest.fixtures.filter((entry) => entry.releases.includes(feature))) {
         ledger.cases.push({ id: `${fixture.id}:jdk${feature}`, fixtureId: fixture.id, release: feature,
           requirementIds: fixture.requirementIds, source: { path: fixture.source }, mainClass: fixture.mainClass,
+          ...(fixture.classGenerator ? { classGenerator: { path: fixture.classGenerator,
+            execution: notRun('Compilation has not completed.') } } : {}),
           status: 'not-run', classes: [], compile: notRun('Preflight has not completed.'),
           native: notRun('Compilation has not completed.'), doppio: notRun('Compilation has not completed.'),
           browser: notRun(browser ? 'Compilation has not completed.' : 'Chromium was not selected.'),
@@ -426,13 +434,15 @@ export async function runCompatibility({ repoRoot = defaultRepoRoot,
       }
     }
     for (const result of ledger.cases) {
-      const sourcePath = path.resolve(repoRoot, result.source.path);
-      const realSource = fs.realpathSync(sourcePath);
-      const relative = path.relative(repoRoot, realSource);
-      requireCondition(relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative) &&
-        fs.lstatSync(sourcePath).isFile(), `Fixture source is not a regular file inside the repository: ${sourcePath}.`);
-      requireCondition(sourcePath !== outputPath, 'Results output must not overwrite a fixture source.');
-      result.source.sha256 = hashFile(sourcePath);
+      for (const input of [result.source, result.classGenerator].filter(Boolean)) {
+        const sourcePath = path.resolve(repoRoot, input.path);
+        const realSource = fs.realpathSync(sourcePath);
+        const relative = path.relative(repoRoot, realSource);
+        requireCondition(relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative) &&
+          fs.lstatSync(sourcePath).isFile(), `Fixture input is not a regular file inside the repository: ${sourcePath}.`);
+        requireCondition(sourcePath !== outputPath, 'Results output must not overwrite a fixture input.');
+        input.sha256 = hashFile(sourcePath);
+      }
     }
     workRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'doppio-java-compatibility-'));
     for (const result of ledger.cases) {
@@ -450,6 +460,12 @@ export async function runCompatibility({ repoRoot = defaultRepoRoot,
             '-classpath', emptyPath, '-sourcepath', emptyPath, '-d', classesPath,
             path.join(repoRoot, fixture.source)], { cwd: caseRoot, timeoutMs: manifest.timeouts.compileMs });
         requireCondition(successful(result.compile), 'Compilation did not succeed.');
+        if (result.classGenerator) {
+          result.classGenerator.execution = await execute(process.execPath,
+            [path.join(repoRoot, result.classGenerator.path), '--classes', classesPath, '--release', String(result.release)],
+            { cwd: caseRoot, timeoutMs: manifest.timeouts.compileMs });
+          requireCondition(successful(result.classGenerator.execution), 'Companion class generation did not succeed.');
+        }
         result.classes = inspectClassFiles(classesPath, result.release, fixture.mainClass);
         result.native = await execute(toolchain.executables.java.path,
           ['-cp', classesPath, fixture.mainClass, ...fixture.arguments],
@@ -491,8 +507,12 @@ export async function runCompatibility({ repoRoot = defaultRepoRoot,
     requireCondition(hashFile(manifestPath) === ledger.manifest.sha256 &&
       hashFile(lockPath) === ledger.toolchainLock.sha256 && hashFile(toolchainsPath) === ledger.toolchainMarker.sha256,
     'Compatibility manifest or toolchain provenance changed during comparison.');
-    for (const result of ledger.cases) requireCondition(hashFile(path.join(repoRoot, result.source.path)) === result.source.sha256,
-      `Fixture source changed during comparison: ${result.source.path}.`);
+    for (const result of ledger.cases) {
+      for (const input of [result.source, result.classGenerator].filter(Boolean)) {
+        requireCondition(hashFile(path.join(repoRoot, input.path)) === input.sha256,
+          `Fixture source or generator changed during comparison: ${input.path}.`);
+      }
+    }
     for (const toolchain of ledger.toolchains) {
       requireCondition(treeDigest(toolchain.home) === toolchain.treeSha256,
         `Toolchain ${toolchain.id} extracted tree changed during comparison.`);

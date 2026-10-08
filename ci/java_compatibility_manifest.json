@@ -28,9 +28,9 @@
   "inventory": {
     "state": "seed-partial",
     "completeJavaSeInventory": false,
-    "packageIds": ["PLAN-001", "JVM-001", "LIB-008"],
+    "packageIds": ["PLAN-001", "JVM-001", "JVM-008", "LIB-008"],
     "roadmap": "docs/compatibility-roadmap.md",
-    "scope": "Three existing standalone fixtures covering selected behavior of eight Java 21 API overloads, recompiled by matching native Java 21 and 25 toolchains.",
+    "scope": "Five fixtures covering eight Java 21 string API overloads and selected final instanceof/pattern-switch/record-pattern/MatchException behavior, compiled by matching native Java 21 and 25 toolchains. One bootstrap-contract companion is explicitly generated after javac; its generator and resulting bytes are recorded.",
     "unassessedScope": "Remaining Java SE language, VM, module, library and host requirements have not been enumerated by this manifest. Final Java 22-25 features are not covered by these Java 21 seeds.",
     "hostAutomation": {
       "ubuntu-node24": "seed-runner",
@@ -45,6 +45,51 @@
     "doppioMs": 120000
   },
   "requirements": [
+    {
+      "id": "LANG-INSTANCEOF-BINDING",
+      "introducedIn": 16,
+      "featureStatus": "final",
+      "packageId": "JVM-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": {
+        "21": "https://docs.oracle.com/javase/specs/jls/se21/html/jls-15.html#jls-15.20.2",
+        "25": "https://docs.oracle.com/javase/specs/jls/se25/html/jls-15.html#jls-15.20.2"
+      }
+    },
+    {
+      "id": "LANG-PATTERN-SWITCH",
+      "introducedIn": 21,
+      "featureStatus": "final",
+      "packageId": "JVM-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": {
+        "21": "https://docs.oracle.com/javase/specs/jls/se21/html/jls-14.html#jls-14.11",
+        "25": "https://docs.oracle.com/javase/specs/jls/se25/html/jls-14.html#jls-14.11"
+      }
+    },
+    {
+      "id": "LANG-RECORD-PATTERN",
+      "introducedIn": 21,
+      "featureStatus": "final",
+      "packageId": "JVM-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": {
+        "21": "https://docs.oracle.com/javase/specs/jls/se21/html/jls-14.html#jls-14.30",
+        "25": "https://docs.oracle.com/javase/specs/jls/se25/html/jls-14.html#jls-14.30"
+      }
+    },
+    {
+      "id": "API-MATCH-EXCEPTION",
+      "signature": "java.lang.MatchException(java.lang.String,java.lang.Throwable)",
+      "introducedIn": 21,
+      "featureStatus": "final",
+      "packageId": "JVM-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": {
+        "21": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/MatchException.html",
+        "25": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/MatchException.html"
+      }
+    },
     {
       "id": "API-STRINGBUILDER-REPEAT-CODEPOINT",
       "signature": "java.lang.StringBuilder java.lang.StringBuilder.repeat(int,int)",
@@ -143,6 +188,33 @@
     }
   ],
   "fixtures": [
+    {
+      "id": "pattern-switch",
+      "source": "classes/modern_fixture/Java21PatternSwitch.java",
+      "mainClass": "classes.modern_test.Java21PatternSwitch",
+      "releases": [21, 25],
+      "workloadIds": ["W-JAVA21", "W-JAVA25"],
+      "packageIds": ["JVM-001", "JVM-004", "JVM-006", "JVM-007", "JVM-008"],
+      "requirementIds": ["LANG-INSTANCEOF-BINDING", "LANG-PATTERN-SWITCH", "LANG-RECORD-PATTERN", "API-MATCH-EXCEPTION"],
+      "arguments": [],
+      "comparison": "successful-native-oracle-stdout-stderr",
+      "coverage": ["binding", "type-and-interface-labels", "guard-restarts", "nested-record-deconstruction", "null-components", "enum-switch", "enum-constant-specific-class", "enum-descriptor-condy", "sealed-exhaustiveness", "single-selector-evaluation", "match-exception-cause", "java25-primitive-record-selectors", "all-eight-primitive-components", "wide-long-double-arguments"],
+      "limitations": "44 deterministic final-language assertions, not complete compiler/language conformance. All eight primitive component bindings are checked; actual javac25 primitive switch selectors cover I/Z/J/D, not every possible bootstrap descriptor. Excludes preview primitive conversions, separately evolved sealed/enum binaries, and the public SwitchBootstraps API."
+    },
+    {
+      "id": "switch-bootstrap-contracts",
+      "source": "classes/modern_fixture/Java21SwitchBootstrapContracts.java",
+      "classGenerator": "ci/generate_switch_bootstrap_fixture.mjs",
+      "mainClass": "classes.modern_test.Java21SwitchBootstrapContracts",
+      "releases": [21, 25],
+      "workloadIds": ["W-JAVA21", "W-JAVA25"],
+      "packageIds": ["JVM-001", "JVM-003", "JVM-008"],
+      "requirementIds": ["LANG-PATTERN-SWITCH"],
+      "arguments": [],
+      "comparison": "successful-native-oracle-stdout-stderr",
+      "coverage": ["string-and-integer-labels", "number-and-character-conversions", "numeric-accessor-failure", "restart-bounds-before-null", "invalid-labels", "invalid-invocation-descriptors", "bootstrap-error-cause"],
+      "limitations": "31 targeted bootstrap assertions. Driver uses genuine javac output; only Java21SwitchBootstrapCalls is replaced by deterministic generated bytecode at major 65/69. Not a public SwitchBootstraps API or full linkage-conformance claim."
+    },
     {
       "id": "string-builder-repeat",
       "source": "classes/modern_fixture/Java21StringBuilderRepeat.java",

@@ -8,6 +8,7 @@ import test from 'node:test';
 import { inspectClassFiles, parseOptions, runCommand, runCompatibility,
   validateManifest, validateToolchains } from './run_java_compatibility.mjs';
 import { treeDigest } from './prepare_java_compatibility_toolchains.mjs';
+import { generateSwitchBootstrapFixture } from './generate_switch_bootstrap_fixture.mjs';
 
 const digest = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -104,10 +105,10 @@ function environment(context) {
     runtimeRoot, calls, execute, run, save };
 }
 
-test('checked-in inventory is three fixtures covering eight mandatory requirements on both releases', () => {
+test('checked-in inventory has five fixtures covering twelve mandatory requirements on both releases', () => {
   const spec = validateManifest(JSON.parse(fs.readFileSync(path.join(repoRoot, 'ci/java_compatibility_manifest.json'))));
-  assert.equal(spec.fixtures.length, 3);
-  assert.equal(spec.requirements.length, 8);
+  assert.equal(spec.fixtures.length, 5);
+  assert.equal(spec.requirements.length, 12);
   assert.deepEqual(spec.releases, [21, 25]);
 });
 
@@ -118,6 +119,8 @@ test('manifest rejects missing, duplicate, skipped or unrepresented required cas
     (spec) => { delete spec.fixtures[0].id; },
     (spec) => { spec.fixtures[0].source = '../outside.java'; },
     (spec) => { spec.fixtures[0].source = '/outside.java'; },
+    ...['../generator.mjs', 'ci/../generator.mjs', '/ci/generator.mjs', 'ci//generator.mjs',
+      'ci/generator.js', true].map(value => (spec) => { spec.fixtures[0].classGenerator = value; }),
     (spec) => { spec.fixtures[0].mainClass = '-version'; },
     (spec) => { spec.fixtures[0].required = false; },
     (spec) => { spec.fixtures[0].skip = true; },
@@ -148,6 +151,73 @@ test('CLI options are explicit and reject duplicate, unknown, missing and unsupp
     ['--release', '21', '--release', '25']]) assert.throws(() => parseOptions(args));
   assert.deepEqual(parseOptions(['--browser', '--release', '25']), { browser: true, release: 25 });
   assert.throws(() => parseOptions(['--browser', '--browser']), /Duplicate/);
+});
+
+test('generated switch companion is deterministic with the selected final class version', () => {
+  for (const release of [21, 25]) {
+    const first = generateSwitchBootstrapFixture(release);
+    assert.deepEqual(first, generateSwitchBootstrapFixture(release));
+    assert.equal(first.readUInt32BE(0), 0xcafebabe);
+    assert.equal(first.readUInt16BE(4), 0);
+    assert.equal(first.readUInt16BE(6), release + 44);
+  }
+  assert.throws(() => generateSwitchBootstrapFixture(17), /release 21 or 25/);
+});
+
+test('companion generation runs between javac and native execution and records provenance', async (context) => {
+  const fixture = environment(context);
+  const generator = 'ci/fixture_generator.mjs';
+  writeFile(path.join(fixture.root, generator), 'fixture generator\n');
+  fixture.spec.fixtures[0].classGenerator = generator;
+  fixture.save();
+  const result = await fixture.run();
+  assert.equal(result.status, 'passed');
+  for (const item of result.cases) {
+    assert.equal(item.classGenerator.sha256, digest('fixture generator\n'));
+    const execution = item.classGenerator.execution;
+    assert.equal(execution.status, 'passed');
+    assert.deepEqual(execution.command.slice(1), [path.join(fixture.root, generator), '--classes',
+      item.native.command[2], '--release', String(item.release)]);
+    const index = fixture.calls.findIndex(call => call.args[0] === path.join(fixture.root, generator) &&
+      call.args[4] === String(item.release));
+    assert.equal(fixture.calls[index - 1].args[0], '--release');
+    assert.equal(fixture.calls[index + 1].args[0], '-cp');
+  }
+});
+
+test('generator errors, mutated input and escaping links fail without credited results', async (context) => {
+  for (const failure of ['exit', 'timeout', 'version', 'mutation', 'escape']) {
+    const fixture = environment(context);
+    const generator = 'ci/fixture_generator.mjs';
+    const filename = path.join(fixture.root, generator);
+    writeFile(filename, 'fixture generator\n');
+    fixture.spec.fixtures[0].classGenerator = generator;
+    fixture.save();
+    if (failure === 'escape') {
+      fs.unlinkSync(filename);
+      const outside = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'doppio-generator-escape-')), 'outside.mjs');
+      context.after(() => fs.rmSync(path.dirname(outside), { recursive: true, force: true }));
+      fs.writeFileSync(outside, 'outside');
+      fs.symlinkSync(outside, filename);
+    }
+    const result = await fixture.run({ execute: async (command, args, options) => {
+      const record = await fixture.execute(command, args, options);
+      if (args[0] === filename) {
+        if (failure === 'exit') { record.status = 'failed'; record.exitCode = 1; }
+        if (failure === 'timeout') { record.status = 'timeout'; record.timedOut = true; }
+        if (failure === 'version') {
+          writeFile(path.join(args[2], 'fixture/First$Generated.class'), classFile(61));
+        }
+        if (failure === 'mutation') fs.appendFileSync(filename, 'mutated');
+      }
+      return record;
+    } });
+    assert.equal(result.status, 'failed', failure);
+    assert.equal(result.summary.passed, 0, failure);
+    if (failure !== 'mutation') {
+      assert.ok(result.cases.every(item => item.native.status === 'not-run'), failure);
+    } else assert.match(result.errors[0], /generator changed/);
+  }
 });
 
 test('Chromium compares the same class directory on both releases and records host provenance', async (context) => {

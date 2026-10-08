@@ -1737,6 +1737,19 @@ export class Opcodes {
       frame.returnToThreadLoop = true;
       return;
     }
+    if (callSiteSpecifier.isSwitchCallSite()) {
+      callSiteSpecifier.evaluateSwitch(thread, args, (e?: JVMTypes.java_lang_Throwable, rv?: number) => {
+        if (e) {
+          thread.throwException(e);
+        } else {
+          opStack.push(rv);
+          frame.pc += 3;
+          thread.setStatus(ThreadStatus.RUNNABLE);
+        }
+      });
+      frame.returnToThreadLoop = true;
+      return;
+    }
     fcn(thread, null, args);
     frame.returnToThreadLoop = true;
   }

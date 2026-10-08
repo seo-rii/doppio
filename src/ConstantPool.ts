@@ -5217,6 +5217,11 @@ export class InvokeDynamic implements IConstantPoolItem {
   private objectMethodsMethodName: string = null;
   private objectMethodsRecordName: string = null;
   private objectMethodsComponents: { name: string; fieldName: string; descriptor: string; }[] = null;
+  private switchLabels: { kind: string; value: any; enumDescriptor?: string; }[] = null;
+  private switchIsEnum: boolean = false;
+  private switchLoader: ClassLoader = null;
+  private switchCaller: ReferenceClassData<JVMTypes.java_lang_Object> = null;
+  private switchPrimitiveSelector: string = null;
   /**
    * A MethodType object corresponding to this InvokeDynamic call's
    * method descriptor.
@@ -5260,6 +5265,107 @@ export class InvokeDynamic implements IConstantPoolItem {
 
   public isObjectMethodsCallSite(): boolean {
     return this.objectMethodsMethodName !== null;
+  }
+
+  public isSwitchCallSite(): boolean {
+    return this.switchLabels !== null;
+  }
+
+  /** Executes the selected compiler-generated SwitchBootstraps call sites. */
+  public evaluateSwitch(thread: JVMThread, args: any[], cb: (e?: JVMTypes.java_lang_Throwable, rv?: number) => void): void {
+    var primitiveSelector = this.switchPrimitiveSelector,
+      selector = primitiveSelector === null ? args[0] : util.boxPrimitiveValue(thread, primitiveSelector, args[0]),
+      restart = args[primitiveSelector === 'J' || primitiveSelector === 'D' ? 2 : 1],
+      labels = this.switchLabels;
+    // The restart check precedes even the null-selector result.
+    if (restart < 0 || restart > labels.length) {
+      thread.throwNewException('Ljava/lang/IndexOutOfBoundsException;', 'Invalid switch restart index: ' + restart);
+      return;
+    }
+    if (selector === null) {
+      cb(null, -1);
+      return;
+    }
+    var selectorClass: ClassData = selector.getClass(),
+      index = restart,
+      matchNext: () => void;
+    matchNext = () => {
+      while (index < labels.length) {
+        var label = labels[index], matched = false;
+        if (label.kind === 'class') {
+          if (label.value instanceof PrimitiveClassData) {
+            // Final record patterns in javac 25 use primitive Class labels for
+            // boxed record components. Preview primitive conversion patterns
+            // are not implemented by this compiler fast path.
+            var primitiveWrappers: { [descriptor: string]: string } = {
+              Z: 'Ljava/lang/Boolean;', B: 'Ljava/lang/Byte;', C: 'Ljava/lang/Character;',
+              S: 'Ljava/lang/Short;', I: 'Ljava/lang/Integer;', J: 'Ljava/lang/Long;',
+              F: 'Ljava/lang/Float;', D: 'Ljava/lang/Double;'
+            };
+            matched = selectorClass.getInternalName() === primitiveWrappers[label.value.getInternalName()];
+          } else {
+            matched = selectorClass.isCastable(label.value);
+          }
+        } else if (label.kind === 'string') {
+          matched = this.switchIsEnum ? selector['java/lang/Enum/name'].toString() === label.value :
+            selectorClass.getInternalName() === 'Ljava/lang/String;' && selector.toString() === label.value;
+        } else if (label.kind === 'integer') {
+          var numericMethod = selectorClass.getInternalName() === 'Ljava/lang/Character;' ? 'charValue()C' :
+            selectorClass.isSubclass(thread.getBsCl().getResolvedClass('Ljava/lang/Number;')) ? 'intValue()I' : null;
+          if (numericMethod !== null) {
+            selector[numericMethod](thread, [], (e?: JVMTypes.java_lang_Throwable, value?: number) => {
+              if (e) {
+                cb(e);
+              } else if (value === label.value) {
+                cb(null, index);
+              } else {
+                index++;
+                matchNext();
+              }
+            });
+            return;
+          }
+        } else if (label.kind === 'enum') {
+          var enumClass = selectorClass;
+          // Constant-specific subclasses also have ACC_ENUM. The declaring
+          // enum is the class whose direct superclass is java.lang.Enum.
+          while (enumClass !== null && ((enumClass.accessFlags.getRawByte() & 0x4000) === 0 ||
+              enumClass.getSuperClass() === null ||
+              enumClass.getSuperClass().getInternalName() !== 'Ljava/lang/Enum;')) {
+            enumClass = enumClass.getSuperClass();
+          }
+          if (enumClass !== null && enumClass.getInternalName() === label.enumDescriptor) {
+            // Even an already-resolved class is delivered asynchronously.
+            // Pause before yielding: invokedynamic has consumed its operands.
+            thread.setStatus(ThreadStatus.ASYNC_WAITING);
+            this.switchLoader.resolveClass(thread, label.enumDescriptor, (resolvedEnum: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+              if (resolvedEnum === null) {
+                return;
+              }
+              var field = resolvedEnum.fieldLookup(label.value),
+                matches = resolvedEnum === enumClass && field !== null && field.accessFlags.isStatic() &&
+                  field.rawDescriptor === label.enumDescriptor &&
+                  util.checkAccess(this.switchCaller, resolvedEnum, resolvedEnum.accessFlags) &&
+                  (<any> resolvedEnum.getConstructor(thread))[field.fullName] === selector;
+              if (matches) {
+                cb(null, index);
+              } else {
+                index++;
+                matchNext();
+              }
+            }, false);
+            return;
+          }
+        }
+        if (matched) {
+          cb(null, index);
+          return;
+        }
+        index++;
+      }
+      cb(null, labels.length);
+    };
+    matchNext();
   }
 
   public evaluateStringConcat(thread: JVMThread, args: any[], cb: (e?: JVMTypes.java_lang_Throwable, rv?: JVMTypes.java_lang_String) => void): void {
@@ -5871,6 +5977,157 @@ export class InvokeDynamic implements IConstantPoolItem {
     return true;
   }
 
+  private constructSwitchCallSiteObject(thread: JVMThread, cl: ClassLoader, clazz: ReferenceClassData<JVMTypes.java_lang_Object>, siteKey: string, bootstrapMethod: [MethodHandle, IConstantPoolItem[]], cb: (status: boolean) => void): boolean {
+    var bootstrapRef = bootstrapMethod[0].getReference(),
+      bootstrapName = bootstrapRef.nameAndTypeInfo.name;
+    if (bootstrapRef.classInfo.name !== 'Ljava/lang/runtime/SwitchBootstraps;' ||
+        (bootstrapName !== 'typeSwitch' && bootstrapName !== 'enumSwitch')) {
+      return false;
+    }
+    var fail = (message: string) => {
+      // Bootstrap validation throws IllegalArgumentException; invokedynamic
+      // exposes it as the cause of BootstrapMethodError (JVMS 5.4.3.6).
+      thread.getBsCl().initializeClass(thread, 'Ljava/lang/IllegalArgumentException;', (causeClass: ReferenceClassData<JVMTypes.java_lang_Throwable>) => {
+        if (causeClass === null) {
+          cb(false);
+          return;
+        }
+        var cause = new (causeClass.getConstructor(thread))(thread);
+        cause['<init>(Ljava/lang/String;)V'](thread, [util.initString(thread.getBsCl(), message)], (causeError?: JVMTypes.java_lang_Throwable) => {
+          if (causeError) {
+            thread.throwException(causeError);
+            cb(false);
+            return;
+          }
+          thread.getBsCl().initializeClass(thread, 'Ljava/lang/BootstrapMethodError;', (errorClass: ReferenceClassData<JVMTypes.java_lang_Throwable>) => {
+            if (errorClass === null) {
+              cb(false);
+              return;
+            }
+            var error = new (errorClass.getConstructor(thread))(thread);
+            error['<init>(Ljava/lang/Throwable;)V'](thread, [cause], (errorError?: JVMTypes.java_lang_Throwable) => {
+              thread.throwException(errorError || error);
+              cb(false);
+            });
+          }, false);
+        });
+      }, false);
+    };
+    if (bootstrapMethod[0].getReferenceType() !== MethodHandleReferenceKind.INVOKESTATIC ||
+        bootstrapRef.nameAndTypeInfo.descriptor !== '(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;[Ljava/lang/Object;)Ljava/lang/invoke/CallSite;') {
+      fail('Unsupported SwitchBootstraps bootstrap method handle');
+      return true;
+    }
+    var types = util.getTypes(this.nameAndTypeInfo.descriptor),
+      isEnum = bootstrapName === 'enumSwitch',
+      primitiveSelector = !isEnum && clazz.majorVersion >= 69 &&
+        ['Z', 'B', 'C', 'S', 'I', 'J', 'F', 'D'].indexOf(types[0]) !== -1 ? types[0] : null;
+    if (types.length !== 3 || (types[0].charAt(0) !== 'L' && types[0].charAt(0) !== '[' && primitiveSelector === null) ||
+        types[1] !== 'I' || types[2] !== 'I') {
+      fail('SwitchBootstraps requires a (reference,int)int or final Java 25 primitive-selector invocation type');
+      return true;
+    }
+    var staticArgs = bootstrapMethod[1],
+      unresolvedArgs = staticArgs.filter((item: IConstantPoolItem) => !item.isResolved());
+    if (unresolvedArgs.length > 0) {
+      util.asyncForEach(unresolvedArgs, (item: IConstantPoolItem, next: (err?: any) => void) => {
+        item.resolve(thread, cl, clazz, (status: boolean) => next(status ? undefined : 'Failed.'), false);
+      }, (err?: any) => {
+        if (err) {
+          cb(false);
+        } else {
+          this.constructSwitchCallSiteObject(thread, cl, clazz, siteKey, bootstrapMethod, cb);
+        }
+      });
+      return true;
+    }
+    util.createMethodType(thread, cl, this.nameAndTypeInfo.descriptor, (e: JVMTypes.java_lang_Throwable, methodType: JVMTypes.java_lang_invoke_MethodType) => {
+      if (e) {
+        thread.throwException(e);
+        cb(false);
+        return;
+      }
+      var selectorClass = cl.getResolvedClass(types[0]),
+        labels: { kind: string; value: any; enumDescriptor?: string; }[] = [];
+      if (isEnum && (!(selectorClass instanceof ReferenceClassData) ||
+          (selectorClass.accessFlags.getRawByte() & 0x4000) === 0 ||
+          selectorClass.getSuperClass().getInternalName() !== 'Ljava/lang/Enum;')) {
+        fail('enumSwitch requires an enum selector type');
+        return;
+      }
+      util.asyncForEach(staticArgs, (item: IConstantPoolItem, next: (err?: any) => void) => {
+        var type = item.getType();
+        if ([ConstantPoolItemType.CLASS, ConstantPoolItemType.STRING, ConstantPoolItemType.INTEGER,
+            ConstantPoolItemType.DYNAMIC].indexOf(type) === -1) {
+          next('Unsupported SwitchBootstraps label: ' + ConstantPoolItemType[type]);
+          return;
+        }
+        var value: any = item.getConstant(thread),
+          dynamicClassName = type === ConstantPoolItemType.DYNAMIC && value !== null &&
+            typeof value.getClass === 'function' ? value.getClass().getInternalName() : null;
+        if (type === ConstantPoolItemType.CLASS || dynamicClassName === 'Ljava/lang/Class;') {
+          var cls: ClassData = value.$cls;
+          if (isEnum && cls !== selectorClass) {
+            next('enumSwitch Class labels must be the selector enum type');
+          } else {
+            labels.push({ kind: 'class', value: cls });
+            next();
+          }
+        } else if (type === ConstantPoolItemType.STRING || dynamicClassName === 'Ljava/lang/String;') {
+          labels.push({ kind: 'string', value: value.toString() });
+          next();
+        } else if (!isEnum && (type === ConstantPoolItemType.INTEGER || dynamicClassName === 'Ljava/lang/Integer;')) {
+          labels.push({ kind: 'integer', value: type === ConstantPoolItemType.INTEGER ? value : value.unbox() });
+          next();
+        } else if (!isEnum && dynamicClassName === 'Ljava/lang/Enum$EnumDesc;') {
+          value['constantType()Ljava/lang/constant/ClassDesc;'](thread, [], (typeError?: JVMTypes.java_lang_Throwable, enumType?: any) => {
+            if (typeError) {
+              thread.throwException(typeError);
+              next(typeError);
+              return;
+            }
+            enumType['descriptorString()Ljava/lang/String;'](thread, [], (descriptorError?: JVMTypes.java_lang_Throwable, descriptor?: JVMTypes.java_lang_String) => {
+              if (descriptorError) {
+                thread.throwException(descriptorError);
+                next(descriptorError);
+                return;
+              }
+              value['constantName()Ljava/lang/String;'](thread, [], (nameError?: JVMTypes.java_lang_Throwable, name?: JVMTypes.java_lang_String) => {
+                if (nameError) {
+                  thread.throwException(nameError);
+                  next(nameError);
+                } else {
+                  labels.push({ kind: 'enum', value: name.toString(), enumDescriptor: descriptor.toString() });
+                  next();
+                }
+              });
+            });
+          });
+        } else {
+          next('Unsupported SwitchBootstraps label: ' + ConstantPoolItemType[type]);
+        }
+      }, (err?: any) => {
+        if (err) {
+          if (typeof err === 'string') {
+            fail(err);
+          } else {
+            cb(false);
+          }
+        } else {
+          this.methodType = methodType;
+          this.switchLabels = labels;
+          this.switchIsEnum = isEnum;
+          this.switchLoader = cl;
+          this.switchCaller = clazz;
+          this.switchPrimitiveSelector = primitiveSelector;
+          this.setResolved(siteKey, [<JVMTypes.java_lang_invoke_MemberName> <any> { vmtarget: function() {} }, null]);
+          cb(true);
+        }
+      });
+    });
+    return true;
+  }
+
   public constructCallSiteObject(thread: JVMThread, cl: ClassLoader, clazz: ReferenceClassData<JVMTypes.java_lang_Object>, siteKey: string, cb: (status: boolean) => void, explicit: boolean = true): void {
     /**
      * A call site specifier gives a symbolic reference to a method handle which
@@ -5886,6 +6143,10 @@ export class InvokeDynamic implements IConstantPoolItem {
     }
 
     if (this.constructObjectMethodsCallSiteObject(thread, cl, siteKey, bootstrapMethod, cb)) {
+      return;
+    }
+
+    if (this.constructSwitchCallSiteObject(thread, cl, clazz, siteKey, bootstrapMethod, cb)) {
       return;
     }
 

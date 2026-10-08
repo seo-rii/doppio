@@ -123,7 +123,7 @@ jobs:
 
       - name: Run genuine Java 21 and 25 seed fixtures
         id: java_compatibility
-        timeout-minutes: 55
+        timeout-minutes: 70
         run: node ci/run_java_compatibility.mjs --browser
 
       - name: Upload Java compatibility baseline ledger

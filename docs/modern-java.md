@@ -34,12 +34,35 @@ matrix continues to describe the current implementation.
 | 18 | 62 | UTF-8-by-default expectations, simple web server tooling output, `Math`/`StrictMath` unsigned multiplication and integer division helpers | Partial: simple class-file container, selected UTF-8 default charset behavior for `file.encoding`, `Charset.defaultCharset()`, default `String` byte conversion, and default `InputStreamReader`/`OutputStreamWriter` byte conversion, direct and reflection-visible `Math.unsignedMultiplyHigh(long, long)` and `StrictMath.unsignedMultiplyHigh(long, long)` behavior for zero, power-of-two, negative-bit-pattern, `Long.MIN_VALUE`, and mixed-sign unsigned products, plus direct and reflection-visible support for all Java 18 `Math`/`StrictMath` `ceilDiv`, `ceilMod`, `divideExact`, `floorDivExact`, and `ceilDivExact` overloads with tested metadata, sign, mixed-width, zero-divisor, and integer-overflow behavior | Medium |
 | 19 | 63 | virtual threads preview dependencies, record pattern preview output, `Thread.threadId()`, `Thread.sleep(Duration)` | Partial: simple class-file container, selected `Thread.threadId()` current-thread behavior matching the existing positive `Thread.getId()` identifier, and selected `Thread.sleep(Duration)` behavior for negative no-op, zero duration, short positive duration, null rejection, and interrupt delivery | High |
 | 20 | 64 | scoped values preview dependencies, pattern matching output | Partial: simple class-file container plus runnable print fixture | High |
-| 21 | 65 | virtual threads, sequenced collections, `Math`/`StrictMath.clamp`, `StringBuilder`/`StringBuffer.repeat`, `String`/`Pattern.splitWithDelimiters`, bounded `String.indexOf`, string templates preview | Partial: simple class-file container, runnable print fixture, selected `Thread.isVirtual()` platform-thread behavior for current, unstarted, and started platform threads, direct and reflection-visible integer/floating-point `Math.clamp` and `StrictMath.clamp` overloads, Unicode/sequence repetition with covariant reflection bridges and synchronized `StringBuffer` calls, delimiter-preserving regex splitting and range-bounded string/code-point searches with direct/reflection/MethodHandle calls, and selected `SequencedCollection`/`List`/`Deque`/`SequencedSet`/`SequencedMap` endpoint, view, and reverse-view behavior | Very high |
+| 21 | 65 | final record patterns and pattern switches, virtual threads, sequenced collections, `Math`/`StrictMath.clamp`, `StringBuilder`/`StringBuffer.repeat`, `String`/`Pattern.splitWithDelimiters`, bounded `String.indexOf`, string templates preview | Partial: selected genuine final pattern-switch/record-pattern lowering and bootstrap contracts (see note below), simple class-file container, runnable print fixture, selected `Thread.isVirtual()` platform-thread behavior for current, unstarted, and started platform threads, direct and reflection-visible integer/floating-point `Math.clamp` and `StrictMath.clamp` overloads, Unicode/sequence repetition with covariant reflection bridges and synchronized `StringBuffer` calls, delimiter-preserving regex splitting and range-bounded string/code-point searches with direct/reflection/MethodHandle calls, and selected `SequencedCollection`/`List`/`Deque`/`SequencedSet`/`SequencedMap` endpoint, view, and reverse-view behavior | Very high |
 | 22 | 66 | class-file API ecosystem expectations, unnamed variables | Partial: simple class-file container plus runnable print fixture | Medium |
 | 23 | 67 | primitive patterns preview, module/JDK library drift | Partial: simple class-file container plus runnable print fixture | High |
 | 24 | 68 | stream gatherers, compact object headers ecosystem assumptions | Partial: simple class-file container plus runnable print fixture | High |
-| 25 | 69 | current LTS class-file and library surface | Partial: simple class-file container plus runnable print fixture | Very high |
+| 25 | 69 | current LTS class-file and library surface | Partial: simple class-file container, runnable print fixture and selected final pattern/record lowering recompiled by genuine javac 25 (see note below) | Very high |
 | 26 | 70 | current feature-release class-file and library surface | Partial: simple class-file container plus runnable print fixture | Very high |
+
+Java 21/25 final pattern note: the native-oracle
+[pattern fixture](../classes/modern_fixture/Java21PatternSwitch.java) exercises
+44 selected assertions for `instanceof` binding, ordered class/interface/enum
+switch labels, guarded restart, null/default/exhaustive switches, nested record
+deconstruction, nullable components and accessor failures with original
+`MatchException` causes. A compiler-generated `typeSwitch`/`enumSwitch` fast path
+handles these cases, including `EnumDesc` nested dynamic constants and javac 25's
+primitive selectors/class labels (`I`/`Z`/`J`/`D`) and all eight primitive record
+component bindings, with correct wide `long`/`double` argument slots. Primitive selectors are boxed for
+this final record-lowering path only, not preview cross-primitive conversions. The
+[bootstrap contracts](../classes/modern_fixture/Java21SwitchBootstrapContracts.java)
+add 31 native-compared assertions for string/integer labels, numeric conversions
+and failure propagation, restart bounds before null and malformed inputs. Their
+companion is deliberately [generated](../ci/generate_switch_bootstrap_fixture.mjs)
+after javac; all final bytes are identical across native, Node and Chromium.
+See the [Java 21](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/runtime/SwitchBootstraps.html)
+and [Java 25](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/runtime/SwitchBootstraps.html)
+bootstrap contracts and [record-pattern semantics](https://docs.oracle.com/javase/specs/jls/se21/html/jls-14.html#jls-14.30.2).
+The public `SwitchBootstraps` class/API, preview primitive conversions, complete
+language conformance and separately evolved sealed/enum binaries are not
+implemented by this slice. The remaining Java 21/25 language and library surface
+is still partial.
 
 Java 9/11 `TimeUnit` note: `toChronoUnit()`, `of(ChronoUnit)`, and
 `convert(Duration)` are implemented as ordinary parsed methods on the retained
