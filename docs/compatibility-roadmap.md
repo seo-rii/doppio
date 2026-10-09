@@ -4,8 +4,9 @@ This roadmap separates today's tested release profile from the work needed for
 modern Java applications and, eventually, broad Java SE compatibility. It is a
 planning inventory, not a new support claim or a test-result report.
 
-The inventory was checked on 2026-10-08 against implementation baseline
-`a944e52fd`. The [support policy](support.md) remains authoritative for releases;
+The Java requirement inventory was checked on 2026-10-08 against implementation
+baseline `a944e52fd`. Compiler-gate counts below reflect the current checked-in
+manifest. The [support policy](support.md) remains authoritative for releases;
 the [compatibility matrix](modern-java.md) records individual implemented
 surfaces. The seed harness below extends the verification baseline without
 claiming broader runtime implementation.
@@ -49,7 +50,7 @@ specification, not assumed from a successful native example.
 | Evidence | What it establishes | What it does not establish |
 | --- | --- | --- |
 | [Release profile](support.md#release-profile) | Java 8 bootstrap plus individually tested modern overlays; Java 17 is the build/native-oracle host | Complete guest Java 17, 21 or 25 support |
-| [Compiler manifest](../ci/modern_java_smoke_shards.json) and [input lock](../ci/modern_java_compiler_inputs.lock.json) | 73 distinct scripts in 8 shards: 50 Kotlin 2.4.0 and 23 Scala 2.13.18 scripts | A count of Java SE features, or a fresh passing run in this planning change |
+| [Compiler manifest](../ci/modern_java_smoke_shards.json) and [input lock](../ci/modern_java_compiler_inputs.lock.json) | 76 distinct scripts in 8 shards: 50 Kotlin 2.4.0, 23 Scala 2.13.18, and one each for Groovy 4.0.33, Clojure 1.12.6 and JRuby 9.4.15.0. Kotlin/Scala inputs use the lock; the other scripts pin their JAR hashes. | A count of Java SE features, full language conformance, or a fresh passing run in this planning change |
 | [Class parser](../src/ClassData.ts) and [fixture generator](../tasks/modern_java.ts) | Accepted major-version range ends at 70; generated Java 20–26 print probes exercise basic execution | Arbitrary javac output, preview semantics or all APIs from those releases |
 | [Core-language fixture notes](modern-java.md#known-core-lang-gaps) | Recent repeat, bounded indexOf and delimiter-preserving split fixtures include local Corretto 25.0.3 comparisons of genuine `--release 21` output | Reproducible native Java 21/25 release gates or broad modern language coverage |
 | [Playground launcher](../website/src/playground.mjs) and [browser suite](../ci/pages_browser_smoke.mjs) | Java 8 tools.jar javac and pinned Kotlin/Scala compile and execute in Doppio | Running modern javac or a modern JDK module image inside Doppio |
@@ -57,7 +58,7 @@ specification, not assumed from a successful native example.
 | [Seed manifest](../ci/java_compatibility_manifest.json), [toolchain lock](../ci/java_compatibility_toolchains.lock.json) and [comparison runner](../ci/run_java_compatibility.mjs) | Eighteen fixtures are compared on matching Java 21 and 25 toolchains, Node and Chromium, including selected public switch APIs, final-language/launcher behavior, Java 25 IO and one explicitly generated bootstrap-contract companion, with input/runtime hashes | A complete requirement inventory or full final Java 22–25 feature conformance |
 
 The version matrix currently labels every Java 9–26 row partial. Its rows and
-the 73 compiler scripts are not a valid denominator for an overall completion
+the 76 language smoke scripts are not a valid denominator for an overall completion
 percentage. A small string overload and a module system are not equal work.
 
 ## Required workload gates
@@ -72,12 +73,15 @@ result tied to a commit.
 | W-JAVA-BASE | Current legacy and modern runtime suites; [Modern Java workflow](../.github/workflows/modern-java.yml) | All required fixtures pass with the existing source/build checks and no unexplained output, exception or side-effect changes. |
 | W-KOTLIN | Kotlin 2.4.0 compiler inside Doppio; all Kotlin scripts from the locked manifest | All 50 current scripts report passed using the same producer artifact and pinned inputs; no missing, duplicate, skipped or timed-out entries. Retain runtime, reflection, coroutine and interop probes. |
 | W-SCALA | Scala 2.13.18 compiler inside Doppio; all Scala scripts from the locked manifest | All 23 current scripts report passed under the same artifact/input rules, including library, reflection, macro, interop and diagnostic probes. |
-| W-BROWSER | Chromium/Playwright 1.57.0, BrowserFS 1.3.0; `./ci/build_pages.sh` and `./ci/run_pages_browser_smoke.sh` | Three languages compile/run; source persistence, documentation/mobile layout, provider mutations and descriptor-close checks pass, without browser/request errors. Preserve the existing local and deployed release checks. |
+| W-BROWSER | Chromium/Playwright 1.57.0, BrowserFS 1.3.0; `./ci/build_pages.sh` and `./ci/run_pages_browser_smoke.sh` | Java, Kotlin and Scala compile/run; source persistence, documentation/mobile layout, provider mutations and descriptor-close checks pass, without browser/request errors. Preserve the existing local and deployed release checks. |
 | W-PACKAGE | `yarn ci:check-package-artifact` and the [package workflow](../.github/workflows/package-artifact.yml) | Clean pack and isolated consumer checks pass, including repeated rebuild, all four CLI entry points, types and bundle execution. Keep this distribution gate separate from guest-Java results. |
 | W-JAVA21 | New genuine javac 21 `--release 21` corpus and native Java 21 oracle | A pinned manifest covers selected language/runtime/library requirements, including records, sealed types, patterns, linkage, reflection, collections and threads; compare exit status, specified output/errors and side effects on Node and Chromium. Missing features remain failures or explicit blockers. |
 | W-JAVA25 | New genuine javac 25 `--release 25` corpus and native Java 25 oracle | Extend the agreed Java 21 profile with final Java 22–25 requirements; verify emitted class major 69 and behavior on each required host. Do not substitute Java 17 bytecode with rewritten version bytes. |
 
 W-KOTLIN and W-SCALA must consume the manifest rather than a hand-picked subset.
+The focused Groovy, Clojure and JRuby CLI smokes are part of the existing
+release gate, not additional Java 21/25 application workloads or browser
+playground languages.
 For existing local commands and the same-commit release contract, see
 [release gates](support.md#release-gates). The
 [compiler shard runner](../ci/run_modern_java_smoke_shard.mjs) already records

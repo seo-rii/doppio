@@ -8,8 +8,8 @@ Doppio Modern JVM
 _doppio_ is a double shot of espresso. This fork keeps the original
 POSIX-compatible runtime system and JVM written in
 [TypeScript](http://www.typescriptlang.org/), while tracking modern Java
-compatibility, Kotlin compiler bring-up, Scala compiler smoke coverage, and
-browser release builds.
+compatibility, Kotlin and Scala compiler bring-up, focused Groovy, Clojure,
+and JRuby CLI compatibility, and browser release builds.
 
 To try the browser build, head to the [live Pages site](https://seorii.page/doppio/).
 The site includes rendered project documentation and an editable Java, Kotlin,
@@ -60,10 +60,23 @@ Run the modern Java runtime suite and representative local compiler smokes:
     ./ci/kotlin_reflect_smoke.sh
     ./ci/scala_smoke.sh
 
+Build the Modern Java release CLI and run the additional JVM language smokes:
+
+    grunt --stack modern-ci-release-cli --grunt-ignore-compile-errors
+    ./ci/groovy_smoke.sh
+    ./ci/clojure_smoke.sh
+    ./ci/jruby_smoke.sh
+
+These are focused CLI checks, not browser playground languages or full language
+conformance suites. Groovy compiles inside Doppio; Clojure runs host-compiled
+AOT output; JRuby interprets Ruby inside Doppio. JRuby 9.4 is an end-of-life
+line. See the [support policy](docs/support.md) for the exact boundaries.
+
 The checked-in [support policy](docs/support.md) defines the release profile,
 what these gates promise, and the platform features that are intentionally out
 of scope. `ci/modern_java_smoke_shards.json` is the source of truth for the
-complete Kotlin and Scala smoke inventory run by the `Modern Java` workflow.
+complete 76-script Kotlin, Scala, Groovy, Clojure, and JRuby smoke inventory run
+by the `Modern Java` workflow.
 
 Run the full test suite in a web browser:
 
