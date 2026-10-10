@@ -701,6 +701,24 @@ test('malformed manifest writes a failed ledger and cannot be mistaken for zero-
   assert.equal(fixture.calls.length, 0);
 });
 
+test('known earlier seed ledger scopes can be refreshed without accepting unrelated files', async (context) => {
+  const fixture = environment(context);
+  const output = path.join(fixture.root, 'build/java-compatibility-results.json');
+  for (const scope of [
+    'Mandatory CLI seed fixtures only; not full Java SE or browser compatibility.',
+    'Mandatory Java compatibility fixtures on selected hosts; the full Java SE inventory remains incomplete.',
+  ]) {
+    writeFile(output, JSON.stringify({ schemaVersion: 1, scope, status: 'failed' }));
+    const result = await fixture.run({ release: 21 });
+    assert.equal(result.status, 'passed');
+    assert.match(result.scope, /this seed alone does not establish/);
+  }
+  const unrelated = JSON.stringify({ schemaVersion: 1, scope: 'Another tool result' });
+  writeFile(output, unrelated);
+  await assert.rejects(fixture.run({ release: 21 }), /not a Java compatibility result ledger/);
+  assert.equal(fs.readFileSync(output, 'utf8'), unrelated);
+});
+
 test('output rejects inputs, non-ledger files, runtime/toolchain paths and symlink escapes before errors can write', async (context) => {
   const fixture = environment(context);
   const preserved = [fixture.sourcePath, fixture.manifestPath, fixture.markerPath, fixture.lockPath,

@@ -13,7 +13,10 @@ const supportedReleases = [21, 25];
 const outputLimitBytes = 4 * 1024 * 1024;
 const inputLimitBytes = 1024 * 1024;
 const resultScope = 'Mandatory Java compatibility fixtures on selected hosts; this seed alone does not establish full Java SE inventory completion.';
-const legacyResultScope = 'Mandatory CLI seed fixtures only; not full Java SE or browser compatibility.';
+const legacyResultScopes = [
+  'Mandatory CLI seed fixtures only; not full Java SE or browser compatibility.',
+  'Mandatory Java compatibility fixtures on selected hosts; the full Java SE inventory remains incomplete.',
+];
 
 function requireCondition(condition, message) {
   if (!condition) throw new Error(message);
@@ -359,7 +362,7 @@ function validateOutputPath(repoRoot, outputPath, inputPaths, runtimePath, toolc
   if (fs.existsSync(outputPath)) {
     requireCondition(fs.lstatSync(outputPath).isFile(), 'Results output must be a regular file, not a link.');
     const previous = JSON.parse(fs.readFileSync(outputPath, 'utf8'));
-    requireCondition(previous?.schemaVersion === 1 && [resultScope, legacyResultScope].includes(previous.scope),
+    requireCondition(previous?.schemaVersion === 1 && [resultScope, ...legacyResultScopes].includes(previous.scope),
       'Refusing to overwrite a file that is not a Java compatibility result ledger.');
   }
 }
