@@ -19,10 +19,11 @@ function manifest() {
     approvedTarget: { requiredHosts: [{ id: 'ubuntu-node24' }, { id: 'chromium' }] },
     inventory: { state: 'seed-partial', completeJavaSeInventory: false },
     timeouts: { compileMs: 60_000, nativeMs: 30_000, doppioMs: 120_000 },
-    requirements: [{ id: 'API-FIRST', introducedIn: 21, featureStatus: 'final',
+    requirements: [{ id: 'API-FIRST', introducedIn: 21, featureStatus: 'final', packageId: 'LIB-008',
       specificationRefs: { 21: 'https://example.test/21', 25: 'https://example.test/25' } }],
     fixtures: [{ id: 'first', source: 'classes/First.java', mainClass: 'fixture.First',
-      releases: [21, 25], requirementIds: ['API-FIRST'], arguments: [],
+      releases: [21, 25], workloadIds: ['W-JAVA21', 'W-JAVA25'],
+      packageIds: ['JVM-001', 'LIB-008'], requirementIds: ['API-FIRST'], arguments: [],
       comparison: 'successful-native-oracle-stdout-stderr' }],
   };
 }
@@ -246,8 +247,16 @@ test('manifest rejects missing, duplicate, skipped or unrepresented required cas
     (spec) => { spec.fixtures[0].required = false; },
     (spec) => { spec.fixtures[0].skip = true; },
     (spec) => { spec.fixtures[0].releases = [21, 21]; },
-    (spec) => { spec.fixtures[0].releases = [21]; },
-    (spec) => { spec.releases = [21]; spec.fixtures[0].releases = [21]; },
+    (spec) => { spec.fixtures[0].releases = [21]; spec.fixtures[0].workloadIds = ['W-JAVA21']; },
+    (spec) => { spec.releases = [21]; spec.fixtures[0].releases = [21];
+      spec.fixtures[0].workloadIds = ['W-JAVA21']; },
+    (spec) => { delete spec.fixtures[0].workloadIds; },
+    (spec) => { spec.fixtures[0].workloadIds = ['W-JAVA25', 'W-JAVA21']; },
+    (spec) => { spec.fixtures[0].workloadIds = ['W-JAVA21']; },
+    (spec) => { delete spec.fixtures[0].packageIds; },
+    (spec) => { spec.fixtures[0].packageIds = ['JVM-001']; },
+    (spec) => { spec.fixtures[0].packageIds = ['JVM-003']; },
+    (spec) => { delete spec.requirements[0].packageId; },
     (spec) => { spec.fixtures[0].requirementIds = ['UNKNOWN']; },
     (spec) => { spec.requirements.push(structuredClone(spec.requirements[0])); },
     (spec) => { spec.requirements.push({ ...spec.requirements[0], id: 'UNMAPPED' }); },
@@ -276,11 +285,12 @@ test('CLI options are explicit and reject duplicate, unknown, missing and unsupp
 
 test('later final features run only on applicable releases while retaining the Java 21 profile', async (context) => {
   const fixture = environment(context);
-  const later = { id: 'LANG-LATER', introducedIn: 25, featureStatus: 'final',
+  const later = { id: 'LANG-LATER', introducedIn: 25, featureStatus: 'final', packageId: 'JVM-008',
     specificationRefs: { 25: 'https://example.test/25' } };
   fixture.spec.requirements.push(later);
   fixture.spec.fixtures.push({ ...fixture.spec.fixtures[0], id: 'later', mainClass: 'fixture.Later',
-    releases: [25], requirementIds: [later.id] });
+    releases: [25], workloadIds: ['W-JAVA25'], packageIds: ['JVM-001', 'JVM-008'],
+    requirementIds: [later.id] });
   fixture.save();
   const result = await fixture.run({ execute: async (command, args, options) => {
     const record = await fixture.execute(command, args, options);
@@ -291,6 +301,7 @@ test('later final features run only on applicable releases while retaining the J
   assert.equal(result.status, 'passed');
   assert.deepEqual(result.cases.map(entry => entry.id), ['first:jdk21', 'first:jdk25', 'later:jdk25']);
   fixture.spec.fixtures[1].releases = [21, 25];
+  fixture.spec.fixtures[1].workloadIds = ['W-JAVA21', 'W-JAVA25'];
   assert.throws(() => validateManifest(fixture.spec), /before its required final features/);
 });
 

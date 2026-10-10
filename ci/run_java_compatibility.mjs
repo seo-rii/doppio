@@ -60,6 +60,8 @@ export function validateManifest(manifest) {
   uniqueNonempty(manifest.requirements.map((entry) => entry?.id), validId, 'Requirement IDs');
   const requirementIds = new Set(manifest.requirements.map((entry) => entry.id));
   for (const requirement of manifest.requirements) {
+    requireCondition(validId(requirement.packageId),
+      `Requirement ${requirement.id} must identify an owner package.`);
     requireCondition(Number.isInteger(requirement.introducedIn) && requirement.introducedIn > 0 &&
       requirement.introducedIn <= Math.max(...manifest.releases) && requirement.featureStatus === 'final',
     `Requirement ${requirement.id} must identify a final feature and its introduction release.`);
@@ -91,6 +93,14 @@ export function validateManifest(manifest) {
     sourceIdentities.add(identity);
     uniqueNonempty(fixture.releases, (value) => manifest.releases.includes(value), `${fixture.id} releases`);
     uniqueNonempty(fixture.requirementIds, (value) => requirementIds.has(value), `${fixture.id} requirement IDs`);
+    uniqueNonempty(fixture.workloadIds, (value) => validId(value), `${fixture.id} workload IDs`);
+    requireCondition(JSON.stringify(fixture.workloadIds) ===
+      JSON.stringify(fixture.releases.map((release) => `W-JAVA${release}`)),
+    `Fixture ${fixture.id} must map each selected release to its approved workload.`);
+    uniqueNonempty(fixture.packageIds, validId, `${fixture.id} package IDs`);
+    requireCondition(fixture.requirementIds.every((id) =>
+      fixture.packageIds.includes(manifest.requirements.find((entry) => entry.id === id).packageId)),
+    `Fixture ${fixture.id} must identify every requirement owner package.`);
     requireCondition(Array.isArray(fixture.arguments) && fixture.arguments.every((value) =>
       typeof value === 'string' && !value.includes('\0')), `Invalid arguments for fixture ${fixture.id}.`);
     requireCondition(fixture.standardInput === undefined || typeof fixture.standardInput === 'string' &&
