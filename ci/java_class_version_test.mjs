@@ -123,6 +123,27 @@ export function assertVersionResult(record, entry, label) {
     `${label}: expected ${entry.error}; actual diagnostic: ${record.stderr.slice(0, 4096)}`);
 }
 
+export async function checkAdmissionCase(record, entry, guestHosts, execute) {
+  record.status = 'running';
+  try {
+    for (const release of entry.nativeReleases) {
+      const result = await execute('native', release);
+      record.native.push({ release, result });
+      assertVersionResult(result, entry, `native${release} ${entry.id}`);
+    }
+    for (const host of guestHosts) {
+      const result = await execute(host);
+      record.guests.push({ host, result });
+      assertVersionResult(result, entry, `${host} ${entry.id}`);
+    }
+    record.status = 'passed';
+  } catch (error) {
+    record.status = 'failed';
+    record.error = error.stack || error.message;
+    throw error;
+  }
+}
+
 function assertLegacyConstantPool(bytes) {
   const count = bytes.readUInt16BE(8);
   let offset = 10;
@@ -242,7 +263,7 @@ export async function runClassVersionTests({ browser = false, nativeOnly = false
         }
       }
       const caseDigest = treeDigest(directory);
-      const record = { id: entry.id, outcome: entry.error ? 'rejected' : 'accepted',
+      const record = { id: entry.id, status: 'running', outcome: entry.error ? 'rejected' : 'accepted',
         controlKind: entry.error ? 'negative-admission' : entry.mutation ? 'structural-header' : 'genuine-compiler-output',
         expectedError: entry.error || null, baseRelease: entry.baseRelease, corpus,
         sourceSha256: digest(fs.readFileSync(entry.corpus === 'modern-shapes' ? shapesSourcePath : sourcePath)),
@@ -269,20 +290,14 @@ export async function runClassVersionTests({ browser = false, nativeOnly = false
               genuineInventories[originalKey], `${entry.id}: genuine ${control.id} output must remain unchanged`);
           }
         }
-        assertVersionResult(result, entry, `${host}${release ? release : ''} ${entry.id}`);
         return result;
       };
-      for (const release of entry.nativeReleases) {
-        record.native.push({ release, result: await execute('native', release) });
-        nativeExecutions++;
-      }
-      for (const host of guestHosts) {
-        record.guests.push({ host, result: await execute(host) });
-        comparisons++;
-      }
-      results.push(record);
       onCase(record);
-      console.log(`PASS class header ${entry.id} ${JSON.stringify(record.input)}`);
+      await checkAdmissionCase(record, entry, guestHosts, execute);
+      nativeExecutions += record.native.length;
+      comparisons += record.guests.length;
+      results.push(record);
+      console.log(`PASS class admission ${entry.id} ${JSON.stringify(record.input)}`);
     }
     if (!nativeOnly) assert.deepEqual(runtimeSnapshot(), runtimeDigests, 'CLI runtime integrity after version tests');
     assert.deepEqual(inputSnapshot(), inputDigests, 'Source, harness, helper and toolchain marker integrity');
@@ -332,14 +347,20 @@ export function writeAdmissionLedger(filename, ledger) {
     assert.equal(previous.schemaVersion, 1, 'Refusing to overwrite an unrelated file');
     assert.equal(previous.scope, ledgerScope, 'Refusing to overwrite an unrelated file');
   }
-  fs.writeFileSync(filename, `${JSON.stringify(ledger, null, 2)}\n`, { mode: 0o600 });
-  fs.chmodSync(filename, 0o600);
+  const temporary = `${filename}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  try {
+    fs.writeFileSync(temporary, `${JSON.stringify(ledger, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
+    fs.renameSync(temporary, filename);
+  } finally {
+    if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
+  }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === harnessPath) {
   const options = process.argv.slice(2);
   const ledger = { schemaVersion: 1, scope: ledgerScope, status: 'failed', gitCommit: null,
-    requestedMode: options[0] || 'node', completedCases: [] };
+    gitTrackedDirty: null, startedAt: new Date().toISOString(),
+    requestedMode: options[0] || 'node', attemptedCases: [] };
   try {
     assert.ok(options.length <= 1 && options.every((option) => ['--browser', '--native-only'].includes(option)),
       'Usage: node ci/java_class_version_test.mjs [--browser | --native-only]');
@@ -349,15 +370,21 @@ if (process.argv[1] && path.resolve(process.argv[1]) === harnessPath) {
     assert.equal(commit.exitCode, 0, `git commit provenance: ${commit.stderr}`);
     assert.match(commit.stdout.trim(), /^[a-f0-9]{40}$/, 'Git commit provenance');
     ledger.gitCommit = commit.stdout.trim();
+    const state = await runCommand('git', ['status', '--porcelain=v1', '--untracked-files=no'],
+      { cwd: repoRoot, timeoutMs: 10_000 });
+    assertCompleted(state, 'git working tree provenance');
+    assert.equal(state.exitCode, 0, `git working tree provenance: ${state.stderr}`);
+    ledger.gitTrackedDirty = state.stdout.trim().length > 0;
     const summary = await runClassVersionTests({ browser: options.includes('--browser'),
-      nativeOnly: options.includes('--native-only'), onCase: (record) => ledger.completedCases.push(record) });
+      nativeOnly: options.includes('--native-only'), onCase: (record) => ledger.attemptedCases.push(record) });
     Object.assign(ledger, summary, { status: 'passed' });
-    delete ledger.completedCases;
+    delete ledger.attemptedCases;
   } catch (error) {
     ledger.error = error.stack || error.message;
     console.error(ledger.error);
     process.exitCode = 1;
   } finally {
+    ledger.finishedAt = new Date().toISOString();
     writeAdmissionLedger(path.join(repoRoot, 'build/java-class-version-results.json'), ledger);
   }
 }

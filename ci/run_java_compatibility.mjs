@@ -406,7 +406,8 @@ export async function runCompatibility({ repoRoot = defaultRepoRoot,
     for (const feature of ledger.selectedReleases) {
       for (const fixture of manifest.fixtures.filter((entry) => entry.releases.includes(feature))) {
         ledger.cases.push({ id: `${fixture.id}:jdk${feature}`, fixtureId: fixture.id, release: feature,
-          requirementIds: fixture.requirementIds, source: { path: fixture.source }, mainClass: fixture.mainClass,
+          requirementIds: fixture.requirementIds, workloadIds: fixture.workloadIds, packageIds: fixture.packageIds,
+          source: { path: fixture.source }, mainClass: fixture.mainClass,
           standardInput: { bytes: Buffer.byteLength(fixture.standardInput || '', 'utf8'),
             sha256: sha256(Buffer.from(fixture.standardInput || '', 'utf8')) },
           ...(fixture.classGenerator ? { classGenerator: { path: fixture.classGenerator,

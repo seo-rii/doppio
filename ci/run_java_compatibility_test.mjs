@@ -519,6 +519,8 @@ test('runner compiles isolated identical bytes with each matching release and re
   assert.match(result.runner.sha256, /^[0-9a-f]{64}$/);
   assert.equal(result.toolchains[0].treeSha256, fixture.lock.toolchains[0].treeSha256);
   for (const item of result.cases) {
+    assert.deepEqual(item.workloadIds, fixture.spec.fixtures[0].workloadIds);
+    assert.deepEqual(item.packageIds, fixture.spec.fixtures[0].packageIds);
     assert.equal(item.classes.length, 2);
     assert.ok(item.classes.every((entry) => entry.major === item.release + 44 && entry.minor === 0));
     assert.deepEqual(item.compile.command.slice(1, 3), ['--release', String(item.release)]);

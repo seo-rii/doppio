@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { assertVersionResult, mutateClassHeader, versionCases,
+import { assertVersionResult, checkAdmissionCase, mutateClassHeader, versionCases,
   writeAdmissionLedger } from './java_class_version_test.mjs';
 
 function header(major = 65, minor = 0) {
@@ -110,6 +110,19 @@ test('modern-shapes genuine controls require their own main output', () => {
     stdout: 'CLASS_SHAPES_INITIALIZED\nCLASS_SHAPES_MAIN point=21\n' };
   assertVersionResult(shapeSuccess, entry, 'genuine shapes');
   assert.throws(() => assertVersionResult(successful, entry, 'wrong corpus output'));
+});
+
+test('failed guest result and prior host evidence remain in the admission ledger', async () => {
+  const entry = { id: 'timeout-control', nativeReleases: [21] };
+  const record = { id: entry.id, native: [], guests: [] };
+  const timeout = { ...successful, status: 'timeout', timedOut: true, exitCode: null };
+  await assert.rejects(checkAdmissionCase(record, entry, ['node', 'chromium'], async (host) =>
+    host === 'chromium' ? timeout : { ...successful }), /chromium timeout-control: timeout/);
+  assert.equal(record.status, 'failed');
+  assert.equal(record.native.length, 1);
+  assert.deepEqual(record.guests.map((result) => result.host), ['node', 'chromium']);
+  assert.deepEqual(record.guests[1].result, timeout);
+  assert.match(record.error, /chromium timeout-control: timeout/);
 });
 
 test('admission ledger retains only matching schema/scope and rejects symlink targets', (context) => {
