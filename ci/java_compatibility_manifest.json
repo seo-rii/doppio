@@ -30,7 +30,7 @@
     "completeJavaSeInventory": false,
     "packageIds": ["PLAN-001", "JVM-001", "JVM-002", "JVM-008", "LIB-008"],
     "roadmap": "docs/compatibility-roadmap.md",
-    "scope": "Twenty fixtures covering eight Java 21 string API overloads, selected binary32 JVM conversion and arithmetic opcode precision, selected public switch bootstrap APIs including Java 25 identity primitive-selector/Class-label behavior and all 49 numeric primitive-selector/Class-label exact conversion pairs, final patterns/MatchException behavior, final Java 22 unnamed variables/patterns, Java 25 module imports/flexible constructors/compact sources/instance mains and five Java 25 IO methods, compiled by matching native Java 21 and 25 toolchains. Primitive-selector cases are implementation-sensitive pinned native Java 25 comparisons, not a general Java SE primitive-selector contract. One bootstrap-contract companion is explicitly generated after javac; its generator and resulting bytes are recorded.",
+    "scope": "Twenty-one fixtures covering eight Java 21 string API overloads, Java 18 Duration.isPositive(), selected binary32 JVM conversion and arithmetic opcode precision, selected public switch bootstrap APIs including Java 25 identity primitive-selector/Class-label behavior and all 49 numeric primitive-selector/Class-label exact conversion pairs, final patterns/MatchException behavior, final Java 22 unnamed variables/patterns, Java 25 module imports/flexible constructors/compact sources/instance mains and five Java 25 IO methods, compiled by matching native Java 21 and 25 toolchains. Primitive-selector cases are implementation-sensitive pinned native Java 25 comparisons, not a general Java SE primitive-selector contract. One bootstrap-contract companion is explicitly generated after javac; its generator and resulting bytes are recorded.",
     "unassessedScope": "Remaining Java SE language, VM, module, library and host requirements have not been enumerated by this manifest. Only the explicitly listed final Java 22-25 requirements are represented. The selected binary32 opcode slice is not complete floating-point conformance or a Math/StrictMath or boxed/native adaptation audit. Public typeSwitch cross conversions for declared reference/boxed selectors, preview constant labels and primitive source patterns remain excluded; the selected numeric primitive API slice does not establish complete latest Java conformance.",
     "hostAutomation": {
       "ubuntu-node24": "seed-runner",
@@ -219,6 +219,18 @@
       }
     },
     {
+      "id": "API-DURATION-IS-POSITIVE",
+      "signature": "boolean java.time.Duration.isPositive()",
+      "introducedIn": 18,
+      "featureStatus": "final",
+      "packageId": "LIB-008",
+      "implementationState": "implemented-slice",
+      "specificationRefs": {
+        "21": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/time/Duration.html#isPositive()",
+        "25": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/time/Duration.html#isPositive()"
+      }
+    },
+    {
       "id": "API-STRINGBUILDER-REPEAT-CODEPOINT",
       "signature": "java.lang.StringBuilder java.lang.StringBuilder.repeat(int,int)",
       "introducedIn": 21,
@@ -316,6 +328,19 @@
     }
   ],
   "fixtures": [
+    {
+      "id": "duration-is-positive",
+      "source": "classes/modern_fixture/Java21DurationIsPositive.java",
+      "mainClass": "classes.modern_test.Java21DurationIsPositive",
+      "releases": [21, 25],
+      "workloadIds": ["W-JAVA21", "W-JAVA25"],
+      "packageIds": ["JVM-001", "JVM-003", "LIB-008"],
+      "requirementIds": ["API-DURATION-IS-POSITIVE"],
+      "arguments": [],
+      "comparison": "successful-native-oracle-stdout-stderr",
+      "coverage": ["zero", "nanosecond-sign-boundaries", "extreme-seconds", "direct-call", "reflection", "method-handle"],
+      "limitations": "Selected sign and method-visibility assertions; not a complete java.time audit."
+    },
     {
       "id": "float-precision",
       "source": "classes/modern_fixture/Java21FloatPrecision.java",

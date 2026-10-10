@@ -55,7 +55,7 @@ specification, not assumed from a successful native example.
 | [Core-language fixture notes](modern-java.md#known-core-lang-gaps) | Recent repeat, bounded indexOf and delimiter-preserving split fixtures include local Corretto 25.0.3 comparisons of genuine `--release 21` output | Reproducible native Java 21/25 release gates or broad modern language coverage |
 | [Playground launcher](../website/src/playground.mjs) and [browser suite](../ci/pages_browser_smoke.mjs) | Java 8 tools.jar javac and pinned Kotlin/Scala compile and execute in Doppio | Running modern javac or a modern JDK module image inside Doppio |
 | [Package smoke](../ci/package_artifact_smoke.mjs) | Isolated installation/rebuild, CLI help contracts, API types and bundle import | Java application compatibility; the isolated consumer uses an offline dummy runtime fixture |
-| [Seed manifest](../ci/java_compatibility_manifest.json), [toolchain lock](../ci/java_compatibility_toolchains.lock.json) and [comparison runner](../ci/run_java_compatibility.mjs) | Eighteen fixtures are compared on matching Java 21 and 25 toolchains, Node and Chromium, including selected public switch APIs, final-language/launcher behavior, Java 25 IO and one explicitly generated bootstrap-contract companion, with input/runtime hashes | A complete requirement inventory or full final Java 22–25 feature conformance |
+| [Seed manifest](../ci/java_compatibility_manifest.json), [toolchain lock](../ci/java_compatibility_toolchains.lock.json) and [comparison runner](../ci/run_java_compatibility.mjs) | Twenty-one fixtures are compared on matching Java 21 and 25 toolchains, Node and Chromium, including selected public switch APIs, final-language/launcher behavior, Java 25 IO, `Duration.isPositive()`, and one explicitly generated bootstrap-contract companion, with input/runtime hashes | A complete requirement inventory or full final Java 22–25 feature conformance |
 
 The version matrix currently labels every Java 9–26 row partial. Its rows and
 the 76 language smoke scripts are not a valid denominator for an overall completion
@@ -99,13 +99,13 @@ the manifest. No server framework is selected.
 The seed manifest maps eight string API overloads, one binary32 instruction
 requirement, four language/runtime
 requirements, two public switch bootstrap APIs, two unnamed-variable/pattern requirements, module imports,
-flexible constructors, compact sources/instance mains and five Java 25 IO methods
-to twenty fixtures (twenty-six requirements). Seven
+flexible constructors, compact sources/instance mains, five Java 25 IO methods,
+and `Duration.isPositive()` to twenty-one fixtures (twenty-seven requirements). Eight
 drivers cover binary32 numeric instructions, repeat, delimiter-preserving split, bounded indexOf, final pattern
-switches/record patterns, bootstrap contracts and public bootstrap calls on matching javac `--release 21`
+switches/record patterns, bootstrap contracts, public bootstrap calls, and duration sign on matching javac `--release 21`
 and `--release 25`. Six isolated IO modes, five final-source/launcher drivers and
 the identity and exact-conversion primitive-switch API fixtures use `--release 25` only.
-Together they produce twenty-seven cases and fifty-four
+Together they produce twenty-nine cases and fifty-eight
 required host comparisons. The contract fixture explicitly
 replaces only its companion with deterministic generated call sites that Java
 source cannot express; generator source/hash and execution are recorded before

@@ -2679,6 +2679,15 @@ function addJavaTimeDurationModernOverlays(data: Buffer): Buffer {
         codePrefix: [0x2a]
       },
       {
+        name: 'isPositive',
+        descriptor: '()Z',
+        helperDescriptor: '(Ljava/time/Duration;)Z',
+        returnOpcode: 0xac,
+        maxStack: 1,
+        maxLocals: 1,
+        codePrefix: [0x2a]
+      },
+      {
         name: 'toDaysPart',
         descriptor: '()J',
         helperDescriptor: '(Ljava/time/Duration;)J',

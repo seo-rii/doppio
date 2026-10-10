@@ -22,6 +22,11 @@ final class DoppioDuration {
     return duration.getSeconds();
   }
 
+  static boolean isPositive(Duration duration) {
+    return duration.getSeconds() > 0 ||
+        (duration.getSeconds() == 0 && duration.getNano() > 0);
+  }
+
   static long toDaysPart(Duration duration) {
     return duration.toDays();
   }

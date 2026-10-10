@@ -1834,6 +1834,11 @@ expanded.
   `file.encoding`, `Charset.defaultCharset()`, default `String` byte
   decoding/encoding, and default `InputStreamReader`/`OutputStreamWriter` byte
   conversion.
+- Java 18 `Duration.isPositive()` is an ordinary parsed method on the retained
+  Java 8 class. Genuine javac 21 and 25 fixtures compare direct calls,
+  reflection, and unreflected handles with their matching native JDKs across
+  zero, nanosecond sign boundaries, and extreme seconds. This is a selected
+  `java.time` API slice, not a complete time-library compatibility claim.
 - Selected Java 19 `Thread.threadId()` behavior is covered for the current
   thread, including a positive identifier and parity with the existing
   `Thread.getId()` value. Selected Java 19 `Thread.sleep(Duration)` behavior

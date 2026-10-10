@@ -105,16 +105,30 @@ function environment(context) {
     runtimeRoot, calls, execute, run, save };
 }
 
-test('checked-in inventory has twenty fixtures covering twenty-six final requirements', () => {
+test('checked-in inventory has twenty-one fixtures covering twenty-seven final requirements', () => {
   const spec = validateManifest(JSON.parse(fs.readFileSync(path.join(repoRoot, 'ci/java_compatibility_manifest.json'))));
-  assert.equal(spec.fixtures.length, 20);
-  assert.equal(spec.requirements.length, 26);
+  assert.equal(spec.fixtures.length, 21);
+  assert.equal(spec.requirements.length, 27);
   assert.deepEqual(spec.releases, [21, 25]);
-  assert.equal(spec.fixtures.filter(fixture => fixture.releases.includes(21)).length, 7);
-  assert.equal(spec.fixtures.filter(fixture => fixture.releases.includes(25)).length, 20);
+  assert.equal(spec.fixtures.filter(fixture => fixture.releases.includes(21)).length, 8);
+  assert.equal(spec.fixtures.filter(fixture => fixture.releases.includes(25)).length, 21);
   const requiredCases = spec.fixtures.reduce((count, fixture) => count + fixture.releases.length, 0);
-  assert.equal(requiredCases, 27);
-  assert.equal(requiredCases * spec.approvedTarget.requiredHosts.length, 54);
+  assert.equal(requiredCases, 29);
+  assert.equal(requiredCases * spec.approvedTarget.requiredHosts.length, 58);
+});
+
+test('Duration.isPositive is a mandatory native-oracle API case on both releases', () => {
+  const spec = validateManifest(JSON.parse(fs.readFileSync(path.join(repoRoot, 'ci/java_compatibility_manifest.json'))));
+  const requirement = spec.requirements.find(entry => entry.id === 'API-DURATION-IS-POSITIVE');
+  const fixture = spec.fixtures.find(entry => entry.id === 'duration-is-positive');
+  assert.equal(requirement.signature, 'boolean java.time.Duration.isPositive()');
+  assert.equal(requirement.introducedIn, 18);
+  assert.equal(requirement.packageId, 'LIB-008');
+  assert.equal(fixture.source, 'classes/modern_fixture/Java21DurationIsPositive.java');
+  assert.deepEqual(fixture.releases, [21, 25]);
+  assert.deepEqual(fixture.requirementIds, [requirement.id]);
+  assert.deepEqual(fixture.workloadIds, ['W-JAVA21', 'W-JAVA25']);
+  assert.equal(fixture.comparison, 'successful-native-oracle-stdout-stderr');
 });
 
 test('binary32 opcode precision is mandatory on Java 21 and 25 without claiming full floating-point conformance', () => {
