@@ -1,0 +1,1189 @@
+{
+  "schemaVersion": 1,
+  "inventoryState": "source-contracts-classified",
+  "conformanceClaim": false,
+  "helperSha256": "f716866895df18b17ab73cb849001852a0200b00d3d16db8a78f3c907356cc52",
+  "generatorSha256": "7c47e1fa2b9a6c31802f0e6e68e32efe3437b4f06e30aaf006aeb486db72b673",
+  "toolchainLockSha256": "44512745628978f337ae09c66aae7fa2a85d295eca78da8649be49e59df69962",
+  "ledgerSha256": "3a36d7330b2d9ef9a837bc406ad5e16ddc06aca30caa278f88b567592cd2ae94",
+  "releases": [
+    {
+      "release": 21,
+      "toolchainId": "jdk21",
+      "provenance": {
+        "helperSha256": "f716866895df18b17ab73cb849001852a0200b00d3d16db8a78f3c907356cc52",
+        "sourceArchiveSha256": "ddde6415037260090aab425b8644699ca3d7e6796bb73f7af621b60f406c697f",
+        "toolchainArchiveSha256": "5b4dc8817df13f88f9bfc434e5d018adb535889ff2fe0ccf758bcebcc216f394",
+        "toolchainTreeSha256": "cd0db18f9cb742dde2e108e644c19a0cd15e10c7cf0417ecb74d92c27c7a8bd5"
+      },
+      "sourceRecordsArtifact": "build/java-se-contract-sources/jdk21-source-docs.tsv.gz",
+      "sourceRecordsSha256": "8efe5cd775f526b76d02601cb8400b92885b9b2dd509dee22ea7d1a8e38d04a3",
+      "sourceCorrections": [
+        {
+          "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/net/doc-files/net-properties.html#Ipv4IPv6",
+          "originalUrl": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/net/spi/doc-files/net-properties.html#Ipv4IPv6",
+          "reason": "InetAddressResolver.LookupPolicy type prose uses a broken relative path; its of(int) contract explicitly references the canonical java/net document through docRoot."
+        }
+      ],
+      "packageProseSupplements": [
+        {
+          "specification": "https://docs.oracle.com/en/java/javase/21/docs/api/java.management.rmi/javax/management/remote/rmi/package-summary.html",
+          "sourceSha256": "de372bb6180804e56f1eb08d16df242a2e6563f8551c7e31c4b7d2e1cd636595"
+        },
+        {
+          "specification": "https://docs.oracle.com/en/java/javase/21/docs/api/java.management/java/lang/management/package-summary.html",
+          "sourceSha256": "8a3534e02f64756f56e790e43566bc7902cfed75289abf23c70604b3a993114b"
+        },
+        {
+          "specification": "https://docs.oracle.com/en/java/javase/21/docs/api/java.management/javax/management/package-summary.html",
+          "sourceSha256": "e15fb1214e9616a78a1b7b33ce5df22e4d29985c3539cf67b460f463543ad5be"
+        },
+        {
+          "specification": "https://docs.oracle.com/en/java/javase/21/docs/api/java.management/javax/management/loading/package-summary.html",
+          "sourceSha256": "5a499158111089cfa1f44951d19b3a0bf9f9f287b3b2e7ae371b7c7e9f6cf0ff"
+        },
+        {
+          "specification": "https://docs.oracle.com/en/java/javase/21/docs/api/java.management/javax/management/modelmbean/package-summary.html",
+          "sourceSha256": "4d8e0ef8af7d3d84ae9443dc566b682e4078ff9860cede8d85d4908e1f4b4f4e"
+        },
+        {
+          "specification": "https://docs.oracle.com/en/java/javase/21/docs/api/java.management/javax/management/monitor/package-summary.html",
+          "sourceSha256": "cd2205b6b6286709f05107eac449c22d7703f7f4ec4533d451e6d79c56c0f252"
+        },
+        {
+          "specification": "https://docs.oracle.com/en/java/javase/21/docs/api/java.management/javax/management/openmbean/package-summary.html",
+          "sourceSha256": "e51263388387c5969142a5207807b5f26410de01d9016732c2d958fd69b38aa5"
+        },
+        {
+          "specification": "https://docs.oracle.com/en/java/javase/21/docs/api/java.management/javax/management/relation/package-summary.html",
+          "sourceSha256": "3594fbc247dcc64bcb8ecc981b805632430a76818ce4d51718a530caf32e0701"
+        },
+        {
+          "specification": "https://docs.oracle.com/en/java/javase/21/docs/api/java.management/javax/management/remote/package-summary.html",
+          "sourceSha256": "20d5bfd6b52cb5169ac1be887eb5adc49a65eaeebd88fc0a306eca3b32e01940"
+        },
+        {
+          "specification": "https://docs.oracle.com/en/java/javase/21/docs/api/java.management/javax/management/timer/package-summary.html",
+          "sourceSha256": "7960002bd3f5347e4d22136e491845f8d83d6ed90b06f6d0445a9fcf9f87cf04"
+        },
+        {
+          "specification": "https://docs.oracle.com/en/java/javase/21/docs/api/java.naming/javax/naming/package-summary.html",
+          "sourceSha256": "4f2be9dfe64b214fc32519aeefa5493bb27ae285da2328a89695de2fa6cc17bc"
+        },
+        {
+          "specification": "https://docs.oracle.com/en/java/javase/21/docs/api/java.naming/javax/naming/directory/package-summary.html",
+          "sourceSha256": "6d12df6ca43a6dc54ab684afb93f288de8820ae011133c4abe2c15e78dbebbf1"
+        },
+        {
+          "specification": "https://docs.oracle.com/en/java/javase/21/docs/api/java.naming/javax/naming/event/package-summary.html",
+          "sourceSha256": "2d8061a30dadfe27e9a2f54884d6bef4ef8d1490981609390d9cc004460c2f6d"
+        },
+        {
+          "specification": "https://docs.oracle.com/en/java/javase/21/docs/api/java.naming/javax/naming/ldap/package-summary.html",
+          "sourceSha256": "512476426cfd15a02b30cf79967eea598ca70391532fba991b9ea89a62397a6c"
+        },
+        {
+          "specification": "https://docs.oracle.com/en/java/javase/21/docs/api/java.naming/javax/naming/ldap/spi/package-summary.html",
+          "sourceSha256": "d04902ce9e478afd443b0ca559dd541977032cf883431be4c6628e76ca743c7b"
+        },
+        {
+          "specification": "https://docs.oracle.com/en/java/javase/21/docs/api/java.naming/javax/naming/spi/package-summary.html",
+          "sourceSha256": "fb6a14504205dd75082c3a5db5f4389490b5a51140f9f3cafac640f4d03c5f97"
+        }
+      ],
+      "sourceFiles": 4143,
+      "publicDocumentationUnits": 48858,
+      "publicDocumentationSha256": "fc51a8fd523ee15954ff79cb56ded995347d67f6203cc78de94126cc2226a62f",
+      "moduleDescriptorsSha256": "8b50438641850f281a786da72cb85a328f8339ed77f9f60d1932ee3ba6664632",
+      "sourceFilesSha256": "533292a7385ce8b437f9676a55aa9800aa89c347dec45de8c5a769009d2b8207",
+      "externalReferenceDiscovery": "pinned-public-api-doctrees",
+      "units": 2124,
+      "counts": {
+        "doc-file": 106,
+        "incorporated-reference": 601,
+        "package-prose": 16,
+        "platform-specification": 69,
+        "preview-reference": 1,
+        "provider-identity": 43,
+        "serialized-form": 1207,
+        "service-contract": 80,
+        "service-loader-contract": 1
+      },
+      "applicability": {
+        "documentation-resource": 68,
+        "incorporated-by-contract": 660,
+        "jdk-implementation-evidence": 55,
+        "jdk-specific-exclusion": 78,
+        "preview-exclusion": 1,
+        "target-contract": 1262
+      }
+    },
+    {
+      "release": 25,
+      "toolchainId": "jdk25",
+      "provenance": {
+        "helperSha256": "f716866895df18b17ab73cb849001852a0200b00d3d16db8a78f3c907356cc52",
+        "sourceArchiveSha256": "9bf8976618453283971347d4bbcfe2ca0a693c4d1af213aeebae64e2f864e516",
+        "toolchainArchiveSha256": "00486fa402136f8d40512b101c645dd4db9be2b5535171530ad241cd96c1223d",
+        "toolchainTreeSha256": "1631db0be3d1f81d99f4246c4fa3e9045d820b123cac9eb20da6eb8987d27c68"
+      },
+      "sourceRecordsArtifact": "build/java-se-contract-sources/jdk25-source-docs.tsv.gz",
+      "sourceRecordsSha256": "d29b274c00568095598659d33b59b055724c643aaf3716aeda0480906ab09a27",
+      "sourceCorrections": [],
+      "packageProseSupplements": [],
+      "sourceFiles": 4328,
+      "publicDocumentationUnits": 51036,
+      "publicDocumentationSha256": "20a62d723be2e522fed0b85081a1add18f157e4c09746541f3ee20f5b1c91c18",
+      "moduleDescriptorsSha256": "46dba4496a6c18acd13f626c0cfd6cdc6d679fa655ac4313cde4fa07d1bbbb17",
+      "sourceFilesSha256": "80fedc840fba7471fdd5b8e21ac7c102b5a9000c0ab763ac916a0d2d83e05b94",
+      "externalReferenceDiscovery": "pinned-public-api-doctrees-and-official-external-specs-index",
+      "units": 2176,
+      "counts": {
+        "doc-file": 108,
+        "incorporated-reference": 656,
+        "jdk-external-reference": 4,
+        "platform-specification": 74,
+        "preview-reference": 3,
+        "provider-identity": 40,
+        "serialized-form": 1211,
+        "service-contract": 79,
+        "service-loader-contract": 1
+      },
+      "applicability": {
+        "documentation-resource": 68,
+        "incorporated-by-contract": 722,
+        "jdk-implementation-evidence": 52,
+        "jdk-specific-exclusion": 81,
+        "preview-exclusion": 3,
+        "target-contract": 1250
+      }
+    }
+  ],
+  "documents": [
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/doc-files/threadPrimitiveDeprecation.html",
+      "bytes": 17466,
+      "sha256": "17d32596e93144233cd092699d78f7c5ece1530ae05e2fc4831feec90ff770d4"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/doc-files/ValueBased.html",
+      "bytes": 7816,
+      "sha256": "7a6b607781254155b11f41a2d702e29b10c2d0c8d968dd57cd9eeadfe6c22228"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/net/doc-files/net-properties.html",
+      "bytes": 29137,
+      "sha256": "4118840af675fdbfef8908215cad2dcbbece798dc434ac18437b500a3f1c5ba5"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/doc-files/coll-designfaq.html",
+      "bytes": 23464,
+      "sha256": "5bc5e182fe1de7cedc6635e12c4b184bba3dea28cf143e6447c81035d908d0ce"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/doc-files/coll-index.html",
+      "bytes": 6933,
+      "sha256": "654a15ae4c40e39a9e443427a857037ca1bf5539a492fc1fdef80ea1b75ea84f"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/doc-files/coll-overview.html",
+      "bytes": 20194,
+      "sha256": "3af965b11e2b895bb3a1338ebf454918acf322969de2b97bf0655c6a6060dda1"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/doc-files/coll-reference.html",
+      "bytes": 28512,
+      "sha256": "326a31f16a2d792716c1181ec061364d677c01c576cc5c8058a4e35941d4d82b"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ServiceLoader.html",
+      "bytes": 57107,
+      "sha256": "fc37aee6b459691e8de1d8963c1dc65938f44889261899d69d7e1f4a49b13b72"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/AWTThreadIssues.html",
+      "bytes": 11957,
+      "sha256": "f3e471b64f71d9d9358fac27c05f01d7932aef4cda135cab60adae7031b55158"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/BorderLayout-1.gif",
+      "bytes": 2716,
+      "sha256": "95327526e27d58683293ed707fad5fb432dc1f235ff706bead4dc1bca4ccb9de"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/Button-1.gif",
+      "bytes": 1920,
+      "sha256": "a4c155cddb4b8219ab400b34ebb9d8ec01ee82d78c533ec42de7db71ad2457f0"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/Checkbox-1.gif",
+      "bytes": 2375,
+      "sha256": "7d32df4bef1c0b307820827c891a80867e00a4c4c6bd0e38ed6e914b606d5eed"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/CheckboxGroup-1.gif",
+      "bytes": 712,
+      "sha256": "7f12489141ccc8a69ca53ce1b723b3b590b39c01cf2653807a92219b2bffe1ed"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/Choice-1.gif",
+      "bytes": 486,
+      "sha256": "d5179088d0f7d7f8d9ce3a63c9473b8d2cafa8257f8a8dd6025e66f81b08e972"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/DesktopProperties.html",
+      "bytes": 16385,
+      "sha256": "6c452be1899f9d28705e58cd693a074b3e1963a2e32599cceb927e59a4be18cc"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/FlowLayout-1.gif",
+      "bytes": 1918,
+      "sha256": "60329dac09c3da8cfe27ecf6d91ffd0f63954d203e06f6137997fc44f45ba05b"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/FocusCycle.svg",
+      "bytes": 4261,
+      "sha256": "44f75fe00f482b9efe40fe4a98c1761678e612d92eca2e8e187b13c8109a5ffb"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/FocusSpec.html",
+      "bytes": 75799,
+      "sha256": "bf6913f0456939ae163ac6e7e16c78c0bd646a093c312c85029b2563ca86d46f"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/FontMetrics-1.gif",
+      "bytes": 290,
+      "sha256": "73a695c3b7d551a8563ba703a813d498d1851c82204008df1eee71c65b96f068"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/GridBagLayout-1.gif",
+      "bytes": 2608,
+      "sha256": "562dfdef63847479e89b0d6bd18284f479fa077a16f406340c278ac3797dbee0"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/GridBagLayout-2.gif",
+      "bytes": 2592,
+      "sha256": "0579e5732ef871374e8c39a1d00e746324d99fe8b1d4f9dc620c45300c07a652"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/GridBagLayout-baseline.png",
+      "bytes": 615,
+      "sha256": "e75e857e16d43214a27f259532b78332c7bd57e7b49612a84bdb913fa4f29b9d"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/GridLayout-1.gif",
+      "bytes": 1764,
+      "sha256": "e27cc7489dd2c75c8319c43a0443d8247a4143e35c596eeb7ebc68f6f266ab80"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/GridLayout-2.gif",
+      "bytes": 1776,
+      "sha256": "888253ef75ea81870897b74ff6370832cfe383402372ada6f0e30a936d9d34f3"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/ImplicitFocusTransfer1.svg",
+      "bytes": 3316,
+      "sha256": "b9cbd5a3f8001968fa59f2d3f7cda1ca53978d14cf31067d10cd033874cbbd0e"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/ImplicitFocusTransfer2.svg",
+      "bytes": 3166,
+      "sha256": "92d56bc70445da42c565926fda1bb12a774a2f4b4888d2faba518226a9a37de8"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/Label-1.gif",
+      "bytes": 819,
+      "sha256": "ff348975445ea58d02309c2b7a1210a16a24fa56d81e1021538e713893f00e56"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/LinearGradientPaint.png",
+      "bytes": 2147,
+      "sha256": "9dfcb0687364d699ac882dabdacbe8069ddd4c5cd9096daac9849c03eab989fa"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/List-1.gif",
+      "bytes": 4193,
+      "sha256": "975ade62ae843307857b965531701d2d89e700532e10edc746f686974bfd6b5b"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/MenuBar-1.gif",
+      "bytes": 2268,
+      "sha256": "3833669c3817c024d1768b39826de5020c9253f13f18c591e89f1b81c31ae28f"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/modal-example1.svg",
+      "bytes": 2943,
+      "sha256": "681f9c84cff1551c977513d3efadf225bd761186a6caeed82c3f98aa464b3319"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/modal-example2.svg",
+      "bytes": 3074,
+      "sha256": "d769494287dbc77fc95472cafd1a1877c233d05cbb823e154d9605aa86480318"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/modal-example3.svg",
+      "bytes": 3576,
+      "sha256": "8b3a417787ce2610cf6997909c4cead362e6859fcf92e764ee893c5917e30ed1"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/modal-example4.svg",
+      "bytes": 3533,
+      "sha256": "63453cb55d52f121a292325adbdf54b48f92d5073d4b08bb8c812226a1195710"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/Modality.html",
+      "bytes": 23613,
+      "sha256": "337ab9f5a5c4209c5f5e64e250704cbdcfe89e7a847d185410a6ba4d853abb8a"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/MultiScreen.gif",
+      "bytes": 3131,
+      "sha256": "0a85318aeb63c2a8277393e55b8a60e09a9faa68ba39b4a7151bc745e60839cb"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/RadialGradientPaint-1.png",
+      "bytes": 13572,
+      "sha256": "58ca47763ade437dfbb07b0b694b11416145cdde07c19bf12072e2a960f820f0"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/RadialGradientPaint-2.png",
+      "bytes": 12021,
+      "sha256": "a7daa6555f953889b857972ff58ed43ffeb88e79fa65f50eae65c166b68051a0"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/RadialGradientPaint-3.png",
+      "bytes": 7219,
+      "sha256": "c4746cca201dcf257fa48159d32e0db0b570f85b496140cd4c989b679e51ca11"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/RadialGradientPaint-4.png",
+      "bytes": 6902,
+      "sha256": "5dfd8d121982e1e70f9714200689a7d1e76e9311018f845238b5389aa800d036"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/Scrollbar-1.gif",
+      "bytes": 968,
+      "sha256": "bac512447f6088a0919abb7e8417a2278f4472526370887c79bfda9e030b68a4"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/Scrollbar-2.gif",
+      "bytes": 1938,
+      "sha256": "3778ad2158f157d9c0baee75ff057e33b129c39a4e5e9ee7e24ca9ae38d60aed"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/TextArea-1.gif",
+      "bytes": 2234,
+      "sha256": "eeb4c31020a2f92b397a204b3f1c41a0d6e42ca3f4a4e4c1fcc183a3f08b0970"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/doc-files/TextField-1.gif",
+      "bytes": 2522,
+      "sha256": "2372d068b2b506e90c3a95049f14dbc60e049c89d4025ce418d94622da8af0ac"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/imageio/metadata/doc-files/bmp_metadata.html",
+      "bytes": 10710,
+      "sha256": "ece7c9d1be8d2bd3b32d89c0f81223c20b7d1d488d5d0ece8f37230df9f56dc0"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/imageio/metadata/doc-files/gif_metadata.html",
+      "bytes": 22810,
+      "sha256": "c399e90fda8a1bba78a3320bd95e56f3c4d8db5119f5b5e39d11e5ba9f705a8d"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/imageio/metadata/doc-files/jpeg_metadata.html",
+      "bytes": 62574,
+      "sha256": "4334452a2b01152291230cdf9aad4d211e78ec4e3de909d2da5c69c912573c52"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/imageio/metadata/doc-files/png_metadata.html",
+      "bytes": 31289,
+      "sha256": "e65723d87b406adb3bf9261f5ae8a56144b0e635ff1955e15591574d79a061f5"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/imageio/metadata/doc-files/standard_metadata.html",
+      "bytes": 22802,
+      "sha256": "e6486e37f56659ed8affb8caf52d0aa6214bdba55bd1197ef1e2501796404159"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/imageio/metadata/doc-files/tiff_metadata.html",
+      "bytes": 53138,
+      "sha256": "18ee204a04193fa449f9dfac54654596208fc288dc2456dd8b50708453f568e6"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/imageio/metadata/doc-files/wbmp_metadata.html",
+      "bytes": 6412,
+      "sha256": "874b6b86a0de74cc868444f6d2a7b9e6e54face61e53280a4855ce235d5c7c1e"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/doc-files/BoxLayout-1.gif",
+      "bytes": 1779,
+      "sha256": "7afa721ab87c8b0c7b912fecea739996f28de47ccf1fb0ed569ec45d08bf2a9a"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/doc-files/groupLayout.1.gif",
+      "bytes": 2913,
+      "sha256": "b6017f1de6c0c5f3c4fafa2d28b4fb1f08662353fe09f34a1f3efdfd11dcdf26"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/doc-files/groupLayout.2.gif",
+      "bytes": 3221,
+      "sha256": "a09ba7df6437aa9f0d34b01c9964c238e305d2c19f9e946394fa7ca71d78e641"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/doc-files/groupLayout.3.gif",
+      "bytes": 3515,
+      "sha256": "308b232afd4a8176cdd3c975cb692c71870aeff21d2ca37dd952f2118a98f7b3"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/doc-files/groupLayout.example.png",
+      "bytes": 2991,
+      "sha256": "27ef428d2dd7efc7b79e2500532abd31d033392417451410957ccba499fb78ae"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/doc-files/JLayeredPane-1.gif",
+      "bytes": 1808,
+      "sha256": "2d5d31e5e4b94ca1a3b5b92d3876c1bf61cf74fe7e43a37b0200b824561793fe"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/doc-files/JRootPane-1.gif",
+      "bytes": 5515,
+      "sha256": "b4a93a5b4f85e75695891bde14f14ebd31756f0bd95fbcea0da5938f0f022b33"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/doc-files/JRootPane-2.gif",
+      "bytes": 2700,
+      "sha256": "b3fba97a0372d4271061c4ef01068bc2a6d910b5edfe78329b4e2cd1624b2eb7"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/doc-files/JScrollPane-1.gif",
+      "bytes": 2504,
+      "sha256": "b5579db2d552556ec91b4b45d80ceef101905cd811b4df26674642868c1b9e23"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/doc-files/SizeSequence-1.gif",
+      "bytes": 912,
+      "sha256": "b449761712d4c2f68844b9ea32b51d2ae55123d84f9d3507f0e8a0abb2699945"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/plaf/multi/doc-files/multi_tsc.html",
+      "bytes": 25063,
+      "sha256": "2a9877f28066f2162a77b1193a937a642fa2323bb089468d1f7ef56cbceac815"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/plaf/nimbus/doc-files/properties.html",
+      "bytes": 12489,
+      "sha256": "9ddb1d727bb1835f8d6db57a4db2c271da48ff9f6d256c0e052d70d5a0533694"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/plaf/synth/doc-files/componentProperties.html",
+      "bytes": 44172,
+      "sha256": "c43f5d330f27d2d40809e247f955b828b4665a139717662b1f3372c86efbef43"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/plaf/synth/doc-files/synth.dtd",
+      "bytes": 5460,
+      "sha256": "d0216213da3916c00ea6592080ee5efffd5af1b7abeb1b7f4d0af7243aa3883f"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/plaf/synth/doc-files/synthFileFormat.html",
+      "bytes": 47017,
+      "sha256": "7eb2dcce59ab05b5df10298cde8e500f16cab5a27421cf8b688183737e33fabb"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/text/doc-files/Document-coord.gif",
+      "bytes": 2480,
+      "sha256": "0cebc8985716fa81c1fd5ceaaf264897ffc29251e7e4e0c6ce6d4c7ff52c5359"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/text/doc-files/Document-insert.gif",
+      "bytes": 3747,
+      "sha256": "cab93e31db1eb7390cebdf5298738956f478c18052dcdf4f70e541d8061b71ca"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/text/doc-files/Document-notification.gif",
+      "bytes": 12309,
+      "sha256": "575a2c1ab55c676e1e6af531d0a312a2b4f4fea7bc30ccb864694f4162d47f25"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/text/doc-files/Document-remove.gif",
+      "bytes": 4059,
+      "sha256": "5ada6a4481b95abca567fa01d3a69667703a9542495036fd16082f65d3476e37"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/text/doc-files/Document-structure.gif",
+      "bytes": 5664,
+      "sha256": "0f47ec23c2b7c7e0cf6127b881c70965f701ab32f70ce08b151c1500a0dae02a"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/text/doc-files/editor.gif",
+      "bytes": 4768,
+      "sha256": "91d7148d195c8cc1ad0091f10914b35379fc2071b73c1cae5a9dc8127a7eee80"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/text/doc-files/paragraph.gif",
+      "bytes": 4695,
+      "sha256": "fbc7e0a9a7c6f95e8d0dc99b44f425e3393adab3077a22054a6eaf18c52028f1"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/text/doc-files/plain1.gif",
+      "bytes": 3788,
+      "sha256": "5b33ada087427a428c516bc4e5cb7ca7cc7daac329ee2947371152306a336662"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/text/doc-files/plain10.gif",
+      "bytes": 9278,
+      "sha256": "2e2ed7f04d953e74fa33ae44657ab38f3d3f6ee018120699e2ea75eea5986f8e"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/text/doc-files/plain11.gif",
+      "bytes": 6409,
+      "sha256": "5ba4437dfb23f34b5e60ebcd57ef04f2486fc61b6536cd69fc1ee44ca18961d4"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/text/doc-files/plain12.gif",
+      "bytes": 7553,
+      "sha256": "90ad515835e1122d008dda52dde933e8eb940d14670c24494ff5096b316081a5"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/text/doc-files/plain2.gif",
+      "bytes": 5644,
+      "sha256": "442ef352c996f89522811779ca9a70b305e782299feed719f902030712ee43a0"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/text/doc-files/plain3.gif",
+      "bytes": 5881,
+      "sha256": "a0072b0d270d2ecef17b1359338cde59259c4270ff23f1925838f05b9d284f2c"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/text/doc-files/plain4.gif",
+      "bytes": 7960,
+      "sha256": "913997c4fff2f26f08365de0461608a2c5dd255380a08fc4ca18dcc31266f7d2"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/text/doc-files/plain5.gif",
+      "bytes": 3339,
+      "sha256": "6a519c23f4d0dfe95709695ab0202e5fec330391a351c652ec5e84fd8a0d05e3"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/text/doc-files/plain6.gif",
+      "bytes": 5829,
+      "sha256": "9c1c48c5bc4505d3e2f9bf4d9fdea56903e5761428bf15805b5e3217c4320169"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/text/doc-files/plain7.gif",
+      "bytes": 11337,
+      "sha256": "3feb830562c3da3e003608901d683f95420f73bad58f31a18874e92883481c32"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/text/doc-files/plain8.gif",
+      "bytes": 7195,
+      "sha256": "d86813159dfd7f5b80cf3b3dfd5bc337f367afad30122bf9c12da02da58a15eb"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/text/doc-files/plain9.gif",
+      "bytes": 8746,
+      "sha256": "e92f2f5947a61a799f55dea14f7433f392f3de9ace0a5eaf765da30fe2608d2e"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/text/doc-files/View-flexibility.jpg",
+      "bytes": 26097,
+      "sha256": "9cfff83fd90d7dfc2b66d3ba8a799dd03c7e9c30bc539d3fc5ff5d622b402fda"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/text/doc-files/View-layout.jpg",
+      "bytes": 40479,
+      "sha256": "46c170dbfe03802a628a2e66ac7b52140acfbd0e927bc7ac8294c21018ab38fc"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/undo/doc-files/UndoManager-1.gif",
+      "bytes": 2739,
+      "sha256": "556967cd416ef9ee29d5290e46d80ff95f40fde7ce3b8f893e2a35004a0a7a46"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/undo/doc-files/UndoManager-2.gif",
+      "bytes": 2721,
+      "sha256": "813de23a36162f52867386900e878c67e9d1301a9a9d1b2b80fee9d6a2da65b2"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/undo/doc-files/UndoManager-3.gif",
+      "bytes": 2714,
+      "sha256": "0086e4eeeb44ed0ff574644acc2b8c8421dcdfd13a227cb182e51f83682aab84"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/undo/doc-files/UndoManager-4.gif",
+      "bytes": 2728,
+      "sha256": "d0d0cab157400923424370cf053bd419520184323fdf8137e57c1bde996dacf9"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.management.rmi/javax/management/remote/rmi/package-summary.html",
+      "bytes": 25176,
+      "sha256": "de372bb6180804e56f1eb08d16df242a2e6563f8551c7e31c4b7d2e1cd636595"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.management/java/lang/management/package-summary.html",
+      "bytes": 25099,
+      "sha256": "8a3534e02f64756f56e790e43566bc7902cfed75289abf23c70604b3a993114b"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.management/javax/management/loading/package-summary.html",
+      "bytes": 14360,
+      "sha256": "5a499158111089cfa1f44951d19b3a0bf9f9f287b3b2e7ae371b7c7e9f6cf0ff"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.management/javax/management/modelmbean/package-summary.html",
+      "bytes": 16940,
+      "sha256": "4d8e0ef8af7d3d84ae9443dc566b682e4078ff9860cede8d85d4908e1f4b4f4e"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.management/javax/management/monitor/package-summary.html",
+      "bytes": 20803,
+      "sha256": "cd2205b6b6286709f05107eac449c22d7703f7f4ec4533d451e6d79c56c0f252"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.management/javax/management/openmbean/package-summary.html",
+      "bytes": 26183,
+      "sha256": "e51263388387c5969142a5207807b5f26410de01d9016732c2d958fd69b38aa5"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.management/javax/management/package-summary.html",
+      "bytes": 55236,
+      "sha256": "e15fb1214e9616a78a1b7b33ce5df22e4d29985c3539cf67b460f463543ad5be"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.management/javax/management/relation/package-summary.html",
+      "bytes": 24594,
+      "sha256": "3594fbc247dcc64bcb8ecc981b805632430a76818ce4d51718a530caf32e0701"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.management/javax/management/remote/package-summary.html",
+      "bytes": 23099,
+      "sha256": "20d5bfd6b52cb5169ac1be887eb5adc49a65eaeebd88fc0a306eca3b32e01940"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.management/javax/management/timer/package-summary.html",
+      "bytes": 10306,
+      "sha256": "7960002bd3f5347e4d22136e491845f8d83d6ed90b06f6d0445a9fcf9f87cf04"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.naming/javax/naming/directory/package-summary.html",
+      "bytes": 18688,
+      "sha256": "6d12df6ca43a6dc54ab684afb93f288de8820ae011133c4abe2c15e78dbebbf1"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.naming/javax/naming/event/package-summary.html",
+      "bytes": 15935,
+      "sha256": "2d8061a30dadfe27e9a2f54884d6bef4ef8d1490981609390d9cc004460c2f6d"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.naming/javax/naming/ldap/package-summary.html",
+      "bytes": 27097,
+      "sha256": "512476426cfd15a02b30cf79967eea598ca70391532fba991b9ea89a62397a6c"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.naming/javax/naming/ldap/spi/package-summary.html",
+      "bytes": 7915,
+      "sha256": "d04902ce9e478afd443b0ca559dd541977032cf883431be4c6628e76ca743c7b"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.naming/javax/naming/package-summary.html",
+      "bytes": 29073,
+      "sha256": "4f2be9dfe64b214fc32519aeefa5493bb27ae285da2328a89695de2fa6cc17bc"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.naming/javax/naming/spi/package-summary.html",
+      "bytes": 15535,
+      "sha256": "fb6a14504205dd75082c3a5db5f4389490b5a51140f9f3cafac640f4d03c5f97"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/serialized-form.html",
+      "bytes": 1935696,
+      "sha256": "73d08775d1650ef5cce3e326cac45670cc2dd5dbce22d392251fd7005c77fb39"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/specs/index.html",
+      "bytes": 5317,
+      "sha256": "d2a6dd6fc5d40bc0177bc0469069ada0b4a7b2051b9f2a01f8e4fbb490139da9"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/external-specs.html",
+      "bytes": 123347,
+      "sha256": "e4695cfc36f9f5ba3b31d22f66fe91656ed0b1e8b5bcceec0ba058cd3721c3df"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/doc-files/RestrictedMethods.html",
+      "bytes": 8004,
+      "sha256": "821d33d23cf52316866588210468ec0846c6d0c79b57a48108d8baa9a25b3204"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/doc-files/threadPrimitiveDeprecation.html",
+      "bytes": 11362,
+      "sha256": "38a27dff287e2c88a6535129108460947887916c54693654e4a14c47a06637cb"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/doc-files/ValueBased.html",
+      "bytes": 8223,
+      "sha256": "5162f1b07d76eed94ac053320be2809d09445be1355494cea651ec171610cf6c"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/net/doc-files/net-properties.html",
+      "bytes": 30623,
+      "sha256": "3d5ccd18191a22dc28e072d6b3ecb98abc208835b5d5d83831df58270bda6109"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/security/doc-files/debug-system-property.html",
+      "bytes": 10955,
+      "sha256": "b91e574437a53319c9751e86ef48aaf831eb6fbe1b935949d50ad87070d39a3a"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/doc-files/coll-designfaq.html",
+      "bytes": 23959,
+      "sha256": "fa3ae456ec76b7a2671f4469e335babd42b5cd16525e799813aded9126231ce5"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/doc-files/coll-index.html",
+      "bytes": 7258,
+      "sha256": "bf901d05f2d765aced55a03d454c51965edd30f21a313b7fdf178221b3f04839"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/doc-files/coll-overview.html",
+      "bytes": 20689,
+      "sha256": "1e774641b5599843e512da71c0606c20ab4b0fe92a48c45a7f13c60420c6b6a5"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/doc-files/coll-reference.html",
+      "bytes": 29007,
+      "sha256": "addf765edfc42515f9fbdf26658afee518678abf4d62f5e2cf3e2d373d1cd2fd"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ServiceLoader.html",
+      "bytes": 59176,
+      "sha256": "910991cd9cdb5d7f458a21fb80cbe28bd13e3be865a160d056bd5856b77ff8ab"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/AWTThreadIssues.html",
+      "bytes": 12394,
+      "sha256": "2f3f83fc639cd55e7a35207663609a3e2ae67a98b7b595a7705cff686bfffbe6"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/BorderLayout-1.png",
+      "bytes": 3211,
+      "sha256": "cf73f619abe684fdd7feddfaf5d11b55d1411994f9da6c5c7a407ae5b17d04e4"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/Button-1.gif",
+      "bytes": 1920,
+      "sha256": "a4c155cddb4b8219ab400b34ebb9d8ec01ee82d78c533ec42de7db71ad2457f0"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/Checkbox-1.gif",
+      "bytes": 2375,
+      "sha256": "7d32df4bef1c0b307820827c891a80867e00a4c4c6bd0e38ed6e914b606d5eed"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/CheckboxGroup-1.gif",
+      "bytes": 712,
+      "sha256": "7f12489141ccc8a69ca53ce1b723b3b590b39c01cf2653807a92219b2bffe1ed"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/Choice-1.gif",
+      "bytes": 486,
+      "sha256": "d5179088d0f7d7f8d9ce3a63c9473b8d2cafa8257f8a8dd6025e66f81b08e972"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/DesktopProperties.html",
+      "bytes": 16882,
+      "sha256": "2e2a4938a08d469ff6b9bded7f97bc6d54fc6e70a61447f7abc67ac2c113c275"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/FlowLayout-1.png",
+      "bytes": 2298,
+      "sha256": "6cc046e5d487b26ffbdee2f3279050b97aef54bf556b0eef0e72a38c9ef1b660"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/FocusCycle.svg",
+      "bytes": 4238,
+      "sha256": "64520469d9921a77f52b1d2bea90b821fb66a52609b25470398b3552fda05bb4"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/FocusSpec.html",
+      "bytes": 75036,
+      "sha256": "b2eca63fb5939ec489ad017997af70e7758f60f5e022c3d07316440ed31d9b71"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/FontMetrics-1.gif",
+      "bytes": 290,
+      "sha256": "73a695c3b7d551a8563ba703a813d498d1851c82204008df1eee71c65b96f068"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/GridBagLayout-1.png",
+      "bytes": 4038,
+      "sha256": "d27bd527e5248866c5516ff5409fee385a4e35c6a8c41f534408034d56437c9c"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/GridBagLayout-2.png",
+      "bytes": 4064,
+      "sha256": "6834a2eda5b77aa5d4ed9961d244f0de958d1f1f354a162e01da9d328a306c13"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/GridBagLayout-baseline.png",
+      "bytes": 615,
+      "sha256": "e75e857e16d43214a27f259532b78332c7bd57e7b49612a84bdb913fa4f29b9d"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/GridLayout-1.png",
+      "bytes": 2310,
+      "sha256": "058ed0031ea088f9e18ddfcf257721fc04f71fef675e46abf13badf1a750115d"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/GridLayout-2.png",
+      "bytes": 2297,
+      "sha256": "979706ace299c24fe3702869f5d9c19f4b77aafc49b10c5ec5a4fbb74bae135e"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/ImplicitFocusTransfer1.svg",
+      "bytes": 3316,
+      "sha256": "b9cbd5a3f8001968fa59f2d3f7cda1ca53978d14cf31067d10cd033874cbbd0e"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/ImplicitFocusTransfer2.svg",
+      "bytes": 3166,
+      "sha256": "92d56bc70445da42c565926fda1bb12a774a2f4b4888d2faba518226a9a37de8"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/Label-1.gif",
+      "bytes": 819,
+      "sha256": "ff348975445ea58d02309c2b7a1210a16a24fa56d81e1021538e713893f00e56"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/LinearGradientPaint.png",
+      "bytes": 2147,
+      "sha256": "9dfcb0687364d699ac882dabdacbe8069ddd4c5cd9096daac9849c03eab989fa"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/List-1.gif",
+      "bytes": 4193,
+      "sha256": "975ade62ae843307857b965531701d2d89e700532e10edc746f686974bfd6b5b"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/MenuBar-1.gif",
+      "bytes": 2268,
+      "sha256": "3833669c3817c024d1768b39826de5020c9253f13f18c591e89f1b81c31ae28f"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/modal-example1.svg",
+      "bytes": 2943,
+      "sha256": "681f9c84cff1551c977513d3efadf225bd761186a6caeed82c3f98aa464b3319"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/modal-example2.svg",
+      "bytes": 3074,
+      "sha256": "d769494287dbc77fc95472cafd1a1877c233d05cbb823e154d9605aa86480318"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/modal-example3.svg",
+      "bytes": 3576,
+      "sha256": "8b3a417787ce2610cf6997909c4cead362e6859fcf92e764ee893c5917e30ed1"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/modal-example4.svg",
+      "bytes": 3533,
+      "sha256": "63453cb55d52f121a292325adbdf54b48f92d5073d4b08bb8c812226a1195710"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/Modality.html",
+      "bytes": 23464,
+      "sha256": "b46b18f11d2b3920dd556bf49d701c72279d0d24f1624ce2e528588846931f87"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/MultiScreen.gif",
+      "bytes": 3131,
+      "sha256": "0a85318aeb63c2a8277393e55b8a60e09a9faa68ba39b4a7151bc745e60839cb"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/RadialGradientPaint-1.png",
+      "bytes": 13572,
+      "sha256": "58ca47763ade437dfbb07b0b694b11416145cdde07c19bf12072e2a960f820f0"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/RadialGradientPaint-2.png",
+      "bytes": 12021,
+      "sha256": "a7daa6555f953889b857972ff58ed43ffeb88e79fa65f50eae65c166b68051a0"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/RadialGradientPaint-3.png",
+      "bytes": 7219,
+      "sha256": "c4746cca201dcf257fa48159d32e0db0b570f85b496140cd4c989b679e51ca11"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/RadialGradientPaint-4.png",
+      "bytes": 6902,
+      "sha256": "5dfd8d121982e1e70f9714200689a7d1e76e9311018f845238b5389aa800d036"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/Scrollbar-1.gif",
+      "bytes": 968,
+      "sha256": "bac512447f6088a0919abb7e8417a2278f4472526370887c79bfda9e030b68a4"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/Scrollbar-2.gif",
+      "bytes": 1938,
+      "sha256": "3778ad2158f157d9c0baee75ff057e33b129c39a4e5e9ee7e24ca9ae38d60aed"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/TextArea-1.gif",
+      "bytes": 2234,
+      "sha256": "eeb4c31020a2f92b397a204b3f1c41a0d6e42ca3f4a4e4c1fcc183a3f08b0970"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/doc-files/TextField-1.gif",
+      "bytes": 2522,
+      "sha256": "2372d068b2b506e90c3a95049f14dbc60e049c89d4025ce418d94622da8af0ac"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/imageio/metadata/doc-files/bmp_metadata.html",
+      "bytes": 11217,
+      "sha256": "61e6c911d26174ad36b180d00a0ba71ae49e0e02a2f5e537dc7c39b596b78432"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/imageio/metadata/doc-files/gif_metadata.html",
+      "bytes": 23318,
+      "sha256": "b607b622f396924ec4621c32f2d64a120a581cd58363d16f39f5c0d60b461ab3"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/imageio/metadata/doc-files/jpeg_metadata.html",
+      "bytes": 63588,
+      "sha256": "463503d376a38a7e1ec2d1a57115c51ae751dc1978710ccb3f45f40e96292ffe"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/imageio/metadata/doc-files/png_metadata.html",
+      "bytes": 31797,
+      "sha256": "bd9150b5dc6fd73455d8a152f60578838738e0997600686a79d3b5c87920618f"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/imageio/metadata/doc-files/standard_metadata.html",
+      "bytes": 23310,
+      "sha256": "506ad16d3e518bd99d40f84b6bf218f471c72a4ffd56b94cd0cdc3d1c538180f"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/imageio/metadata/doc-files/tiff_metadata.html",
+      "bytes": 53653,
+      "sha256": "fdf649ea3e01a7b7320fde811fc02dfef72cc65c8a3cbeeec5deca43ccb94cda"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/imageio/metadata/doc-files/wbmp_metadata.html",
+      "bytes": 6919,
+      "sha256": "58e7603a1f4f28ea7cbeb12e66fdb8564f41cb09f230c8979b380acc74c479f8"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/doc-files/BoxLayout-1.svg",
+      "bytes": 2472,
+      "sha256": "6d16ddf67733ca8b6b0d46b7d515cfcf7f5884cbaf27524453172ea75c03975f"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/doc-files/groupLayout.1.gif",
+      "bytes": 2913,
+      "sha256": "b6017f1de6c0c5f3c4fafa2d28b4fb1f08662353fe09f34a1f3efdfd11dcdf26"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/doc-files/groupLayout.2.gif",
+      "bytes": 3221,
+      "sha256": "a09ba7df6437aa9f0d34b01c9964c238e305d2c19f9e946394fa7ca71d78e641"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/doc-files/groupLayout.3.gif",
+      "bytes": 3515,
+      "sha256": "308b232afd4a8176cdd3c975cb692c71870aeff21d2ca37dd952f2118a98f7b3"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/doc-files/groupLayout.example.png",
+      "bytes": 2991,
+      "sha256": "27ef428d2dd7efc7b79e2500532abd31d033392417451410957ccba499fb78ae"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/doc-files/JLayeredPane-1.gif",
+      "bytes": 1808,
+      "sha256": "2d5d31e5e4b94ca1a3b5b92d3876c1bf61cf74fe7e43a37b0200b824561793fe"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/doc-files/JRootPane-1.gif",
+      "bytes": 5515,
+      "sha256": "b4a93a5b4f85e75695891bde14f14ebd31756f0bd95fbcea0da5938f0f022b33"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/doc-files/JRootPane-2.gif",
+      "bytes": 2700,
+      "sha256": "b3fba97a0372d4271061c4ef01068bc2a6d910b5edfe78329b4e2cd1624b2eb7"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/doc-files/JScrollPane-1.gif",
+      "bytes": 2504,
+      "sha256": "b5579db2d552556ec91b4b45d80ceef101905cd811b4df26674642868c1b9e23"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/doc-files/SizeSequence-1.gif",
+      "bytes": 912,
+      "sha256": "b449761712d4c2f68844b9ea32b51d2ae55123d84f9d3507f0e8a0abb2699945"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/plaf/multi/doc-files/multi_tsc.html",
+      "bytes": 25568,
+      "sha256": "d5dd1d4e35a4c24e8437a9b513ea5595db6fe9e4da64dc394fe5df55996da901"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/plaf/nimbus/doc-files/properties.html",
+      "bytes": 12995,
+      "sha256": "8bc0a04a2c147055cd363dcc61028a7e7107b5c2ddd36fe52afac4d604bef63a"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/plaf/synth/doc-files/componentProperties.html",
+      "bytes": 44677,
+      "sha256": "450f043c88ceb8d3f3aaa8d15b8a87e800a73d609f42e3cf6d8759a3c7c51ec4"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/plaf/synth/doc-files/synth.dtd",
+      "bytes": 5455,
+      "sha256": "d20cdc532fc9a5bb85e1db500bef246b42efad2891a4d577296f010d54bbc6bd"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/plaf/synth/doc-files/synthFileFormat.html",
+      "bytes": 46047,
+      "sha256": "d88f3cf4af8007a49efaeb88d46940a7f53cb9ba22dca6cd36be50e15ed42e99"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/doc-files/Document-coord.gif",
+      "bytes": 2480,
+      "sha256": "0cebc8985716fa81c1fd5ceaaf264897ffc29251e7e4e0c6ce6d4c7ff52c5359"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/doc-files/Document-insert.svg",
+      "bytes": 5033,
+      "sha256": "0f68057b05c46b81d4c1c419e0392de778fdb703b4d434b511e181e16ecaa129"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/doc-files/Document-notification.gif",
+      "bytes": 12309,
+      "sha256": "575a2c1ab55c676e1e6af531d0a312a2b4f4fea7bc30ccb864694f4162d47f25"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/doc-files/Document-remove.svg",
+      "bytes": 5150,
+      "sha256": "20b52d002043bbbc060e2ed3059048a5b960689a6424999a9a16cdaf93a1b8e0"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/doc-files/Document-structure.gif",
+      "bytes": 5664,
+      "sha256": "0f47ec23c2b7c7e0cf6127b881c70965f701ab32f70ce08b151c1500a0dae02a"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/doc-files/editor.gif",
+      "bytes": 4768,
+      "sha256": "91d7148d195c8cc1ad0091f10914b35379fc2071b73c1cae5a9dc8127a7eee80"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/doc-files/paragraph.gif",
+      "bytes": 4695,
+      "sha256": "fbc7e0a9a7c6f95e8d0dc99b44f425e3393adab3077a22054a6eaf18c52028f1"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/doc-files/plain1.gif",
+      "bytes": 3788,
+      "sha256": "5b33ada087427a428c516bc4e5cb7ca7cc7daac329ee2947371152306a336662"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/doc-files/plain10.gif",
+      "bytes": 9278,
+      "sha256": "2e2ed7f04d953e74fa33ae44657ab38f3d3f6ee018120699e2ea75eea5986f8e"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/doc-files/plain11.gif",
+      "bytes": 6409,
+      "sha256": "5ba4437dfb23f34b5e60ebcd57ef04f2486fc61b6536cd69fc1ee44ca18961d4"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/doc-files/plain12.gif",
+      "bytes": 7553,
+      "sha256": "90ad515835e1122d008dda52dde933e8eb940d14670c24494ff5096b316081a5"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/doc-files/plain2.gif",
+      "bytes": 5644,
+      "sha256": "442ef352c996f89522811779ca9a70b305e782299feed719f902030712ee43a0"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/doc-files/plain3.gif",
+      "bytes": 5881,
+      "sha256": "a0072b0d270d2ecef17b1359338cde59259c4270ff23f1925838f05b9d284f2c"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/doc-files/plain4.gif",
+      "bytes": 7960,
+      "sha256": "913997c4fff2f26f08365de0461608a2c5dd255380a08fc4ca18dcc31266f7d2"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/doc-files/plain5.gif",
+      "bytes": 3339,
+      "sha256": "6a519c23f4d0dfe95709695ab0202e5fec330391a351c652ec5e84fd8a0d05e3"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/doc-files/plain6.gif",
+      "bytes": 5829,
+      "sha256": "9c1c48c5bc4505d3e2f9bf4d9fdea56903e5761428bf15805b5e3217c4320169"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/doc-files/plain7.gif",
+      "bytes": 11337,
+      "sha256": "3feb830562c3da3e003608901d683f95420f73bad58f31a18874e92883481c32"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/doc-files/plain8.gif",
+      "bytes": 7195,
+      "sha256": "d86813159dfd7f5b80cf3b3dfd5bc337f367afad30122bf9c12da02da58a15eb"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/doc-files/plain9.gif",
+      "bytes": 8746,
+      "sha256": "e92f2f5947a61a799f55dea14f7433f392f3de9ace0a5eaf765da30fe2608d2e"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/doc-files/View-flexibility.jpg",
+      "bytes": 26097,
+      "sha256": "9cfff83fd90d7dfc2b66d3ba8a799dd03c7e9c30bc539d3fc5ff5d622b402fda"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/doc-files/View-layout.jpg",
+      "bytes": 40479,
+      "sha256": "46c170dbfe03802a628a2e66ac7b52140acfbd0e927bc7ac8294c21018ab38fc"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/undo/doc-files/UndoManager-1.gif",
+      "bytes": 2739,
+      "sha256": "556967cd416ef9ee29d5290e46d80ff95f40fde7ce3b8f893e2a35004a0a7a46"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/undo/doc-files/UndoManager-2.gif",
+      "bytes": 2721,
+      "sha256": "813de23a36162f52867386900e878c67e9d1301a9a9d1b2b80fee9d6a2da65b2"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/undo/doc-files/UndoManager-3.gif",
+      "bytes": 2714,
+      "sha256": "0086e4eeeb44ed0ff574644acc2b8c8421dcdfd13a227cb182e51f83682aab84"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/undo/doc-files/UndoManager-4.gif",
+      "bytes": 2728,
+      "sha256": "d0d0cab157400923424370cf053bd419520184323fdf8137e57c1bde996dacf9"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/api/serialized-form.html",
+      "bytes": 1931737,
+      "sha256": "0990b1444bd2e467d8c283c85308629578d283d10ae80711d86e2e978edf17c6"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/25/docs/specs/index.html",
+      "bytes": 5287,
+      "sha256": "315ffd152c428487795aeb42abd805768b6542f40fc3900ef56d7f733935c99e"
+    }
+  ]
+}
