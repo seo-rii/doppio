@@ -153,8 +153,18 @@ jobs:
         run: node ci/class_file_version_test.cjs && node --test ci/java_class_version_test_test.mjs
 
       - name: Run Java class-file version compatibility
+        id: class_version_admission
         timeout-minutes: 50
         run: node ci/java_class_version_test.mjs --browser
+
+      - name: Upload class-file admission ledger
+        if: always() && steps.class_version_admission.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-class-version-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Check evolved switch ledger contract
         timeout-minutes: 1

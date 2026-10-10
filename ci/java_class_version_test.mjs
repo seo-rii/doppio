@@ -12,8 +12,13 @@ const repoRoot = path.resolve(path.dirname(harnessPath), '..');
 const mainClass = 'classes.modern_test.JavaClassVersion';
 const classPath = `${mainClass.replaceAll('.', '/')}.class`;
 const sourcePath = path.join(repoRoot, 'classes/modern_fixture/JavaClassVersion.java');
+const shapesMainClass = 'classes.modern_test.JavaClassAdmissionShapes';
+const shapesClassPath = `${shapesMainClass.replaceAll('.', '/')}.class`;
+const shapesSourcePath = path.join(repoRoot, 'classes/modern_fixture/JavaClassAdmissionShapes.java');
 const timeoutMs = 30_000;
 const expectedOutput = 'CLASS_VERSION_INITIALIZED\nCLASS_VERSION_MAIN\n';
+const shapesOutput = 'CLASS_SHAPES_INITIALIZED\nCLASS_SHAPES_MAIN point=21\n';
+const ledgerScope = 'JVM-001 genuine Java 21/25 class-file admission and explicit header controls';
 const digest = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 const normalize = (value) => value.replaceAll('\r\n', '\n');
 const versionError = 'java.lang.UnsupportedClassVersionError';
@@ -26,6 +31,10 @@ export function versionCases() {
   const cases = [
     { id: 'genuine-release21', baseRelease: 21, nativeReleases: [21] },
     { id: 'genuine-release25', baseRelease: 25, nativeReleases: [25] },
+    { id: 'genuine-shapes-release21', baseRelease: 21, corpus: 'modern-shapes',
+      mainClass: shapesMainClass, expectedOutput: shapesOutput, nativeReleases: [21] },
+    { id: 'genuine-shapes-release25', baseRelease: 25, corpus: 'modern-shapes',
+      mainClass: shapesMainClass, expectedOutput: shapesOutput, nativeReleases: [25] },
   ];
   for (const [major, minor] of [[45, 3], [45, 65535], [55, 1], [55, 65535]]) {
     cases.push({ id: `historical-${major}-${minor}`, baseRelease: 21,
@@ -83,7 +92,8 @@ export function assertVersionResult(record, entry, label) {
   if (!entry.error) {
     assert.equal(record.status, 'passed', `${label}: ${record.stderr}`);
     assert.equal(record.exitCode, 0, `${label}: exit code`);
-    assert.equal(normalize(record.stdout), expectedOutput, `${label}: initialization and body`);
+    assert.equal(normalize(record.stdout), entry.expectedOutput || expectedOutput,
+      `${label}: initialization and body`);
     assert.equal(normalize(record.stderr), '', `${label}: stderr`);
     return;
   }
@@ -129,19 +139,19 @@ function assertLegacyConstantPool(bytes) {
   }
 }
 
-export async function runClassVersionTests({ browser = false, nativeOnly = false } = {}) {
+export async function runClassVersionTests({ browser = false, nativeOnly = false, onCase = () => {} } = {}) {
   assert.ok(!browser || !nativeOnly, 'Native-only mode cannot claim Chromium coverage');
-  const inputs = [sourcePath, harnessPath,
+  const lockPath = path.join(repoRoot, 'ci/java_compatibility_toolchains.lock.json');
+  const markerPath = path.join(repoRoot, 'build/java-compatibility-toolchains/toolchains.json');
+  const inputs = [sourcePath, shapesSourcePath, harnessPath,
     path.join(repoRoot, 'ci/run_java_compatibility.mjs'),
-    path.join(repoRoot, 'ci/prepare_java_compatibility_toolchains.mjs'),
-    path.join(repoRoot, 'ci/java_compatibility_toolchains.lock.json'),
-    path.join(repoRoot, 'build/java-compatibility-toolchains/toolchains.json')];
+    path.join(repoRoot, 'ci/prepare_java_compatibility_toolchains.mjs'), lockPath, markerPath];
   if (!nativeOnly) inputs.push(process.execPath);
   const inputSnapshot = () => inputs.map((filename) => ({ path: filename, sha256: digest(fs.readFileSync(filename)) }));
   const inputDigests = inputSnapshot();
-  const lockBytes = fs.readFileSync(inputs[4]);
+  const lockBytes = fs.readFileSync(lockPath);
   const lock = JSON.parse(lockBytes);
-  const marker = JSON.parse(fs.readFileSync(inputs[5]));
+  const marker = JSON.parse(fs.readFileSync(markerPath));
   validateToolchains(marker, lock, digest(lockBytes), [21, 25]);
   const toolchain = (release) => marker.toolchains.find((entry) => entry.feature === release);
   const verifyJdks = () => {
@@ -160,21 +170,47 @@ export async function runClassVersionTests({ browser = false, nativeOnly = false
     const genuineDirectories = {};
     const genuineInventories = {};
     const originals = {};
+    const controls = [
+      { id: 'simple', source: sourcePath, main: mainClass, classFile: classPath },
+      { id: 'modern-shapes', source: shapesSourcePath, main: shapesMainClass, classFile: shapesClassPath },
+    ];
     for (const release of [21, 25]) {
-      const directory = path.join(temporaryRoot, `genuine-${release}`);
-      fs.mkdirSync(directory);
-      const result = await runCommand(path.join(toolchain(release).home, 'bin/javac'),
-        ['--release', String(release), '-encoding', 'UTF-8', '-proc:none',
-          '-classpath', emptySourcePath, '-sourcepath', emptySourcePath,
-          '-d', directory, sourcePath], { cwd: temporaryRoot, timeoutMs: 60_000 });
-      assertCompleted(result, `compile genuine Java ${release}`);
-      assert.equal(result.exitCode, 0, `compile genuine Java ${release}: ${result.stderr}`);
-      assert.equal(result.stdout + result.stderr, '', 'Compilation must be clean');
-      genuineDirectories[release] = directory;
-      genuineInventories[release] = inspectClassFiles(directory, release, mainClass);
-      assert.equal(genuineInventories[release].length, 1, 'One deliberately simple class per genuine control');
-      originals[release] = fs.readFileSync(path.join(directory, classPath));
-      assertLegacyConstantPool(originals[release]);
+      for (const control of controls) {
+        const key = `${release}:${control.id}`;
+        const directory = path.join(temporaryRoot, `genuine-${release}-${control.id}`);
+        fs.mkdirSync(directory);
+        const result = await runCommand(path.join(toolchain(release).home, 'bin/javac'),
+          ['--release', String(release), '-encoding', 'UTF-8', '-proc:none',
+            '-classpath', emptySourcePath, '-sourcepath', emptySourcePath,
+            '-d', directory, control.source], { cwd: temporaryRoot, timeoutMs: 60_000 });
+        assertCompleted(result, `compile genuine Java ${release} ${control.id}`);
+        assert.equal(result.exitCode, 0, `compile genuine Java ${release} ${control.id}: ${result.stderr}`);
+        assert.equal(result.stdout + result.stderr, '', 'Compilation must be clean');
+        genuineDirectories[key] = directory;
+        genuineInventories[key] = inspectClassFiles(directory, release, control.main);
+        if (control.id === 'simple') {
+          assert.equal(genuineInventories[key].length, 1, 'One deliberately simple class per header control');
+          originals[release] = fs.readFileSync(path.join(directory, classPath));
+          assertLegacyConstantPool(originals[release]);
+        } else {
+          for (const name of ['Shape', 'Point', 'Marker']) {
+            assert.ok(genuineInventories[key].some((entry) => entry.path ===
+              `${shapesMainClass.replaceAll('.', '/')}$${name}.class`),
+            `Genuine ${release} output must include ${name}`);
+          }
+          for (const [filename, attribute] of [
+            [`${shapesMainClass.replaceAll('.', '/')}$Shape.class`, 'PermittedSubclasses:'],
+            [`${shapesMainClass.replaceAll('.', '/')}$Point.class`, 'Record:'],
+            [shapesClassPath, 'BootstrapMethods:'],
+          ]) {
+            const detail = await runCommand(path.join(toolchain(release).home, 'bin/javap'),
+              ['-v', '-p', path.join(directory, filename)], { cwd: temporaryRoot, timeoutMs: 30_000 });
+            assertCompleted(detail, `inspect genuine Java ${release} ${filename}`);
+            assert.equal(detail.exitCode, 0, `javap ${filename}: ${detail.stderr}`);
+            assert.ok(detail.stdout.includes(attribute), `${filename} lacks ${attribute}`);
+          }
+        }
+      }
     }
     const runnerPath = path.join(repoRoot, 'build/release-cli/console/runner.js');
     const runtimeRoot = path.dirname(path.dirname(runnerPath));
@@ -190,9 +226,14 @@ export async function runClassVersionTests({ browser = false, nativeOnly = false
     let comparisons = 0;
     let nativeExecutions = 0;
     for (const entry of versionCases()) {
-      const original = originals[entry.baseRelease];
+      const corpus = entry.corpus || 'simple';
+      const key = `${entry.baseRelease}:${corpus}`;
+      const entryMainClass = entry.mainClass || mainClass;
+      const entryClassPath = entry.corpus === 'modern-shapes' ? shapesClassPath : classPath;
+      const original = entry.corpus === 'modern-shapes' ?
+        fs.readFileSync(path.join(genuineDirectories[key], entryClassPath)) : originals[entry.baseRelease];
       const bytes = entry.mutation ? mutateClassHeader(original, entry.mutation) : original;
-      const directory = entry.mutation ? path.join(temporaryRoot, entry.id) : genuineDirectories[entry.baseRelease];
+      const directory = entry.mutation ? path.join(temporaryRoot, entry.id) : genuineDirectories[key];
       if (entry.mutation) {
         fs.mkdirSync(path.dirname(path.join(directory, classPath)), { recursive: true });
         fs.writeFileSync(path.join(directory, classPath), bytes);
@@ -203,25 +244,30 @@ export async function runClassVersionTests({ browser = false, nativeOnly = false
       const caseDigest = treeDigest(directory);
       const record = { id: entry.id, outcome: entry.error ? 'rejected' : 'accepted',
         controlKind: entry.error ? 'negative-admission' : entry.mutation ? 'structural-header' : 'genuine-compiler-output',
-        expectedError: entry.error || null, baseRelease: entry.baseRelease,
-        input: { path: classPath, originalSha256: digest(original), sha256: digest(bytes),
-          size: bytes.length, mutation: entry.mutation || null }, native: [], guests: [] };
+        expectedError: entry.error || null, baseRelease: entry.baseRelease, corpus,
+        sourceSha256: digest(fs.readFileSync(entry.corpus === 'modern-shapes' ? shapesSourcePath : sourcePath)),
+        input: { path: entryClassPath, originalSha256: digest(original), sha256: digest(bytes),
+          size: bytes.length, mutation: entry.mutation || null, treeSha256: caseDigest,
+          classFiles: entry.mutation ? null : genuineInventories[key] }, native: [], guests: [] };
       const execute = async (host, release) => {
         assert.equal(treeDigest(directory), caseDigest, `${entry.id}: class integrity before ${host}`);
         let result;
         if (host === 'chromium') {
-          result = await session.execute({ classesPath: directory, mainClass, arguments: [], timeoutMs });
+          result = await session.execute({ classesPath: directory, mainClass: entryMainClass, arguments: [], timeoutMs });
         } else {
           const command = host === 'native' ? path.join(toolchain(release).home, 'bin/java') : process.execPath;
           const prefix = host === 'native' ? [] : ['--no-deprecation', runnerPath];
           // Preview is deliberately never enabled on either native host.
-          result = await runCommand(command, [...prefix, '-cp', directory, mainClass],
+          result = await runCommand(command, [...prefix, '-cp', directory, entryMainClass],
             { cwd: temporaryRoot, timeoutMs, standardInput: '' });
         }
         assert.equal(treeDigest(directory), caseDigest, `${entry.id}: class integrity after ${host}`);
         for (const originalRelease of [21, 25]) {
-          assert.deepEqual(inspectClassFiles(genuineDirectories[originalRelease], originalRelease, mainClass),
-            genuineInventories[originalRelease], `${entry.id}: genuine compiler output must remain unchanged`);
+          for (const control of controls) {
+            const originalKey = `${originalRelease}:${control.id}`;
+            assert.deepEqual(inspectClassFiles(genuineDirectories[originalKey], originalRelease, control.main),
+              genuineInventories[originalKey], `${entry.id}: genuine ${control.id} output must remain unchanged`);
+          }
         }
         assertVersionResult(result, entry, `${host}${release ? release : ''} ${entry.id}`);
         return result;
@@ -235,14 +281,16 @@ export async function runClassVersionTests({ browser = false, nativeOnly = false
         comparisons++;
       }
       results.push(record);
+      onCase(record);
       console.log(`PASS class header ${entry.id} ${JSON.stringify(record.input)}`);
     }
     if (!nativeOnly) assert.deepEqual(runtimeSnapshot(), runtimeDigests, 'CLI runtime integrity after version tests');
     assert.deepEqual(inputSnapshot(), inputDigests, 'Source, harness, helper and toolchain marker integrity');
     verifyJdks();
     const browserIntegrity = session ? session.verifyIntegrity() : null;
-    const summary = { scope: 'JVM-001 class-version admission; final 21/25 controls and explicit header mutations only',
-      nativeOnly, cases: results.length, genuine: results.filter((entry) => entry.controlKind === 'genuine-compiler-output').length,
+    const summary = { scope: ledgerScope, nativeOnly,
+      guestHosts, notRunGuestHosts: ['node', 'chromium'].filter((host) => !guestHosts.includes(host)),
+      cases: results.length, genuine: results.filter((entry) => entry.controlKind === 'genuine-compiler-output').length,
       structural: results.filter((entry) => entry.controlKind === 'structural-header').length,
       negative: results.filter((entry) => entry.outcome === 'rejected').length, nativeExecutions, comparisons,
       inputDigests, runtimeDigests, browserProvenance: session?.provenance || null, browserIntegrity,
@@ -265,14 +313,51 @@ export async function runClassVersionTests({ browser = false, nativeOnly = false
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === harnessPath) {
+export function writeAdmissionLedger(filename, ledger) {
+  assert.equal(ledger.schemaVersion, 1, 'Admission ledger schema');
+  assert.equal(ledger.scope, ledgerScope, 'Admission ledger scope');
+  assert.ok(['passed', 'failed'].includes(ledger.status), 'Admission ledger must have a final status');
+  fs.mkdirSync(path.dirname(filename), { recursive: true });
+  assert.ok(!fs.lstatSync(path.dirname(filename)).isSymbolicLink(),
+    'Refusing to write through a symlinked admission ledger directory');
+  let existing;
   try {
-    const options = process.argv.slice(2);
+    existing = fs.lstatSync(filename);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  if (existing) {
+    assert.ok(existing.isFile(), 'Refusing to overwrite a non-regular admission ledger');
+    const previous = JSON.parse(fs.readFileSync(filename, 'utf8'));
+    assert.equal(previous.schemaVersion, 1, 'Refusing to overwrite an unrelated file');
+    assert.equal(previous.scope, ledgerScope, 'Refusing to overwrite an unrelated file');
+  }
+  fs.writeFileSync(filename, `${JSON.stringify(ledger, null, 2)}\n`, { mode: 0o600 });
+  fs.chmodSync(filename, 0o600);
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === harnessPath) {
+  const options = process.argv.slice(2);
+  const ledger = { schemaVersion: 1, scope: ledgerScope, status: 'failed', gitCommit: null,
+    requestedMode: options[0] || 'node', completedCases: [] };
+  try {
     assert.ok(options.length <= 1 && options.every((option) => ['--browser', '--native-only'].includes(option)),
       'Usage: node ci/java_class_version_test.mjs [--browser | --native-only]');
-    await runClassVersionTests({ browser: options.includes('--browser'), nativeOnly: options.includes('--native-only') });
+    const commit = await runCommand('git', ['rev-parse', '--verify', 'HEAD'],
+      { cwd: repoRoot, timeoutMs: 10_000 });
+    assertCompleted(commit, 'git commit provenance');
+    assert.equal(commit.exitCode, 0, `git commit provenance: ${commit.stderr}`);
+    assert.match(commit.stdout.trim(), /^[a-f0-9]{40}$/, 'Git commit provenance');
+    ledger.gitCommit = commit.stdout.trim();
+    const summary = await runClassVersionTests({ browser: options.includes('--browser'),
+      nativeOnly: options.includes('--native-only'), onCase: (record) => ledger.completedCases.push(record) });
+    Object.assign(ledger, summary, { status: 'passed' });
+    delete ledger.completedCases;
   } catch (error) {
-    console.error(error.stack || error.message);
+    ledger.error = error.stack || error.message;
+    console.error(ledger.error);
     process.exitCode = 1;
+  } finally {
+    writeAdmissionLedger(path.join(repoRoot, 'build/java-class-version-results.json'), ledger);
   }
 }

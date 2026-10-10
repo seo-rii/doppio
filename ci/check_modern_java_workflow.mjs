@@ -591,8 +591,18 @@ for (const [name, fields] of [
     'run: node ci/class_file_version_test.cjs && node --test ci/java_class_version_test_test.mjs',
   ]],
   ['Run Java class-file version compatibility', [
+    'id: class_version_admission',
     'timeout-minutes: 50',
     'run: node ci/java_class_version_test.mjs --browser',
+  ]],
+  ['Upload class-file admission ledger', [
+    "if: always() && steps.class_version_admission.outcome != 'skipped'",
+    'uses: actions/upload-artifact@v7',
+    'with:',
+    '  path: build/java-class-version-results.json',
+    '  archive: false',
+    '  if-no-files-found: error',
+    '  retention-days: 7',
   ]],
   ['Check evolved switch ledger contract', [
     'timeout-minutes: 1',
@@ -716,6 +726,7 @@ const runtimeOrder = [
   'Upload Java uncaught-exception exit ledger',
   'Check class-file version admission',
   'Run Java class-file version compatibility',
+  'Upload class-file admission ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',

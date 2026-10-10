@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
-import { assertVersionResult, mutateClassHeader, versionCases } from './java_class_version_test.mjs';
+import { assertVersionResult, mutateClassHeader, versionCases,
+  writeAdmissionLedger } from './java_class_version_test.mjs';
 
 function header(major = 65, minor = 0) {
   const bytes = Buffer.alloc(16);
@@ -25,7 +29,10 @@ test('header mutations are isolated copies and record genuine controls separatel
   assert.deepEqual(mutation.subarray(8), original.subarray(8));
   assert.deepEqual(original, before);
   const controls = versionCases().filter((entry) => !entry.mutation);
-  assert.deepEqual(controls.map((entry) => entry.baseRelease), [21, 25]);
+  assert.deepEqual(controls.map((entry) => [entry.baseRelease, entry.corpus || 'simple']),
+    [[21, 'simple'], [25, 'simple'], [21, 'modern-shapes'], [25, 'modern-shapes']]);
+  assert.ok(controls.filter((entry) => entry.corpus === 'modern-shapes')
+    .every((entry) => entry.mainClass === 'classes.modern_test.JavaClassAdmissionShapes'));
 });
 
 test('malformed magic and incomplete header are deliberate copy mutations', () => {
@@ -53,7 +60,7 @@ test('corpus covers historical boundary controls, every truncated header, and bo
   }
   assert.deepEqual(cases.filter((entry) => entry.mutation?.truncateBytes !== undefined)
     .map((entry) => entry.mutation.truncateBytes), [0, 1, 2, 3, 4, 5, 6, 7]);
-  assert.equal(cases.length, 25);
+  assert.equal(cases.length, 27);
 });
 
 test('negative gate fails closed on status, timeout, wrong exception, and executed body', () => {
@@ -95,4 +102,30 @@ test('positive gate requires both static initialization and main body with no di
   for (const mutation of [{ stdout: 'CLASS_VERSION_MAIN\n' }, { stderr: 'warning' }, { exitCode: 1 }]) {
     assert.throws(() => assertVersionResult({ ...successful, ...mutation }, {}, 'invalid positive'));
   }
+});
+
+test('modern-shapes genuine controls require their own main output', () => {
+  const entry = versionCases().find((candidate) => candidate.id === 'genuine-shapes-release21');
+  const shapeSuccess = { ...successful,
+    stdout: 'CLASS_SHAPES_INITIALIZED\nCLASS_SHAPES_MAIN point=21\n' };
+  assertVersionResult(shapeSuccess, entry, 'genuine shapes');
+  assert.throws(() => assertVersionResult(successful, entry, 'wrong corpus output'));
+});
+
+test('admission ledger retains only matching schema/scope and rejects symlink targets', (context) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'doppio-admission-ledger-test-'));
+  context.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const filename = path.join(directory, 'results.json');
+  const ledger = { schemaVersion: 1,
+    scope: 'JVM-001 genuine Java 21/25 class-file admission and explicit header controls',
+    status: 'passed', gitCommit: 'a'.repeat(40), results: [] };
+  writeAdmissionLedger(filename, ledger);
+  assert.deepEqual(JSON.parse(fs.readFileSync(filename, 'utf8')), ledger);
+  assert.equal(fs.statSync(filename).mode & 0o777, 0o600);
+  writeAdmissionLedger(filename, { ...ledger, status: 'failed' });
+  fs.writeFileSync(filename, '{"schemaVersion":1,"scope":"unrelated"}\n');
+  assert.throws(() => writeAdmissionLedger(filename, ledger), /unrelated/);
+  fs.unlinkSync(filename);
+  fs.symlinkSync(path.join(directory, 'outside.json'), filename);
+  assert.throws(() => writeAdmissionLedger(filename, ledger), /non-regular/);
 });
