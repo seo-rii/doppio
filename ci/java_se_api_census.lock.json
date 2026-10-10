@@ -1,0 +1,1185 @@
+{
+  "schemaVersion": 1,
+  "scope": "Java SE API structural/source component; not by itself PLAN-001 completion",
+  "completeJavaSeInventory": false,
+  "runnerSha256": "949e75c32a54d53f45971fb0e4e4bc2ab61c044997d622d42fc72b22f429fa50",
+  "helperSha256": "625fe22d52f90d2c6d4c1a029045059e31a144dd7a81764a67fbea3800805435",
+  "projectionSha256": "072e37a104efae430e6487b1a42ea5c0ad92bb42bd763129801337267d03257b",
+  "reconciliationSha256": "7b2ea1ee56d3013d4b5ab00af41482a630cd44b43154a521fe9d2e7784d6f6e0",
+  "ownerRulesSha256": "8e594a83467ab97c8ba3b6bf3a89b77cd742e7043f7e75133f637e96a554929b",
+  "toolchainLockSha256": "44512745628978f337ae09c66aae7fa2a85d295eca78da8649be49e59df69962",
+  "toolchains": [
+    {
+      "id": "jdk21",
+      "feature": 21,
+      "version": "21.0.11",
+      "archiveSha256": "5b4dc8817df13f88f9bfc434e5d018adb535889ff2fe0ccf758bcebcc216f394",
+      "treeSha256": "cd0db18f9cb742dde2e108e644c19a0cd15e10c7cf0417ecb74d92c27c7a8bd5",
+      "records": 177627,
+      "sha256": "f2f0912e0cb76f5a365f6f3310d8ecad4143546c82ab735cb5d410b7c11eec17",
+      "countByKind": {
+        "classFile": 7842,
+        "exports": 280,
+        "member": 165199,
+        "module": 22,
+        "opens": 2,
+        "provides": 43,
+        "requires": 59,
+        "type": 4055,
+        "uses": 78
+      },
+      "excludedModules": [
+        [
+          "jdk.accessibility",
+          "jdk-specific"
+        ],
+        [
+          "jdk.attach",
+          "jdk-specific"
+        ],
+        [
+          "jdk.charsets",
+          "jdk-specific"
+        ],
+        [
+          "jdk.compiler",
+          "jdk-specific"
+        ],
+        [
+          "jdk.crypto.cryptoki",
+          "jdk-specific"
+        ],
+        [
+          "jdk.crypto.ec",
+          "jdk-specific"
+        ],
+        [
+          "jdk.dynalink",
+          "jdk-specific"
+        ],
+        [
+          "jdk.editpad",
+          "jdk-specific"
+        ],
+        [
+          "jdk.hotspot.agent",
+          "jdk-specific"
+        ],
+        [
+          "jdk.httpserver",
+          "jdk-specific"
+        ],
+        [
+          "jdk.incubator.vector",
+          "incubator"
+        ],
+        [
+          "jdk.internal.ed",
+          "jdk-specific"
+        ],
+        [
+          "jdk.internal.jvmstat",
+          "jdk-specific"
+        ],
+        [
+          "jdk.internal.le",
+          "jdk-specific"
+        ],
+        [
+          "jdk.internal.opt",
+          "jdk-specific"
+        ],
+        [
+          "jdk.internal.vm.ci",
+          "jdk-specific"
+        ],
+        [
+          "jdk.internal.vm.compiler",
+          "jdk-specific"
+        ],
+        [
+          "jdk.internal.vm.compiler.management",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jartool",
+          "jdk-specific"
+        ],
+        [
+          "jdk.javadoc",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jcmd",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jconsole",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jdeps",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jdi",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jdwp.agent",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jfr",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jlink",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jpackage",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jshell",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jsobject",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jstatd",
+          "jdk-specific"
+        ],
+        [
+          "jdk.localedata",
+          "jdk-specific"
+        ],
+        [
+          "jdk.management",
+          "jdk-specific"
+        ],
+        [
+          "jdk.management.agent",
+          "jdk-specific"
+        ],
+        [
+          "jdk.management.jfr",
+          "jdk-specific"
+        ],
+        [
+          "jdk.naming.dns",
+          "jdk-specific"
+        ],
+        [
+          "jdk.naming.rmi",
+          "jdk-specific"
+        ],
+        [
+          "jdk.net",
+          "jdk-specific"
+        ],
+        [
+          "jdk.nio.mapmode",
+          "jdk-specific"
+        ],
+        [
+          "jdk.random",
+          "jdk-specific"
+        ],
+        [
+          "jdk.sctp",
+          "jdk-specific"
+        ],
+        [
+          "jdk.security.auth",
+          "jdk-specific"
+        ],
+        [
+          "jdk.security.jgss",
+          "jdk-specific"
+        ],
+        [
+          "jdk.unsupported",
+          "jdk-specific"
+        ],
+        [
+          "jdk.unsupported.desktop",
+          "jdk-specific"
+        ],
+        [
+          "jdk.xml.dom",
+          "jdk-specific"
+        ],
+        [
+          "jdk.zipfs",
+          "jdk-specific"
+        ]
+      ],
+      "modules": [
+        {
+          "name": "java.base",
+          "records": 42646,
+          "sha256": "5362f8477b239f0a0ec363911bd157a1b33465e533099992f0af79e74413d415",
+          "counts": {
+            "classFile": 3453,
+            "exports": 121,
+            "member": 37638,
+            "module": 1,
+            "provides": 4,
+            "type": 1393,
+            "uses": 36
+          }
+        },
+        {
+          "name": "java.compiler",
+          "records": 3474,
+          "sha256": "83471198aa4fe91dc4d22e963f049cc34a3e843acc2da001f2d4f94d40f13e57",
+          "counts": {
+            "classFile": 144,
+            "exports": 6,
+            "member": 3184,
+            "module": 1,
+            "requires": 1,
+            "type": 136,
+            "uses": 2
+          }
+        },
+        {
+          "name": "java.datatransfer",
+          "records": 274,
+          "sha256": "a9fa5f0126181e7c575c669e935c1b34ef35a3126f9aeaa1276e3af9bf2871e2",
+          "counts": {
+            "classFile": 15,
+            "exports": 2,
+            "member": 242,
+            "module": 1,
+            "requires": 1,
+            "type": 12,
+            "uses": 1
+          }
+        },
+        {
+          "name": "java.desktop",
+          "records": 104848,
+          "sha256": "07a82de451409cf05ebc3af9597eb0e24f1cc8dfc13ab08b2dab59b034a4a51a",
+          "counts": {
+            "classFile": 3162,
+            "exports": 54,
+            "member": 99888,
+            "module": 1,
+            "opens": 1,
+            "provides": 30,
+            "requires": 4,
+            "type": 1690,
+            "uses": 18
+          }
+        },
+        {
+          "name": "java.instrument",
+          "records": 142,
+          "sha256": "fbb237178c16be8038df29dc1bcdb8f17e3575674cde84c87d6da9208ee2bb16",
+          "counts": {
+            "classFile": 6,
+            "exports": 2,
+            "member": 126,
+            "module": 1,
+            "requires": 1,
+            "type": 6
+          }
+        },
+        {
+          "name": "java.logging",
+          "records": 524,
+          "sha256": "942d32ba3c71ff363665fc6248c957f6455d1cf5279f15ed8719241267e6e1c6",
+          "counts": {
+            "classFile": 49,
+            "exports": 1,
+            "member": 454,
+            "module": 1,
+            "provides": 1,
+            "requires": 1,
+            "type": 17
+          }
+        },
+        {
+          "name": "java.management",
+          "records": 5267,
+          "sha256": "529cb3313f0c738e0cc80f81c4d61847ddf5ad9720837cd26f2e513a1b92a5bc",
+          "counts": {
+            "classFile": 260,
+            "exports": 16,
+            "member": 4790,
+            "module": 1,
+            "provides": 1,
+            "requires": 1,
+            "type": 195,
+            "uses": 3
+          }
+        },
+        {
+          "name": "java.management.rmi",
+          "records": 315,
+          "sha256": "dd72f861480a323e7a3ccbe5bb316d09fdde1c6ee9956c65b1080ea966f01e6e",
+          "counts": {
+            "classFile": 30,
+            "exports": 3,
+            "member": 266,
+            "module": 1,
+            "provides": 2,
+            "requires": 4,
+            "type": 9
+          }
+        },
+        {
+          "name": "java.naming",
+          "records": 3469,
+          "sha256": "de0d2dbc106a33ff3f2507ea1156fb7f482d0475742a5b7e82ab56791d429391",
+          "counts": {
+            "classFile": 115,
+            "exports": 9,
+            "member": 3236,
+            "module": 1,
+            "provides": 1,
+            "requires": 2,
+            "type": 102,
+            "uses": 3
+          }
+        },
+        {
+          "name": "java.net.http",
+          "records": 480,
+          "sha256": "e25587c3822d920a71869784a4b1199423c9a5a0d32f10f707dc45b74e3397db",
+          "counts": {
+            "classFile": 22,
+            "exports": 1,
+            "member": 433,
+            "module": 1,
+            "requires": 1,
+            "type": 22
+          }
+        },
+        {
+          "name": "java.prefs",
+          "records": 289,
+          "sha256": "a2710f839aa352d2babf3c3251b5f21f19510612f76a28ed1d68d0b30c1e2753",
+          "counts": {
+            "classFile": 39,
+            "exports": 1,
+            "member": 236,
+            "module": 1,
+            "requires": 2,
+            "type": 9,
+            "uses": 1
+          }
+        },
+        {
+          "name": "java.rmi",
+          "records": 1266,
+          "sha256": "c519a197c4e8401fb56f8c69ba1f4b88a39e2c42b7aa0c6066a497fc8cc1c9d7",
+          "counts": {
+            "classFile": 63,
+            "exports": 8,
+            "member": 1136,
+            "module": 1,
+            "requires": 2,
+            "type": 55,
+            "uses": 1
+          }
+        },
+        {
+          "name": "java.scripting",
+          "records": 335,
+          "sha256": "e01ed0cc0836cd929160f760a44160908ec155ed8bc4f3d0572790839fa8c12e",
+          "counts": {
+            "classFile": 12,
+            "exports": 1,
+            "member": 307,
+            "module": 1,
+            "requires": 1,
+            "type": 12,
+            "uses": 1
+          }
+        },
+        {
+          "name": "java.se",
+          "records": 21,
+          "sha256": "19aa56967d4f2e3037980dc44d207dae84e767a93b91b4421442dd7853a73153",
+          "counts": {
+            "module": 1,
+            "requires": 20
+          }
+        },
+        {
+          "name": "java.security.jgss",
+          "records": 455,
+          "sha256": "b6f992c8a5ba65036eaa35ea9b02371c5bf8ca3242823141a18c47d9b8aeaa67",
+          "counts": {
+            "classFile": 20,
+            "exports": 8,
+            "member": 406,
+            "module": 1,
+            "opens": 1,
+            "provides": 1,
+            "requires": 2,
+            "type": 16
+          }
+        },
+        {
+          "name": "java.security.sasl",
+          "records": 219,
+          "sha256": "b98caa6c539e76e2a30433dd07eac5237ef95fe1ff3f2a4e8ae39b56e2346f0c",
+          "counts": {
+            "classFile": 12,
+            "exports": 2,
+            "member": 191,
+            "module": 1,
+            "provides": 1,
+            "requires": 2,
+            "type": 10
+          }
+        },
+        {
+          "name": "java.smartcardio",
+          "records": 289,
+          "sha256": "b9a085e407ee33d4bc9a8199a54844cf99ae43a4e3b2298695209b77b445ec36",
+          "counts": {
+            "classFile": 16,
+            "exports": 1,
+            "member": 256,
+            "module": 1,
+            "provides": 1,
+            "requires": 1,
+            "type": 13
+          }
+        },
+        {
+          "name": "java.sql",
+          "records": 3185,
+          "sha256": "fd9f31fbd34c30a399679a01178b827bee85bb203dc88a9ef58a1e3aa880c7ec",
+          "counts": {
+            "classFile": 78,
+            "exports": 2,
+            "member": 3025,
+            "module": 1,
+            "requires": 4,
+            "type": 74,
+            "uses": 1
+          }
+        },
+        {
+          "name": "java.sql.rowset",
+          "records": 3033,
+          "sha256": "9bcc24c5048f48536e0a440f35946930a6b5b90860146783fe1b9f7e6fe289b3",
+          "counts": {
+            "classFile": 37,
+            "exports": 3,
+            "member": 2957,
+            "module": 1,
+            "requires": 4,
+            "type": 30,
+            "uses": 1
+          }
+        },
+        {
+          "name": "java.transaction.xa",
+          "records": 105,
+          "sha256": "06a0f4c64e3d5fd7904fd89885adfd8057a068487cfba550451d75010a217c90",
+          "counts": {
+            "classFile": 3,
+            "exports": 1,
+            "member": 96,
+            "module": 1,
+            "requires": 1,
+            "type": 3
+          }
+        },
+        {
+          "name": "java.xml",
+          "records": 5773,
+          "sha256": "f5591197cb4ecc619179f2ef71067ad0cadb8a321a147a6f902b43d1a80fc854",
+          "counts": {
+            "classFile": 245,
+            "exports": 32,
+            "member": 5291,
+            "module": 1,
+            "requires": 1,
+            "type": 193,
+            "uses": 10
+          }
+        },
+        {
+          "name": "java.xml.crypto",
+          "records": 1171,
+          "sha256": "fd5029c218aeda2e5a281830267a26cd08d28ede2992f4266c39074deaa2b972",
+          "counts": {
+            "classFile": 61,
+            "exports": 6,
+            "member": 1041,
+            "module": 1,
+            "provides": 1,
+            "requires": 3,
+            "type": 58
+          }
+        }
+      ],
+      "oracle": {
+        "officialSources": {
+          "typeIndex": "https://docs.oracle.com/en/java/javase/21/docs/api/type-search-index.js",
+          "memberIndex": "https://docs.oracle.com/en/java/javase/21/docs/api/member-search-index.js",
+          "previewList": "https://docs.oracle.com/en/java/javase/21/docs/api/preview-list.html",
+          "reflectivePreviewPages": []
+        },
+        "officialSourceSha256": {
+          "typeIndex": "00657bb3ee38398c217f18ec4037e3ea4826ab2331f36811dd0b65d019ad1a69",
+          "memberIndex": "7d983434ae0c9d91a13db5ba2ed3232eee8e7ef8e2b8fd7fcefad7ecb7227725",
+          "previewList": "c8bbbc82b36b745c64e90a1133e15bcc77f5c878c7ded4e29d9467b957c914a6",
+          "reflectivePreviewPages": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "documentedTypes": 4055,
+        "documentedMembers": 46034,
+        "exactMemberMatches": 46034,
+        "memberAnchoredRecords": 46318,
+        "memberAnchorAliases": 1,
+        "previewDocumentedTypes": 38,
+        "previewDocumentedMembers": 17,
+        "reflectivePreviewTypes": 0,
+        "annotationPreviewTypes": 38,
+        "annotationPreviewMembers": 17
+      },
+      "projection": {
+        "records": 177627,
+        "stableIdSha256": "6f144a4916b9b3cfe22f15479288bb0d87b58e3b2e7c03ecb26e85c1e919c616",
+        "byOwner": {
+          "OUT-OF-SCOPE": 7889,
+          "JVM-011": 484,
+          "LIB-005": 7740,
+          "LIB-008": 140724,
+          "LIB-009": 5427,
+          "LIB-003": 3625,
+          "JVM-009": 164,
+          "LIB-007": 294,
+          "LIB-010": 808,
+          "JVM-003": 682,
+          "LIB-004": 119,
+          "JVM-008": 42,
+          "LIB-006": 3626,
+          "LIB-001": 5533,
+          "LIB-002": 470
+        },
+        "byClassification": {
+          "JDK-image-classfile-not-itself-an-exported-API-declaration": 7842,
+          "jdk-specific": 46,
+          "incubator": 1,
+          "qualified-export-not-public-Java-SE-API": 102,
+          "Java-SE-module-contract": 382,
+          "Java-SE-exported-API": 168181,
+          "preview-excluded-from-final-only-profile": 1073
+        },
+        "byTestPlan": {
+          "not-applicable": 7889,
+          "module-resolution-service-contract": 484,
+          "member-values-errors-side-effects-contract": 165199,
+          "type-reflection-access-contract": 4055
+        },
+        "previewUnits": 1073,
+        "previewUnitIdsSha256": "03615a94eb48c1e2c28ebfffa8225d2618b7410966589e346da5bb200bcd3070"
+      },
+      "catalogueRecords": 177627,
+      "catalogueSha256": "d4622741cd6dab775025ec242e336c40dcff038f09e66c2afd60a0e2ebf0b08b"
+    },
+    {
+      "id": "jdk25",
+      "feature": 25,
+      "version": "25.0.3",
+      "archiveSha256": "00486fa402136f8d40512b101c645dd4db9be2b5535171530ad241cd96c1223d",
+      "treeSha256": "1631db0be3d1f81d99f4246c4fa3e9045d820b123cac9eb20da6eb8987d27c68",
+      "records": 183864,
+      "sha256": "0dda61dc4596c17bdff4ceaa7e7a9d26ba8b162df8776c6b022cf019ea1786c4",
+      "countByKind": {
+        "classFile": 7927,
+        "exports": 275,
+        "member": 171109,
+        "module": 22,
+        "opens": 2,
+        "provides": 40,
+        "requires": 59,
+        "type": 4306,
+        "uses": 77
+      },
+      "excludedModules": [
+        [
+          "jdk.accessibility",
+          "jdk-specific"
+        ],
+        [
+          "jdk.attach",
+          "jdk-specific"
+        ],
+        [
+          "jdk.charsets",
+          "jdk-specific"
+        ],
+        [
+          "jdk.compiler",
+          "jdk-specific"
+        ],
+        [
+          "jdk.crypto.cryptoki",
+          "jdk-specific"
+        ],
+        [
+          "jdk.crypto.ec",
+          "jdk-specific"
+        ],
+        [
+          "jdk.dynalink",
+          "jdk-specific"
+        ],
+        [
+          "jdk.editpad",
+          "jdk-specific"
+        ],
+        [
+          "jdk.graal.compiler",
+          "jdk-specific"
+        ],
+        [
+          "jdk.graal.compiler.management",
+          "jdk-specific"
+        ],
+        [
+          "jdk.hotspot.agent",
+          "jdk-specific"
+        ],
+        [
+          "jdk.httpserver",
+          "jdk-specific"
+        ],
+        [
+          "jdk.incubator.vector",
+          "incubator"
+        ],
+        [
+          "jdk.internal.ed",
+          "jdk-specific"
+        ],
+        [
+          "jdk.internal.jvmstat",
+          "jdk-specific"
+        ],
+        [
+          "jdk.internal.le",
+          "jdk-specific"
+        ],
+        [
+          "jdk.internal.md",
+          "jdk-specific"
+        ],
+        [
+          "jdk.internal.opt",
+          "jdk-specific"
+        ],
+        [
+          "jdk.internal.vm.ci",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jartool",
+          "jdk-specific"
+        ],
+        [
+          "jdk.javadoc",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jcmd",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jconsole",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jdeps",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jdi",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jdwp.agent",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jfr",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jlink",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jpackage",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jshell",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jsobject",
+          "jdk-specific"
+        ],
+        [
+          "jdk.jstatd",
+          "jdk-specific"
+        ],
+        [
+          "jdk.localedata",
+          "jdk-specific"
+        ],
+        [
+          "jdk.management",
+          "jdk-specific"
+        ],
+        [
+          "jdk.management.agent",
+          "jdk-specific"
+        ],
+        [
+          "jdk.management.jfr",
+          "jdk-specific"
+        ],
+        [
+          "jdk.naming.dns",
+          "jdk-specific"
+        ],
+        [
+          "jdk.naming.rmi",
+          "jdk-specific"
+        ],
+        [
+          "jdk.net",
+          "jdk-specific"
+        ],
+        [
+          "jdk.nio.mapmode",
+          "jdk-specific"
+        ],
+        [
+          "jdk.sctp",
+          "jdk-specific"
+        ],
+        [
+          "jdk.security.auth",
+          "jdk-specific"
+        ],
+        [
+          "jdk.security.jgss",
+          "jdk-specific"
+        ],
+        [
+          "jdk.unsupported",
+          "jdk-specific"
+        ],
+        [
+          "jdk.unsupported.desktop",
+          "jdk-specific"
+        ],
+        [
+          "jdk.xml.dom",
+          "jdk-specific"
+        ],
+        [
+          "jdk.zipfs",
+          "jdk-specific"
+        ]
+      ],
+      "modules": [
+        {
+          "name": "java.base",
+          "records": 48822,
+          "sha256": "50a8af90d8bbeb1de41d897212a8f9edb0f92d6e86d3f7175905490adbfec679",
+          "counts": {
+            "classFile": 3655,
+            "exports": 115,
+            "member": 43380,
+            "module": 1,
+            "provides": 1,
+            "type": 1635,
+            "uses": 35
+          }
+        },
+        {
+          "name": "java.compiler",
+          "records": 3795,
+          "sha256": "225316a88024b74d8e0cec25e23670c1e87e3021fda93babff9c381c58b9b01d",
+          "counts": {
+            "classFile": 156,
+            "exports": 6,
+            "member": 3483,
+            "module": 1,
+            "requires": 1,
+            "type": 146,
+            "uses": 2
+          }
+        },
+        {
+          "name": "java.datatransfer",
+          "records": 274,
+          "sha256": "0f81859acc0d92fe8411ae4b5661f4b10f211a2116dc1540e9e23548111a1292",
+          "counts": {
+            "classFile": 15,
+            "exports": 2,
+            "member": 242,
+            "module": 1,
+            "requires": 1,
+            "type": 12,
+            "uses": 1
+          }
+        },
+        {
+          "name": "java.desktop",
+          "records": 104838,
+          "sha256": "63570e09b04ae826673ae3232be253dfb2f2e1f356e828918bb2133c296dbeae",
+          "counts": {
+            "classFile": 3104,
+            "exports": 55,
+            "member": 99933,
+            "module": 1,
+            "opens": 1,
+            "provides": 30,
+            "requires": 4,
+            "type": 1692,
+            "uses": 18
+          }
+        },
+        {
+          "name": "java.instrument",
+          "records": 142,
+          "sha256": "e129e571369220ed46ecd5b7585b7438a47e2f155b83466f9e6ebb0ef5d8fbca",
+          "counts": {
+            "classFile": 6,
+            "exports": 2,
+            "member": 126,
+            "module": 1,
+            "requires": 1,
+            "type": 6
+          }
+        },
+        {
+          "name": "java.logging",
+          "records": 513,
+          "sha256": "5583950808801066f7e1a36d6919b9d935fb48f98790a2da6552c4ac67b2f3ef",
+          "counts": {
+            "classFile": 38,
+            "exports": 1,
+            "member": 454,
+            "module": 1,
+            "provides": 1,
+            "requires": 1,
+            "type": 17
+          }
+        },
+        {
+          "name": "java.management",
+          "records": 5041,
+          "sha256": "6a2aef739a7ed1f5c956ee0930476f60605aec3a4e37936a85e2b8de37259f43",
+          "counts": {
+            "classFile": 241,
+            "exports": 16,
+            "member": 4587,
+            "module": 1,
+            "provides": 1,
+            "requires": 1,
+            "type": 191,
+            "uses": 3
+          }
+        },
+        {
+          "name": "java.management.rmi",
+          "records": 303,
+          "sha256": "aebf55b483e9856846252c9fb9cfc954ee52b8bc5adcb89c1962e3249a7e56e2",
+          "counts": {
+            "classFile": 18,
+            "exports": 3,
+            "member": 266,
+            "module": 1,
+            "provides": 2,
+            "requires": 4,
+            "type": 9
+          }
+        },
+        {
+          "name": "java.naming",
+          "records": 3461,
+          "sha256": "436df1a3222b749b6cd9b080ce07a06ad4d0a2a4c1751b753c894d69b5d62c4d",
+          "counts": {
+            "classFile": 115,
+            "exports": 9,
+            "member": 3228,
+            "module": 1,
+            "provides": 1,
+            "requires": 2,
+            "type": 102,
+            "uses": 3
+          }
+        },
+        {
+          "name": "java.net.http",
+          "records": 483,
+          "sha256": "d5ad8398e57db7fa49ff28b1c6b1755dbd1db5f64d401bd9898804621e85c868",
+          "counts": {
+            "classFile": 22,
+            "exports": 1,
+            "member": 436,
+            "module": 1,
+            "requires": 1,
+            "type": 22
+          }
+        },
+        {
+          "name": "java.prefs",
+          "records": 275,
+          "sha256": "d428cf8233e7c908f419f08d8896a17dda1c9c862d11b4cb5c37280f909aac68",
+          "counts": {
+            "classFile": 25,
+            "exports": 1,
+            "member": 236,
+            "module": 1,
+            "requires": 2,
+            "type": 9,
+            "uses": 1
+          }
+        },
+        {
+          "name": "java.rmi",
+          "records": 1265,
+          "sha256": "dcbc23d7244c7789f875c4afe76f01316f1c36ba72970956d64337b461980080",
+          "counts": {
+            "classFile": 62,
+            "exports": 8,
+            "member": 1136,
+            "module": 1,
+            "requires": 2,
+            "type": 55,
+            "uses": 1
+          }
+        },
+        {
+          "name": "java.scripting",
+          "records": 335,
+          "sha256": "87173ebad5b97ee279a360a52dcd9b071144d992c073cfb42f1b98e34dc00041",
+          "counts": {
+            "classFile": 12,
+            "exports": 1,
+            "member": 307,
+            "module": 1,
+            "requires": 1,
+            "type": 12,
+            "uses": 1
+          }
+        },
+        {
+          "name": "java.se",
+          "records": 21,
+          "sha256": "e49712cbaab210d9fa05e4031fed0f0dabefaff54b022593bb9162b99cac2d72",
+          "counts": {
+            "module": 1,
+            "requires": 20
+          }
+        },
+        {
+          "name": "java.security.jgss",
+          "records": 455,
+          "sha256": "ec28d682ec7f1549e9f04d3a74de2573a18365168e8ec7d1a7b5448179af3f35",
+          "counts": {
+            "classFile": 20,
+            "exports": 8,
+            "member": 406,
+            "module": 1,
+            "opens": 1,
+            "provides": 1,
+            "requires": 2,
+            "type": 16
+          }
+        },
+        {
+          "name": "java.security.sasl",
+          "records": 219,
+          "sha256": "748d355c196a322cfaf9d2192b72a0a69e5d164929ce87f006e5d8c0c182e37e",
+          "counts": {
+            "classFile": 12,
+            "exports": 2,
+            "member": 191,
+            "module": 1,
+            "provides": 1,
+            "requires": 2,
+            "type": 10
+          }
+        },
+        {
+          "name": "java.smartcardio",
+          "records": 289,
+          "sha256": "08f820d635b9f0a8f73a784de209002b50564552e327cf4ac47a804c63ffb556",
+          "counts": {
+            "classFile": 16,
+            "exports": 1,
+            "member": 256,
+            "module": 1,
+            "provides": 1,
+            "requires": 1,
+            "type": 13
+          }
+        },
+        {
+          "name": "java.sql",
+          "records": 3183,
+          "sha256": "3f6216f33e867c0ca277fabdd33dad08ccc0724b0be38d44c7afdea29e4011ec",
+          "counts": {
+            "classFile": 76,
+            "exports": 2,
+            "member": 3025,
+            "module": 1,
+            "requires": 4,
+            "type": 74,
+            "uses": 1
+          }
+        },
+        {
+          "name": "java.sql.rowset",
+          "records": 3029,
+          "sha256": "06419d218e42d92749a0f8f795b728355a2a26944311628eef730703408d9216",
+          "counts": {
+            "classFile": 33,
+            "exports": 3,
+            "member": 2957,
+            "module": 1,
+            "requires": 4,
+            "type": 30,
+            "uses": 1
+          }
+        },
+        {
+          "name": "java.transaction.xa",
+          "records": 105,
+          "sha256": "a71bf7aad87408e987d82914ef523addb85d85d863a25eac73ea310e3059bb91",
+          "counts": {
+            "classFile": 3,
+            "exports": 1,
+            "member": 96,
+            "module": 1,
+            "requires": 1,
+            "type": 3
+          }
+        },
+        {
+          "name": "java.xml",
+          "records": 5790,
+          "sha256": "350bfa175d6f76eddc322cc92a1f3091700a898963614d0465ce870312553694",
+          "counts": {
+            "classFile": 237,
+            "exports": 32,
+            "member": 5315,
+            "module": 1,
+            "requires": 1,
+            "type": 194,
+            "uses": 10
+          }
+        },
+        {
+          "name": "java.xml.crypto",
+          "records": 1179,
+          "sha256": "49c73f2a58e8925a302d8c746c53fdc84af727b4f0fd334086019ee820aaa74f",
+          "counts": {
+            "classFile": 61,
+            "exports": 6,
+            "member": 1049,
+            "module": 1,
+            "provides": 1,
+            "requires": 3,
+            "type": 58
+          }
+        }
+      ],
+      "oracle": {
+        "officialSources": {
+          "typeIndex": "https://docs.oracle.com/en/java/javase/25/docs/api/type-search-index.js",
+          "memberIndex": "https://docs.oracle.com/en/java/javase/25/docs/api/member-search-index.js",
+          "previewList": "https://docs.oracle.com/en/java/javase/25/docs/api/preview-list.html",
+          "reflectivePreviewPages": [
+            "https://docs.oracle.com/en/java/javase/25/docs/api/java.compiler/javax/lang/model/util/AbstractAnnotationValueVisitorPreview.html",
+            "https://docs.oracle.com/en/java/javase/25/docs/api/java.compiler/javax/lang/model/util/AbstractElementVisitorPreview.html",
+            "https://docs.oracle.com/en/java/javase/25/docs/api/java.compiler/javax/lang/model/util/AbstractTypeVisitorPreview.html",
+            "https://docs.oracle.com/en/java/javase/25/docs/api/java.compiler/javax/lang/model/util/ElementKindVisitorPreview.html",
+            "https://docs.oracle.com/en/java/javase/25/docs/api/java.compiler/javax/lang/model/util/ElementScannerPreview.html",
+            "https://docs.oracle.com/en/java/javase/25/docs/api/java.compiler/javax/lang/model/util/SimpleAnnotationValueVisitorPreview.html",
+            "https://docs.oracle.com/en/java/javase/25/docs/api/java.compiler/javax/lang/model/util/SimpleElementVisitorPreview.html",
+            "https://docs.oracle.com/en/java/javase/25/docs/api/java.compiler/javax/lang/model/util/SimpleTypeVisitorPreview.html",
+            "https://docs.oracle.com/en/java/javase/25/docs/api/java.compiler/javax/lang/model/util/TypeKindVisitorPreview.html"
+          ]
+        },
+        "officialSourceSha256": {
+          "typeIndex": "22bb10f3e4e3b74580cc910d1a84ae54cb047c285350a4ff285ecf26268b01d2",
+          "memberIndex": "a80689888aae92eb53585f3edc3097cf5cbf0bcbf2e39b1e0ea3500163ee5de4",
+          "previewList": "d70f15820752c41427e664fc10215ddb61bed684e7279bda2139cc6a9ff2ee04",
+          "reflectivePreviewPages": "566f778b7e23c454e2aa08839def951052a57f8f3ebb18c5200773ca98af59ee"
+        },
+        "documentedTypes": 4306,
+        "documentedMembers": 47924,
+        "exactMemberMatches": 47924,
+        "memberAnchoredRecords": 48210,
+        "memberAnchorAliases": 1,
+        "previewDocumentedTypes": 13,
+        "previewDocumentedMembers": 5,
+        "reflectivePreviewTypes": 9,
+        "annotationPreviewTypes": 22,
+        "annotationPreviewMembers": 5
+      },
+      "projection": {
+        "records": 183864,
+        "stableIdSha256": "ace0440968ccf2e52aea0e631ef3660a842e8fd8ab5ecb00db5278ff260b3b5d",
+        "byOwner": {
+          "OUT-OF-SCOPE": 7974,
+          "JVM-011": 475,
+          "LIB-005": 7783,
+          "LIB-008": 141449,
+          "LIB-009": 5221,
+          "LIB-003": 3671,
+          "JVM-009": 161,
+          "LIB-007": 5703,
+          "LIB-010": 863,
+          "JVM-003": 677,
+          "LIB-004": 119,
+          "JVM-008": 60,
+          "LIB-006": 3635,
+          "LIB-001": 5524,
+          "LIB-002": 549
+        },
+        "byClassification": {
+          "JDK-image-classfile-not-itself-an-exported-API-declaration": 7927,
+          "jdk-specific": 46,
+          "incubator": 1,
+          "qualified-export-not-public-Java-SE-API": 92,
+          "Java-SE-module-contract": 383,
+          "Java-SE-exported-API": 174887,
+          "preview-excluded-from-final-only-profile": 528
+        },
+        "byTestPlan": {
+          "not-applicable": 7974,
+          "module-resolution-service-contract": 475,
+          "member-values-errors-side-effects-contract": 171109,
+          "type-reflection-access-contract": 4306
+        },
+        "previewUnits": 528,
+        "previewUnitIdsSha256": "7126bcd26a92e538219b6d24e10371cebe9a7aabddbd4b41079a2f31ca335a57"
+      },
+      "catalogueRecords": 183864,
+      "catalogueSha256": "a2144d024d23c15aa28e9caa7a4216d2e492de736bd7bc49b1b02eca63203cc0"
+    }
+  ]
+}
