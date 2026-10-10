@@ -47,7 +47,7 @@ function inputs() {
     })));
   const summary = { required: cases.length, passed: cases.length, failed: 0, notRun: 0 };
   const seed = { schemaVersion: 1,
-    scope: 'Mandatory Java compatibility fixtures on selected hosts; the full Java SE inventory remains incomplete.',
+    scope: 'Mandatory Java compatibility fixtures on selected hosts; this seed alone does not establish full Java SE inventory completion.',
     status: 'passed', source: { commit, trackedDirty: false }, sourceAtEnd: { commit, trackedDirty: false },
     manifest: { sha256: hash }, runner: { sha256: hash },
     host: { node: process.version, nodeExecutableSha256: hash },

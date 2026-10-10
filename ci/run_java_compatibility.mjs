@@ -12,7 +12,7 @@ const sha256Pattern = /^[0-9a-f]{64}$/;
 const supportedReleases = [21, 25];
 const outputLimitBytes = 4 * 1024 * 1024;
 const inputLimitBytes = 1024 * 1024;
-const resultScope = 'Mandatory Java compatibility fixtures on selected hosts; the full Java SE inventory remains incomplete.';
+const resultScope = 'Mandatory Java compatibility fixtures on selected hosts; this seed alone does not establish full Java SE inventory completion.';
 const legacyResultScope = 'Mandatory CLI seed fixtures only; not full Java SE or browser compatibility.';
 
 function requireCondition(condition, message) {

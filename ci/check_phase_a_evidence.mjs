@@ -13,7 +13,7 @@ const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), '..');
 const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 const digestPattern = /^[a-f0-9]{64}$/;
-const seedScope = 'Mandatory Java compatibility fixtures on selected hosts; the full Java SE inventory remains incomplete.';
+const seedScope = 'Mandatory Java compatibility fixtures on selected hosts; this seed alone does not establish full Java SE inventory completion.';
 const admissionScope = 'JVM-001 genuine Java 21/25 class-file admission and explicit header controls';
 const admissionInputFiles = ['classes/modern_fixture/JavaClassVersion.java',
   'classes/modern_fixture/JavaClassAdmissionShapes.java', 'ci/java_class_version_test.mjs',
