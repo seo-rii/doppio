@@ -153,9 +153,12 @@ if (completeResult.status !== 0) {
 
 for (const name of [
   'Check Java compatibility baseline tooling',
+  'Check phase A inventory and evidence contracts',
   'Build Java compatibility browser runtime',
   'Install Java compatibility Chromium',
   'Prepare pinned Java compatibility toolchains',
+  'Verify complete phase A requirements inventory',
+  'Upload phase A requirements inventory',
   'Run genuine Java 21 and 25 seed fixtures',
   'Run final Java 25 launcher compatibility',
   'Check main exit status contracts',
@@ -164,6 +167,7 @@ for (const name of [
   'Check class-file version admission',
   'Run Java class-file version compatibility',
   'Upload class-file admission ledger',
+  'Verify current-commit phase A execution evidence',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -185,6 +189,12 @@ for (const [original, replacement] of [
   ['run: node ci/run_java_compatibility.mjs --browser\n', 'run: node ci/run_java_compatibility.mjs --browser --release 21\n'],
   ['run: node ci/run_java_compatibility.mjs --browser\n', 'run: node ci/run_java_compatibility.mjs\n'],
   ['run: node ci/prepare_java_compatibility_toolchains.mjs\n', 'run: node ci/prepare_java_compatibility_toolchains.mjs || true\n'],
+  ['run: node --test ci/plan_spec_source_index_test.mjs ci/check_java_se_api_census_test.mjs ci/java_se_contract_sources_test.mjs ci/check_plan_spec_obligations_test.mjs ci/check_phase_a_inventory_test.mjs ci/check_phase_a_evidence_test.mjs\n', 'run: echo contracts checked\n'],
+  ['run: node ci/plan_spec_source_index.mjs --check && node ci/check_java_se_api_census.mjs && node ci/java_se_contract_sources.mjs && node ci/check_phase_a_inventory.mjs\n', 'run: echo inventory checked\n'],
+  ["if: always() && steps.phase_a_inventory.outcome != 'skipped'", 'if: success()'],
+  ['build/java-se-api-census/*.gz', 'build/missing-api-census/*.gz'],
+  ['build/java-se-contract-sources/*.gz', 'build/missing-contract-sources/*.gz'],
+  ['run: node ci/check_phase_a_evidence.mjs\n', 'run: node ci/check_phase_a_evidence.mjs || true\n'],
   ['timeout-minutes: 130\n', 'timeout-minutes: 1300\n'],
   ['run: node ci/java25_main_test.mjs --browser\n', 'run: node ci/java25_main_test.mjs\n'],
   ['run: node ci/java25_main_test.mjs --browser\n', 'run: node ci/java25_main_test.mjs --browser || true\n'],
@@ -234,6 +244,18 @@ expectCheckerFailure(
 expectCheckerFailure(
   'Java 25 launcher gate before the seed execution dependency',
   { workflow: swapAdjacentSteps(realWorkflow, 'Run genuine Java 21 and 25 seed fixtures', 'Run final Java 25 launcher compatibility') },
+  'remain in dependency order'
+);
+
+expectCheckerFailure(
+  'phase A inventory before pinned toolchain preparation',
+  { workflow: swapAdjacentSteps(realWorkflow, 'Prepare pinned Java compatibility toolchains', 'Verify complete phase A requirements inventory') },
+  'remain in dependency order'
+);
+
+expectCheckerFailure(
+  'phase A execution evidence before admission results',
+  { workflow: swapAdjacentSteps(realWorkflow, 'Run Java class-file version compatibility', 'Verify current-commit phase A execution evidence') },
   'remain in dependency order'
 );
 

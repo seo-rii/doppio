@@ -1,7 +1,5 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import {
   chapterSourceUrl,
@@ -10,23 +8,23 @@ import {
 } from './check_plan_spec_obligations.mjs';
 
 const ledgerUrl = new URL('./plan_spec_obligations.json', import.meta.url);
-const checkerPath = fileURLToPath(new URL('./check_plan_spec_obligations.mjs', import.meta.url));
 
 function copyLedger() {
   return JSON.parse(fs.readFileSync(ledgerUrl, 'utf8'));
 }
 
-test('indexes both editions of every JLS/JVMS chapter while keeping obligations open', () => {
+test('resolves every JLS/JVMS chapter to full source contracts without claiming conformance', () => {
   const ledger = copyLedger();
   assert.deepEqual(validateSpecGapLedger(ledger), {
     profile: 'java-se-21-25-final',
     sourceEditions: 4,
     indexedChapters: 26,
-    openEditionChapterGaps: 52,
-    openCrossCuttingGaps: 5,
-    completeJavaSeInventory: false,
+    resolvedEditionChapterCells: 52,
+    resolvedCrossCuttingItems: 5,
+    resolutionMapComplete: true,
+    semanticAssessmentComplete: false,
   });
-  assert.equal(checkSpecGapLedger().completeJavaSeInventory, false);
+  assert.equal(checkSpecGapLedger().resolutionMapComplete, true);
   assert.equal(
     chapterSourceUrl(ledger, 'JVMS', 25, 4),
     'https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-4.html#jvms-4',
@@ -71,21 +69,26 @@ test('rejects source substitution and missing inherited, service or exclusion ga
   }
 
   const noEvidence = copyLedger();
-  noEvidence.crossCuttingGaps[0].missingEvidence = '';
-  assert.throws(() => validateSpecGapLedger(noEvidence), /missingEvidence must not be empty/);
+  noEvidence.crossCuttingGaps[0].resolution = '';
+  assert.throws(() => validateSpecGapLedger(noEvidence), /resolution must not be empty/);
 });
 
-test('schema v1 cannot silently claim clause-level PLAN-001 completion', () => {
+test('a resolution declaration cannot substitute for the complete source inventories', () => {
   const claimed = copyLedger();
   claimed.completeJavaSeInventory = true;
-  assert.throws(() => validateSpecGapLedger(claimed), /cannot claim a complete inventory/);
+  assert.throws(() => validateSpecGapLedger(claimed), /cannot claim inventory completion/);
 
   const closedChapter = copyLedger();
   closedChapter.chapterGaps[0].state = 'complete';
-  assert.throws(() => validateSpecGapLedger(closedChapter), /cannot be closed in schema v1/);
+  assert.throws(() => validateSpecGapLedger(closedChapter), /needs source-contract coverage/);
 
-  assert.throws(() => checkSpecGapLedger({ requireComplete: true }), /PLAN-001 remains open/);
-  const result = spawnSync(process.execPath, [checkerPath, '--require-complete'], { encoding: 'utf8' });
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /52 edition\/chapter gaps and 5 cross-cutting gaps/);
+  const missingComponent = copyLedger();
+  delete missingComponent.components.supplementary;
+  assert.throws(() => validateSpecGapLedger(missingComponent), /All three inventory components/);
+  const unlinked = copyLedger();
+  unlinked.crossCuttingGaps[0].evidence = ['specification'];
+  assert.throws(() => validateSpecGapLedger(unlinked), /needs all source components/);
+  const semanticClaim = copyLedger();
+  semanticClaim.semanticAssessmentComplete = true;
+  assert.throws(() => validateSpecGapLedger(semanticClaim), /not implementation assessment/);
 });

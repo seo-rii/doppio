@@ -133,17 +133,24 @@ not establish general stack-trace formatting or thread-scheduling equivalence.
 A separate 26-scenario check covers main completion and shutdown for class-file
 majors 52, 65 and 69, including failure recording before handler dispatch.
 
-The class-file admission gate (`yarn ci:class-file-version`) compares twenty-five
-cases against pinned native Java and both hosts: two untouched javac 21/25
+The class-file admission gate (`yarn ci:class-file-version`) requires twenty-seven
+cases against pinned native Java and both hosts: four untouched javac 21/25
 controls, four labeled historical header controls and nineteen negative cases.
+The genuine controls include a simple class and modern record/sealed/lambda/
+pattern-switch shapes from each compiler, with emitted attribute checks.
 Unsupported majors/minors and disabled previews produce
 `UnsupportedClassVersionError`; malformed magic and truncated headers retain
 `ClassFormatError`. Every rejected input must fail before initialization or main
-execution. Fifty guest checks preserve identical input hashes. A separate
+execution. Fifty-four guest checks preserve identical input hashes. The retained
+ledger records the source commit, compiler/runtime hashes, individual host
+results and failed-case evidence. A separate
 57-scenario check covers parser/loader/Lookup classification, recovery after
 failed definitions, application-loader propagation and deferred launch shutdown.
 Historical header mutations are structural probes, not language compatibility
 claims; the existing major range 45–70 remains partial.
+
+[Phase A's inventory and evidence rules](phase-a-inventory.md) distinguish
+complete requirements accounting from implemented and tested behavior.
 
 The `yarn ci:java-pattern-evolution` gate separately recompiles enum and sealed
 declarations without changing their javac 21/25 callers or synthetic helpers.

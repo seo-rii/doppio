@@ -1,9 +1,8 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "profile": "java-se-21-25-final",
-  "completeJavaSeInventory": false,
-  "purpose": "Source-chapter gap ledger, not a clause-level requirement inventory or a compatibility claim. A listed seed fixture does not close its chapter.",
-  "chapterExitRule": "For each edition and chapter, classify applicability, extract every applicable normative obligation at section/clause granularity, assign an implementation package and status, and link specification and test evidence. Record justified exclusions separately.",
+  "purpose": "Resolution map for the complete Java SE 21/25 contract inventory. Whole sections and API declarations include all normative prose, failures, side effects, tables and incorporated references. Inventory completion does not claim runtime implementation or conformance.",
+  "chapterExitRule": "Index every chapter preamble and nested section in both target editions, pin source spans, resolve applicability and planning owner, and assign a concrete pending test plan or executable evidence. Semantic implementation assessment may remain unassessed.",
   "editions": [
     {
       "id": "JLS-21",
@@ -35,88 +34,483 @@
     }
   ],
   "chapterGaps": [
-    { "id": "JLS-01", "spec": "JLS", "chapter": 1, "title": "Introduction", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JLS-02", "spec": "JLS", "chapter": 2, "title": "Grammars", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JLS-03", "spec": "JLS", "chapter": 3, "title": "Lexical Structure", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JLS-04", "spec": "JLS", "chapter": 4, "title": "Types, Values, and Variables", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JLS-05", "spec": "JLS", "chapter": 5, "title": "Conversions and Contexts", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JLS-06", "spec": "JLS", "chapter": 6, "title": "Names", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JLS-07", "spec": "JLS", "chapter": 7, "title": "Packages and Modules", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JLS-08", "spec": "JLS", "chapter": 8, "title": "Classes", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JLS-09", "spec": "JLS", "chapter": 9, "title": "Interfaces", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JLS-10", "spec": "JLS", "chapter": 10, "title": "Arrays", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JLS-11", "spec": "JLS", "chapter": 11, "title": "Exceptions", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JLS-12", "spec": "JLS", "chapter": 12, "title": "Execution", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JLS-13", "spec": "JLS", "chapter": 13, "title": "Binary Compatibility", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JLS-14", "spec": "JLS", "chapter": 14, "title": "Blocks, Statements, and Patterns", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JLS-15", "spec": "JLS", "chapter": 15, "title": "Expressions", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JLS-16", "spec": "JLS", "chapter": 16, "title": "Definite Assignment", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JLS-17", "spec": "JLS", "chapter": 17, "title": "Threads and Locks", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JLS-18", "spec": "JLS", "chapter": 18, "title": "Type Inference", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JLS-19", "spec": "JLS", "chapter": 19, "title": "Syntax", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JVMS-01", "spec": "JVMS", "chapter": 1, "title": "Introduction", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JVMS-02", "spec": "JVMS", "chapter": 2, "title": "The Structure of the Java Virtual Machine", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JVMS-03", "spec": "JVMS", "chapter": 3, "title": "Compiling for the Java Virtual Machine", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JVMS-04", "spec": "JVMS", "chapter": 4, "title": "The class File Format", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JVMS-05", "spec": "JVMS", "chapter": 5, "title": "Loading, Linking, and Initializing", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JVMS-06", "spec": "JVMS", "chapter": 6, "title": "The Java Virtual Machine Instruction Set", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" },
-    { "id": "JVMS-07", "spec": "JVMS", "chapter": 7, "title": "Opcode Mnemonics by Opcode", "releases": [21, 25], "censusOwner": "PLAN-001", "state": "clauses-unenumerated" }
+    {
+      "id": "JLS-01",
+      "spec": "JLS",
+      "chapter": 1,
+      "title": "Introduction",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JLS-02",
+      "spec": "JLS",
+      "chapter": 2,
+      "title": "Grammars",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JLS-03",
+      "spec": "JLS",
+      "chapter": 3,
+      "title": "Lexical Structure",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JLS-04",
+      "spec": "JLS",
+      "chapter": 4,
+      "title": "Types, Values, and Variables",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JLS-05",
+      "spec": "JLS",
+      "chapter": 5,
+      "title": "Conversions and Contexts",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JLS-06",
+      "spec": "JLS",
+      "chapter": 6,
+      "title": "Names",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JLS-07",
+      "spec": "JLS",
+      "chapter": 7,
+      "title": "Packages and Modules",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JLS-08",
+      "spec": "JLS",
+      "chapter": 8,
+      "title": "Classes",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JLS-09",
+      "spec": "JLS",
+      "chapter": 9,
+      "title": "Interfaces",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JLS-10",
+      "spec": "JLS",
+      "chapter": 10,
+      "title": "Arrays",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JLS-11",
+      "spec": "JLS",
+      "chapter": 11,
+      "title": "Exceptions",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JLS-12",
+      "spec": "JLS",
+      "chapter": 12,
+      "title": "Execution",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JLS-13",
+      "spec": "JLS",
+      "chapter": 13,
+      "title": "Binary Compatibility",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JLS-14",
+      "spec": "JLS",
+      "chapter": 14,
+      "title": "Blocks, Statements, and Patterns",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JLS-15",
+      "spec": "JLS",
+      "chapter": 15,
+      "title": "Expressions",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JLS-16",
+      "spec": "JLS",
+      "chapter": 16,
+      "title": "Definite Assignment",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JLS-17",
+      "spec": "JLS",
+      "chapter": 17,
+      "title": "Threads and Locks",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JLS-18",
+      "spec": "JLS",
+      "chapter": 18,
+      "title": "Type Inference",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JLS-19",
+      "spec": "JLS",
+      "chapter": 19,
+      "title": "Syntax",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JVMS-01",
+      "spec": "JVMS",
+      "chapter": 1,
+      "title": "Introduction",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JVMS-02",
+      "spec": "JVMS",
+      "chapter": 2,
+      "title": "The Structure of the Java Virtual Machine",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JVMS-03",
+      "spec": "JVMS",
+      "chapter": 3,
+      "title": "Compiling for the Java Virtual Machine",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JVMS-04",
+      "spec": "JVMS",
+      "chapter": 4,
+      "title": "The class File Format",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JVMS-05",
+      "spec": "JVMS",
+      "chapter": 5,
+      "title": "Loading, Linking, and Initializing",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JVMS-06",
+      "spec": "JVMS",
+      "chapter": 6,
+      "title": "The Java Virtual Machine Instruction Set",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    },
+    {
+      "id": "JVMS-07",
+      "spec": "JVMS",
+      "chapter": 7,
+      "title": "Opcode Mnemonics by Opcode",
+      "releases": [
+        21,
+        25
+      ],
+      "censusOwner": "PLAN-001",
+      "state": "source-contracts-indexed",
+      "evidence": [
+        "specification"
+      ]
+    }
   ],
   "crossCuttingGaps": [
     {
       "id": "JAVA8-INHERITED-SEMANTICS",
       "censusOwner": "PLAN-001",
-      "state": "open",
+      "state": "source-contracts-indexed",
       "sourceUrls": [
         "https://docs.oracle.com/javase/specs/jls/se8/html/index.html",
         "https://docs.oracle.com/javase/specs/jvms/se8/html/index.html",
         "https://docs.oracle.com/javase/8/docs/api/"
       ],
-      "missingEvidence": "Trace retained Java 8 language, VM and library contracts through the 21/25 editions; a legacy pass or unchanged signature is not a behavioral census."
+      "evidence": [
+        "specification",
+        "api",
+        "supplementary"
+      ],
+      "resolution": "All contracts in the 21/25 editions are in scope, including retained Java 8 behavior. The inventory is not restricted to newly added APIs or changed signatures. The Java 8-derived runtime and compiler workload remains required separately."
     },
     {
       "id": "EDITION-DELTA",
       "censusOwner": "PLAN-001",
-      "state": "open",
+      "state": "source-contracts-indexed",
       "sourceUrls": [
         "https://docs.oracle.com/javase/specs/jls/se21/html/index.html",
         "https://docs.oracle.com/javase/specs/jls/se25/html/index.html",
         "https://docs.oracle.com/javase/specs/jvms/se21/html/index.html",
         "https://docs.oracle.com/javase/specs/jvms/se25/html/index.html"
       ],
-      "missingEvidence": "Classify final semantic changes and removals across 21–25, including changes finalized in 22–24; chapter titles and javac output alone do not establish a delta inventory."
+      "evidence": [
+        "specification",
+        "api",
+        "supplementary"
+      ],
+      "resolution": "Each edition retains complete contracts and hashes. Added, removed and text/signature-changed units produce pending comparison work; unchanged signatures do not waive prose review. A changed hash alone is not a claim of changed semantics."
     },
     {
       "id": "SERVICE-PROVIDER-CONTRACTS",
       "censusOwner": "PLAN-001",
-      "state": "open",
+      "state": "source-contracts-indexed",
       "sourceUrls": [
         "https://docs.oracle.com/javase/specs/jls/se25/html/jls-7.html#jls-7.7.3",
         "https://docs.oracle.com/javase/specs/jls/se25/html/jls-7.html#jls-7.7.4",
         "https://docs.oracle.com/en/java/javase/25/docs/api/index.html"
       ],
-      "missingEvidence": "Enumerate 21/25 module uses/provides declarations and service-loading/provider behavior, with implementation owners and tests; exported member signatures do not cover this."
+      "evidence": [
+        "api",
+        "supplementary"
+      ],
+      "resolution": "Module uses/provides declarations, ServiceLoader and exported SPI contracts retain discovery/configuration/caching/errors and incorporated behavior. Observed Corretto provider identities are implementation evidence, not automatically Java SE requirements."
     },
     {
       "id": "API-BEHAVIOR",
       "censusOwner": "PLAN-001",
-      "state": "open",
+      "state": "source-contracts-indexed",
       "sourceUrls": [
         "https://docs.oracle.com/en/java/javase/21/docs/api/index.html",
         "https://docs.oracle.com/en/java/javase/25/docs/api/index.html"
       ],
-      "missingEvidence": "Map behavioral guarantees, exceptions, side effects and provider contracts for public/protected APIs, including unchanged Java 8-era members; a structural API census is not a contract inventory."
+      "evidence": [
+        "api",
+        "supplementary"
+      ],
+      "resolution": "Every exported module/package and public/protected type/member has a complete-contract unit, including inherited guarantees, exceptions, side effects, serialized forms and incorporated references. Concrete test-plan families are pending until later implementation batches."
     },
     {
       "id": "FEATURE-BOUNDARY",
       "censusOwner": "PLAN-001",
-      "state": "open",
+      "state": "source-contracts-indexed",
       "sourceUrls": [
         "https://docs.oracle.com/javase/specs/jls/se25/html/jls-1.html#jls-1.5",
         "https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-1.html#jvms-1.5",
         "https://docs.oracle.com/en/java/javase/25/docs/api/preview-list.html"
       ],
-      "missingEvidence": "Classify preview, incubator and JDK-specific surfaces separately from final Java SE obligations and record justified host/platform exclusions."
+      "evidence": [
+        "specification",
+        "api",
+        "supplementary"
+      ],
+      "resolution": "Per-edition final/preview/incubator/JDK classifications retain excluded units separately. Host-dependent required contracts remain owned and unassessed, not silently excluded because the current runtime cannot implement them."
     }
-  ]
+  ],
+  "inventoryGranularity": "whole-source-contract",
+  "semanticAssessmentComplete": false,
+  "completionGate": "ci/check_phase_a_inventory.mjs",
+  "components": {
+    "specification": "ci/plan_spec_source_index.json",
+    "api": "ci/java_se_api_census.lock.json",
+    "supplementary": "ci/java_se_contract_sources.lock.json"
+  }
 }

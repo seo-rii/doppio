@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const RELEASES = [21, 25];
@@ -54,13 +55,21 @@ export function chapterSourceUrl(ledger, spec, release, chapter) {
   return `${edition.chapterUrlPrefix}${chapter}.html#${spec.toLowerCase()}-${chapter}`;
 }
 
-// Schema v1 deliberately represents open source coverage, not completed obligations.
-// A later clause-level schema and validator are required before PLAN-001 can close.
+// This validates the resolution map. Only the aggregate gate verifies the
+// generated source inventories; the declaration alone cannot close PLAN-001.
 export function validateSpecGapLedger(ledger) {
   assert.ok(ledger && typeof ledger === 'object' && !Array.isArray(ledger), 'Ledger must be an object');
-  assert.equal(ledger.schemaVersion, 1, 'Unknown PLAN-001 ledger schema');
+  assert.equal(ledger.schemaVersion, 2, 'Unknown PLAN-001 ledger schema');
   assert.equal(ledger.profile, 'java-se-21-25-final', 'Unexpected target profile');
-  assert.equal(ledger.completeJavaSeInventory, false, 'Schema v1 cannot claim a complete inventory');
+  assert.equal(ledger.completeJavaSeInventory, undefined, 'A resolution map cannot claim inventory completion');
+  assert.equal(ledger.inventoryGranularity, 'whole-source-contract', 'Complete contracts are the inventory unit');
+  assert.equal(ledger.semanticAssessmentComplete, false, 'Inventory is not implementation assessment');
+  assert.equal(ledger.completionGate, 'ci/check_phase_a_inventory.mjs');
+  assert.deepEqual(ledger.components, {
+    specification: 'ci/plan_spec_source_index.json',
+    api: 'ci/java_se_api_census.lock.json',
+    supplementary: 'ci/java_se_contract_sources.lock.json',
+  }, 'All three inventory components are required');
   requireText(ledger.purpose, 'purpose');
   requireText(ledger.chapterExitRule, 'chapterExitRule');
 
@@ -95,7 +104,8 @@ export function validateSpecGapLedger(ledger) {
     assert.equal(gap.title, CHAPTER_TITLES[gap.spec][gap.chapter - 1], `${id} official chapter title changed`);
     assert.deepEqual(gap.releases, RELEASES, `${id} must retain both source editions`);
     assert.equal(gap.censusOwner, 'PLAN-001', `${id} needs an enumeration owner`);
-    assert.equal(gap.state, 'clauses-unenumerated', `${id} cannot be closed in schema v1`);
+    assert.equal(gap.state, 'source-contracts-indexed', `${id} needs source-contract coverage`);
+    assert.deepEqual(gap.evidence, ['specification'], `${id} needs source-index evidence`);
     for (const release of gap.releases) chapterSourceUrl(ledger, gap.spec, release, gap.chapter);
   }
   for (const spec of Object.keys(CHAPTER_COUNTS)) {
@@ -112,8 +122,10 @@ export function validateSpecGapLedger(ledger) {
     assert.ok(!seenCrossCutting.has(gap.id), `Duplicate cross-cutting gap ${gap.id}`);
     seenCrossCutting.add(gap.id);
     assert.equal(gap.censusOwner, 'PLAN-001', `${gap.id} needs an enumeration owner`);
-    assert.equal(gap.state, 'open', `${gap.id} cannot be closed in schema v1`);
-    requireText(gap.missingEvidence, `${gap.id} missingEvidence`);
+    assert.equal(gap.state, 'source-contracts-indexed', `${gap.id} needs source-contract coverage`);
+    requireText(gap.resolution, `${gap.id} resolution`);
+    assert.deepEqual(gap.evidence, ['API-BEHAVIOR', 'SERVICE-PROVIDER-CONTRACTS'].includes(gap.id)
+      ? ['api', 'supplementary'] : ['specification', 'api', 'supplementary'], `${gap.id} needs all source components`);
     assert.ok(Array.isArray(gap.sourceUrls) && gap.sourceUrls.length > 0, `${gap.id} needs source URLs`);
     for (const source of gap.sourceUrls) {
       const url = new URL(source);
@@ -129,9 +141,10 @@ export function validateSpecGapLedger(ledger) {
     profile: ledger.profile,
     sourceEditions: ledger.editions.length,
     indexedChapters: ledger.chapterGaps.length,
-    openEditionChapterGaps: ledger.chapterGaps.reduce((sum, gap) => sum + gap.releases.length, 0),
-    openCrossCuttingGaps: ledger.crossCuttingGaps.length,
-    completeJavaSeInventory: false,
+    resolvedEditionChapterCells: ledger.chapterGaps.reduce((sum, gap) => sum + gap.releases.length, 0),
+    resolvedCrossCuttingItems: ledger.crossCuttingGaps.length,
+    resolutionMapComplete: true,
+    semanticAssessmentComplete: false,
   };
 }
 
@@ -139,7 +152,10 @@ export function checkSpecGapLedger({ requireComplete = false, ledgerPath = new U
   const ledger = JSON.parse(fs.readFileSync(ledgerPath, 'utf8'));
   const summary = validateSpecGapLedger(ledger);
   if (requireComplete) {
-    throw new Error(`PLAN-001 remains open: ${summary.openEditionChapterGaps} edition/chapter gaps and ${summary.openCrossCuttingGaps} cross-cutting gaps; a clause-level schema is required`);
+    assert.equal(String(ledgerPath), String(new URL('./plan_spec_obligations.json', import.meta.url)),
+      'Complete inventory validation requires the repository resolution map');
+    const checker = fileURLToPath(new URL('./check_phase_a_inventory.mjs', import.meta.url));
+    return JSON.parse(execFileSync(process.execPath, [checker], { encoding: 'utf8', maxBuffer: 1024 * 1024 }));
   }
   return summary;
 }

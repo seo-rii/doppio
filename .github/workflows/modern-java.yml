@@ -77,6 +77,10 @@ jobs:
         timeout-minutes: 3
         run: node --test ci/prepare_java_compatibility_toolchains_test.mjs ci/run_java_compatibility_test.mjs ci/java_compatibility_browser_test.mjs
 
+      - name: Check phase A inventory and evidence contracts
+        timeout-minutes: 3
+        run: node --test ci/plan_spec_source_index_test.mjs ci/check_java_se_api_census_test.mjs ci/java_se_contract_sources_test.mjs ci/check_plan_spec_obligations_test.mjs ci/check_phase_a_inventory_test.mjs ci/check_phase_a_evidence_test.mjs
+
       - name: Build release CLI runner
         timeout-minutes: 20
         run: ./node_modules/.bin/grunt --stack modern-ci-release-cli --grunt-ignore-compile-errors
@@ -120,6 +124,26 @@ jobs:
       - name: Prepare pinned Java compatibility toolchains
         timeout-minutes: 25
         run: node ci/prepare_java_compatibility_toolchains.mjs
+
+      - name: Verify complete phase A requirements inventory
+        id: phase_a_inventory
+        timeout-minutes: 30
+        run: node ci/plan_spec_source_index.mjs --check && node ci/check_java_se_api_census.mjs && node ci/java_se_contract_sources.mjs && node ci/check_phase_a_inventory.mjs
+
+      - name: Upload phase A requirements inventory
+        if: always() && steps.phase_a_inventory.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: |
+            build/phase-a-inventory.json
+            build/phase-a-edition-deltas.json.gz
+            build/java-se-api-census/*.gz
+            build/java-se-api-census/summary.json
+            build/java-se-contract-sources/*.gz
+            build/java-se-contract-sources/summary.json
+            build/java-se-contract-sources/documents/*.gz
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Run genuine Java 21 and 25 seed fixtures
         id: java_compatibility
@@ -165,6 +189,10 @@ jobs:
           archive: false
           if-no-files-found: error
           retention-days: 7
+
+      - name: Verify current-commit phase A execution evidence
+        timeout-minutes: 1
+        run: node ci/check_phase_a_evidence.mjs
 
       - name: Check evolved switch ledger contract
         timeout-minutes: 1

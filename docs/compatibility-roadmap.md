@@ -4,9 +4,11 @@ This roadmap separates today's tested release profile from the work needed for
 modern Java applications and, eventually, broad Java SE compatibility. It is a
 planning inventory, not a new support claim or a test-result report.
 
-The Java requirement inventory was checked on 2026-10-08 against implementation
-baseline `a944e52fd`. Compiler-gate counts below reflect the current checked-in
-manifest. The [support policy](support.md) remains authoritative for releases;
+The initial implementation survey was checked on 2026-10-08 against baseline
+`a944e52fd`. The Phase A source inventory now separately covers whole Java SE
+21/25 contracts; it does not turn unassessed implementation into support.
+Compiler-gate counts below reflect the current checked-in manifest.
+The [support policy](support.md) remains authoritative for releases;
 the [compatibility matrix](modern-java.md) records individual implemented
 surfaces. The seed harness below extends the verification baseline without
 claiming broader runtime implementation.
@@ -234,18 +236,24 @@ retains exact exit/stdout/stderr comparisons, using cleared selected throwable
 stacks rather than claiming general diagnostic or scheduling compatibility.
 A 26-scenario completion/shutdown check also covers majors 52, 65 and 69.
 
-The separate class-version admission gate adds twenty-five cases and fifty
-Node/Chromium checks: two untouched javac 21/25 controls, four labeled historical
+The separate class-version admission gate adds twenty-seven cases and fifty-four
+Node/Chromium checks: four untouched javac 21/25 controls, four labeled historical
 header controls and nineteen failures for out-of-range majors, invalid modern
 minors, disabled previews, bad magic and all header truncations of zero through
-seven bytes. Header mutations and their original/final hashes are explicit;
+seven bytes. The genuine controls include records, sealed types, runtime
+annotations, lambdas, string concatenation and a record-pattern switch. Emitted
+class hashes and expected class attributes are verified. Header mutations and
+their original/final hashes are explicit;
 they are not genuine-source compatibility evidence. General loader and
 `Lookup.defineClass` use typed classification for version errors, preserve
 structural `ClassFormatError`, and admit the historical arbitrary minor values.
 The accepted major range remains 45–70, not full Java 26 compatibility. A
 57-scenario check also covers definition recovery, application-loader error
 propagation and normal shutdown after the pending launch diagnostic. General VM
-verification and opt-in preview execution remain separate work.
+verification and opt-in preview execution remain separate work. Raw native and
+guest outcomes, including a failing attempt, are retained in
+`build/java-class-version-results.json`. The Phase A execution checker rejects
+partial or stale evidence and requires both hosts on the current clean commit.
 
 On Linux x64 with the existing Node 24/Java 17 build prerequisites:
 
@@ -279,16 +287,17 @@ The browser adapter mounts the same guest bootstrap image through BrowserFS,
 copies the compiled class bytes into a fresh context and captures each Java
 stdout/stderr stream and exit result. Timeouts, browser errors and changed
 browser inputs fail the run. A local invocation without `--browser` explicitly
-records Chromium as not run. These seeds do not complete PLAN-001, M0, W-JAVA21
-or W-JAVA25; the full language/VM/library census and additional source-feature
-probes remain open.
+records Chromium as not run. These seeds alone do not complete PLAN-001, M0,
+W-JAVA21 or W-JAVA25. The full language/VM/library inventory is a separate
+Phase A gate; broader source-feature and semantic probes belong to later bundles.
 
 ## Remaining work inventory
 
 These **23 planning packages** are an initial decomposition, not an exhaustive
 API list, equal-sized tasks or an estimate of implementation effort. Do not sum
-their statuses into a completion percentage. PLAN-001 expands them into the
-actual requirement/test inventory before a denominator is frozen.
+their statuses into a completion percentage. The Phase A source catalogues
+provide the detailed contract inventory; implementation and test evidence
+remain separate, and the units do not have equal implementation cost.
 
 Status vocabulary:
 
@@ -336,20 +345,18 @@ passing one batch never closes the others.
 
 | ID | Priority and current state | Required work and exit evidence |
 | --- | --- | --- |
-| PLAN-001 | P0; target/workload scope approved and 27-requirement seed manifest checked in; complete requirements inventory absent | Expand the versioned manifest beyond the selected seed requirements. Enumerate applicable JLS/JVMS requirements and all target Java SE modules, exported public/protected types and members, service/provider contracts and behavioral changes, including inherited Java 8 behavior. Map each to an owner package, specification, status and tests, with no unclassified entries. Classify preview/incubator/JDK-specific features separately; preserve exclusions in the ledger. |
+| PLAN-001 | P0; full-contract inventory and source reconciliation are enforced by the [Phase A gate](phase-a-inventory.md); the 27-requirement executable seed remains a selected subset | Preserve complete JLS/JVMS and Java SE module/package/type/member contracts, service/provider and supplemental sources, including retained Java 8 behavior. Every unit needs a source, applicability, owner, implementation assessment and concrete pending test plan or evidence. Implementation may remain unassessed; missing source coverage or classification fails the inventory gate. |
 
-The [normative-source gap ledger](../ci/plan_spec_obligations.json) indexes all
+The [source-resolution map](../ci/plan_spec_obligations.json) indexes all
 19 JLS chapters and seven JVMS chapters in both the [Java 21](https://docs.oracle.com/javase/specs/jls/se21/html/index.html)
 and [Java 25](https://docs.oracle.com/javase/specs/jls/se25/html/index.html)
 editions, with the corresponding [JVMS 21](https://docs.oracle.com/javase/specs/jvms/se21/html/index.html)
 and [JVMS 25](https://docs.oracle.com/javase/specs/jvms/se25/html/index.html)
-sources. The 52 edition/chapter cells remain open for semantic applicability
-and obligation review; five separate gaps retain inherited Java 8 semantics,
-edition deltas, service/provider contracts, API behavior and feature-boundary
-classification. `node ci/check_plan_spec_obligations.mjs` validates this gap
-ledger, while `--require-complete` fails until a later clause-level schema can
-prove the exit rule. The chapter index is a source map, not a count of Java SE
-requirements or a PLAN-001 completion claim.
+sources. Its 52 edition/chapter cells and five cross-cutting entries resolve
+to the pinned specification, API and supplementary contract inventories.
+`node ci/check_plan_spec_obligations.mjs` validates the resolution map;
+`--require-complete` delegates to the aggregate inventory checker and requires
+all generated artifacts. The declaration alone cannot prove complete coverage.
 
 The [pinned source-anchor index](../ci/plan_spec_source_index.json) expands
 that map to 2,078 source units from all four official tables of contents,
@@ -361,13 +368,18 @@ by a concrete shared test-plan template. Its 21-versus-25 text hashes flag
 semantic change. `node ci/plan_spec_source_index.mjs --check` validates the
 pinned offline snapshot, and `--verify-official` refetches and compares the
 official source pages. `sourceAnchorsComplete` means source coverage only;
-`semanticAssessmentComplete` remains false and neither flag closes PLAN-001.
+`semanticAssessmentComplete` remains false. The aggregate checker combines this
+index with all 22 Java SE modules, official type/member-index reconciliation,
+public documentation, serialized forms and incorporated source dependencies.
+It also links each executable seed requirement to a full source unit and emits
+edition-difference work. See [Phase A](phase-a-inventory.md) for commands and the
+distinction between inventory completion and runtime conformance.
 
 ### JVM and language execution
 
 | ID | Priority and current evidence | Exit evidence and main dependencies |
 | --- | --- | --- |
-| JVM-001 | P0; pinned true-javac 21/25 Node/Chromium seed plus twenty-five admission cases with explicit header mutations and disabled-preview rejection | Expand the selected corpus and retained provenance beyond version admission. Preserve the distinction between untouched compiler output and deliberate invalid/header controls. Foundation for W-JAVA21/25 remains partial; preview execution is outside the final-only profile. |
+| JVM-001 | P0; pinned true-javac 21/25 corpus plus 27 admission cases, including four untouched controls and explicit negative/header mutations | Require the complete seed and admission corpus on native Java, Node and Chromium with current-commit, source/class/runtime hashes and retained raw results. The [execution evidence gate](../ci/check_phase_a_evidence.mjs) fails on stale, dirty, missing, skipped or timed-out evidence. Broader verification and linkage are B/C work; W-JAVA21/25 remain partial. |
 | JVM-002 | P1; verifier coverage unassessed; default-method superinterface initialization excluded in [invoke design](design/java-lang-invoke.md#lookup-class-initialization) | Spec-mapped valid/malformed corpus for format, stack maps, operand/local types, branches, linking/default resolution and initialization order/failure caching, including exact specified errors. Depends on JVM-001; module access also needs JVM-011. |
 | JVM-003 | P1; selected handles/lookups, but full conversions and executable VarHandles unclaimed in [implemented invoke slices](design/java-lang-invoke.md#implemented-slices) | Matrices for lookup/access, invocation/adaptation/combinators and field/array VarHandle read/write/CAS/update semantics. Verify memory-order requirements separately. Depends on JVM-001/002; module cases on JVM-011. |
 | JVM-004 | P1; selected indy/condy paths, with unsupported general bootstraps in [constant pool](../src/ConstantPool.ts) and [open questions](design/java-lang-invoke.md#open-design-questions) | User bootstrap handles, nested dynamic arguments, adaptation/access, success/failure caching and specified exceptions; retain lambda, concat, record and compiler probes. Depends on JVM-003. |
@@ -409,10 +421,11 @@ The Java 25 inventory must not stop at Java 21 additions. Final APIs include
 and [ScopedValue since 25](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/ScopedValue.html).
 Unassessed means probes are still needed, not that a source search proved absence.
 
-PLAN-001 must also cover the remaining standard modules: desktop/data transfer,
+The full inventory also covers the remaining standard modules: desktop/data transfer,
 compiler APIs/annotation processing, instrumentation, naming, preferences, RMI,
 scripting, SQL/rowsets/transactions, XML/XML cryptography, authentication and
-logging, among others. Assign implementation packages after the census; neither
+logging and smart-card I/O, among others. Explicit owner rules assign these to
+the existing planning packages; neither
 inheritance from Java 8 nor omission from the table demonstrates compatibility.
 The [Java SE 25 API overview](https://docs.oracle.com/en/java/javase/25/docs/api/index.html)
 is the module/API inventory source and distinguishes Java SE modules from
@@ -431,7 +444,7 @@ JDK-specific modules.
 | M0: measurable baseline | Scope approved; complete PLAN-001 inventory; pin JVM-001 toolchains; check in manifests and host-separated result format | Every selected requirement is classified with provenance; required workload list and exclusions are explicit; baseline results are reproducible. An initial failing baseline is useful evidence, not milestone compatibility completion. |
 | M1: Java 21 workload profile | Resolve failures for the agreed Java 21 applications/features, using JVM/LIB dependencies above | W-JAVA21 and all retained existing gates pass on one commit for every required host; no unaccounted skip or unsupported requirement in the selected profile. |
 | M2: Java 25 workload profile | Add final Java 22–25 requirements and resolve their failures | W-JAVA25, W-JAVA21 and retained gates pass on one commit, with named applications and deviations published. Do not imply full Java SE from this result. |
-| M3: broader Java SE conformance | Resolve the remaining spec/module inventory and host boundaries beyond the workload profiles | No required entry is partial, missing or unassessed; applicable conformance evidence is recorded. Any permitted platform exclusions need specification justification. Certification is a separate claim. |
+| M3: broader Java SE conformance | Implement and verify the remaining spec/module contracts and host boundaries beyond the workload profiles | No required entry is partial, missing or unassessed; applicable conformance evidence is recorded. Any permitted platform exclusions need specification justification. Certification is a separate claim. |
 
 Plan the next implementation batches through the work bundles above:
 

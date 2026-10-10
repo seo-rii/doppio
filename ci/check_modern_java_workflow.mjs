@@ -547,6 +547,10 @@ for (const [name, fields] of [
     'timeout-minutes: 3',
     'run: node --test ci/prepare_java_compatibility_toolchains_test.mjs ci/run_java_compatibility_test.mjs ci/java_compatibility_browser_test.mjs',
   ]],
+  ['Check phase A inventory and evidence contracts', [
+    'timeout-minutes: 3',
+    'run: node --test ci/plan_spec_source_index_test.mjs ci/check_java_se_api_census_test.mjs ci/java_se_contract_sources_test.mjs ci/check_plan_spec_obligations_test.mjs ci/check_phase_a_inventory_test.mjs ci/check_phase_a_evidence_test.mjs',
+  ]],
   ['Build Java compatibility browser runtime', [
     'timeout-minutes: 10',
     'run: ./node_modules/.bin/grunt --stack make_build_dir:release vite-release listings:release --grunt-ignore-compile-errors',
@@ -558,6 +562,26 @@ for (const [name, fields] of [
   ['Prepare pinned Java compatibility toolchains', [
     'timeout-minutes: 25',
     'run: node ci/prepare_java_compatibility_toolchains.mjs',
+  ]],
+  ['Verify complete phase A requirements inventory', [
+    'id: phase_a_inventory',
+    'timeout-minutes: 30',
+    'run: node ci/plan_spec_source_index.mjs --check && node ci/check_java_se_api_census.mjs && node ci/java_se_contract_sources.mjs && node ci/check_phase_a_inventory.mjs',
+  ]],
+  ['Upload phase A requirements inventory', [
+    "if: always() && steps.phase_a_inventory.outcome != 'skipped'",
+    'uses: actions/upload-artifact@v7',
+    'with:',
+    '  path: |',
+    '    build/phase-a-inventory.json',
+    '    build/phase-a-edition-deltas.json.gz',
+    '    build/java-se-api-census/*.gz',
+    '    build/java-se-api-census/summary.json',
+    '    build/java-se-contract-sources/*.gz',
+    '    build/java-se-contract-sources/summary.json',
+    '    build/java-se-contract-sources/documents/*.gz',
+    '  if-no-files-found: error',
+    '  retention-days: 7',
   ]],
   ['Run genuine Java 21 and 25 seed fixtures', [
     'id: java_compatibility',
@@ -603,6 +627,10 @@ for (const [name, fields] of [
     '  archive: false',
     '  if-no-files-found: error',
     '  retention-days: 7',
+  ]],
+  ['Verify current-commit phase A execution evidence', [
+    'timeout-minutes: 1',
+    'run: node ci/check_phase_a_evidence.mjs',
   ]],
   ['Check evolved switch ledger contract', [
     'timeout-minutes: 1',
@@ -710,6 +738,7 @@ const runtimeOrder = [
   'Check Pages smoke retry',
   'Install Java compatibility Chromium',
   'Check Java compatibility baseline tooling',
+  'Check phase A inventory and evidence contracts',
   'Build release CLI runner',
   'Build Java compatibility browser runtime',
   'Verify compiler bootstrap overlay',
@@ -719,6 +748,8 @@ const runtimeOrder = [
   'Run Java 17 legacy compatibility tests',
   'Run modern Java compatibility tests',
   'Prepare pinned Java compatibility toolchains',
+  'Verify complete phase A requirements inventory',
+  'Upload phase A requirements inventory',
   'Run genuine Java 21 and 25 seed fixtures',
   'Run final Java 25 launcher compatibility',
   'Check main exit status contracts',
@@ -727,6 +758,7 @@ const runtimeOrder = [
   'Check class-file version admission',
   'Run Java class-file version compatibility',
   'Upload class-file admission ledger',
+  'Verify current-commit phase A execution evidence',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
