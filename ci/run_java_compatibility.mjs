@@ -109,6 +109,9 @@ export function validateManifest(manifest) {
     requireCondition(fixture.standardInput === undefined || typeof fixture.standardInput === 'string' &&
       Buffer.byteLength(fixture.standardInput, 'utf8') <= inputLimitBytes,
     `Invalid or oversized standardInput for fixture ${fixture.id}.`);
+    requireCondition(fixture.expectedStdout === undefined || typeof fixture.expectedStdout === 'string' &&
+      Buffer.byteLength(fixture.expectedStdout, 'utf8') <= outputLimitBytes,
+    `Invalid or oversized expectedStdout for fixture ${fixture.id}.`);
     requireCondition(fixture.releases.every(release => fixture.requirementIds.every(id =>
       manifest.requirements.find(requirement => requirement.id === id).introducedIn <= release)),
     `Fixture ${fixture.id} cannot select a release before its required final features.`);
@@ -411,6 +414,7 @@ export async function runCompatibility({ repoRoot = defaultRepoRoot,
         ledger.cases.push({ id: `${fixture.id}:jdk${feature}`, fixtureId: fixture.id, release: feature,
           requirementIds: fixture.requirementIds, workloadIds: fixture.workloadIds, packageIds: fixture.packageIds,
           source: { path: fixture.source }, mainClass: fixture.mainClass,
+          ...(fixture.expectedStdout === undefined ? {} : { expectedStdout: fixture.expectedStdout }),
           standardInput: { bytes: Buffer.byteLength(fixture.standardInput || '', 'utf8'),
             sha256: sha256(Buffer.from(fixture.standardInput || '', 'utf8')) },
           ...(fixture.classGenerator ? { classGenerator: { path: fixture.classGenerator,
@@ -520,6 +524,11 @@ export async function runCompatibility({ repoRoot = defaultRepoRoot,
           result.comparison.browserSucceeded = successful(result.browser);
           result.comparison.browserStdoutEqual = normalize(result.native.stdout) === normalize(result.browser.stdout);
           result.comparison.browserStderrEqual = normalize(result.native.stderr) === normalize(result.browser.stderr);
+        }
+        if (fixture.expectedStdout !== undefined) {
+          result.comparison.nativeStdoutExpected = normalize(result.native.stdout) === normalize(fixture.expectedStdout);
+          requireCondition(result.comparison.nativeStdoutExpected,
+            'Native output must match the explicit expectedStdout contract.');
         }
         requireCondition(result.comparison.nativeSucceeded && result.comparison.doppioSucceeded &&
           result.comparison.stdoutEqual && result.comparison.stderrEqual,

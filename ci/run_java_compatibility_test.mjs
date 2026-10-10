@@ -574,6 +574,55 @@ test('only CRLF is normalized, and manifest arguments are passed to both VMs', a
   assert.equal(result.cases[0].doppio.command.at(-1), 'hello world');
 });
 
+test('an optional expected stdout contract is bounded and rejects non-string values', () => {
+  for (const value of [null, 7, {}, 'x'.repeat(4 * 1024 * 1024 + 1)]) {
+    const spec = manifest();
+    spec.fixtures[0].expectedStdout = value;
+    assert.throws(() => validateManifest(spec), /expectedStdout/);
+  }
+  for (const value of ['', 'one\ntwo\n']) {
+    const spec = manifest();
+    spec.fixtures[0].expectedStdout = value;
+    assert.equal(validateManifest(spec), spec);
+  }
+});
+
+test('matching but incomplete native and guest output fails an explicit output contract', async (context) => {
+  const fixture = environment(context);
+  fixture.spec.fixtures[0].expectedStdout = 'one\ntwo\nthree\n';
+  fixture.save();
+  const result = await fixture.run();
+  assert.equal(result.status, 'failed');
+  assert.equal(result.summary.passed, 0);
+  for (const entry of result.cases) {
+    assert.equal(entry.expectedStdout, 'one\ntwo\nthree\n');
+    assert.equal(entry.comparison.stdoutEqual, true);
+    assert.equal(entry.comparison.nativeStdoutExpected, false);
+    assert.equal(entry.comparison.status, 'failed');
+    assert.match(entry.error, /expectedStdout/);
+  }
+});
+
+test('explicit output contracts normalize CRLF only and retain empty expectations', async (context) => {
+  const fixture = environment(context);
+  for (const [expected, actual, status] of [
+    ['one\ntwo\n', 'one\r\ntwo\r\n', 'passed'],
+    ['one\ntwo\n', 'one\ntwo', 'failed'],
+    ['', '', 'passed'],
+    ['', '\n', 'failed'],
+  ]) {
+    fixture.spec.fixtures[0].expectedStdout = expected;
+    fixture.save();
+    const result = await fixture.run({ release: 21, execute: async (...args) => {
+      const record = await fixture.execute(...args);
+      if (!['-version', '--release'].includes(args[1][0])) record.stdout = actual;
+      return record;
+    } });
+    assert.equal(result.status, status);
+    assert.equal(result.cases[0].comparison.nativeStdoutExpected, status === 'passed');
+  }
+});
+
 for (const mismatch of ['stdout', 'stderr', 'native-exit', 'doppio-exit', 'timeout']) {
   test(`a ${mismatch} mismatch fails the ledger without dropping other required cases`, async (context) => {
     const fixture = environment(context);
