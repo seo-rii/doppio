@@ -305,6 +305,33 @@ measurement or an architectural decision; **P1** completes selected workloads;
 precede P1 even when the eventual implementation belongs to P2. Package IDs are
 stable; a split should retain links to its parent.
 
+### Work bundles
+
+Use the following seven bundles to plan related changes together. Every one of
+the 23 packages below has exactly one primary bundle; cross-bundle dependencies
+do not transfer ownership. A bundle is a workstream, not one giant PR or a new
+support level. Select a bounded batch within it by shared runtime path, API
+family or compiler output, with a reference contract and explicit outcomes
+on each required host. Keep individual package/requirement statuses in the
+manifest.
+
+| Bundle | Primary package IDs | Batches to plan together | Dependency and acceptance boundary |
+| --- | --- | --- | --- |
+| A. Evidence and class admission | PLAN-001, JVM-001 | Requirement census, genuine javac 21/25 corpus, class-version/admission controls and result provenance | Establish the measured input for other bundles; a seed pass does not finish the inventory or W-JAVA21/25. |
+| B. Loading and final language | JVM-002, JVM-006, JVM-007, JVM-008 | Verifier/linkage and initialization first; then related record, sealed, pattern, switch and launcher cases | JVM-002 precedes the dependent language batches; JVM-008 also needs the bootstrap work in C. Retain negative and evolved-binary cases. |
+| C. Invocation and class metadata | JVM-003, JVM-004, JVM-005, LIB-007 | Lookup/handle/VarHandle behavior with indy/condy; hidden classes, constants and public class-file APIs as later bounded batches | Depends on B's verifier/linkage foundation; module access also needs G. Do not treat class-file parsing inside the VM as the public API. |
+| D. Scheduling and concurrency | JVM-009, JVM-010, LIB-003, LIB-004 | Execution/memory model before virtual-thread lifecycle and concurrent libraries; cleaner lifecycle separately after reachability and I/O decisions | JVM-010 is the foundation; F supplies host blocking-I/O capabilities. A flag-only virtual-thread shim does not close this bundle. |
+| E. Collections and core libraries | LIB-001, LIB-002, LIB-008 | Sequenced collections, sequential streams/collectors, then independent core/math/time/format/random/charset families | Independent families can proceed alongside B/C; parallel streams depend on D. Group related API surfaces, not unrelated methods merely to enlarge a commit. |
+| F. Host services | LIB-005, LIB-006, LIB-009, LIB-010 | Node/Chromium capability matrix; file/channel, transport, process/management and foreign-interface feasibility as separate host-focused batches | Keep host-specific limits explicit. Networking depends on D's concurrency model; foreign calls require a feasibility decision before an implementation claim. |
+| G. Modules and hosted tools | JVM-011, TOOL-001 | Module resolution/access design, then implementation; hosted modern javac only if separately selected | Design can run in parallel, but access enforcement depends on B/C. TOOL-001 remains outside the approved initial workload. |
+
+Within a bundle, add focused tests for each requirement, but build and run the
+shared Node/Chromium and retained release gates at a batch boundary rather
+than after every single method. A batch may use multiple commits when its
+changes are independently reviewable or revertible. A bundle is complete only
+when all of its package exit evidence below is met on the required hosts;
+passing one batch never closes the others.
+
 ### Scope and measurement
 
 | ID | Priority and current state | Required work and exit evidence |
@@ -381,22 +408,23 @@ JDK-specific modules.
 | M2: Java 25 workload profile | Add final Java 22–25 requirements and resolve their failures | W-JAVA25, W-JAVA21 and retained gates pass on one commit, with named applications and deviations published. Do not imply full Java SE from this result. |
 | M3: broader Java SE conformance | Resolve the remaining spec/module inventory and host boundaries beyond the workload profiles | No required entry is partial, missing or unassessed; applicable conformance evidence is recorded. Any permitted platform exclusions need specification justification. Certification is a separate claim. |
 
-The next coherent implementation units should be:
+Plan the next implementation batches through the work bundles above:
 
-1. Expand the approved target/workload seed manifest into the full requirement
-   inventory. Keep unknowns visible instead of inventing a coverage denominator.
-2. Expand the pinned native Java 21/25 Node and Chromium corpus beyond the
-   version-admission gate, retaining separate host results and explicit
-   generated/mutated inputs for each requirement.
-3. Expand the selected final-language/launcher corpus into remaining positive,
-   negative and evolved-binary cases beyond the selected enum/sealed gate.
-   Preserve the three pinned launcher differences; classify observed failures
-   before choosing fixes.
-4. Define module, scheduler/virtual-thread and host-native feasibility decisions
-   in parallel with independent library work. They can change the critical path
-   and cannot be estimated as a series of small API overlays.
-5. Fix one measured requirement at a time, retain native and host regressions,
-   and commit each independently reviewable unit.
+1. Keep A's requirement inventory and genuine javac 21/25 Node/Chromium
+   corpus growing together. Record unknowns, input provenance and distinct
+   host results; do not turn the seed into a completion percentage.
+2. Start independent bounded batches in B, C, E and F in parallel where their
+   dependencies permit. Within B/C, establish verifier/linkage before dependent
+   invoke, bootstrap and final-language cases. Preserve the three pinned
+   launcher differences and classify failures before choosing fixes.
+3. Define G's module model and D/F's scheduler, virtual-thread and host-native
+   feasibility while independent library batches progress. These decisions can
+   change the critical path and are not a string of small API overlays.
+4. For each batch, specify its related requirements and exit evidence up front;
+   run focused native or specification-based checks while developing, then the
+   shared host and retained gates at the batch boundary. Commit coherent,
+   independently reviewable units and leave unfinished package/bundle statuses
+   open.
 
 Infrastructure deployment and new external application targets remain separate
 decisions; the seed work does not authorize them.
