@@ -343,13 +343,25 @@ The [normative-source gap ledger](../ci/plan_spec_obligations.json) indexes all
 and [Java 25](https://docs.oracle.com/javase/specs/jls/se25/html/index.html)
 editions, with the corresponding [JVMS 21](https://docs.oracle.com/javase/specs/jvms/se21/html/index.html)
 and [JVMS 25](https://docs.oracle.com/javase/specs/jvms/se25/html/index.html)
-sources. All 52 edition/chapter cells remain open for applicability and
-clause-level extraction; five separate gaps retain inherited Java 8 semantics,
+sources. The 52 edition/chapter cells remain open for semantic applicability
+and obligation review; five separate gaps retain inherited Java 8 semantics,
 edition deltas, service/provider contracts, API behavior and feature-boundary
 classification. `node ci/check_plan_spec_obligations.mjs` validates this gap
 ledger, while `--require-complete` fails until a later clause-level schema can
 prove the exit rule. The chapter index is a source map, not a count of Java SE
 requirements or a PLAN-001 completion claim.
+
+The [pinned source-anchor index](../ci/plan_spec_source_index.json) expands
+that map to 2,078 source units from all four official tables of contents,
+including every chapter preamble and the JVMS instruction anchors. Each unit
+has a URL, bounded source-text hash, compiler/guest/information/boundary route,
+package owner, unassessed status and a unique pending-test assignment backed
+by a concrete shared test-plan template. Its 21-versus-25 text hashes flag
+1,520 edition-specific rows for review; a changed hash is not by itself a
+semantic change. `node ci/plan_spec_source_index.mjs --check` validates the
+pinned offline snapshot, and `--verify-official` refetches and compares the
+official source pages. `sourceAnchorsComplete` means source coverage only;
+`semanticAssessmentComplete` remains false and neither flag closes PLAN-001.
 
 ### JVM and language execution
 
