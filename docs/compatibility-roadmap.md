@@ -338,6 +338,19 @@ passing one batch never closes the others.
 | --- | --- | --- |
 | PLAN-001 | P0; target/workload scope approved and 27-requirement seed manifest checked in; complete requirements inventory absent | Expand the versioned manifest beyond the selected seed requirements. Enumerate applicable JLS/JVMS requirements and all target Java SE modules, exported public/protected types and members, service/provider contracts and behavioral changes, including inherited Java 8 behavior. Map each to an owner package, specification, status and tests, with no unclassified entries. Classify preview/incubator/JDK-specific features separately; preserve exclusions in the ledger. |
 
+The [normative-source gap ledger](../ci/plan_spec_obligations.json) indexes all
+19 JLS chapters and seven JVMS chapters in both the [Java 21](https://docs.oracle.com/javase/specs/jls/se21/html/index.html)
+and [Java 25](https://docs.oracle.com/javase/specs/jls/se25/html/index.html)
+editions, with the corresponding [JVMS 21](https://docs.oracle.com/javase/specs/jvms/se21/html/index.html)
+and [JVMS 25](https://docs.oracle.com/javase/specs/jvms/se25/html/index.html)
+sources. All 52 edition/chapter cells remain open for applicability and
+clause-level extraction; five separate gaps retain inherited Java 8 semantics,
+edition deltas, service/provider contracts, API behavior and feature-boundary
+classification. `node ci/check_plan_spec_obligations.mjs` validates this gap
+ledger, while `--require-complete` fails until a later clause-level schema can
+prove the exit rule. The chapter index is a source map, not a count of Java SE
+requirements or a PLAN-001 completion claim.
+
 ### JVM and language execution
 
 | ID | Priority and current evidence | Exit evidence and main dependencies |
