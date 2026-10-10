@@ -168,6 +168,9 @@ for (const name of [
   'Run Java class-file version compatibility',
   'Upload class-file admission ledger',
   'Verify current-commit phase A execution evidence',
+  'Check phase B initialization contracts',
+  'Run Java initialization compatibility',
+  'Upload Java initialization ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -195,6 +198,12 @@ for (const [original, replacement] of [
   ['build/java-se-api-census/*.gz', 'build/missing-api-census/*.gz'],
   ['build/java-se-contract-sources/*.gz', 'build/missing-contract-sources/*.gz'],
   ['run: node ci/check_phase_a_evidence.mjs\n', 'run: node ci/check_phase_a_evidence.mjs || true\n'],
+  ['run: node --test ci/class_initialization_test.cjs ci/java_initialization_contract_test.mjs\n', 'run: node --test ci/java_initialization_contract_test.mjs\n'],
+  ['run: node ci/run_java_compatibility.mjs --manifest ci/java_initialization_manifest.json --output build/java-initialization-results.json --browser\n', 'run: node ci/run_java_compatibility.mjs --manifest ci/java_initialization_manifest.json --output build/java-initialization-results.json\n'],
+  ['run: node ci/run_java_compatibility.mjs --manifest ci/java_initialization_manifest.json --output build/java-initialization-results.json --browser\n', 'run: node ci/run_java_compatibility.mjs --manifest ci/java_initialization_manifest.json --output build/java-initialization-results.json --browser --release 21\n'],
+  ['run: node ci/run_java_compatibility.mjs --manifest ci/java_initialization_manifest.json --output build/java-initialization-results.json --browser\n', 'run: node ci/run_java_compatibility.mjs --manifest ci/java_initialization_manifest.json --output build/java-initialization-results.json --browser || true\n'],
+  ["if: always() && steps.java_initialization.outcome != 'skipped'", 'if: success()'],
+  ['path: build/java-initialization-results.json', 'path: build/missing-initialization-ledger.json'],
   ['timeout-minutes: 130\n', 'timeout-minutes: 1300\n'],
   ['run: node ci/java25_main_test.mjs --browser\n', 'run: node ci/java25_main_test.mjs\n'],
   ['run: node ci/java25_main_test.mjs --browser\n', 'run: node ci/java25_main_test.mjs --browser || true\n'],
@@ -256,6 +265,18 @@ expectCheckerFailure(
 expectCheckerFailure(
   'phase A execution evidence before admission results',
   { workflow: swapAdjacentSteps(realWorkflow, 'Run Java class-file version compatibility', 'Verify current-commit phase A execution evidence') },
+  'remain in dependency order'
+);
+
+expectCheckerFailure(
+  'initialization host gate before its unit and manifest contracts',
+  { workflow: swapAdjacentSteps(realWorkflow, 'Check phase B initialization contracts', 'Run Java initialization compatibility') },
+  'remain in dependency order'
+);
+
+expectCheckerFailure(
+  'initialization ledger upload before its executions',
+  { workflow: swapAdjacentSteps(realWorkflow, 'Run Java initialization compatibility', 'Upload Java initialization ledger') },
   'remain in dependency order'
 );
 

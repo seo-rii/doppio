@@ -194,6 +194,24 @@ jobs:
         timeout-minutes: 1
         run: node ci/check_phase_a_evidence.mjs
 
+      - name: Check phase B initialization contracts
+        timeout-minutes: 1
+        run: node --test ci/class_initialization_test.cjs ci/java_initialization_contract_test.mjs
+
+      - name: Run Java initialization compatibility
+        id: java_initialization
+        timeout-minutes: 10
+        run: node ci/run_java_compatibility.mjs --manifest ci/java_initialization_manifest.json --output build/java-initialization-results.json --browser
+
+      - name: Upload Java initialization ledger
+        if: always() && steps.java_initialization.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-initialization-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Check evolved switch ledger contract
         timeout-minutes: 1
         run: node --test ci/java_pattern_evolution_contract_test.mjs

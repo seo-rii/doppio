@@ -258,10 +258,14 @@ The implementation order is observable and follows HotSpot 17:
 The focused fixture covers exact reflection metadata, validation and access
 ordering, class/interface initialization, superclass order, repeat identity,
 reflection and unreflected invocation, ordinary and `Error` failures,
-superclass failure propagation, and concurrent waiters. Initialization of
-superinterfaces that declare default methods, exact modern module lookup-mode
-semantics, named-module qualified exports, and SecurityManager checks remain
-separate compatibility work.
+superclass failure propagation, and concurrent waiters. The separate
+[Phase B initialization slice](../phase-b-loading.md) adds superclass-first,
+ordered recursive initialization of superinterfaces declaring non-abstract,
+non-static methods, including private instance methods and synthetic bridges.
+It covers no-initializer classes, prerequisite failures and owner/waiter state
+transitions without claiming complete initialization conformance. Exact modern
+module lookup-mode semantics, named-module qualified exports, and SecurityManager
+checks remain separate compatibility work.
 
 The 2026-07-17 validation completed the full Java 9-26 suite in 6 minutes 22
 seconds, Kotlin 2.4.0 full-classpath compiler smoke in 81 seconds, Scala

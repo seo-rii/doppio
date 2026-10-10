@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "profile": "phase-b-class-interface-initialization",
+  "approvedTarget": {
+    "intermediateRelease": 21,
+    "targetRelease": 25,
+    "featurePolicy": "final-only",
+    "requiredHosts": [
+      { "id": "ubuntu-node24", "runtime": "node", "majorVersion": 24 },
+      { "id": "chromium", "runtime": "chromium", "playwrightVersion": "1.57.0" }
+    ]
+  },
+  "inventory": {
+    "state": "initialization-slice",
+    "completeJavaSeInventory": false,
+    "phaseBComplete": false,
+    "packageIds": ["JVM-002"],
+    "roadmap": "docs/phase-b-loading.md",
+    "scope": "Selected class/interface initialization order, declared instance methods, active-use triggers, recursive access and failure propagation/caching. This batch does not establish complete initialization, verifier, linkage, memory-model or Phase B conformance."
+  },
+  "releases": [21, 25],
+  "timeouts": { "compileMs": 60000, "nativeMs": 30000, "doppioMs": 120000 },
+  "requirements": [
+    {
+      "id": "JVM-INIT-SUPERINTERFACE-ORDER",
+      "introducedIn": 8,
+      "featureStatus": "final",
+      "packageId": "JVM-002",
+      "implementationState": "implemented-slice",
+      "specificationRefs": {
+        "21": "https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-5.html#jvms-5.5",
+        "25": "https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-5.html#jvms-5.5"
+      }
+    },
+    {
+      "id": "JVM-INIT-DECLARED-INSTANCE-METHODS",
+      "introducedIn": 9,
+      "featureStatus": "final",
+      "packageId": "JVM-002",
+      "implementationState": "implemented-slice",
+      "specificationRefs": {
+        "21": "https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-5.html#jvms-5.5",
+        "25": "https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-5.html#jvms-5.5"
+      }
+    },
+    {
+      "id": "JVM-INIT-INTERFACE-DIRECT",
+      "introducedIn": 1,
+      "featureStatus": "final",
+      "packageId": "JVM-002",
+      "implementationState": "implemented-slice",
+      "specificationRefs": {
+        "21": "https://docs.oracle.com/javase/specs/jls/se21/html/jls-12.html#jls-12.4.1",
+        "25": "https://docs.oracle.com/javase/specs/jls/se25/html/jls-12.html#jls-12.4.1"
+      }
+    },
+    {
+      "id": "JVM-INIT-ACTIVE-USE",
+      "introducedIn": 1,
+      "featureStatus": "final",
+      "packageId": "JVM-002",
+      "implementationState": "implemented-slice",
+      "specificationRefs": {
+        "21": "https://docs.oracle.com/javase/specs/jls/se21/html/jls-12.html#jls-12.4.1",
+        "25": "https://docs.oracle.com/javase/specs/jls/se25/html/jls-12.html#jls-12.4.1"
+      }
+    },
+    {
+      "id": "JVM-INIT-REENTRANCY",
+      "introducedIn": 1,
+      "featureStatus": "final",
+      "packageId": "JVM-002",
+      "implementationState": "implemented-slice",
+      "specificationRefs": {
+        "21": "https://docs.oracle.com/javase/specs/jls/se21/html/jls-12.html#jls-12.4.2",
+        "25": "https://docs.oracle.com/javase/specs/jls/se25/html/jls-12.html#jls-12.4.2"
+      }
+    },
+    {
+      "id": "JVM-INIT-FAILURE-CACHING",
+      "introducedIn": 1,
+      "featureStatus": "final",
+      "packageId": "JVM-002",
+      "implementationState": "implemented-slice",
+      "specificationRefs": {
+        "21": "https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-5.html#jvms-5.5",
+        "25": "https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-5.html#jvms-5.5"
+      }
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "class-interface-initialization",
+      "source": "classes/modern_fixture/JavaInitializationOrder.java",
+      "mainClass": "classes.modern_test.JavaInitializationOrder",
+      "releases": [21, 25],
+      "workloadIds": ["W-JAVA21", "W-JAVA25"],
+      "packageIds": ["JVM-002"],
+      "requirementIds": [
+        "JVM-INIT-SUPERINTERFACE-ORDER",
+        "JVM-INIT-DECLARED-INSTANCE-METHODS",
+        "JVM-INIT-INTERFACE-DIRECT",
+        "JVM-INIT-ACTIVE-USE",
+        "JVM-INIT-REENTRANCY",
+        "JVM-INIT-FAILURE-CACHING"
+      ],
+      "arguments": [],
+      "comparison": "successful-native-oracle-stdout-stderr",
+      "expectedStdout": "order=BaseDefault,Base,Root,Left,Right,Deep,Leaf,Ordered\nrepeat=<none>\nno-clinit=NoClinitBase,NoClinitDefault\ndirect-interface=DirectChild\ndirect-interface-parent=DirectParent\nmethod-flags=PrivateOnly,NonDefaultClass\nnon-eager-interfaces=PrivateStaticOnly,StaticOnly,AbstractOnly\nsynthetic-default=BridgeChild,BridgeClass\noverridden-default=OverrideDefault,OverrideClass\npassive-uses=<none>\nreflective-active-use=PassiveClass,PassiveInterface\ndeclaring-members=DeclaringParent\ndeclaring-child=DeclaringDefault,DeclaringChild\ngetstatic=GetOnly\nputstatic=PutOnly\ninvokestatic=InvokeOnly\nrecursive=RecursiveA.start,RecursiveB.start,RecursiveB.end,RecursiveA.end\nrecursive-default=RecursiveDefault,RecursiveImplementer\nruntime-failure=RuntimeClass\nerror-failure=ErrorClass\ndefault-runtime-failure=FailingDefault\ndefault-error-failure=ErrorDefault\nsuperclass-failure=FailingSuperclass\nskipped-interfaces-remain-usable=AfterFailingDefault,AfterErrorDefault,AfterFailingSuperclass\nINITIALIZATION_OK\n",
+      "coverage": [
+        "superclass-before-parent-first-interface-order",
+        "diamond-deduplication-and-non-default-intermediates",
+        "no-clinit-fast-path",
+        "direct-interface-leaves-parent-uninitialized",
+        "private-instance-and-synthetic-bridge-included",
+        "static-and-abstract-only-interfaces-excluded",
+        "class-override-does-not-suppress-interface-initialization",
+        "passive-use-and-declaring-member-active-use",
+        "recursive-default-values-and-single-execution",
+        "exception-wrapper-and-error-identity",
+        "failed-prerequisites-poison-dependent-class-without-retry",
+        "failure-stops-later-prerequisites-without-poisoning-them"
+      ],
+      "limitations": "Genuine javac 21/25 output without preview or version mutation. Deterministic selected scenarios, not a general verifier/linkage or Java memory-model proof. Waiter and owner transitions have separate VM unit checks and the retained Lookup.ensureInitialized fixture. No OOM, named-module or arbitrary initialization-deadlock claim."
+    }
+  ]
+}
