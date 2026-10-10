@@ -281,7 +281,7 @@ export function inspectClassFiles(directory, release, mainClass) {
   return records;
 }
 
-function runtimeSnapshot(repoRoot, runtimePath) {
+export function runtimeSnapshot(repoRoot, runtimePath) {
   const runtimeRoot = path.resolve(path.dirname(runtimePath), '..');
   const guestHome = fs.realpathSync(path.join(runtimeRoot, 'vendor', 'java_home'));
   for (const required of [runtimePath, path.join(runtimeRoot, 'src', 'jvm.js'),
@@ -379,7 +379,7 @@ export async function runCompatibility({ repoRoot = defaultRepoRoot,
     runtimePath, toolchainsPath);
   const ledger = { schemaVersion: 1, startedAt: new Date().toISOString(), status: 'failed',
     scope: resultScope,
-    manifest: { path: manifestPath }, source: null,
+    manifest: { path: manifestPath }, source: null, sourceAtEnd: null,
     host: { platform: process.platform, arch: process.arch, osRelease: os.release(), node: process.version,
       nodeExecutableSha256: hashFile(process.execPath) },
     runner: { path: scriptPath, sha256: hashFile(scriptPath) },
@@ -548,6 +548,10 @@ export async function runCompatibility({ repoRoot = defaultRepoRoot,
         `Toolchain executable changed during comparison: ${executable.path}.`);
     }
     if (browserSession) await browserSession.verifyIntegrity();
+    ledger.sourceAtEnd = repositoryState(repoRoot);
+    requireCondition(ledger.sourceAtEnd.commit === ledger.source.commit &&
+      ledger.sourceAtEnd.trackedDirty === ledger.source.trackedDirty,
+    'Git commit or tracked working-tree state changed during comparison.');
     ledger.inputIntegrity.status = 'passed';
   } catch (error) {
     ledger.errors.push(error.message);

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { assertVersionResult, checkAdmissionCase, mutateClassHeader, versionCases,
+import { assertStableGitProvenance, assertVersionResult, checkAdmissionCase, mutateClassHeader, versionCases,
   writeAdmissionLedger } from './java_class_version_test.mjs';
 
 function header(major = 65, minor = 0) {
@@ -123,6 +123,18 @@ test('failed guest result and prior host evidence remain in the admission ledger
   assert.deepEqual(record.guests.map((result) => result.host), ['node', 'chromium']);
   assert.deepEqual(record.guests[1].result, timeout);
   assert.match(record.error, /chromium timeout-control: timeout/);
+});
+
+test('admission requires a clean and unchanged Git state through its final host result', () => {
+  const clean = { commit: 'a'.repeat(40), trackedDirty: false };
+  assert.doesNotThrow(() => assertStableGitProvenance(clean, { ...clean }));
+  for (const [start, end] of [
+    [{ ...clean, trackedDirty: true }, clean],
+    [clean, { ...clean, trackedDirty: true }],
+    [clean, { ...clean, commit: 'b'.repeat(40) }],
+  ]) {
+    assert.throws(() => assertStableGitProvenance(start, end));
+  }
 });
 
 test('admission ledger retains only matching schema/scope and rejects symlink targets', (context) => {

@@ -513,6 +513,7 @@ test('runner compiles isolated identical bytes with each matching release and re
   assert.equal(result.manifest.sha256, digest(fs.readFileSync(fixture.manifestPath)));
   assert.equal(result.source.commit, 'a'.repeat(40));
   assert.equal(result.source.trackedDirty, true);
+  assert.deepEqual(result.sourceAtEnd, result.source);
   assert.equal(result.inputIntegrity.status, 'passed');
   assert.match(result.host.node, /^v\d+\./);
   assert.match(result.runtime.snapshotSha256, /^[0-9a-f]{64}$/);
@@ -538,6 +539,25 @@ test('runner compiles isolated identical bytes with each matching release and re
   assert.deepEqual(saved, result);
   assert.equal(fs.statSync(path.join(fixture.root, 'build/java-compatibility-results.json')).mode & 0o777, 0o600);
   assert.equal((await fixture.run({ release: 25 })).summary.required, 1);
+});
+
+test('runner fails the ledger if Git commit or tracked state changes before completion', async (context) => {
+  for (const end of [
+    { commit: 'b'.repeat(40), trackedDirty: false },
+    { commit: 'a'.repeat(40), trackedDirty: true },
+  ]) {
+    const fixture = environment(context);
+    const start = { commit: 'a'.repeat(40), trackedDirty: false };
+    let reads = 0;
+    const result = await fixture.run({ repositoryState: () => reads++ === 0 ? start : end });
+    assert.equal(reads, 2);
+    assert.equal(result.status, 'failed');
+    assert.deepEqual(result.source, start);
+    assert.deepEqual(result.sourceAtEnd, end);
+    assert.equal(result.inputIntegrity.status, 'failed');
+    assert.match(result.errors.join('\n'), /Git commit or tracked working-tree state changed/);
+    assert.ok(result.cases.every((entry) => entry.status === 'failed'));
+  }
 });
 
 test('only CRLF is normalized, and manifest arguments are passed to both VMs', async (context) => {

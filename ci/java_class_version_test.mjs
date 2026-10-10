@@ -314,10 +314,6 @@ export async function runClassVersionTests({ browser = false, nativeOnly = false
       toolchains: marker.toolchains.map(({ id, feature, version, archiveSha256 }) => ({ id, feature, version, archiveSha256,
         treeSha256: lock.toolchains.find((entry) => entry.id === id).treeSha256 })),
       standardInput: { bytes: 0, sha256: digest('') }, results };
-    console.log(`PASS class-version gate: ${summary.genuine} genuine compiler controls, ` +
-      `${summary.structural} structural header controls and ${summary.negative} negative cases; ` +
-      `${nativeExecutions} native executions and ${comparisons} guest checks`);
-    console.log(JSON.stringify({ provenance: { ...summary, results: undefined } }));
     return summary;
   } finally {
     try {
@@ -356,29 +352,48 @@ export function writeAdmissionLedger(filename, ledger) {
   }
 }
 
+async function readGitProvenance() {
+  const commit = await runCommand('git', ['rev-parse', '--verify', 'HEAD'],
+    { cwd: repoRoot, timeoutMs: 10_000 });
+  assertCompleted(commit, 'git commit provenance');
+  assert.equal(commit.exitCode, 0, `git commit provenance: ${commit.stderr}`);
+  assert.match(commit.stdout.trim(), /^[a-f0-9]{40}$/, 'Git commit provenance');
+  const state = await runCommand('git', ['status', '--porcelain=v1', '--untracked-files=no'],
+    { cwd: repoRoot, timeoutMs: 10_000 });
+  assertCompleted(state, 'git working tree provenance');
+  assert.equal(state.exitCode, 0, `git working tree provenance: ${state.stderr}`);
+  return { commit: commit.stdout.trim(), trackedDirty: state.stdout.trim().length > 0 };
+}
+
+export function assertStableGitProvenance(start, end) {
+  assert.equal(start.trackedDirty, false, 'Admission must start from committed inputs');
+  assert.equal(end.commit, start.commit, 'Git HEAD changed during admission');
+  assert.equal(end.trackedDirty, false, 'Tracked inputs changed during admission');
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === harnessPath) {
   const options = process.argv.slice(2);
   const ledger = { schemaVersion: 1, scope: ledgerScope, status: 'failed', gitCommit: null,
-    gitTrackedDirty: null, startedAt: new Date().toISOString(),
+    gitTrackedDirty: null, gitCommitAtEnd: null, gitTrackedDirtyAtEnd: null,
+    startedAt: new Date().toISOString(),
     requestedMode: options[0] || 'node', attemptedCases: [] };
+  let successfulSummary;
   try {
     assert.ok(options.length <= 1 && options.every((option) => ['--browser', '--native-only'].includes(option)),
       'Usage: node ci/java_class_version_test.mjs [--browser | --native-only]');
-    const commit = await runCommand('git', ['rev-parse', '--verify', 'HEAD'],
-      { cwd: repoRoot, timeoutMs: 10_000 });
-    assertCompleted(commit, 'git commit provenance');
-    assert.equal(commit.exitCode, 0, `git commit provenance: ${commit.stderr}`);
-    assert.match(commit.stdout.trim(), /^[a-f0-9]{40}$/, 'Git commit provenance');
-    ledger.gitCommit = commit.stdout.trim();
-    const state = await runCommand('git', ['status', '--porcelain=v1', '--untracked-files=no'],
-      { cwd: repoRoot, timeoutMs: 10_000 });
-    assertCompleted(state, 'git working tree provenance');
-    assert.equal(state.exitCode, 0, `git working tree provenance: ${state.stderr}`);
-    ledger.gitTrackedDirty = state.stdout.trim().length > 0;
+    const start = await readGitProvenance();
+    ledger.gitCommit = start.commit;
+    ledger.gitTrackedDirty = start.trackedDirty;
+    assert.equal(start.trackedDirty, false, 'Admission must start from committed inputs');
     const summary = await runClassVersionTests({ browser: options.includes('--browser'),
       nativeOnly: options.includes('--native-only'), onCase: (record) => ledger.attemptedCases.push(record) });
+    const end = await readGitProvenance();
+    ledger.gitCommitAtEnd = end.commit;
+    ledger.gitTrackedDirtyAtEnd = end.trackedDirty;
+    assertStableGitProvenance(start, end);
     Object.assign(ledger, summary, { status: 'passed' });
     delete ledger.attemptedCases;
+    successfulSummary = summary;
   } catch (error) {
     ledger.error = error.stack || error.message;
     console.error(ledger.error);
@@ -386,5 +401,11 @@ if (process.argv[1] && path.resolve(process.argv[1]) === harnessPath) {
   } finally {
     ledger.finishedAt = new Date().toISOString();
     writeAdmissionLedger(path.join(repoRoot, 'build/java-class-version-results.json'), ledger);
+  }
+  if (successfulSummary) {
+    console.log(`PASS class-version gate: ${successfulSummary.genuine} genuine compiler controls, ` +
+      `${successfulSummary.structural} structural header controls and ${successfulSummary.negative} negative cases; ` +
+      `${successfulSummary.nativeExecutions} native executions and ${successfulSummary.comparisons} guest checks`);
+    console.log(JSON.stringify({ provenance: { ...successfulSummary, results: undefined } }));
   }
 }
