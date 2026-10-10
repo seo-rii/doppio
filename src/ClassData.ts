@@ -312,8 +312,8 @@ export abstract class ClassData {
   public accessFlags: Flags = null;
   /**
    * We make this private to *enforce* call sites to use our getter functions.
-   * The actual state of this class depends on the state of its parents, and
-   * parents do not inform their children when they change state.
+   * A state query must not complete initialization: even a class without a
+   * static initializer may still be waiting for a superinterface initializer.
    */
   private state: ClassState = ClassState.LOADED;
   private jco: JVMTypes.java_lang_Class = null;
@@ -513,14 +513,6 @@ export abstract class ClassData {
    * Gets the current state of this class.
    */
   protected getState(): ClassState {
-    if (this.state === ClassState.RESOLVED && this.getMethod('<clinit>()V') === null) {
-      // We can promote to INITIALIZED if this class has no static initialization
-      // logic, and its parent class is initialized.
-      var scls = this.getSuperClass();
-      if (scls !== null && scls.getState() === ClassState.INITIALIZED) {
-        this.state = ClassState.INITIALIZED;
-      }
-    }
     return this.state;
   }
 
@@ -1486,23 +1478,58 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
   }
 
   /**
+   * JVMS 5.5: initialize a class's superclass, then the superinterfaces that
+   * declare non-abstract, non-static methods. Enumerate interface ancestors
+   * before their children, in class-file declaration order. The JVM predicate
+   * includes private and synthetic instance bodies, not only source defaults.
+   * Direct initialization of an interface has no such prerequisites.
+   */
+  private getInitializationDependencies(): ReferenceClassData<JVMTypes.java_lang_Object>[] {
+    var dependencies: ReferenceClassData<JVMTypes.java_lang_Object>[] = [],
+      visited = new Set<ReferenceClassData<JVMTypes.java_lang_Object>>();
+    if (this.accessFlags.isInterface()) {
+      return dependencies;
+    }
+    if (this.superClass !== null) {
+      dependencies.push(this.superClass);
+    }
+    var visit = (iface: ReferenceClassData<JVMTypes.java_lang_Object>): void => {
+      if (visited.has(iface)) {
+        return;
+      }
+      visited.add(iface);
+      // Do not prune initialized interfaces: direct interface initialization
+      // does not initialize their ancestors, which may still be prerequisites.
+      iface.getInterfaces().forEach(visit);
+      if (iface.getMethods().some((method: Method) => !method.accessFlags.isAbstract() && !method.isStatic)) {
+        dependencies.push(iface);
+      }
+    };
+    this.interfaceClasses.forEach(visit);
+    return dependencies;
+  }
+
+  /**
    * Attempt to synchronously initialize. This is possible if there is no
-   * static initializer, and the parent classes are properly initialized.
+   * static initializer, and all initialization prerequisites can be completed
+   * without executing Java code or waiting for another initialization owner.
    */
   public tryToInitialize(): boolean {
     if (this.getState() === ClassState.INITIALIZED) {
       // Already initialized.
       return true;
     }
-    if (this.getState() === ClassState.ERRONEOUS) {
+    if (this.getState() === ClassState.ERRONEOUS || this.initLock.getOwner() !== null) {
       return false;
     }
 
     if (this.getState() === ClassState.RESOLVED || this.tryToResolve()) {
-      // Ensure parent is initialized.
-      if (this.superClass !== null && !this.superClass.tryToInitialize()) {
-        // Parent failed to initialize.
-        return false;
+      var dependencies = this.getInitializationDependencies();
+      for (var i = 0; i < dependencies.length; i++) {
+        if (!dependencies[i].tryToInitialize()) {
+          // A prerequisite needs asynchronous initialization or is erroneous.
+          return false;
+        }
       }
 
       // Check if this class has a static initializer.
@@ -1572,7 +1599,7 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
   }
 
   /**
-   * Asynchronously *initializes* the class and its super classes.
+   * Asynchronously *initializes* the class and its initialization prerequisites.
    * Throws a Java exception on the thread if initialization fails.
    * @param thread The thread that is performing the initialization.
    * @param cb Callback to invoke when completed. Contains a reference to the
@@ -1609,27 +1636,22 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
         if (!ownsInitialization) {
           return;
         }
-        // Initialize the super class, and then this class.
-        if (this.superClass != null) {
-          this.superClass.initialize(thread, (cdata: ClassData) => {
-            if (cdata == null) {
-              // A class whose superclass initialization failed is erroneous too.
-              this.setState(ClassState.ERRONEOUS);
-              this.initLock.unlock(null);
-            } else {
-              // Initialize myself.
-              this._initialize(thread, (cdata: ClassData) => {
-                this.initLock.unlock(cdata);
-              });
-            }
+        asyncForEach(this.getInitializationDependencies(), (dependency: ReferenceClassData<JVMTypes.java_lang_Object>, next: (err?: any) => void) => {
+          dependency.initialize(thread, (cdata: ClassData) => {
+            next(cdata === null);
           }, explicit);
-        } else {
-          // java/lang/Object's parent is NULL.
-          // Continue initializing this class.
-          this._initialize(thread, (cdata: ClassData) => {
-            this.initLock.unlock(cdata);
-          });
-        }
+        }, (err?: any) => {
+          if (err) {
+            // A failed superclass or qualifying superinterface poisons this
+            // class too, even if this class has no initializer of its own.
+            this.setState(ClassState.ERRONEOUS);
+            this.initLock.unlock(null);
+          } else {
+            this._initialize(thread, (cdata: ClassData) => {
+              this.initLock.unlock(cdata);
+            });
+          }
+        });
       }
     } else {
       // Resolve first, then initialize.
@@ -1645,8 +1667,8 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
   }
 
   /**
-   * Helper function. Initializes this class alone. Assumes super class is
-   * already initialized.
+   * Helper function. Initializes this class alone. Assumes its initialization
+   * prerequisites have already completed.
    */
   private _initialize(thread: JVMThread, cb: (cdata: ClassData) => void): void {
     var cons = <typeof JVMTypes.java_lang_Object> <any> this.getConstructor(thread);
@@ -1708,7 +1730,12 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
    * is in the process of initializing it.
    */
   public isInitialized(thread: JVMThread): boolean {
-    return this.getState() === ClassState.INITIALIZED || this.initLock.getOwner() === thread;
+    var state = this.getState();
+    // Completion callbacks run before the lock's queue is cleared. A failed
+    // initializer must not look initialized to its former owner during that
+    // interval, or an immediate retry could bypass the cached failure.
+    return state === ClassState.INITIALIZED ||
+      (state === ClassState.RESOLVED && thread !== null && this.initLock.getOwner() === thread);
   }
 
   /**
