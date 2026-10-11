@@ -165,3 +165,22 @@ for (const [requested, declared] of [['[I', '[[I'], ['Ljava/lang/Object;', '[Lja
     assert.equal(pair.result.field, null);
   });
 }
+
+for (const [tag, iface, allowed] of [[10, false, true], [10, true, false], [11, true, true], [11, false, false]]) {
+  test(`${tag === 10 ? 'Methodref' : 'InterfaceMethodref'} retains the symbolic ${iface ? 'interface' : 'class'} kind`, async () => {
+    const w = world(), owner = w.define({name: 'methods/Owner', flags: iface ? 0x601 : 0x21,
+      methods: [{name: 'target', descriptor: '()V', flags: iface ? 0x401 : 1}]});
+    const pair = w.reference(tag, owner, 'target', '()V'), result = await w.resolve(pair);
+    assert.equal(result.success, allowed);
+    if (allowed) {
+      assert.deepEqual(result.errors, []);
+      assert.ok(pair.result.method === owner.getMethods()[0]);
+    } else {
+      assert.equal(result.errors.length, 1);
+      assert.equal(result.errors[0].name, 'Ljava/lang/IncompatibleClassChangeError;');
+      assert.equal(pair.result.method, null);
+      assert.equal(pair.result.fullSignature, null);
+      assert.equal(pair.result.jsConstructor, null);
+    }
+  });
+}

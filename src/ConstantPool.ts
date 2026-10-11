@@ -716,8 +716,13 @@ export class MethodReference implements IConstantPoolItem {
         }
       }, explicit);
     } else {
-      var cls = this.classInfo.cls,
-        method = cls.methodLookup(this.signature);
+      var cls = this.classInfo.cls;
+      if (cls.accessFlags.isInterface()) {
+        thread.throwNewException('Ljava/lang/IncompatibleClassChangeError;', cls.getExternalName() + ' is an interface');
+        cb(false);
+        return;
+      }
+      var method = cls.methodLookup(this.signature);
       if (method === null || (cls.getInternalName() === 'Ljava/lang/StackTraceElement;' &&
           (this.signature === 'toString()Ljava/lang/String;' ||
            this.signature === 'equals(Ljava/lang/Object;)Z' ||
@@ -3759,8 +3764,13 @@ export class InterfaceMethodReference implements IConstantPoolItem {
         }
       }, explicit);
     } else {
-      var cls = this.classInfo.cls,
-        method = cls.methodLookup(this.signature),
+      var cls = this.classInfo.cls;
+      if (!cls.accessFlags.isInterface()) {
+        thread.throwNewException('Ljava/lang/IncompatibleClassChangeError;', cls.getExternalName() + ' is not an interface');
+        cb(false);
+        return;
+      }
+      var method = cls.methodLookup(this.signature),
         syntheticMethod: any;
       this.paramWordSize = util.getMethodDescriptorWordSize(this.nameAndTypeInfo.descriptor);
       if (method === null && cls.getInternalName() === 'Ljava/util/concurrent/CompletionStage;' &&
