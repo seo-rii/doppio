@@ -1,8 +1,14 @@
 package classes.modern_test;
 
+import java.lang.constant.ConstantDesc;
+import java.lang.invoke.MethodHandles;
+import java.lang.reflect.Type;
+
 /**
  * Genuine javac input for the selected B5 array/object execution clauses.
- * No reflection, dynamic concatenation, bytecode mutation or clone workaround.
+ * No dynamic concatenation, bytecode mutation or clone workaround. The two
+ * ConstantDesc array cases also compare raw/generic interface metadata; the
+ * ConstantDesc API dependency is not general dynamic-bootstrap coverage.
  * Output is checked against independently specified, exact per-case traces.
  */
 public final class JavaCoreArraysObjects {
@@ -120,6 +126,51 @@ public final class JavaCoreArraysObjects {
     }
     static int lengthInts(int[] values) { return values.length; }
     static int lengthReferences(Object[] values) { return values.length; }
+  }
+
+  private static final class ConstantDescProbes {
+    static ConstantDesc[] allocate(int size) { return new ConstantDesc[size]; }
+    static ConstantDesc cast(Object value) { return (ConstantDesc) value; }
+    static ConstantDesc store(ConstantDesc[] values, int index, ConstantDesc value) {
+      values[index] = value;
+      return values[index];
+    }
+    static Object storeAlias(Object[] values, int index, Object value) {
+      values[index] = value;
+      return values[index];
+    }
+    static int warmStores(ConstantDesc[] values, Object[] expected, int rounds) {
+      int mask = 0;
+      for (int round = 0; round < rounds; round++) {
+        for (int i = 0; i < expected.length; i++) {
+          require(store(values, i, cast(expected[i])) == expected[i]);
+          mask |= 1 << i;
+        }
+      }
+      return mask;
+    }
+    static Object resolve(ConstantDesc value, MethodHandles.Lookup lookup) {
+      try {
+        return value.resolveConstantDesc(lookup);
+      } catch (ReflectiveOperationException failure) {
+        throw new AssertionError(failure);
+      }
+    }
+    static boolean interfaceMetadata(Class<?> type, boolean expected) {
+      int raw = 0;
+      for (Class<?> candidate : type.getInterfaces()) {
+        if (candidate == ConstantDesc.class) raw++;
+      }
+      int generic = 0;
+      for (Type candidate : type.getGenericInterfaces()) {
+        if (candidate == ConstantDesc.class) generic++;
+      }
+      return raw == (expected ? 1 : 0) && generic == raw;
+    }
+    static Object[] positiveValues() {
+      return new Object[] { Integer.valueOf(1001), Long.valueOf(4294967298L),
+        Float.valueOf(1.5f), Double.valueOf(-2.25d), new String("constant-desc") };
+    }
   }
 
   private static int marked(String event, int value, boolean abrupt) {
@@ -713,6 +764,83 @@ public final class JavaCoreArraysObjects {
     } catch (RuntimeException failure) { error(failure, NullPointerException.class); }
   }
 
+  public static void caseConstantDescStores() {
+    begin("ao-constant-desc-stores");
+    Object[] expected = ConstantDescProbes.positiveValues();
+    Class<?>[] types = { Integer.class, Long.class, Float.class, Double.class, String.class };
+    ConstantDesc[] values = ConstantDescProbes.allocate(expected.length);
+    int typeMask = 0;
+    int normalMask = 0;
+    for (int i = 0; i < expected.length; i++) {
+      if (expected[i].getClass() == types[i]) typeMask |= 1 << i;
+      if (ConstantDescProbes.store(values, i, ConstantDescProbes.cast(expected[i])) == expected[i]) {
+        normalMask |= 1 << i;
+      }
+    }
+    emit("types", typeMask);
+    // Repeated calls exercise the warmed path without claiming JIT coverage.
+    pair("stores", normalMask, ConstantDescProbes.warmStores(values, expected, 256));
+    MethodHandles.Lookup lookup = MethodHandles.lookup();
+    int nullMask = 0;
+    int resolveMask = 0;
+    int assignableMask = 0;
+    int interfacesMask = 0;
+    for (int i = 0; i < expected.length; i++) {
+      if (ConstantDescProbes.store(values, i, null) == null) nullMask |= 1 << i;
+      require(ConstantDescProbes.store(values, i, ConstantDescProbes.cast(expected[i])) == expected[i]);
+      if (ConstantDescProbes.resolve(values[i], lookup) == expected[i]) resolveMask |= 1 << i;
+      if (ConstantDesc.class.isAssignableFrom(types[i])) assignableMask |= 1 << i;
+      if (ConstantDescProbes.interfaceMetadata(types[i], true)) interfacesMask |= 1 << i;
+    }
+    emit("null", nullMask);
+    emit("resolve", resolveMask);
+    emit("assignable", assignableMask);
+    emit("interfaces", interfacesMask);
+  }
+
+  public static void caseConstantDescRejections() {
+    begin("ao-constant-desc-rejections");
+    Object[] expected = ConstantDescProbes.positiveValues();
+    Object[] rejected = { Boolean.TRUE, Byte.valueOf((byte) 7), Short.valueOf((short) 9),
+      Character.valueOf('x'), new Object() };
+    ConstantDesc[] values = ConstantDescProbes.allocate(expected.length);
+    Object[] alias = values;
+    for (int i = 0; i < expected.length; i++) {
+      require(ConstantDescProbes.store(values, i, ConstantDescProbes.cast(expected[i])) == expected[i]);
+    }
+    int rejectedMask = 0;
+    int unchangedMask = 0;
+    int disallowedMask = 0;
+    int interfacesMask = 0;
+    for (int i = 0; i < rejected.length; i++) {
+      try {
+        ConstantDescProbes.storeAlias(alias, i, rejected[i]);
+        missingException();
+      } catch (RuntimeException failure) {
+        require(failure.getClass() == ArrayStoreException.class);
+        rejectedMask |= 1 << i;
+      }
+      for (int j = 0; j < expected.length; j++) require(values[j] == expected[j]);
+      unchangedMask |= 1 << i;
+      Class<?> rejectedType = rejected[i].getClass();
+      if (!ConstantDesc.class.isAssignableFrom(rejectedType)) disallowedMask |= 1 << i;
+      if (ConstantDescProbes.interfaceMetadata(rejectedType, false)) interfacesMask |= 1 << i;
+    }
+    emit(new StringBuilder("errors=java.lang.ArrayStoreException:").append(rejectedMask).toString());
+    emit("unchanged", unchangedMask);
+    emit("disallowed", disallowedMask);
+    emit("interfaces", interfacesMask);
+    int nullMask = 0;
+    int restoredMask = 0;
+    for (int i = 0; i < expected.length; i++) {
+      if (ConstantDescProbes.storeAlias(alias, i, null) == null) nullMask |= 1 << i;
+      if (ConstantDescProbes.storeAlias(alias, i, expected[i]) == expected[i]
+          && values[i] == expected[i]) restoredMask |= 1 << i;
+    }
+    emit("null", nullMask);
+    emit("restored", restoredMask);
+  }
+
   public static void main(String[] args) {
     caseBoolean();
     caseByte();
@@ -752,6 +880,8 @@ public final class JavaCoreArraysObjects {
     caseClassLiterals();
     caseInitializerOrder();
     caseArraylength();
+    caseConstantDescStores();
+    caseConstantDescRejections();
     System.out.println("CORE_ARRAYS_OBJECTS_OK");
   }
 }

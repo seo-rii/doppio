@@ -191,6 +191,22 @@ export function proveCoreGroup(group, classes) {
           ins.cp.value === constraint.value);
         assert.ok(match, `Actual constant operand ${entry.id}:${probe.method}`); matches.push(match);
       }
+      if (probe.symbolicOperands !== undefined) {
+        assert.ok(Array.isArray(probe.symbolicOperands) && probe.symbolicOperands.length > 0,
+          `Nonempty symbolic operand obligations ${entry.id}:${probe.method}`);
+        for (const constraint of probe.symbolicOperands) {
+          assert.ok(constraint && typeof constraint === 'object' && !Array.isArray(constraint) &&
+            coreOpcodeNames.includes(constraint.opcode) && [7, 9, 10, 11].includes(constraint.tag),
+          `Known symbolic operand obligation ${entry.id}:${probe.method}`);
+          const fields = constraint.tag === 7 ? ['value'] : ['owner', 'name', 'descriptor'];
+          assert.ok(fields.every(field => typeof constraint[field] === 'string' && constraint[field].length > 0) &&
+            Object.keys(constraint).every(field => ['opcode', 'tag', ...fields].includes(field)),
+          `Complete symbolic operand obligation ${entry.id}:${probe.method}`);
+          const match = method.instructions.find(ins => ins.name === constraint.opcode && ins.cp?.tag === constraint.tag &&
+            fields.every(field => ins.cp[field] === constraint[field]));
+          assert.ok(match, `Actual symbolic operand ${entry.id}:${probe.method}`); matches.push(match);
+        }
+      }
       for (const constraint of probe.branches || []) {
         const match = method.instructions.find(ins => ins.name === constraint.opcode && Math.abs(ins.branchOffset) >= constraint.minDistance &&
           (constraint.direction === 'forward' ? ins.branchOffset > 0 : ins.branchOffset < 0));

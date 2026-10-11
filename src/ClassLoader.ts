@@ -35,13 +35,16 @@ function utf8Constant(value: string): Buffer {
   return rv;
 }
 
-function constantPoolEnd(data: Buffer): { count: number; offset: number } {
+function constantPoolEnd(data: Buffer, utf8Constants?: {[index: number]: string}): { count: number; offset: number } {
   var count = data.readUInt16BE(8),
     offset = 10;
   for (var i = 1; i < count; i++) {
     var tag = data.readUInt8(offset++);
     switch (tag) {
       case 1:
+        if (utf8Constants !== undefined) {
+          utf8Constants[i] = data.toString('utf8', offset + 2, offset + 2 + data.readUInt16BE(offset));
+        }
         offset += 2 + data.readUInt16BE(offset);
         break;
       case 3:
@@ -3338,6 +3341,75 @@ function addJavaNioMappedByteBufferModernOverlays(data: Buffer): Buffer {
   ]);
 }
 
+/** Java 8's five directly loadable nominal constants need a real interface
+ * identity, including its erased method, for casts, arrays and invokeinterface.
+ * Native declarations leave every original member and Code attribute intact.
+ * Constable/describeConstable are a separate class-library compatibility unit. */
+function addNominalConstantDescOverlay(data: Buffer, typeStr: string): Buffer {
+  var utf8Constants: {[index: number]: string} = {},
+    cp = constantPoolEnd(data, utf8Constants),
+    methods = methodsInfo(data, cp.offset),
+    classAttributes = Buffer.from(data.slice(methods.endOffset)),
+    attributesCount = classAttributes.readUInt16BE(0),
+    attributeOffset = 2,
+    signatureOffset = -1,
+    oldSignature: string = null;
+  for (var i = 0; i < attributesCount; i++) {
+    var nameIndex = classAttributes.readUInt16BE(attributeOffset),
+      length = classAttributes.readUInt32BE(attributeOffset + 2);
+    if (utf8Constants[nameIndex] === 'Signature' && length === 2) {
+      signatureOffset = attributeOffset + 6;
+      oldSignature = utf8Constants[classAttributes.readUInt16BE(signatureOffset)];
+    }
+    attributeOffset += 6 + length;
+  }
+  if (typeof oldSignature !== 'string' || signatureOffset < 0) {
+    throw new Error(typeStr + ' is missing its class Signature attribute');
+  }
+
+  var interfaceNameIndex = cp.count,
+    interfaceClassIndex = cp.count + 1,
+    methodNameIndex = cp.count + 2,
+    typedDescriptorIndex = cp.count + 3,
+    bridgeDescriptorIndex = cp.count + 4,
+    signatureIndex = cp.count + 5,
+    exceptionsNameIndex = cp.count + 6,
+    exceptionNameIndex = cp.count + 7,
+    exceptionClassIndex = cp.count + 8,
+    methodParametersNameIndex = cp.count + 9,
+    extraConstants = Buffer.concat([
+      utf8Constant('java/lang/constant/ConstantDesc'),
+      Buffer.concat([Buffer.from([7]), u2(interfaceNameIndex)]),
+      utf8Constant('resolveConstantDesc'),
+      utf8Constant('(Ljava/lang/invoke/MethodHandles$Lookup;)' + typeStr),
+      utf8Constant('(Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/Object;'),
+      utf8Constant(oldSignature + 'Ljava/lang/constant/ConstantDesc;'),
+      utf8Constant('Exceptions'),
+      utf8Constant('java/lang/ReflectiveOperationException'),
+      Buffer.concat([Buffer.from([7]), u2(exceptionNameIndex)]),
+      utf8Constant('MethodParameters')
+    ]),
+    interfacesCountOffset = cp.offset + 6,
+    interfacesCount = data.readUInt16BE(interfacesCountOffset),
+    interfacesEndOffset = interfacesCountOffset + 2 + interfacesCount * 2,
+    typedMethod = Buffer.concat([
+      u2(0x0101), u2(methodNameIndex), u2(typedDescriptorIndex), u2(0)
+    ]),
+    bridgeMethod = Buffer.concat([
+      u2(0x1141), u2(methodNameIndex), u2(bridgeDescriptorIndex), u2(2),
+      u2(exceptionsNameIndex), u4(4), u2(1), u2(exceptionClassIndex),
+      u2(methodParametersNameIndex), u4(5), Buffer.from([1]), u2(0), u2(0x1000)
+    ]);
+  classAttributes.writeUInt16BE(signatureIndex, signatureOffset);
+  return Buffer.concat([
+    data.slice(0, 8), u2(cp.count + 10), data.slice(10, cp.offset), extraConstants,
+    data.slice(cp.offset, interfacesCountOffset), u2(interfacesCount + 1),
+    data.slice(interfacesCountOffset + 2, interfacesEndOffset), u2(interfaceClassIndex),
+    data.slice(interfacesEndOffset, methods.countOffset), u2(methods.count + 2),
+    data.slice(methods.countOffset + 2, methods.endOffset), typedMethod, bridgeMethod, classAttributes
+  ]);
+}
+
 /**
  * Used to lock classes for loading.
  */
@@ -3477,6 +3549,12 @@ export function applyModernBootstrapOverlays(typeStr: string, data: Buffer): Buf
   }
   if (typeStr === 'Ljava/nio/MappedByteBuffer;') {
     data = addJavaNioMappedByteBufferModernOverlays(data);
+  }
+  // Keep this last so pre-existing String overlay CP operands do not change.
+  if (typeStr === 'Ljava/lang/Integer;' || typeStr === 'Ljava/lang/Long;' ||
+      typeStr === 'Ljava/lang/Float;' || typeStr === 'Ljava/lang/Double;' ||
+      typeStr === 'Ljava/lang/String;') {
+    data = addNominalConstantDescOverlay(data, typeStr);
   }
   return data;
 }

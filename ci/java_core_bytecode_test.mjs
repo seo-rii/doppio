@@ -107,3 +107,41 @@ test('constraints require decoded wide, CP-value/index and branch-distance opera
     assert.throws(() => proveCoreGroup(changed, classes), /Actual/);
   }
 });
+
+test('symbolic evidence decodes actual class and interface-method CP targets', () => {
+  const pool = [null, {tag: 1, value: 'java/lang/constant/ConstantDesc'}, {tag: 7, first: 1},
+    {tag: 1, value: 'resolveConstantDesc'},
+    {tag: 1, value: '(Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/Object;'},
+    {tag: 12, first: 3, second: 4}, {tag: 11, first: 2, second: 5}];
+  const decoded = decodeCoreCode(Buffer.from([189, 0, 2, 192, 0, 2, 185, 0, 6, 2, 0, 176]), pool);
+  assert.deepEqual(decoded.slice(0, 3).map(ins => [ins.name, ins.cp]), [
+    ['anewarray', {index: 2, tag: 7, value: 'java.lang.constant.ConstantDesc'}],
+    ['checkcast', {index: 2, tag: 7, value: 'java.lang.constant.ConstantDesc'}],
+    ['invokeinterface', {index: 6, tag: 11, owner: 'java.lang.constant.ConstantDesc', name: 'resolveConstantDesc',
+      descriptor: '(Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/Object;'}]
+  ]);
+  const g = group(), classes = graph();
+  classes.get('Helper').methods.get('probe(J)F').instructions.push(...decoded);
+  const probe = g.cases[0].probes[0];
+  probe.symbolicOperands = [
+    {opcode: 'anewarray', tag: 7, value: 'java.lang.constant.ConstantDesc'},
+    {opcode: 'checkcast', tag: 7, value: 'java.lang.constant.ConstantDesc'},
+    {opcode: 'invokeinterface', tag: 11, owner: 'java.lang.constant.ConstantDesc', name: 'resolveConstantDesc',
+      descriptor: '(Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/Object;'}
+  ];
+  const proof = proveCoreGroup(g, classes)[0].probes[0];
+  assert.equal(proof.matches.filter(ins => ins.name === 'invokeinterface').length, 1);
+  for (const [index, changes] of [[0, {value: 'java.lang.Object'}], [1, {opcode: 'new'}],
+    [2, {tag: 10}], [2, {owner: 'java.lang.String'}], [2, {name: 'describeConstable'}],
+    [2, {descriptor: '()Ljava/lang/Object;'}]]) {
+    const changed = structuredClone(g);
+    Object.assign(changed.cases[0].probes[0].symbolicOperands[index], changes);
+    assert.throws(() => proveCoreGroup(changed, classes), /Actual symbolic operand/);
+  }
+  for (const constraints of [[], null, {}, [null], [{}], [{opcode: 'anewarray', tag: 7}],
+    [{opcode: 'anewarray', tag: 7, value: 'java.lang.Object', typo: true}],
+    [{opcode: 'invokeinterface', tag: 11, owner: 'java.lang.constant.ConstantDesc'}]]) {
+    const changed = structuredClone(g); changed.cases[0].probes[0].symbolicOperands = constraints;
+    assert.throws(() => proveCoreGroup(changed, classes), /symbolic operand obligation/);
+  }
+});

@@ -778,7 +778,7 @@ for (const [name, fields] of [
   ]],
   ['Check phase B core semantics contracts', [
     'timeout-minutes: 3',
-    'run: node --test ci/jvm_float_precision_test.cjs ci/jvm_float_to_long_test.cjs ci/array_store_semantics_test.cjs ci/athrow_semantics_test.cjs ci/java_core_bytecode_test.mjs ci/java_core_stack_forms_contract_test.mjs ci/java_core_semantics_contract_test.mjs',
+    'run: node --test ci/jvm_float_precision_test.cjs ci/jvm_float_to_long_test.cjs ci/array_store_semantics_test.cjs ci/athrow_semantics_test.cjs ci/nominal_constant_interfaces_test.cjs ci/java_core_bytecode_test.mjs ci/java_core_stack_forms_contract_test.mjs ci/java_core_semantics_contract_test.mjs',
   ]],
   ['Run Java core semantics compatibility', [
     'id: java_core_semantics',

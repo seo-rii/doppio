@@ -3245,7 +3245,7 @@ export default function (): any {
     }
   }
 
-  return {
+  var natives: {[name: string]: any} = {
     'java/lang/Class': java_lang_Class,
     'java/lang/ClassLoader$NativeLibrary': java_lang_ClassLoader$NativeLibrary,
     'java/lang/ClassLoader': java_lang_ClassLoader,
@@ -3281,4 +3281,17 @@ export default function (): any {
     'java/lang/invoke/MethodHandleNatives': java_lang_invoke_MethodHandleNatives,
     'java/lang/invoke/MethodHandle': java_lang_invoke_MethodHandle
   };
+  // These five bootstrap types are nominal descriptors of themselves. Both
+  // the typed declaration and its erased interface bridge ignore Lookup,
+  // including null, and return the exact receiver without active VM work.
+  var resolveNominalConstant = function(thread: JVMThread, javaThis: JVMTypes.java_lang_Object,
+      lookup: JVMTypes.java_lang_invoke_MethodHandles$Lookup): JVMTypes.java_lang_Object {
+    return javaThis;
+  };
+  ['java/lang/Integer', 'java/lang/Long', 'java/lang/Float', 'java/lang/Double', 'java/lang/String'].forEach((name: string) => {
+    var methods = natives[name] || (natives[name] = {});
+    methods['resolveConstantDesc(Ljava/lang/invoke/MethodHandles$Lookup;)L' + name + ';'] = resolveNominalConstant;
+    methods['resolveConstantDesc(Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/Object;'] = resolveNominalConstant;
+  });
+  return natives;
 };

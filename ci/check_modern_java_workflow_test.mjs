@@ -74,7 +74,7 @@ const invocationEvolutionUnits = [
 const invocationEvolutionUnitCommand = `node --test ${invocationEvolutionUnits.join(' ')}`;
 const invocationEvolutionRunnerCommand = 'node ci/java_invocation_evolution_test.mjs --browser';
 const coreSemanticsUnits = ['ci/jvm_float_precision_test.cjs', 'ci/jvm_float_to_long_test.cjs',
-  'ci/array_store_semantics_test.cjs', 'ci/athrow_semantics_test.cjs', 'ci/java_core_bytecode_test.mjs',
+  'ci/array_store_semantics_test.cjs', 'ci/athrow_semantics_test.cjs', 'ci/nominal_constant_interfaces_test.cjs', 'ci/java_core_bytecode_test.mjs',
   'ci/java_core_stack_forms_contract_test.mjs', 'ci/java_core_semantics_contract_test.mjs'];
 const coreSemanticsUnitCommand = `node --test ${coreSemanticsUnits.join(' ')}`;
 const coreSemanticsRunnerCommand = 'node ci/java_core_semantics_test.mjs --browser';

@@ -16,15 +16,15 @@ const success = group => ({status: 'passed', exitCode: 0, signal: null, error: n
   outputLimitExceeded: false, stderr: '', stdout: group.cases.flatMap(entry => entry.trace.map(event => `${entry.id}=${event}`))
     .concat([group.completionMarker, '']).join('\n')});
 
-test('B5 corpus has five mandatory groups and 155 independently fixed genuine or explicit-mutation scenarios', () => {
+test('B5 corpus has five mandatory groups and 157 independently fixed genuine or explicit-mutation scenarios', () => {
   assert.deepEqual(coreGroups.map(group => [group.id, group.cases.length]),
-    [['numeric', 48], ['arrays-objects', 38], ['control', 26], ['exceptions', 18], ['stack-forms', 25]]);
-  assert.equal(validateCoreGroups(), 155);
+    [['numeric', 48], ['arrays-objects', 40], ['control', 26], ['exceptions', 18], ['stack-forms', 25]]);
+  assert.equal(validateCoreGroups(), 157);
   assert.equal(coreGroups[4].kind, 'explicit-byte-mutation');
   assert.equal(coreGroups[4].cases.filter(entry => entry.payload.major !== 'original-modern').length, 8);
   const numeric = coreGroups[0];
   assert.deepEqual(numeric.cases.find(entry => entry.id === 'l2f').trace, ['df000000,5f000000,5e800001,de800001']);
-  assert.equal(coreGroups[1].cases.flatMap(entry => entry.trace).length, 180);
+  assert.equal(coreGroups[1].cases.flatMap(entry => entry.trace).length, 192);
   const generated = coreGroups[2].generatedSources();
   assert.ok(generated.length > 0 && generated.every(source => typeof source.text === 'string' && source.text.length > 0));
   assert.deepEqual(generated, coreGroups[2].generatedSources());
@@ -51,7 +51,7 @@ test('source-unit references bind both actual edition indices without promoting 
 
 test('all native and guest execution cells are registered as not-run before the first compile', () => {
   const ledger = createCoreLedger();
-  assert.equal(ledger.results.length, 10); assert.equal(ledger.caseCount, 155);
+  assert.equal(ledger.results.length, 10); assert.equal(ledger.caseCount, 157);
   assert.equal(ledger.results.flatMap(record => record.executions).length, 30);
   assert.deepEqual(coreRequiredHosts, ['native', 'node', 'chromium']);
   for (const record of ledger.results) {

@@ -3,6 +3,9 @@
 // from each dedicated entry; their presence is not dynamic-path coverage.
 // Branches, handlers and initialization are dependencies, not JLS 14, B1,
 // dynamic-bootstrap, monitor/memory, module or entire-chapter closure.
+// The two ConstantDesc array cases depend on the Java 12+ platform interface,
+// its exact five direct self-describing value types and resolveConstantDesc.
+// They do not claim general constant-dynamic or bootstrap resolution support.
 export default {
   id: "arrays-objects",
   source: "classes/modern_fixture/JavaCoreArraysObjects.java",
@@ -541,6 +544,41 @@ export default {
       probes: [
         {"className":"classes.modern_test.JavaCoreArraysObjects$ArrayProbes","method":"lengthInts","descriptor":"([I)I","requiredOpcodes":["arraylength"]},
         {"className":"classes.modern_test.JavaCoreArraysObjects$ArrayProbes","method":"lengthReferences","descriptor":"([Ljava/lang/Object;)I","requiredOpcodes":["arraylength"]}
+      ]
+    },
+    {
+      id: "ao-constant-desc-stores",
+      entryMethod: "caseConstantDescStores",
+      entryDescriptor: "()V",
+      trace: ["types=31","stores=31,31","null=31","resolve=31","assignable=31","interfaces=31"],
+      anchors: {
+        JLS: ["4.10.2","10.5","15.16","15.26.1"],
+        JVMS: ["6.5.anewarray","6.5.aaload","6.5.aastore","6.5.checkcast","6.5.invokeinterface"]
+      },
+      probes: [
+        {"className":"classes.modern_test.JavaCoreArraysObjects$ConstantDescProbes","method":"allocate","descriptor":"(I)[Ljava/lang/constant/ConstantDesc;","requiredOpcodes":["anewarray"],"symbolicOperands":[{"opcode":"anewarray","tag":7,"value":"java.lang.constant.ConstantDesc"}]},
+        {"className":"classes.modern_test.JavaCoreArraysObjects$ConstantDescProbes","method":"cast","descriptor":"(Ljava/lang/Object;)Ljava/lang/constant/ConstantDesc;","requiredOpcodes":["checkcast"],"symbolicOperands":[{"opcode":"checkcast","tag":7,"value":"java.lang.constant.ConstantDesc"}]},
+        {"className":"classes.modern_test.JavaCoreArraysObjects$ConstantDescProbes","method":"store","descriptor":"([Ljava/lang/constant/ConstantDesc;ILjava/lang/constant/ConstantDesc;)Ljava/lang/constant/ConstantDesc;","requiredOpcodes":["aastore","aaload"]},
+        {"className":"classes.modern_test.JavaCoreArraysObjects$ConstantDescProbes","method":"warmStores","descriptor":"([Ljava/lang/constant/ConstantDesc;[Ljava/lang/Object;I)I","requiredOpcodes":["invokestatic","goto"]},
+        {"className":"classes.modern_test.JavaCoreArraysObjects$ConstantDescProbes","method":"resolve","descriptor":"(Ljava/lang/constant/ConstantDesc;Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/Object;","requiredOpcodes":["invokeinterface"],"symbolicOperands":[{"opcode":"invokeinterface","tag":11,"owner":"java.lang.constant.ConstantDesc","name":"resolveConstantDesc","descriptor":"(Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/Object;"}]},
+        {"className":"classes.modern_test.JavaCoreArraysObjects$ConstantDescProbes","method":"interfaceMetadata","descriptor":"(Ljava/lang/Class;Z)Z","requiredOpcodes":["invokevirtual","aaload"]}
+      ]
+    },
+    {
+      id: "ao-constant-desc-rejections",
+      entryMethod: "caseConstantDescRejections",
+      entryDescriptor: "()V",
+      trace: ["errors=java.lang.ArrayStoreException:31","unchanged=31","disallowed=31","interfaces=31","null=31","restored=31"],
+      anchors: {
+        JLS: ["4.10.2","10.5","15.26.1"],
+        JVMS: ["6.5.anewarray","6.5.aaload","6.5.aastore","6.5.checkcast"]
+      },
+      probes: [
+        {"className":"classes.modern_test.JavaCoreArraysObjects$ConstantDescProbes","method":"allocate","descriptor":"(I)[Ljava/lang/constant/ConstantDesc;","requiredOpcodes":["anewarray"],"symbolicOperands":[{"opcode":"anewarray","tag":7,"value":"java.lang.constant.ConstantDesc"}]},
+        {"className":"classes.modern_test.JavaCoreArraysObjects$ConstantDescProbes","method":"cast","descriptor":"(Ljava/lang/Object;)Ljava/lang/constant/ConstantDesc;","requiredOpcodes":["checkcast"],"symbolicOperands":[{"opcode":"checkcast","tag":7,"value":"java.lang.constant.ConstantDesc"}]},
+        {"className":"classes.modern_test.JavaCoreArraysObjects$ConstantDescProbes","method":"store","descriptor":"([Ljava/lang/constant/ConstantDesc;ILjava/lang/constant/ConstantDesc;)Ljava/lang/constant/ConstantDesc;","requiredOpcodes":["aastore","aaload"]},
+        {"className":"classes.modern_test.JavaCoreArraysObjects$ConstantDescProbes","method":"storeAlias","descriptor":"([Ljava/lang/Object;ILjava/lang/Object;)Ljava/lang/Object;","requiredOpcodes":["aastore","aaload"]},
+        {"className":"classes.modern_test.JavaCoreArraysObjects$ConstantDescProbes","method":"interfaceMetadata","descriptor":"(Ljava/lang/Class;Z)Z","requiredOpcodes":["invokevirtual","aaload"]}
       ]
     },
   ]
