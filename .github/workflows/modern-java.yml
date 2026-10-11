@@ -382,6 +382,27 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Check phase B sealed semantics contracts
+        timeout-minutes: 3
+        run: node --test ci/sealed_class_derivation_test.cjs ci/sealed_class_reflection_test.cjs ci/java_sealed_semantics_contract_test.mjs
+
+      # Twenty bounded javac operations (60s) and six group/release executions
+      # on native (30s), Node (60s) and Chromium (60s): 35 minutes plus five
+      # minutes for immutable variant/mutation checks and durable ledger writes.
+      - name: Run Java sealed semantics compatibility
+        id: java_sealed_semantics
+        timeout-minutes: 40
+        run: node ci/java_sealed_semantics_test.mjs --browser
+
+      - name: Upload Java sealed semantics ledger
+        if: always() && steps.java_sealed_semantics.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-sealed-semantics-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Check evolved switch ledger contract
         timeout-minutes: 1
         run: node --test ci/java_pattern_evolution_contract_test.mjs

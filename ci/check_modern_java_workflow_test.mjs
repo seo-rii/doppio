@@ -82,6 +82,10 @@ const recordSemanticsUnits = ['ci/record_component_native_test.cjs', 'ci/annotat
   'ci/java_record_semantics_contract_test.mjs'];
 const recordSemanticsUnitCommand = `node --test ${recordSemanticsUnits.join(' ')}`;
 const recordSemanticsRunnerCommand = 'node ci/java_record_semantics_test.mjs --browser';
+const sealedSemanticsUnits = ['ci/sealed_class_derivation_test.cjs', 'ci/sealed_class_reflection_test.cjs',
+  'ci/java_sealed_semantics_contract_test.mjs'];
+const sealedSemanticsUnitCommand = `node --test ${sealedSemanticsUnits.join(' ')}`;
+const sealedSemanticsRunnerCommand = 'node ci/java_sealed_semantics_test.mjs --browser';
 const memberGates = [
   {name: 'member resolution', units: memberResolutionUnits, unitCommand: memberResolutionUnitCommand,
     runnerCommand: memberResolutionRunnerCommand, stepId: 'java_member_resolution',
@@ -98,6 +102,9 @@ const memberGates = [
   {name: 'record semantics', units: recordSemanticsUnits, unitCommand: recordSemanticsUnitCommand,
     runnerCommand: recordSemanticsRunnerCommand, stepId: 'java_record_semantics',
     ledger: 'build/java-record-semantics-results.json', timeout: 30},
+  {name: 'sealed semantics', units: sealedSemanticsUnits, unitCommand: sealedSemanticsUnitCommand,
+    runnerCommand: sealedSemanticsRunnerCommand, stepId: 'java_sealed_semantics',
+    ledger: 'build/java-sealed-semantics-results.json', timeout: 40},
 ];
 const packageScripts = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).scripts;
 for (const [name, command] of [
@@ -118,6 +125,8 @@ for (const [name, command] of [
   ['ci:core-semantics', coreSemanticsRunnerCommand],
   ['ci:record-semantics:test', recordSemanticsUnitCommand],
   ['ci:record-semantics', recordSemanticsRunnerCommand],
+  ['ci:sealed-semantics:test', sealedSemanticsUnitCommand],
+  ['ci:sealed-semantics', sealedSemanticsRunnerCommand],
 ]) {
   if (packageScripts[name] !== command) {
     throw new Error(`${name} must retain the complete phase B command: ${command}`);
@@ -304,6 +313,9 @@ for (const name of [
   'Check phase B record semantics contracts',
   'Run Java record semantics compatibility',
   'Upload Java record semantics ledger',
+  'Check phase B sealed semantics contracts',
+  'Run Java sealed semantics compatibility',
+  'Upload Java sealed semantics ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -657,7 +669,10 @@ for (const [firstName, secondName] of [
   ['Upload Java core semantics ledger', 'Check phase B record semantics contracts'],
   ['Check phase B record semantics contracts', 'Run Java record semantics compatibility'],
   ['Run Java record semantics compatibility', 'Upload Java record semantics ledger'],
-  ['Upload Java record semantics ledger', 'Check evolved switch ledger contract'],
+  ['Upload Java record semantics ledger', 'Check phase B sealed semantics contracts'],
+  ['Check phase B sealed semantics contracts', 'Run Java sealed semantics compatibility'],
+  ['Run Java sealed semantics compatibility', 'Upload Java sealed semantics ledger'],
+  ['Upload Java sealed semantics ledger', 'Check evolved switch ledger contract'],
 ]) {
   expectCheckerFailure(
     `member resolution/access dependency reversed: ${firstName} before ${secondName}`,
