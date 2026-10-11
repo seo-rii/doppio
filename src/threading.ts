@@ -562,8 +562,11 @@ export class NativeStackFrame implements IStackFrame {
         rv = this.nativeMethod.apply(null, method.convertArgs(thread, args));
         break;
     }
-    // Ensure thread is running, and we are the running method.
-    if (thread.getStatus() === ThreadStatus.RUNNABLE && thread.currentMethod() === method) {
+    // A synchronous cached failure can make the thread runnable while an
+    // internal exception boundary is still above this frame. currentMethod()
+    // intentionally skips those boundaries; only this exact top frame may
+    // return normally, without discarding a queued original Throwable.
+    if (thread.getStatus() === ThreadStatus.RUNNABLE && thread.isCurrentFrame(this)) {
       // Normal native method exit.
       var returnType = method.returnType;
       switch (returnType) {
@@ -781,6 +784,11 @@ export class JVMThread implements Thread {
       }
     }
     return null;
+  }
+
+  /** Includes internal exception boundaries, unlike currentMethod(). */
+  public isCurrentFrame(frame: IStackFrame): boolean {
+    return this.stack[this.stack.length - 1] === frame;
   }
 
   /**
