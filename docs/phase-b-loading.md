@@ -402,8 +402,58 @@ tree and unchanged source/compiler/runtime/HEAD provenance. Attempted failures
 are retained in `build/java-member-resolution-results.json` and
 `build/java-member-access-results.json`. Native-only diagnostics and source unit
 tests are not guest-host evidence. These commands describe required gates, not a
-fresh passing result. The broader retained execution, evolved receiver dispatch,
-named-module access and general bootstrap boundaries remain explicit.
+fresh passing result. The broader retained execution, named-module access and
+general bootstrap boundaries remain explicit. B4d adds evolved receiver controls.
+
+## B4d evolved invocation and declaring-owner initialization
+
+The `ci/java_invocation_evolution_test.mjs` gate requires 34 scenarios per release
+from genuine, separate javac 21/25 compilations. Replacement compilation changes
+only designated owners. Eighteen original callers and seven original receiver
+classes retain their exact bytes; all payload classes are mounted as resource-only
+`.bin` files, with no caller mutations or fallback payload `.class` files.
+Decoded executable operands bind the exact opcode, CP tag, owner, name and
+descriptor rather than merely finding a matching constant somewhere in the pool.
+
+The matrix covers removed defaults, subinterface reabstraction, unrelated default
+conflicts, superclass `invokespecial`, a single concrete default alongside an
+unrelated abstract method, and diamond/more-specific defaults. Exact inherited
+class declarations win over interface defaults, including an abstract superclass
+declaration that masks a default. On one unchanged caller/CP entry, an overriding
+receiver succeeds before and after a conflicting receiver, a null receiver still
+throws `NullPointerException`, and a repeat conflict retains its specified error.
+These receiver-dependent errors must not poison successful symbolic resolution.
+
+Class/interface static-to-instance and instance-to-static evolution requires
+`IncompatibleClassChangeError` before null receiver checks or initialization.
+Field-kind evolution has matching controls. Static active use initializes the
+actual declaration owner, not an intermediate symbolic subclass; interface
+static use does not initialize an otherwise unused parent. Explicit later active
+use proves that the deferred class/interface was not already initialized.
+
+There is one narrowly recorded native-oracle boundary. Pinned Java 21 reports
+exact `AbstractMethodError` for the evolved `invokeinterface` unrelated-default
+conflict; pinned Java 25 reports exact `IncompatibleClassChangeError`. Both guest
+hosts require the latter, as specified by
+[JVMS 6.5.invokeinterface](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-6.html#jvms-6.5.invokeinterface).
+Actual default flags, declaring/implementing class identities, defining loaders
+and stage routing are checked. Although AME is an ICCE subclass, the oracle never
+accepts a generic superclass match. Explicit host/release profiles apply only to
+this named case: 33/34 Java 21 cases and 34/34 Java 25 cases are parity candidates,
+not a claim that all native and specified outcomes agree.
+
+```sh
+yarn ci:invocation-evolution:test
+yarn ci:invocation-evolution
+```
+
+The official gate requires both native releases, Node and Chromium, unchanged
+source/compiler/runtime inputs and a clean, unchanged committed tree. It retains
+attempted failures in `build/java-invocation-evolution-results.json`, with exact
+host/release expectations and the documented oracle difference. Native-only runs
+do not establish guest execution. These selected cases do not prove every
+linking rule or complete JVM-002; broader retained execution is B5, module access
+is G, and arbitrary bootstrap/Lookup behavior remains C.
 
 ## Remaining boundaries
 
