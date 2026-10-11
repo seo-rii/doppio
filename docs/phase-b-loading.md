@@ -468,6 +468,15 @@ accepts a generic superclass match. Explicit host/release profiles apply only to
 this named case: 33/34 Java 21 cases and 34/34 Java 25 cases are parity candidates,
 not a claim that all native and specified outcomes agree.
 
+At clean `c27d38a8f`, strict CLI and browser builds, an actual JVM bootstrap
+callback, and all eight B1–B4 Java 21/25 native/Node/Chromium gates pass. The
+fresh retained inventory also passes 77 default and 246 modern fixtures with
+original goldens and class files, unchanged HEAD and source/runtime/input
+snapshots, and no unrun cases. This is selected integration evidence, not a
+claim of exhaustive linking or whole-JVM conformance. The 607-test compiled
+unit/contract run has 606 passes and one optional native-taxonomy skip; that
+optional check passes in a separate pinned-native-enabled 13-test run.
+
 ```sh
 yarn ci:invocation-evolution:test
 yarn ci:invocation-evolution
