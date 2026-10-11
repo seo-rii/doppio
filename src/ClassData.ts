@@ -1099,10 +1099,12 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
 
   /**
    * Returns the VM index for the given method. Returns -1 if not present in the
-   * virtual method table (e.g. is static or a constructor).
+   * instance method table (e.g. is static or a constructor). Private methods
+   * retain exact declaration indices for MemberName's dispatch metadata; they
+   * never become override candidates in selectMethod.
    */
   public getVMIndexForMethod(m: Method): number {
-    if (m.accessFlags.isStatic() || m.accessFlags.isPrivate() || m.name[0] === '<') return -1;
+    if (m.accessFlags.isStatic() || m.name[0] === '<') return -1;
     var index = this.vmOrigins.indexOf(m);
     if (index === -1 && (this.isSubclass(m.cls) || this.isSubinterface(m.cls))) {
       // VM overlays can be registered after this receiver's hierarchy was
@@ -1296,7 +1298,7 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     this.vmOrigins = this.superClass === null ? [] : this.superClass.vmOrigins.slice();
     var interfaceMethods = this.getSuperinterfaceMethods(), seen = new Set(this.vmOrigins);
     this.methods.concat(interfaceMethods).forEach(method => {
-      if (!method.accessFlags.isStatic() && !method.accessFlags.isPrivate() && method.name[0] !== '<' && !seen.has(method)) {
+      if (!method.accessFlags.isStatic() && method.name[0] !== '<' && !seen.has(method)) {
         seen.add(method);
         this.vmOrigins.push(method);
       }
@@ -1391,7 +1393,8 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
   }
 
   /**
-   * Looks up a field with the given name. Returns null if no method found.
+   * Symbolic field lookup matches both name and descriptor (JVMS 5.4.3.2).
+   * Name-only callers retain the existing metadata convenience query.
    */
   public fieldLookup(name: string, descriptor?: string): Field {
     if (descriptor === undefined) return this._fieldLookup[name] || null;

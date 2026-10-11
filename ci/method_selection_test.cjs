@@ -8,7 +8,7 @@ const {test} = require('node:test');
 const runtime = process.env.DOPPIO_RELEASE_CLI_ROOT || path.resolve(__dirname, '../build/release-cli');
 const sourceModules = new Set(['ClassData', 'ClassLoader', 'ConstantPool', 'threading', 'methods',
   'ClassVerification', 'BytecodeVerifier', 'BytecodeTypeVerifier', 'VerificationRelations',
-  'GeneratedAdapters', 'LambdaAdapters', 'ReflectionAdapters', 'LoadingConstraints', 'ClassPreparation', 'opcodes']);
+  'GeneratedAdapters', 'LambdaAdapters', 'ReflectionAdapters', 'LoadingConstraints', 'ClassPreparation', 'opcodes', 'method_handles']);
 const cache = new Map();
 function load(name) {
   const filename = path.join(runtime, 'src', name + '.js');
@@ -389,7 +389,44 @@ test('VM indices retain distinct declaration anchors for transitive override sel
   assert.notEqual(aIndex, cIndex);
   assert.equal(d.getMethodFromVMIndex(aIndex), declared(d));
   assert.equal(d.getMethodFromVMIndex(cIndex), declared(c));
-  assert.equal(d.getVMIndexForMethod(declared(d, 'privateBody()V')), -1);
+  assert.equal(d.getMethodFromVMIndex(d.getVMIndexForMethod(declared(d, 'privateBody()V'))),
+    declared(d, 'privateBody()V'));
+});
+
+test('private instance VM indices retain distinct declaration identities without virtual overrides', () => {
+  const w = world(), base = w.define('scope/PrivateBase', {methods: [methodSpec(PRIVATE)]});
+  const child = w.define('scope/PrivateChild', {parent: base, methods: [methodSpec(PRIVATE)]});
+  const shadow = w.define('scope/PublicShadow', {parent: child, methods: [methodSpec(PUBLIC)]});
+  const baseMethod = declared(base), childMethod = declared(child), shadowMethod = declared(shadow);
+  const baseIndex = base.getVMIndexForMethod(baseMethod), childIndex = child.getVMIndexForMethod(childMethod);
+  assert.ok(baseIndex >= 0 && childIndex >= 0);
+  assert.notEqual(baseIndex, childIndex);
+  for (const cls of [base, child, shadow]) assert.equal(cls.getMethodFromVMIndex(baseIndex), baseMethod);
+  assert.equal(shadow.getMethodFromVMIndex(childIndex), childMethod);
+  assert.equal(shadow.getMethodFromVMIndex(shadow.getVMIndexForMethod(shadowMethod)), shadowMethod);
+  assert.equal(childMethod.canOverride(baseMethod), false);
+  assert.equal(shadowMethod.canOverride(baseMethod), false);
+  const excluded = w.define('scope/NonInstance', {methods: [methodSpec(PRIVATE | STATIC), methodSpec(PUBLIC, '<init>')]});
+  assert.equal(excluded.getVMIndexForMethod(declared(excluded)), -1);
+  assert.equal(excluded.getVMIndexForMethod(declared(excluded, '<init>()V')), -1);
+});
+
+test('private MemberName refresh preserves access flags and a valid index before exact bridge invocation', () => {
+  const w = world(), base = w.define('scope/PrivateHandleBase', {methods: [methodSpec(PRIVATE)]});
+  const child = w.define('scope/PrivateHandleChild', {parent: base, methods: [methodSpec(PUBLIC)]});
+  const flags = (5 << 24) | 0x10000 | PRIVATE, member = {
+    'java/lang/invoke/MemberName/flags': flags,
+    'java/lang/invoke/MemberName/clazz': {$cls: base},
+    'java/lang/invoke/MemberName/name': {toString: () => 'm'},
+    'java/lang/invoke/MemberName/type': {toString: () => '()V'}
+  };
+  const owner = invocationThread(), receiver = {getClass: () => child};
+  load('method_handles').refreshMemberNameMethodTarget(owner, member);
+  assert.equal(member['java/lang/invoke/MemberName/flags'], flags, 'VM metadata must not grant private access');
+  assert.ok(member.vmindex >= 0, 'Java MemberName validates dispatch metadata before Lookup access checks');
+  assert.equal(base.getMethodFromVMIndex(member.vmindex), declared(base));
+  member.vmtarget(owner, '(Lscope/PrivateHandleBase;)V', [receiver]);
+  assert.equal(owner.stack[0].method, declared(base), 'A public subclass shadow must not replace the private declaration');
 });
 
 function overlay(cls, flags = PUBLIC, name = 'overlay') {
