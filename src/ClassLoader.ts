@@ -10,6 +10,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as JVMTypes from '../includes/JVMTypes';
 import {setImmediate} from 'browserfs';
+import {getLoadingConstraints} from './LoadingConstraints';
 const debug = logging.debug;
 const error = logging.error;
 
@@ -3556,7 +3557,19 @@ export abstract class ClassLoader {
   public addClass(typeStr: string, classData: ClassData): void {
     // If the class is already added, ensure it is the same class we are adding again.
     assert(this.loadedClasses[typeStr] != null ? this.loadedClasses[typeStr] === classData : true);
+    // Guest publication paths check this inside their exception boundary first.
+    // Trusted primitive/array and direct setup paths must also retain records.
+    var violation = getLoadingConstraints(this).record(this, classData);
+    assert(violation === null, 'Unchecked initiating-loader constraint violation: ' + typeStr);
     this.loadedClasses[typeStr] = classData;
+  }
+
+  protected recordInitiation(thread: JVMThread, cls: ClassData): boolean {
+    var violation = getLoadingConstraints(this).record(this, cls);
+    if (violation === null) return true;
+    this.definitionError(thread, 'Ljava/lang/LinkageError;',
+      'Loading constraint violation for ' + ext_classname(violation.name));
+    return false;
   }
 
   /**
@@ -3688,7 +3701,8 @@ export abstract class ClassLoader {
           if (cls !== null && previous != null && previous !== cls) {
             this.definitionError(request.thread, 'Ljava/lang/LinkageError;', 'Conflicting initiating-loader identity: ' + candidate.getExternalName());
             done(null);
-          } else done(<ReferenceClassData<JVMTypes.java_lang_Object>> cls);
+          } else if (cls !== null && !this.recordInitiation(request.thread, cls)) done(null);
+          else done(<ReferenceClassData<JVMTypes.java_lang_Object>> cls);
         }, false, request.ancestry);
       });
     };
@@ -4189,6 +4203,7 @@ export class CustomClassLoader extends ClassLoader {
           cb(null);
           return;
         }
+        if (!this.recordInitiation(thread, cls)) { cb(null); return; }
         this.addClass(typeStr, cls);
         cb(cls);
       }
