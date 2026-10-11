@@ -54,9 +54,30 @@ export function memberResolutionCases() {
       trace: ['metadata-ready-no-effects', `same-name-${name}-identities-distinct`, 'accepted@invoke-a', `value-a=${iface ? 41 : 71}`,
         'accepted@invoke-b', `value-b=${iface ? 43 : 72}`, `effects=${iface ? 'first,first' : 'identity-owner,identity-owner'}`]});
   }
+  const clone = (id, caller, owner, error, valueTrace, payloads = [`baseline:${caller}`]) => cases.push({
+    id, kind: 'array-clone-resolution', caller, payloads, expectedError: error, expectedEffects: '', section: '5.4.3.3',
+    cloneReference: {kind: 10, owner, name: 'clone', descriptor: '()Ljava/lang/Object;', opcode: 0xb6, pc: 1},
+    objectCloneMetadata: {declaringClass: 'java.lang.Object', definingLoader: 'bootstrap', visibility: 'protected', static: false,
+      descriptor: '()Ljava/lang/Object;', checkedBeforeAndAfter: true},
+    trace: ['metadata-ready-no-effects', 'object-clone-bootstrap-protected-before', `${error || 'accepted'}@invoke`,
+      ...(error ? [] : ['clone-identity-and-array-type', valueTrace]), 'object-clone-bootstrap-protected-after', 'effects=none']});
+  for (const [label, caller, owner, values] of [
+    ['primitive', 'PrimitiveCloneCaller', '[I', 'primitive-values-and-independent-slots'],
+    ['reference', 'ReferenceCloneCaller', '[Ljava/lang/Object;', 'shared-elements-and-independent-slots'],
+    ['multirank', 'MultirankCloneCaller', '[[I', 'shared-inner-arrays-and-independent-slots']
+  ]) {
+    clone(`${label}-array-clone`, full(caller), owner, null, values);
+    clone(`${label}-array-clone-null`, full(caller), owner, 'java.lang.NullPointerException', null);
+  }
+  clone('public-leaf-array-clone', 'cloneaccess.LeafCloneCaller', '[Lmembers/CloneLeaf;', null,
+    'public-leaf-values-and-loader-identity', ['baseline:cloneaccess.LeafCloneCaller', b('CloneLeaf')]);
+  clone('hidden-leaf-array-clone', 'cloneaccess.LeafCloneCaller', '[Lmembers/CloneLeaf;', 'java.lang.IllegalAccessError', null,
+    ['baseline:cloneaccess.LeafCloneCaller', e('CloneLeaf')]);
   return cases.map(entry => ({...entry, packageId: 'JVM-002', mutation: false, expectedPhase: 'invoke',
     specificationRefs: Object.fromEntries([21, 25].map(release => [release,
-      ['5.3', entry.section, '5.5'].map(section => `https://docs.oracle.com/javase/specs/jvms/se${release}/html/jvms-5.html#jvms-${section}`)]))}));
+      [...['5.3', entry.section, '5.5', ...(entry.cloneReference ? ['5.4.4'] : [])]
+        .map(section => `https://docs.oracle.com/javase/specs/jvms/se${release}/html/jvms-5.html#jvms-${section}`),
+      ...(entry.cloneReference ? [`https://docs.oracle.com/javase/specs/jls/se${release}/html/jls-10.html#jls-10.7`] : [])]]))}));
 }
 
 /** Stage two contains replacement owners only; old callers are never recompiled. */
@@ -105,6 +126,13 @@ export function memberResolutionSources() {
   add(baseline, 'IdentityOwner', field('IdentityOwner', 'identity-owner', 71));
   add(evolved, 'IdentityOwner', field('IdentityOwner', 'identity-owner', 72));
   caller('IdentityCaller', 'IdentityOwner.value');
+  for (const [name, type] of [['PrimitiveCloneCaller', 'int[]'], ['ReferenceCloneCaller', 'Object[]'], ['MultirankCloneCaller', 'int[][]']]) {
+    add(baseline, name, `public class ${name} { public static Object copy(${type} value) { return value.clone(); } }`);
+  }
+  add(baseline, 'CloneLeaf', `public class CloneLeaf { static { ${mark('clone-leaf-init', 80)}; } }`);
+  add(evolved, 'CloneLeaf', `class CloneLeaf { static { ${mark('clone-leaf-init', 80)}; } }`);
+  baseline.push({binaryName: 'cloneaccess.LeafCloneCaller', text:
+    'package cloneaccess; public class LeafCloneCaller { public static Object copy(members.CloneLeaf[] value) { return value.clone(); } }\n'});
   return [{stage: 'baseline', sources: baseline}, {stage: 'evolved', sources: evolved}];
 }
 
@@ -115,13 +143,19 @@ const callerReferences = {
   InterfaceCaller: ['Role', 11, '()I'], GoneInterfaceCaller: ['GoneRole', 11, '()I'],
   FieldKindCaller: ['FieldKindOwner', 9, 'I'], IdentityCaller: ['IdentityOwner', 9, 'I']
 };
+const cloneReferences = {
+  'members.PrimitiveCloneCaller': '[I', 'members.ReferenceCloneCaller': '[Ljava/lang/Object;',
+  'members.MultirankCloneCaller': '[[I', 'cloneaccess.LeafCloneCaller': '[Lmembers/CloneLeaf;'
+};
+const isCaller = filename => Object.hasOwn(callerReferences, path.basename(filename, '.class')) ||
+  Object.hasOwn(cloneReferences, filename.replace(/\.class$/, '').replaceAll('/', '.'));
 
 export function inspectMemberResolutionPayload(bytes, binaryName) {
   const layout = readStructureLayout(bytes), utf = index => layout.pool[index].value;
   const references = layout.pool.flatMap((entry, index) => entry && [9, 10, 11].includes(entry.tag) ? [{
     index, kind: entry.tag, owner: utf(layout.pool[entry.first].first), name: utf(layout.pool[entry.second].first),
     descriptor: utf(layout.pool[entry.second].second)}] : []);
-  const expected = callerReferences[binaryName.slice('members.'.length)];
+  const expected = callerReferences[binaryName.slice('members.'.length)], cloneOwner = cloneReferences[binaryName];
   const methods = layout.methods.entries.map(({name, descriptor, flags, code}) => ({name, descriptor, flags,
     ...(code ? {instructionsHex: bytes.subarray(code.instructionsOffset, code.instructionsOffset + code.codeLength).toString('hex')} : {})}));
   if (expected) {
@@ -155,9 +189,26 @@ export function inspectMemberResolutionPayload(bytes, binaryName) {
       entry.owner === `members/${owner}` && entry.name === 'value' && entry.descriptor === descriptor),
       'Executable CP operand must bind the exact symbolic owner/tag/name/descriptor');
   }
+  let cloneCall;
+  if (cloneOwner) {
+    const descriptor = `(${cloneOwner})Ljava/lang/Object;`;
+    const copy = methods.find(method => method.name === 'copy' && method.descriptor === descriptor);
+    assert.ok(copy, 'Unchanged typed array clone caller entry');
+    assert.equal(copy.flags, 0x0009, 'Array clone caller remains public static');
+    const instructions = Buffer.from(copy.instructionsHex, 'hex');
+    assert.equal(instructions.length, 5, 'Exact clone instruction boundaries: array argument, virtual call, object return');
+    assert.equal(instructions[0], 0x2a, 'Clone receives the unchanged array argument without a preceding cast');
+    assert.equal(instructions[1], 0xb6, 'Clone really executes invokevirtual at the exact instruction boundary');
+    assert.equal(instructions[4], 0xb0, 'Clone returns the exact resulting object');
+    const operand = instructions.readUInt16BE(2);
+    const reference = references.find(entry => entry.index === operand);
+    assert.ok(reference?.kind === 10 && reference.owner === cloneOwner && reference.name === 'clone' &&
+      reference.descriptor === '()Ljava/lang/Object;', 'Clone executable CP operand must bind exact array owner/name/tag/descriptor');
+    cloneCall = {method: 'copy', methodDescriptor: descriptor, opcode: 0xb6, pc: 1, ...reference};
+  }
   return {flags: layout.flags, fields: layout.fields.entries.map(({name, descriptor, flags}) => ({name, descriptor, flags})),
     interfaces: Array.from({length: layout.interfaceCount}, (_, index) => utf(layout.pool[bytes.readUInt16BE(layout.interfacesOffset + index * 2)].first)),
-    methods, references};
+    methods, references, ...(cloneCall ? {cloneCall} : {})};
 }
 
 export function assertMemberResolutionEvolution(baseline, replacements, permitted) {
@@ -166,9 +217,9 @@ export function assertMemberResolutionEvolution(baseline, replacements, permitte
   for (const replacement of replacements) {
     assert.ok(originals.has(replacement.path), 'Every replacement has a genuine baseline');
     assert.notEqual(replacement.sha256, originals.get(replacement.path).sha256, 'Evolution must actually change owner bytes');
-    assert.ok(!Object.hasOwn(callerReferences, path.basename(replacement.path, '.class')), 'Evolution must never recompile a caller');
+    assert.ok(!isCaller(replacement.path), 'Evolution must never recompile a caller');
   }
-  return baseline.filter(entry => Object.hasOwn(callerReferences, path.basename(entry.path, '.class')));
+  return baseline.filter(entry => isCaller(entry.path));
 }
 
 function completed(result, label) {
@@ -320,6 +371,13 @@ export async function runMemberResolutionTests({nativeOnly = false, browser = !n
       }
       assert.deepEqual([...new Set(record.cases.flatMap(entry => entry.payloads))].sort(), record.payloads.map(entry => entry.id).sort(),
         'All and only mandatory case payloads are compiled and mounted');
+      for (const entry of record.cases.filter(candidate => candidate.cloneReference)) {
+        const proof = record.payloads.find(payload => payload.id === `baseline:${entry.caller}`).declarations.cloneCall;
+        assert.ok(proof, 'Mandatory clone case retains decoded genuine caller evidence');
+        const {kind, owner, name, descriptor, opcode, pc} = proof;
+        assert.deepEqual({kind, owner, name, descriptor, opcode, pc}, entry.cloneReference,
+          'Every clone case binds its exact manifest target to the executed genuine CP operand');
+      }
       record.classpath = {directory, separatePayloadCompilationRoots: record.stages.map(stage => stage.directory),
         files: inventory(directory), fallbackPayloadClassFiles: false, treeSha256: treeDigest(directory)};
       const verifyInputs = () => {
