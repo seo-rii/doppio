@@ -132,12 +132,67 @@ and include valid reserved flags, historical attribute recognition, modified
 UTF-8, category-2 parameter slots and malformed opaque annotation controls.
 These commands document the gate; a fresh passing ledger is the evidence.
 
+## B3 pre-execution verification
+
+The verifier reads the retained declaration, not interpreter-quickened bytes or
+a native replacement. An immutable decoder checks instruction operands, local
+slots, branch/switch targets, exception-handler boundaries and stack-map
+positions. Type checking then applies explicit stack-map frames to modern
+classes (major 51+) and an inference/subroutine policy to historical classes.
+It checks operand/local categories, array components, calls/fields, handlers,
+constructor initialization and uninitialized aliases. It does not execute a
+bootstrap method or resolve a symbolic member to prove a type obligation.
+
+Reference constraints are checked against actual class and defining-loader
+identities, including runtime packages, array covariance, protected receivers
+and special-invocation owners. Metadata loading is distinct from verification:
+ordinary class definition and bootstrap delegation prepare the hierarchy but
+do not recursively verify dependencies. Explicit linking, initialization and
+bytecode/native execution require the verification gate. Failed verification
+cannot be caught by an unverified method's own handlers. Concurrent waiters
+share the result; a metadata loading failure retains its guest Throwable.
+
+This separation follows [JVMS 25 §5.4.1](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-5.html#jvms-5.4.1):
+loading a type while verifying another type does not require verifying that
+dependency. In particular, checking a parent's method that accepts its child
+must not recursively wait for the parent's verification again. Lookup-defined
+and anonymous classes retain their exact identity and explicit linking paths.
+
+The bootstrap bytecode overlays use the same verifier, without an exemption.
+Their generated branching methods now carry stack maps; the overlay unit gate
+checks all 1,385 methods from the 36 transformed classes, verifies that 1,273
+original Code attributes remain byte-identical, and rejects ten controls with
+required frames removed. These decoder/type tests are not, by themselves,
+evidence that metadata obligations or Java execution succeeded.
+
+`ci/java_bytecode_verification_test.mjs` compiles genuine Java 21 and 25
+fixtures. Its 66 bytecode cases include untouched compiler output, valid
+mutations, invalid instruction/type-flow cases and explicitly labeled
+historical mutations. The expected outcomes are 11 acceptances, 50
+`VerifyError`s and five `ClassFormatError`s per release. Every modification is
+replayable and hashed; no modern input is silently relabeled as an older class.
+The loader re-entry regression separately checks that metadata loading does
+not verify the dependency, but its later active use does.
+
+```sh
+yarn ci:bytecode-verification:test
+yarn ci:bytecode-verification
+```
+
+The host gate requires native Java, Node and Chromium for both releases and a
+clean unchanged committed tree. It writes
+`build/java-bytecode-verification-results.json`, retaining failed attempts,
+source/compiler/runtime hashes, binary mutation provenance, exact ordered
+errors and completion traces. CI uploads failures too. Source-transpiled
+lifecycle units and local precommit diagnostics are explicitly separate from
+this clean-tree execution evidence.
+
 ## Remaining boundaries
 
-This slice does not finish B1, JVM-002 or Phase B. General Code/StackMap bytecode
-type checking is not currently an enforcement phase: parsing and storing a
-StackMapTable is not verification. B2's structural corpus does not establish
-the opcode, branch or type-flow constraints assigned to B3 and `VerifyError`.
+These batches do not finish B1, JVM-002 or Phase B. B2's structural corpus does
+not establish B3's verification constraints; the separate B3 gates are required.
+Passing the selected verifier corpus is not an exhaustive proof of every
+verification rule, historical class shape or adversarial resource limit.
 Remaining initialization cases include exceptional allocation during error
 wrapping and broader concurrency/memory-model interactions. General linkage,
 module access, hidden classes and arbitrary bootstrap behavior remain separate.

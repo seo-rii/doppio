@@ -196,7 +196,7 @@ jobs:
 
       - name: Check phase B initialization contracts
         timeout-minutes: 1
-        run: node --test ci/class_initialization_test.cjs ci/java_initialization_contract_test.mjs
+        run: node --test ci/class_initialization_test.cjs ci/interface_invocation_initialization_test.cjs ci/java_initialization_contract_test.mjs
 
       - name: Run Java initialization compatibility
         id: java_initialization
@@ -226,6 +226,24 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           path: build/java-class-structure-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Check phase B bytecode verification contracts
+        timeout-minutes: 3
+        run: node --test ci/bytecode_structure_test.cjs ci/bytecode_type_test.cjs ci/verification_relations_test.cjs ci/verification_exception_boundary_test.cjs ci/class_verification_test.cjs ci/verification_loader_failure_test.cjs ci/class_verification_integration_test.cjs ci/modern_overlay_verification_test.cjs ci/java_bytecode_verification_contract_test.mjs
+
+      - name: Run Java bytecode verification compatibility
+        id: java_bytecode_verification
+        timeout-minutes: 15
+        run: node ci/java_bytecode_verification_test.mjs --browser
+
+      - name: Upload Java bytecode verification ledger
+        if: always() && steps.java_bytecode_verification.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-bytecode-verification-results.json
           archive: false
           if-no-files-found: error
           retention-days: 7

@@ -17,6 +17,30 @@ const realCompilerLock = JSON.parse(
   fs.readFileSync(path.join(repoRoot, 'ci', 'modern_java_compiler_inputs.lock.json'), 'utf8')
 );
 const realCompilerInputTool = fs.readFileSync(compilerInputToolPath, 'utf8');
+const initializationUnitCommand = 'node --test ci/class_initialization_test.cjs ci/interface_invocation_initialization_test.cjs ci/java_initialization_contract_test.mjs';
+const verificationUnits = [
+  'ci/bytecode_structure_test.cjs',
+  'ci/bytecode_type_test.cjs',
+  'ci/verification_relations_test.cjs',
+  'ci/verification_exception_boundary_test.cjs',
+  'ci/class_verification_test.cjs',
+  'ci/verification_loader_failure_test.cjs',
+  'ci/class_verification_integration_test.cjs',
+  'ci/modern_overlay_verification_test.cjs',
+  'ci/java_bytecode_verification_contract_test.mjs',
+];
+const verificationUnitCommand = `node --test ${verificationUnits.join(' ')}`;
+const verificationRunnerCommand = 'node ci/java_bytecode_verification_test.mjs --browser';
+const packageScripts = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).scripts;
+for (const [name, command] of [
+  ['ci:java-initialization:test', initializationUnitCommand],
+  ['ci:bytecode-verification:test', verificationUnitCommand],
+  ['ci:bytecode-verification', verificationRunnerCommand],
+]) {
+  if (packageScripts[name] !== command) {
+    throw new Error(`${name} must retain the complete phase B command: ${command}`);
+  }
+}
 
 function smokeScript(language, suffix, compileSeconds = 300) {
   const prefix = `${language}_${suffix}`.toUpperCase();
@@ -174,6 +198,9 @@ for (const name of [
   'Check phase B structural contracts',
   'Run Java class-file structural compatibility',
   'Upload Java class-file structural ledger',
+  'Check phase B bytecode verification contracts',
+  'Run Java bytecode verification compatibility',
+  'Upload Java bytecode verification ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -201,7 +228,8 @@ for (const [original, replacement] of [
   ['build/java-se-api-census/*.gz', 'build/missing-api-census/*.gz'],
   ['build/java-se-contract-sources/*.gz', 'build/missing-contract-sources/*.gz'],
   ['run: node ci/check_phase_a_evidence.mjs\n', 'run: node ci/check_phase_a_evidence.mjs || true\n'],
-  ['run: node --test ci/class_initialization_test.cjs ci/java_initialization_contract_test.mjs\n', 'run: node --test ci/java_initialization_contract_test.mjs\n'],
+  [`run: ${initializationUnitCommand}\n`, 'run: node --test ci/java_initialization_contract_test.mjs\n'],
+  [`run: ${initializationUnitCommand}\n`, 'run: node --test ci/class_initialization_test.cjs ci/java_initialization_contract_test.mjs\n'],
   ['run: node ci/run_java_compatibility.mjs --manifest ci/java_initialization_manifest.json --output build/java-initialization-results.json --browser\n', 'run: node ci/run_java_compatibility.mjs --manifest ci/java_initialization_manifest.json --output build/java-initialization-results.json\n'],
   ['run: node ci/run_java_compatibility.mjs --manifest ci/java_initialization_manifest.json --output build/java-initialization-results.json --browser\n', 'run: node ci/run_java_compatibility.mjs --manifest ci/java_initialization_manifest.json --output build/java-initialization-results.json --browser --release 21\n'],
   ['run: node ci/run_java_compatibility.mjs --manifest ci/java_initialization_manifest.json --output build/java-initialization-results.json --browser\n', 'run: node ci/run_java_compatibility.mjs --manifest ci/java_initialization_manifest.json --output build/java-initialization-results.json --browser || true\n'],
@@ -213,6 +241,16 @@ for (const [original, replacement] of [
   ['run: node ci/java_class_structure_test.mjs --browser\n', 'run: node ci/java_class_structure_test.mjs --browser || true\n'],
   ["if: always() && steps.java_class_structure.outcome != 'skipped'", 'if: success()'],
   ['path: build/java-class-structure-results.json', 'path: build/missing-structure-ledger.json'],
+  [`run: ${verificationRunnerCommand}\n`, 'run: node ci/java_bytecode_verification_test.mjs\n'],
+  [`run: ${verificationRunnerCommand}\n`, 'run: node ci/java_bytecode_verification_test.mjs --native-only\n'],
+  [`run: ${verificationRunnerCommand}\n`, `run: ${verificationRunnerCommand} --native-only\n`],
+  [`run: ${verificationRunnerCommand}\n`, `run: ${verificationRunnerCommand} --release 21\n`],
+  [`run: ${verificationRunnerCommand}\n`, `run: ${verificationRunnerCommand} --release 25\n`],
+  [`run: ${verificationRunnerCommand}\n`, `run: ${verificationRunnerCommand} || true\n`],
+  ["if: always() && steps.java_bytecode_verification.outcome != 'skipped'", 'if: success()'],
+  ["if: always() && steps.java_bytecode_verification.outcome != 'skipped'", "if: always() && steps.java_bytecode_verification.outcome == 'success'"],
+  ['id: java_bytecode_verification\n', 'id: missing_bytecode_verification\n'],
+  ['path: build/java-bytecode-verification-results.json', 'path: build/missing-verification-ledger.json'],
   ['timeout-minutes: 130\n', 'timeout-minutes: 1300\n'],
   ['run: node ci/java25_main_test.mjs --browser\n', 'run: node ci/java25_main_test.mjs\n'],
   ['run: node ci/java25_main_test.mjs --browser\n', 'run: node ci/java25_main_test.mjs --browser || true\n'],
@@ -243,6 +281,15 @@ for (const [original, replacement] of [
   expectCheckerFailure(
     `changed Java compatibility baseline contract: ${original.trim()}`,
     { workflow: replaceRequired(realWorkflow, original, replacement) },
+    'exact bounded, fail-closed baseline command or artifact contract'
+  );
+}
+
+for (const omitted of verificationUnits) {
+  expectCheckerFailure(
+    `bytecode verification contracts omit ${omitted}`,
+    { workflow: replaceRequired(realWorkflow, `run: ${verificationUnitCommand}\n`,
+      `run: node --test ${verificationUnits.filter(filename => filename !== omitted).join(' ')}\n`) },
     'exact bounded, fail-closed baseline command or artifact contract'
   );
 }
@@ -306,6 +353,19 @@ expectCheckerFailure(
   { workflow: swapAdjacentSteps(realWorkflow, 'Run Java class-file structural compatibility', 'Upload Java class-file structural ledger') },
   'remain in dependency order'
 );
+
+for (const [firstName, secondName] of [
+  ['Upload Java class-file structural ledger', 'Check phase B bytecode verification contracts'],
+  ['Check phase B bytecode verification contracts', 'Run Java bytecode verification compatibility'],
+  ['Run Java bytecode verification compatibility', 'Upload Java bytecode verification ledger'],
+  ['Upload Java bytecode verification ledger', 'Check evolved switch ledger contract'],
+]) {
+  expectCheckerFailure(
+    `bytecode verification dependency reversed: ${firstName} before ${secondName}`,
+    { workflow: swapAdjacentSteps(realWorkflow, firstName, secondName) },
+    'remain in dependency order'
+  );
+}
 
 expectCheckerFailure(
   'uncaught exit upload before its native and guest executions',

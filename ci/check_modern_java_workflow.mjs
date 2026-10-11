@@ -634,7 +634,7 @@ for (const [name, fields] of [
   ]],
   ['Check phase B initialization contracts', [
     'timeout-minutes: 1',
-    'run: node --test ci/class_initialization_test.cjs ci/java_initialization_contract_test.mjs',
+    'run: node --test ci/class_initialization_test.cjs ci/interface_invocation_initialization_test.cjs ci/java_initialization_contract_test.mjs',
   ]],
   ['Run Java initialization compatibility', [
     'id: java_initialization',
@@ -664,6 +664,24 @@ for (const [name, fields] of [
     'uses: actions/upload-artifact@v7',
     'with:',
     '  path: build/java-class-structure-results.json',
+    '  archive: false',
+    '  if-no-files-found: error',
+    '  retention-days: 7',
+  ]],
+  ['Check phase B bytecode verification contracts', [
+    'timeout-minutes: 3',
+    'run: node --test ci/bytecode_structure_test.cjs ci/bytecode_type_test.cjs ci/verification_relations_test.cjs ci/verification_exception_boundary_test.cjs ci/class_verification_test.cjs ci/verification_loader_failure_test.cjs ci/class_verification_integration_test.cjs ci/modern_overlay_verification_test.cjs ci/java_bytecode_verification_contract_test.mjs',
+  ]],
+  ['Run Java bytecode verification compatibility', [
+    'id: java_bytecode_verification',
+    'timeout-minutes: 15',
+    'run: node ci/java_bytecode_verification_test.mjs --browser',
+  ]],
+  ['Upload Java bytecode verification ledger', [
+    "if: always() && steps.java_bytecode_verification.outcome != 'skipped'",
+    'uses: actions/upload-artifact@v7',
+    'with:',
+    '  path: build/java-bytecode-verification-results.json',
     '  archive: false',
     '  if-no-files-found: error',
     '  retention-days: 7',
@@ -801,6 +819,9 @@ const runtimeOrder = [
   'Check phase B structural contracts',
   'Run Java class-file structural compatibility',
   'Upload Java class-file structural ledger',
+  'Check phase B bytecode verification contracts',
+  'Run Java bytecode verification compatibility',
+  'Upload Java bytecode verification ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',

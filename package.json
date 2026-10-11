@@ -117,6 +117,8 @@
     "ci:java-initialization": "node ci/run_java_compatibility.mjs --manifest ci/java_initialization_manifest.json --output build/java-initialization-results.json --browser",
     "ci:class-structure:test": "node --test ci/class_member_structure_test.cjs ci/class_attribute_structure_test.cjs ci/java_class_structure_contract_test.mjs",
     "ci:class-structure": "node ci/java_class_structure_test.mjs --browser",
+    "ci:bytecode-verification:test": "node --test ci/bytecode_structure_test.cjs ci/bytecode_type_test.cjs ci/verification_relations_test.cjs ci/verification_exception_boundary_test.cjs ci/class_verification_test.cjs ci/verification_loader_failure_test.cjs ci/class_verification_integration_test.cjs ci/modern_overlay_verification_test.cjs ci/java_bytecode_verification_contract_test.mjs",
+    "ci:bytecode-verification": "node ci/java_bytecode_verification_test.mjs --browser",
     "ci:java25-main": "node ci/java25_main_test.mjs --browser",
     "ci:java-uncaught-exit": "node ci/java_uncaught_exit_test.mjs --browser",
     "ci:java-uncaught-exit:test": "node ci/jvm_exit_status_test.cjs && node --test ci/java_uncaught_exit_contract_test.mjs",
