@@ -207,7 +207,7 @@ all eight direct-call descriptors and compare host/Doppio output using only the
 generated Doppio compiler bootstrap overlay. Difficulty: medium.
 
 Compiler bootstrap note: `modern-ci-release-cli` generates a deterministic
-compiler-only JAR containing the 36 Java 8 bootstrap classes changed by the
+compiler-only JAR containing the 41 Java 8 bootstrap classes changed by the
 shared parsed-overlay dispatch. Kotlin and Scala put this artifact before
 `doppio.jar` and `rt.jar` for source analysis, eliminating host JDK metadata
 from the main compiler, broad modern interop, duration, diagnostic, Kotlin
@@ -2705,7 +2705,24 @@ commit. One existing optional unit diagnostic is skipped; no required C1
 execution is skipped. Consumer compiler smokes use Node/native Java 17 and do
 not replace the genuine 21/25 C1 host matrix.
 
+[C2's selected matrix](phase-c-invocation.md#c2-verified-batch-exit) adds 48
+array-adapter, variable-arity/routing and control-flow cases. At clean
+`be7cb5dc2`, all 18 pinned Java 21/25 native/Node/Chromium cells and 288 outcomes
+pass with the original expectations. The runtime adds parsed `withVarargs`
+mode switching, corrects only the positive-length null-spread exception path,
+and matches pinned counted-range initialization order. The three counted-range
+order-sensitive cases remain native-regression evidence because the API body
+pseudocode and API Note disagree.
+
+A fresh C1 full-host run, strict builds, 875 unit/contract tests, all 15
+batch-boundary regression gates, the original unchanged 323 fixtures and the
+selected Kotlin/Scala MethodHandle compiler smokes also pass at that frozen
+implementation. One existing optional unit diagnostic is skipped; no required
+C1/C2 execution is skipped. The overlay verifier independently checks all
+1,460 Code bodies in its 37-class inventory; the compiler-only bootstrap
+artifact has a separate, exact 41-class inventory.
+
 This does not establish the complete conversion lattice, arbitrary combinator
 graphs, executable VarHandles or memory ordering, general bootstrap linkage,
 hidden definitions, named-module access or the public class-file API. Source
-units remain unassessed; C2–C7 and full Phase C/package conformance are unclaimed.
+units remain unassessed; C3–C7 and full Phase C/package conformance are unclaimed.

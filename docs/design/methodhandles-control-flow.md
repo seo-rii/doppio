@@ -147,8 +147,9 @@ int iterations(A...)
 V init(A...)
 V body(V, int, A...)
 V countedLoop(A... args) {
+  int limit = iterations(args...);
   V v = init(args...);
-  for (int i = 0; i < iterations(args...); i++) {
+  for (int i = 0; i < limit; i++) {
     v = body(v, i, args...);
   }
   return v;
@@ -161,6 +162,16 @@ the end value executes no iterations. Both overloads accept `init == null` and
 initialize non-`void` state to the Java default value for the body return type.
 The explicit-range overload still requires non-null `start`, `end`, and `body`
 handles.
+
+`iterations` is evaluated once before initialization, not on each loop
+condition. Explicit ranges evaluate `end`, initialize state, then evaluate
+`start`, once each before the body. Empty/reversed ranges still initialize
+these components; void initialization and null-init Java defaults keep the
+same ordering. The Java 21/25 API body pseudocode and generic-loop API Note
+disagree on start-versus-init order. The selected `end → init → start` order
+and exception barriers therefore use `pinned-native-regression` evidence,
+not a resolution of that documentation conflict. See the
+[C2 scope and verified exit](../phase-c-invocation.md#c2-verified-batch-exit).
 
 The selected implementation requires the body to carry the complete external
 argument list. `start`, `end`/`iterations`, and `init` may accept matching

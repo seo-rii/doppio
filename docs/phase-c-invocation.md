@@ -5,8 +5,9 @@ Phase C owns `JVM-003`, `JVM-004`, `JVM-005` and `LIB-007` from the
 B1–B8 loading, verification, linking and language foundation; that foundation
 does not establish general method-handle, bootstrap or module conformance.
 This is an ordered batch plan, not a single feature, effort estimate or new
-support level. The current implementation batch is C2. Later batches below
-remain pending and may need further subdivision before implementation.
+support level. The selected C1 and C2 batches are verified. The next planned
+batch is C3; C3–C7 remain pending and may need further subdivision before
+implementation.
 
 ## Batches and dependencies
 
@@ -102,8 +103,8 @@ No other case is promoted merely by agreeing with native output.
 
 ## Evidence and retained compatibility
 
-The C1 gate must retain the genuine compiler recipes and raw outcomes from each
-applicable release and host, with source, class, runtime, toolchain and Git
+The C1 and C2 gates must retain the genuine compiler recipes and raw outcomes
+from each applicable release and host, with source, class, runtime, toolchain and Git
 provenance. Fixed expected traces and completion markers must be checked
 independently of native-versus-guest equality. Two equally incomplete runs cannot
 pass by agreeing. Failed compilation or execution, timeout, missing cases,
@@ -121,7 +122,7 @@ Retain the original Java 8 invocation/lambda corpus and Java 17 lookup,
 lookup-mode/private-lookup, unreflect, conversion, combinator and control-flow
 fixtures. Kotlin and Scala method-handle/bootstrap smoke paths are independent
 language-consumer gates. Their existing presence in the repository is not a
-fresh C1 result. A runtime change must rerun the affected retained groups and
+fresh batch result. A runtime change must rerun the affected retained groups and
 the batch-boundary regression gates with unchanged sources, goldens and class
 files; record exactly which checks were actually executed.
 
@@ -224,5 +225,77 @@ all 1,385 Code methods still pass independent decoding/type verification.
 C1's selected batch is verified. All broader completion flags remain false:
 full Phase C, JVM-003, source-unit/API conformance, general bootstrap dispatch,
 VarHandle execution and named-module runtime conformance are not established.
-Indexed source ownership remains unchanged. C2–C7 stay pending; the next batch
-is C2's collection, variable-arity and control-flow matrix.
+Indexed source ownership remains unchanged. At that C1 exit, C2–C7 remained
+pending; the later selected C2 exit follows.
+
+## C2 verified batch exit
+
+At clean implementation commit `be7cb5dc2`, the selected C2 gate passes on the
+pinned Java 21/25 toolchains and both guest hosts:
+
+- 48 fixed cases: 16 array-adapter, 16 variable-arity/routing and 16 control-flow
+  cases, with 91 selected ordered trace events.
+- Six genuine compilations, eight untouched class files (majors 65/69, minor 0)
+  and 192 case-linked Code probes. Shared helper probes may repeat; these are
+  not distinct-method or dynamic-branch counts.
+- All 18 native/Node/Chromium execution cells and 288 case outcomes pass, with
+  no failed, missing, skipped or timed-out required executions.
+
+The 2026-10-11 UTC verified ledger SHA-256 is
+`b6e079d0d5a3a116797e28279e44e379bea9b931fc7d42b4fc6f2dae328f68d0`.
+It binds the original compiler recipes, class inventory, actual Code operands,
+fixed traces and source/toolchain/runtime/Git provenance at that implementation
+commit, not an arbitrary later runtime.
+
+The pre-fix native/Node diagnostic at `ac5b61f79` recorded six passing native
+cells and six failed Node cells; Chromium was not run in that diagnostic. Its
+raw failed ledger remains preserved (SHA-256
+`795086b307890c76bc2012a1af3bf6593f01b426525f815302a68e712a6d64ce`).
+Three runtime differences were corrected without relaxing the original case,
+trace, throwable or timeout expectations:
+
+- `MethodHandle.withVarargs(boolean)` now has a parsed public, non-native,
+  non-final delegate. Same-mode calls preserve identity; switching to fixed
+  arity uses `asFixedArity`, and switching to variable arity uses the exact
+  trailing array type with `asVarargsCollector`.
+- The stock spread validator redirects only its positive-length null branch
+  to `NullPointerException`. Null/zero behavior and all non-null instructions
+  remain unchanged, including the existing length-mismatch exception paths.
+- Explicit counted ranges now evaluate `end`, state initialization and `start`
+  in the pinned native order. The three order-sensitive cases remain explicitly
+  classified as `pinned-native-regression` because of the API documentation
+  conflict described above.
+
+The same frozen implementation also passes:
+
+- A fresh C1 full-host run: all 60 cases, 24 cells and 360 outcomes, with ledger
+  SHA-256 `ccf6d171fbf3f5ae4f772dc34cf5b205cfd1ea2f34fb901b06a80734040a67fe`.
+- Strict release CLI/browser builds, ES5 type checking, the actual workflow
+  checker and its mutation tests.
+- 875 unit/contract tests; one existing optional JDK error-category diagnostic
+  is skipped (876 total, zero failures).
+- All 15 B1–B8 and separate retained-language/launcher/evolved-switch host
+  gates, including the previously selected explicit Java 21 oracle difference.
+- The original 323 fixtures (77 legacy and 246 modern), with sources, class
+  files and goldens unchanged, zero failures/timeouts and four identical input
+  snapshots (SHA-256
+  `3aa53f9f71542b5ea9fb2780d84e552f7ea025f8eda39cdbbb1235b2d15f4cda`).
+- The selected Kotlin 2.4.0 and Scala 2.13.18 MethodHandle compiler smokes,
+  compiled inside Doppio and checked on Node against native Java 17 with
+  lock-verified compiler inputs. These do not claim Chromium or complete
+  compiler-language conformance.
+
+The overlay verifier checks 116 generated/rewritten bodies and 1,344 unchanged
+stock Code attributes: all 1,460 Code methods across 37 transformed classes,
+including 12 branchful bodies with 48 explicit full frames. Historical generated
+body identities, all stock MethodHandle methods and the other 73 MethodHandleImpl
+methods are retained. The compiler-only bootstrap JAR separately contains 41
+exact class-only entries.
+
+C1 and C2 retain separate inventories and ledgers while sharing the immutable
+evidence protocol. The selected C2 batch is verified; C3–C7 remain pending.
+Full Phase C, JVM-003, source-unit/API conformance, general bootstrap dispatch,
+VarHandle execution and named-module runtime conformance remain unclaimed.
+All broader completion flags stay false and indexed source ownership is
+unchanged. The next batch is C3's executable VarHandle matrix; memory ordering
+still requires D's separate execution-model evidence.

@@ -53,6 +53,13 @@ implemented:
    `StringConcatFactory`, `CONSTANT_Dynamic`, records, and sealed classes share
    class loading and bootstrap code.
 
+These are retained smoke instructions, not the Phase C evidence gate. C1/C2
+add genuine, untouched javac 21/25 fixtures under `classes/modern_fixture`,
+independent Code/trace contracts and strict native/Node/Chromium gates. A
+compile-error waiver or Java 17 smoke cannot replace those gates. At the batch
+boundary, rerun the original retained sources, class files and goldens without
+regenerating them; see the [Phase C reproduction commands](../phase-c-invocation.md).
+
 ## Fixture Matrix
 
 The fixture matrix tracks the covered smoke tests and the next fixtures to add:
@@ -485,6 +492,43 @@ original handle. Retained Java 8/17 fixture bytes and the original C1
 order/failure expectations remain unchanged; additional genuine regression
 subchecks cover gaps, three filters, mutable caller arrays and selected
 wide/type-changing filters.
+
+## C2 Genuine Collection and Control-Flow Evidence
+
+The [selected C2 gate](../phase-c-invocation.md#c2-verified-batch-exit) has a
+separate 48-case inventory: array adapters, variable arity/argument routing and
+control flow, 16 cases each. At clean `be7cb5dc2`, all 18 genuine Java 21/25
+native/Node/Chromium cells and 288 outcomes pass. Shared case-linked helper
+probes are not distinct-method or dynamic-branch coverage. C1's fresh full-host
+gate and the retained batch-boundary checks also pass on that implementation.
+
+`MethodHandle.withVarargs(boolean)` is added as a six-byte parsed public,
+non-native, non-final instance delegate to `DoppioMethodHandleVarargs`.
+Same-mode calls preserve the original handle; disabling variable arity uses
+`asFixedArity`, and enabling it uses `asVarargsCollector` with the exact
+trailing array parameter type. Zero-parameter/non-array rejection is explicit
+in the helper. Existing stock MethodHandle methods and their metadata remain
+unchanged; this needs no new native bridge.
+
+The stock package-private static `MethodHandleImpl.checkSpreadArgument(Object,int)`
+changes only its positive-length null branch to an appended
+`NullPointerException` block. Null/zero and non-null instructions, access
+flags, non-Code attributes and line numbers are retained, as are the other
+73 methods in the class. Five explicit full frames describe the changed body.
+Existing trailing and positioned spreaders share that validator.
+
+Explicit counted ranges now follow the pinned Java 21/25 `end → init → start`
+evaluation and exception order. Original case expectations remain unchanged.
+The three order-sensitive cases are `pinned-native-regression`, because the
+API body pseudocode and generic-loop API Note disagree; this does not resolve
+that specification-documentation conflict.
+
+The overlay verifier checks 116 generated/rewritten bodies and 1,344 unchanged
+stock Code attributes: all 1,460 Code methods across 37 transformed classes,
+including 12 branchful bodies with 48 explicit full frames. Both historical
+generated-body identity hashes remain unchanged. The deterministic
+compiler-only bootstrap JAR separately contains 41 exact class-only entries.
+C3–C7 and full Phase C/JVM-003 conformance remain unclaimed.
 
 ## Open Design Questions
 
