@@ -1327,13 +1327,6 @@ public final class DoppioMethodHandles {
       int initArgumentCount,
       boolean voidState,
       Object[] args) throws Throwable {
-    int startValue = 0;
-    if (start != null) {
-      Object[] startArgs = new Object[startArgumentCount];
-      System.arraycopy(args, 0, startArgs, 0, startArgumentCount);
-      startValue = ((Integer) start.invokeWithArguments(startArgs)).intValue();
-    }
-
     Object[] endArgs = new Object[endArgumentCount];
     System.arraycopy(args, 0, endArgs, 0, endArgumentCount);
     int endValue = ((Integer) end.invokeWithArguments(endArgs)).intValue();
@@ -1353,6 +1346,14 @@ public final class DoppioMethodHandles {
         System.arraycopy(args, 0, initArgs, 0, initArgumentCount);
         state = init.invokeWithArguments(initArgs);
       }
+    }
+
+    // Match the pinned JDK 21/25 end/init/start generic-loop clause order.
+    int startValue = 0;
+    if (start != null) {
+      Object[] startArgs = new Object[startArgumentCount];
+      System.arraycopy(args, 0, startArgs, 0, startArgumentCount);
+      startValue = ((Integer) start.invokeWithArguments(startArgs)).intValue();
     }
 
     int leadingBodyArguments = voidState ? 1 : 2;
