@@ -5558,13 +5558,26 @@ export class InvokeDynamic implements IConstantPoolItem {
       components = this.objectMethodsComponents;
 
     if (this.objectMethodsMethodName === 'toString') {
-      var parts: string[] = [];
-      for (var i = 0; i < components.length; i++) {
-        var component = components[i],
-          value = self[component.fieldName];
-        parts.push(component.name + '=' + this.stringifyObjectMethodValue(component.descriptor, value));
-      }
-      cb(null, util.initString(thread.getBsCl(), this.objectMethodsRecordName + '[' + parts.join(', ') + ']'));
+      var parts: string[] = [],
+        i = 0,
+        appendNext: () => void;
+      appendNext = () => {
+        if (i === components.length) {
+          cb(null, util.initString(thread.getBsCl(), this.objectMethodsRecordName + '[' + parts.join(', ') + ']'));
+          return;
+        }
+        var component = components[i++];
+        this.stringifyObjectMethodValue(thread, component.descriptor, self[component.fieldName],
+            (error?: JVMTypes.java_lang_Throwable, text?: string) => {
+          if (error) {
+            cb(error);
+          } else {
+            parts.push(component.name + '=' + text);
+            appendNext();
+          }
+        });
+      };
+      appendNext();
       return;
     } else if (this.objectMethodsMethodName === 'equals') {
       var other = args[1],
@@ -5760,26 +5773,54 @@ export class InvokeDynamic implements IConstantPoolItem {
     return null;
   }
 
-  private stringifyObjectMethodValue(type: string, value: any): string {
+  private stringifyObjectMethodValue(thread: JVMThread, type: string, value: any,
+      cb: (error?: JVMTypes.java_lang_Throwable, text?: string) => void): void {
     if (value === null) {
-      return 'null';
+      cb(null, 'null');
+      return;
     }
     switch (type) {
       case 'Z':
-        return value !== 0 ? 'true' : 'false';
       case 'C':
-        return String.fromCharCode(value);
       case 'J':
-        return value.toString();
       case 'B':
       case 'S':
       case 'I':
-        return '' + value;
+        this.stringifyConcatArg(thread, type, value, cb);
+        return;
       case 'F':
       case 'D':
-        return this.stringifyFloatingPointValue(value);
+        // The Java APIs define decimal/scientific rendering and binary32
+        // precision; JavaScript's numeric formatter is not an equivalent.
+        var wrapper = type === 'F' ? 'java/lang/Float' : 'java/lang/Double';
+        thread.getBsCl().initializeClass(thread, 'L' + wrapper + ';', (cls: ReferenceClassData<any>) => {
+          if (cls === null) {
+            return; // Class initialization already propagated its guest error.
+          }
+          var constructor = <any> cls.getConstructor(thread),
+            parameters = type === 'D' ? [value, null] : [value];
+          constructor[wrapper + '/toString(' + type + ')Ljava/lang/String;'](thread, parameters,
+              (error?: JVMTypes.java_lang_Throwable, text?: JVMTypes.java_lang_String) => {
+            if (error) {
+              cb(error);
+            } else {
+              cb(null, text === null ? 'null' : text.toString());
+            }
+          });
+        });
+        return;
       default:
-        return value.toString();
+        // This includes arrays and boxed values declared as Object. Do not
+        // substitute a JavaScript toString or the concat fast unboxer here.
+        value['toString()Ljava/lang/String;'](thread, [],
+            (error?: JVMTypes.java_lang_Throwable, text?: JVMTypes.java_lang_String) => {
+          if (error) {
+            cb(error);
+          } else {
+            cb(null, text === null ? 'null' : text.toString());
+          }
+        });
+        return;
     }
   }
 
