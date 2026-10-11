@@ -434,12 +434,28 @@ receiver succeeds before and after a conflicting receiver, a null receiver still
 throws `NullPointerException`, and a repeat conflict retains its specified error.
 These receiver-dependent errors must not poison successful symbolic resolution.
 
+Special invocation has its own metadata-only selector, shared by the interpreter
+and emitted JIT. For a non-constructor reference to an actual superclass, lookup
+starts at the caller's direct superclass; otherwise it starts at the symbolic
+owner. It does not dispatch on the receiver or reuse the virtual override
+predicate. Instance declarations precede maximally-specific interface defaults,
+including abstract class declarations. Java SE 8+ treats `ACC_SUPER` as set even
+when the class-file bit is clear. Parsed-metadata and frame tests retain exact
+private/constructor/interface targets, category-two argument slots and the
+original CP declaration; their emitted-JIT controls are not a native compilation
+or whole-language conformance claim.
+
 Class/interface static-to-instance and instance-to-static evolution requires
 `IncompatibleClassChangeError` before null receiver checks or initialization.
 Field-kind evolution has matching controls. Static active use initializes the
 actual declaration owner, not an intermediate symbolic subclass; interface
 static use does not initialize an otherwise unused parent. Explicit later active
 use proves that the deferred class/interface was not already initialized.
+The slow instruction paths validate a resolved member's staticness and access
+before installing a fast opcode. Instance fields resolve before the null check;
+static fields and methods reject a wrong kind before initialization. These
+instruction-local errors do not turn successful CP resolution into a cached
+symbolic failure, so the same reference remains usable by a correct instruction.
 
 There is one narrowly recorded native-oracle boundary. Pinned Java 21 reports
 exact `AbstractMethodError` for the evolved `invokeinterface` unrelated-default
