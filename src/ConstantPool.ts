@@ -12,6 +12,21 @@ import {JVMThread, BytecodeStackFrame, InternalStackFrame, NativeStackFrame} fro
 import * as JVMTypes from '../includes/JVMTypes';
 import {setImmediate} from 'browserfs';
 import {validateConstantClassName, validateMemberNameAndType, validateMethodDescriptor, validateUnqualifiedName} from './classfile_validation';
+import {getLoadingConstraints} from './LoadingConstraints';
+import {error as logError} from './logging';
+
+/** JVMS 5.4.3.2-4 connects the CP caller to the actual declaration owner,
+ * never an intermediate class named by the symbolic reference. */
+function checkMemberLoadingConstraints(thread: JVMThread, loader: ClassLoader,
+    caller: ReferenceClassData<JVMTypes.java_lang_Object>, owner: ClassData, descriptor: string): boolean {
+  var initiating = caller === null ? loader : caller.getLoader(),
+    violation = getLoadingConstraints(initiating).imposeDescriptor(descriptor, initiating, owner.getLoader());
+  if (violation === null) return true;
+  var message = 'Loading constraint violation for ' + util.ext_classname(violation.name);
+  if (thread === null) logError('JVM bootstrap member resolution failed: ' + message);
+  else thread.throwNewException('Ljava/lang/LinkageError;', message);
+  return false;
+}
 
 /**
  * Represents a constant pool item. Use the item's type to discriminate among them.
@@ -3343,6 +3358,10 @@ export class MethodReference implements IConstantPoolItem {
           thread.throwNewException('Ljava/lang/IllegalAccessError;', `${caller.getExternalName()} cannot access ${method.cls.getExternalName()}.${method.name}`);
           cb(false);
         } else {
+          if (!checkMemberLoadingConstraints(thread, loader, caller, method.cls, this.nameAndTypeInfo.descriptor)) {
+            cb(false);
+            return;
+          }
           if (syntheticMethod !== undefined && method === syntheticMethod) method = method.cls.registerVMMethod(method);
           this.setResolved(thread, method);
           cb(true);
@@ -3829,6 +3848,10 @@ export class InterfaceMethodReference implements IConstantPoolItem {
           thread.throwNewException('Ljava/lang/IllegalAccessError;', `${caller.getExternalName()} cannot access ${method.cls.getExternalName()}.${method.name}`);
           cb(false);
         } else {
+          if (!checkMemberLoadingConstraints(thread, loader, caller, method.cls, this.nameAndTypeInfo.descriptor)) {
+            cb(false);
+            return;
+          }
           if (syntheticMethod !== undefined && method === syntheticMethod) method = method.cls.registerVMMethod(method);
           this.setResolved(thread, method);
           cb(true);
@@ -3962,6 +3985,10 @@ export class FieldReference implements IConstantPoolItem {
           thread.throwNewException('Ljava/lang/IllegalAccessError;', `${caller.getExternalName()} cannot access ${field.cls.getExternalName()}.${field.name}`);
           cb(false);
         } else {
+          if (!checkMemberLoadingConstraints(thread, loader, caller, field.cls, this.nameAndTypeInfo.descriptor)) {
+            cb(false);
+            return;
+          }
           this.fullFieldName = `${util.descriptor2typestr(field.cls.getInternalName())}/${field.name}`;
           this.field = field;
           cb(true);
