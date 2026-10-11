@@ -199,8 +199,15 @@ function terminalModel(mode = 'native-only') {
     const group = final.finalGroups.find(candidate => candidate.id === record.group); record.status = 'passed';
     record.classFiles = group.driverClassNames.map(name => name.replaceAll('.', '/') + '.class').sort().map(filename => ({path: filename, sha256: digest, size: 100, major: record.release + 44, minor: 0}));
     const file = name => record.classFiles.find(item => item.path === name.replaceAll('.', '/') + '.class');
-    record.classpath = {genuineCompilerBytes: true, byteTransformations: false, fallbackClassFiles: false, treeSha256: digest};
-    record.operations = [{kind: 'genuine-driver', result: {...emptyResult}, outputEvidence: {treeSha256: digest, files: record.classFiles.map(({path, sha256, size}) => ({path, sha256, size}))}}];
+    const directory = path.join(os.tmpdir(), 'doppio-synthetic-final-receipt', 'release' + record.release, group.id, 'classes');
+    record.classpath = {directory, genuineCompilerBytes: true, byteTransformations: false, fallbackClassFiles: false, treeSha256: digest};
+    const compiler = JSON.parse(fs.readFileSync(path.join(root, 'build/java-compatibility-toolchains/toolchains.json'))).toolchains.find(item => item.feature === record.release);
+    const source = path.join(root, group.source), empty = path.resolve(directory, '..', '..', '..', 'empty-sourcepath');
+    const command = path.join(compiler.home, 'bin', 'javac'), arguments_ = ['--release', String(record.release), '-encoding', 'UTF-8', '-proc:none', '-g',
+      '-sourcepath', empty, '-classpath', empty, '-d', directory, source];
+    record.operations = [{kind: 'genuine-driver', command, arguments: arguments_, sourceDigests: [{path: source, sha256: sha(fs.readFileSync(source))}],
+      result: {...emptyResult, command: [command, ...arguments_], cwd: path.dirname(directory), timeoutMs: final.finalTimeouts.compileMs},
+      outputEvidence: {directory, treeSha256: digest, files: record.classFiles.map(({path, sha256, size}) => ({path, sha256, size}))}}];
     record.bytecodeProofs = group.cases.map(entry => ({id: entry.id, probes: entry.probes.map(probe => ({owner: probe.className || group.mainClass,
       method: probe.method, descriptor: probe.descriptor, classFile: file(probe.className || group.mainClass), codeSha256: digest,
       matches: [...probe.requiredOpcodes.map(name => ({name})), ...(probe.symbolicOperands || []).map(operand => ({name: operand.opcode, cp: {...operand}}))],
@@ -240,6 +247,12 @@ test('terminal bookkeeping requires all source/global/compiler/runtime/static ev
     l => delete l.toolchains, l => delete l.runtime, l => delete l.browserProvenance, l => delete l.browserIntegrity,
     l => l.ownedSourceInventory[0].assessmentStatus = 'complete', l => l.results[0].operations.pop(),
     l => delete l.results[0].operations[0].outputEvidence, l => l.results[0].classFiles.pop(),
+    l => l.results[0].operations[0].command = '/not-the-locked-javac',
+    l => l.results[0].operations[0].arguments = ['--release', '8', 'Unrelated.java'],
+    l => l.results[0].operations[0].sourceDigests = [],
+    l => l.results[0].operations[0].result.command = ['unrelated-process'],
+    l => l.results[0].operations[0].result.cwd = '/unrelated-directory',
+    l => l.results[0].operations[0].result.timeoutMs = 0,
     l => l.results[0].bytecodeProofs.pop(), l => l.results[0].bytecodeProofs[0].probes.pop(),
     l => l.results[0].bytecodeProofs[0].probes[0].owner = 'Decoy', l => l.results[0].bytecodeProofs[0].probes[0].codeSha256 = 'not-hash',
     l => l.results[0].bytecodeProofs[0].probes[0].classFile.sha256 = '1'.repeat(64),

@@ -209,6 +209,11 @@ export function assertFinalLedgerInventory(ledger, {phase = 'inventory'} = {}) {
   assert.equal(ledger.caseCount, 58); assert.equal(ledger.releaseQualifiedCaseCount, 88); assert.equal(ledger.genuineCompilationCount, 7); assert.equal(ledger.executionCellCount, 21);
   assert.equal(validateFinalGroups(), 58);
   const expected = records(); assert.deepEqual(ledger.results.map(record => [record.release, record.group]), expected.map(({release, group}) => [release, group.id]), 'Exact seven release/group records');
+  let lockedCompilers;
+  if (phase === 'terminal' && ledger.results.some(record => record.status === 'passed')) {
+    const marker = JSON.parse(fs.readFileSync(path.join(repoRoot, 'build/java-compatibility-toolchains/toolchains.json')));
+    lockedCompilers = marker.toolchains;
+  }
   const hosts = selectedHosts(ledger.requestedMode);
   if (phase === 'initial') assert.equal(ledger.status, 'running');
   if (phase === 'terminal') assert.ok(['passed', 'failed'].includes(ledger.status), 'Terminal overall final-language outcome');
@@ -252,7 +257,20 @@ export function assertFinalLedgerInventory(ledger, {phase = 'inventory'} = {}) {
     if (phase === 'terminal') assert.ok(['passed', 'failed'].includes(record.status), 'Terminal final-language record');
     if (phase === 'terminal' && record.status === 'passed') {
       assert.deepEqual(record.operations.map(operation => operation.kind), ['genuine-driver'], 'Exactly one genuine compiler attempt per record');
-      const result = record.operations[0].result;
+      const operation = record.operations[0], result = operation.result;
+      const compiler = lockedCompilers.find(toolchain => toolchain.feature === record.release);
+      assert.ok(compiler, 'Actual retained matching compiler home');
+      assert.equal(operation.command, path.join(compiler.home, 'bin', 'javac'), 'Original locked compiler invocation');
+      const source = path.join(repoRoot, group.source), output = record.classpath?.directory;
+      assert.ok(typeof output === 'string' && path.isAbsolute(output), 'Original private compiler destination');
+      assert.equal(operation.outputEvidence?.directory, output, 'Compiler receipt and original classpath destination');
+      const empty = path.resolve(output, '..', '..', '..', 'empty-sourcepath');
+      assert.deepEqual(operation.arguments, ['--release', String(record.release), '-encoding', 'UTF-8', '-proc:none', '-g',
+        '-sourcepath', empty, '-classpath', empty, '-d', output, source], 'Exact genuine compiler edition/source/no-fallback recipe');
+      assert.deepEqual(operation.sourceDigests, [{path: source, sha256: sha(fs.readFileSync(source))}], 'Original single-source compiler digest');
+      assert.deepEqual(result?.command, [operation.command, ...operation.arguments], 'Raw subprocess executed the retained compiler recipe');
+      assert.equal(result.cwd, path.dirname(output), 'Raw compiler working directory');
+      assert.equal(result.timeoutMs, finalTimeouts.compileMs, 'Raw bounded compiler attempt');
       assert.ok(result && result.status === 'passed' && result.exitCode === 0 && !result.error && !result.signal && !result.timedOut && !result.outputLimitExceeded && result.stdout === '' && result.stderr === '', 'Raw clean compiler evidence');
       assert.deepEqual(record.classFiles?.map(file => file.path), group.driverClassNames.map(name => name.replaceAll('.', '/') + '.class').sort(), 'Exact original javac class inventory');
       for (const file of record.classFiles) assert.ok(/^[a-f0-9]{64}$/.test(file.sha256) && file.major === record.release + 44 && file.minor === 0 && Number.isInteger(file.size) && file.size > 8, 'Actual major/hash evidence');
