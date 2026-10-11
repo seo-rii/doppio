@@ -8,7 +8,7 @@ const {test} = require('node:test');
 const ts = require('typescript');
 const runtime = process.env.DOPPIO_RELEASE_CLI_ROOT || path.resolve(__dirname, '../build/release-cli');
 const sourceModules = new Set(['LambdaAdapters', 'GeneratedAdapters', 'ClassData', 'ClassLoader', 'ConstantPool', 'threading', 'methods',
-  'ClassVerification', 'BytecodeVerifier', 'BytecodeTypeVerifier', 'VerificationRelations']);
+  'ClassVerification', 'ClassPreparation', 'LoadingConstraints', 'BytecodeVerifier', 'BytecodeTypeVerifier', 'VerificationRelations']);
 const cache = new Map();
 function load(name) {
   const filename = path.join(runtime, 'src', name + '.js');
@@ -237,7 +237,7 @@ test('adapter continuation restores the category-two async return padding', () =
 test('adapter target still enters the ordinary pre-execution verification gate', () => {
   const w = world(), {cls} = adapted(w), bridge = cls.getMethods().find(item => item.isNative);
   let requested = 0;
-  w.host.isVerified = () => false;
+  w.host.verification.isVerified = () => false;
   w.host.resolve = () => { requested++; };
   bridge.getNativeFunction()(w.thread, {}, {}, 2.5);
   const frame = w.thread.stack[1];

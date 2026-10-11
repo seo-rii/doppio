@@ -8,7 +8,7 @@ const {test} = require('node:test');
 const ts = require('typescript');
 const runtime = process.env.DOPPIO_RELEASE_CLI_ROOT || path.resolve(__dirname, '../build/release-cli');
 const sourceModules = new Set(['ClassData', 'ClassLoader', 'ConstantPool', 'threading', 'methods',
-  'ClassVerification', 'BytecodeVerifier', 'BytecodeTypeVerifier', 'VerificationRelations',
+  'ClassVerification', 'ClassPreparation', 'LoadingConstraints', 'BytecodeVerifier', 'BytecodeTypeVerifier', 'VerificationRelations',
   'GeneratedAdapters', 'LambdaAdapters', 'ReflectionAdapters']);
 const cache = new Map();
 function load(name) {

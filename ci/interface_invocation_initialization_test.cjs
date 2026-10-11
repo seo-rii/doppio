@@ -7,6 +7,7 @@ const runtimeRoot = process.env.DOPPIO_RELEASE_CLI_ROOT || path.resolve(__dirnam
 const {Opcodes, LookupTable} = require(path.join(runtimeRoot, 'src/opcodes'));
 const {OpCode, ThreadStatus} = require(path.join(runtimeRoot, 'src/enums'));
 const {PreAllocatedStack} = require(path.join(runtimeRoot, 'src/threading'));
+const {Flags} = require(path.join(runtimeRoot, 'src/util'));
 
 function invocation({declaringInitialized = false, symbolicInitialized = false, direct = false} = {}) {
   const events = [];
@@ -19,9 +20,14 @@ function invocation({declaringInitialized = false, symbolicInitialized = false, 
     initialize(thread, callback) { events.push('symbolic initialization'); callback(this); }
   };
   const signature = 'value()I';
+  const resolved = {cls: declaring, name: 'value', signature, fullSignature: 'interfaces/Parent/' + signature,
+    accessFlags: new Flags(declaringInitialized ? 1 : 0x401), isSignaturePolymorphic: () => false};
+  const implementation = {cls: {isResolved: () => true}, name: 'value', signature,
+    fullSignature: 'receivers/Concrete/' + signature, accessFlags: new Flags(0x101), returnType: 'I',
+    convertArgs: (thread, args) => [thread, ...args], getNativeFunction: () => () => { events.push('invoked'); return 7; }};
   const reference = {
     isResolved: () => true,
-    method: {cls: declaring, isSignaturePolymorphic: () => false},
+    method: resolved,
     classInfo: {cls: symbolic, isResolved: () => true},
     signature,
     paramWordSize: 0
@@ -30,7 +36,12 @@ function invocation({declaringInitialized = false, symbolicInitialized = false, 
     get(index) { assert.equal(index, 1); return reference; },
     getUnchecked(index) { assert.equal(index, 1); return reference; }
   };
-  const receiver = {[signature]() { events.push('invoked'); }};
+  const receiverClass = {
+    isCastable(target) { assert.equal(target, symbolic); return true; },
+    selectMethod(method) { assert.equal(method, resolved); return {kind: 'selected', method: implementation}; }
+  };
+  const receiver = {getClass: () => receiverClass,
+    [signature]() { assert.fail('Dispatch must use the resolved Method, not a string alias'); }};
   const frame = {
     pc: 0,
     returnToThreadLoop: false,
@@ -40,7 +51,11 @@ function invocation({declaringInitialized = false, symbolicInitialized = false, 
   };
   frame.opStack.push(receiver);
   const thread = {
-    setStatus(status) { events.push(status); },
+    stack: [], status: ThreadStatus.RUNNABLE,
+    getStatus() { return this.status; },
+    currentMethod() { return this.stack.at(-1)?.method || null; },
+    setStatus(status) { this.status = status; events.push(status); },
+    asyncReturn(value) { assert.equal(value, 7); this.stack.pop(); },
     throwNewException(type) { events.push(type); }
   };
   const code = Buffer.from([OpCode.INVOKEINTERFACE, 0, 1, 1, 0]);
@@ -60,7 +75,9 @@ for (const [label, options] of [
     assert.deepEqual(events, [], 'neither the symbolic interface nor declaring owner is an active use');
     assert.equal(frame.returnToThreadLoop, false);
     LookupTable[code[0]](thread, frame, code);
-    assert.deepEqual(events, ['invoked']);
+    assert.deepEqual(events, [ThreadStatus.RUNNABLE], 'selection schedules a frame without invoking or initializing interfaces');
+    thread.stack.at(-1).run(thread);
+    assert.deepEqual(events, [ThreadStatus.RUNNABLE, 'invoked']);
     assert.equal(frame.returnToThreadLoop, true);
   });
 }
@@ -81,6 +98,7 @@ test('unresolved invokeinterface resolves once, then dispatches without initiali
   assert.equal(code[0], OpCode.INVOKEINTERFACE);
   assert.equal(frame.returnToThreadLoop, true);
   assert.deepEqual(events, [ThreadStatus.ASYNC_WAITING, 'resolved', ThreadStatus.RUNNABLE]);
+  assert.equal(thread.status, ThreadStatus.RUNNABLE);
   events.length = 0;
   frame.returnToThreadLoop = false;
   Opcodes.invokeinterface(thread, frame, code);

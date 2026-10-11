@@ -8,7 +8,7 @@ const {test} = require('node:test');
 const ts = require('typescript');
 const runtime = process.env.DOPPIO_RELEASE_CLI_ROOT || path.resolve(__dirname, '../build/release-cli');
 const sourceModules = new Set(['ReflectionAdapters', 'GeneratedAdapters', 'ClassData', 'ClassLoader', 'ConstantPool',
-  'threading', 'methods', 'ClassVerification', 'BytecodeVerifier', 'BytecodeTypeVerifier', 'VerificationRelations']);
+  'threading', 'methods', 'ClassVerification', 'ClassPreparation', 'LoadingConstraints', 'BytecodeVerifier', 'BytecodeTypeVerifier', 'VerificationRelations']);
 const cache = new Map();
 function load(name) {
   const filename = path.join(runtime, 'src', name + '.js');
@@ -315,7 +315,7 @@ test('serialization allocation failure preserves the original error and exposes 
 test('exact adapter target still enters the ordinary pre-execution verification gate', () => {
   const w = world(true), {cls} = adapted(w), bridge = bridgeFor(cls, 6);
   let requested = 0;
-  w.parent.isVerified = () => false;
+  w.parent.verification.isVerified = () => false;
   w.parent.resolve = () => { requested++; };
   bridge.getNativeFunction()(w.thread, {});
   const frame = w.thread.stack[1];

@@ -14,7 +14,7 @@ function load(name) {
   loaded.filename = filename;
   loaded.paths = Module._nodeModulePaths(path.dirname(filename));
   const original = loaded.require.bind(loaded);
-  loaded.require = id => /^\.\/(?:ClassLoader|ClassVerification|BytecodeVerifier|BytecodeTypeVerifier|VerificationRelations|threading)$/.test(id)
+  loaded.require = id => /^\.\/(?:ClassLoader|ClassVerification|LoadingConstraints|BytecodeVerifier|BytecodeTypeVerifier|VerificationRelations|threading)$/.test(id)
     ? load(id.slice(2)) : original(id);
   loaded._compile(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src', name + '.ts'), 'utf8'), {
     compilerOptions: {target: ts.ScriptTarget.ES5, module: ts.ModuleKind.CommonJS}

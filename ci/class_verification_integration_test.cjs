@@ -7,7 +7,7 @@ const path = require('node:path');
 const {test} = require('node:test');
 const ts = require('typescript');
 const runtime = process.env.DOPPIO_RELEASE_CLI_ROOT || path.resolve(__dirname, '../build/release-cli');
-const sourceModules = new Set(['ClassData', 'ClassLoader', 'ConstantPool', 'threading', 'methods', 'ClassVerification', 'BytecodeVerifier',
+const sourceModules = new Set(['ClassData', 'ClassLoader', 'ConstantPool', 'threading', 'methods', 'ClassVerification', 'ClassPreparation', 'LoadingConstraints', 'BytecodeVerifier',
   'BytecodeTypeVerifier', 'VerificationRelations']);
 const cache = new Map();
 function load(name) {
@@ -73,7 +73,7 @@ function classFixture(options = {}) {
   Object.assign(cls, {className: options.name || 'Lmeta/Fixture;', loader: {}, verification: gate,
     state: options.state === undefined ? ClassState.LOADED : options.state,
     superClass: null, superClassRef: null, interfaceRefs: [], interfaceClasses: [], accessFlags: new Flags(1),
-    attrs: [], fields: [], methods: [], _methodLookup: {}, _vmTable: [], _uninheritedDefaultMethods: [],
+    attrs: [], fields: [], methods: [], vmMethods: Object.create(null), vmOrigins: [], _vmTable: [], _uninheritedDefaultMethods: [],
     _fieldLookup: {}, _objectFields: [], _staticFields: [], initLock: new ClassLock(), _constructor: null});
   // Initializer execution is controlled, but real initialize/tryToInitialize,
   // hierarchy assembly, ClassLock and state queries remain in use.
@@ -169,6 +169,7 @@ test('initialization owner re-entry still requires verification and never accept
   cls.initLock.tryLock(owner, () => {});
   assert.equal(cls.isInitialized(owner), false);
   gate.complete(true);
+  assert.equal(cls.tryToResolve(), true, 'An initialization owner must have completed preparation too');
   assert.equal(cls.isInitialized(owner), true);
   assert.equal(cls.isInitialized(outsider), false);
   cls.setState(ClassState.ERRONEOUS);
@@ -177,14 +178,16 @@ test('initialization owner re-entry still requires verification and never accept
   assert.equal(cls.isResolved(), true, 'Initialization failure does not undo successful verification');
 });
 
-test('two asynchronous resolution callers assemble actual method/field tables only once', () => {
+test('two asynchronous resolution callers assemble actual method/field tables only once', async () => {
   const parent = classFixture({name: 'Lmeta/Parent;', verified: true, state: ClassState.RESOLVED}).cls;
   const {cls, gate} = classFixture(), callbacks = [], results = [], first = threadFixture(), second = threadFixture();
-  const parentMethod = {cls: parent, name: 'parent', signature: 'parent()V', isStatic: false};
-  parent._vmTable.push(parentMethod);
-  parent._methodLookup[parentMethod.signature] = parentMethod;
+  const parentMethod = {cls: parent, name: 'parent', signature: 'parent()V', rawDescriptor: '()V',
+    accessFlags: new Flags(1), isStatic: false};
+  parent.methods.push(parentMethod);
+  parent.vmOrigins.push(parentMethod);
+  assert.equal(parent.tryToResolve(), true);
   parent._objectFields.push({name: 'parentField', isStatic: false});
-  cls.methods.push({cls, name: 'child', signature: 'child()V', isStatic: false});
+  cls.methods.push({cls, name: 'child', signature: 'child()V', rawDescriptor: '()V', accessFlags: new Flags(1), isStatic: false});
   cls.fields.push({name: 'childField', isStatic: false}, {name: 'staticField', isStatic: true});
   cls.superClassRef = new ClassReference(parent.getInternalName());
   cls.loader = {loadClass(thread, name, callback) {
@@ -197,10 +200,11 @@ test('two asynchronous resolution callers assemble actual method/field tables on
   callbacks[0]();
   callbacks[1]();
   assert.deepEqual(results, []);
-  assert.deepEqual(cls._vmTable.map(method => method.name), ['parent', 'child']);
+  assert.deepEqual(cls.getVMTable().map(method => method.name), ['parent', 'child']);
   assert.deepEqual(cls._objectFields.map(field => field.name), ['parentField', 'childField']);
   assert.equal(cls._staticFields.length, 1);
   gate.complete(true);
+  await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(results, [cls, cls]);
   assert.equal(cls.isResolved(), true);
 });
@@ -295,6 +299,7 @@ test('verification failure cannot exit a synchronized method monitor that was ne
 
 test('verified synchronized abrupt completion releases only an acquired monitor once', () => {
   const w = bytecodeFixture({verified: true, synchronized: true});
+  assert.equal(w.cls.tryToResolve(), true);
   const failure = {getClass: () => ({getInternalName: () => 'Ljava/lang/RuntimeException;'})};
   assert.equal(w.frame.scheduleException(w.thread, failure), false);
   assert.equal(w.counters.exits, 0);
@@ -462,8 +467,9 @@ test('a hierarchy-linked ClassReference is not cached as fully resolved until ve
   assert.equal(reference.tryResolve(w.loader), false);
   w.parent.gate.complete(true);
   w.child.gate.complete(true);
-  assert.equal(reference.isResolved(), true);
+  assert.equal(reference.isResolved(), false, 'Verification alone is not full prepared linking');
   assert.equal(reference.tryResolve(w.loader), true);
+  assert.equal(reference.isResolved(), true);
 });
 
 test('current-method class identity waits for verification instead of resolving a same-name loader class', () => {
