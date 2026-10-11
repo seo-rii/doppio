@@ -95,12 +95,46 @@ Passing runs after the correction must be established by the retained ledger,
 not by this regression description. Phase A's last detached run had no verified
 completion status when B began; A remains unconfirmed until its two gates pass.
 
+## B2 structural validation
+
+The parser bounds every byte read, checks class/member names and descriptors,
+constant-pool kinds and versioned tags, modifier combinations, duplicate
+declarations and required Code attributes. Parsed attributes are isolated to
+their declared payloads. Code length and handler numeric ranges, StackMap
+encoding tags, singleton attributes and recognized metadata references are
+checked before execution. Reserved flags and unknown or inapplicable attributes
+remain ignored; opaque annotation data is not eagerly treated as a reflection
+request. These are format checks, not operand-type verification.
+
+`ci/java_class_structure_test.mjs` compiles the genuine `JavaClassStructure`
+fixture with each pinned javac 21/25. Its 50 cases per release contain one
+untouched control, seven opaque-annotation acceptance controls, and 42 explicit
+structural mutations. The original files are never relabeled or changed.
+Every mutation records replayable edits and original/result hashes. Native,
+Node and Chromium must produce the complete ordered outcome list, with exact
+Java error classes and no initialization of rejected classes. Checking time
+(definition, resolution or initialization) is recorded but need not match
+HotSpot's implementation choice.
+
+```sh
+yarn ci:class-structure:test
+yarn ci:class-structure
+```
+
+The cross-host command requires a clean committed tree and unchanged start/end
+HEAD. `build/java-class-structure-results.json` retains compiler, toolchain,
+source, mutation-tree, runtime and browser provenance, including raw failures.
+CI uploads that ledger even on failure. Unit tests use the actual compiled VM
+and include valid reserved flags, historical attribute recognition, modified
+UTF-8, category-2 parameter slots and malformed opaque annotation controls.
+These commands document the gate; a fresh passing ledger is the evidence.
+
 ## Remaining boundaries
 
 This slice does not finish B1, JVM-002 or Phase B. General Code/StackMap bytecode
 type checking is not currently an enforcement phase: parsing and storing a
-StackMapTable is not verification. Structural rejection and the error boundary
-between `ClassFormatError` and `VerifyError` need their own negative corpus.
+StackMapTable is not verification. B2's structural corpus does not establish
+the opcode, branch or type-flow constraints assigned to B3 and `VerifyError`.
 Remaining initialization cases include exceptional allocation during error
 wrapping and broader concurrency/memory-model interactions. General linkage,
 module access, hidden classes and arbitrary bootstrap behavior remain separate.

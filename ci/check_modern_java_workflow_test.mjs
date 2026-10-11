@@ -171,6 +171,9 @@ for (const name of [
   'Check phase B initialization contracts',
   'Run Java initialization compatibility',
   'Upload Java initialization ledger',
+  'Check phase B structural contracts',
+  'Run Java class-file structural compatibility',
+  'Upload Java class-file structural ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -204,6 +207,12 @@ for (const [original, replacement] of [
   ['run: node ci/run_java_compatibility.mjs --manifest ci/java_initialization_manifest.json --output build/java-initialization-results.json --browser\n', 'run: node ci/run_java_compatibility.mjs --manifest ci/java_initialization_manifest.json --output build/java-initialization-results.json --browser || true\n'],
   ["if: always() && steps.java_initialization.outcome != 'skipped'", 'if: success()'],
   ['path: build/java-initialization-results.json', 'path: build/missing-initialization-ledger.json'],
+  ['run: node --test ci/class_member_structure_test.cjs ci/class_attribute_structure_test.cjs ci/java_class_structure_contract_test.mjs\n', 'run: node --test ci/java_class_structure_contract_test.mjs\n'],
+  ['run: node ci/java_class_structure_test.mjs --browser\n', 'run: node ci/java_class_structure_test.mjs\n'],
+  ['run: node ci/java_class_structure_test.mjs --browser\n', 'run: node ci/java_class_structure_test.mjs --native-only\n'],
+  ['run: node ci/java_class_structure_test.mjs --browser\n', 'run: node ci/java_class_structure_test.mjs --browser || true\n'],
+  ["if: always() && steps.java_class_structure.outcome != 'skipped'", 'if: success()'],
+  ['path: build/java-class-structure-results.json', 'path: build/missing-structure-ledger.json'],
   ['timeout-minutes: 130\n', 'timeout-minutes: 1300\n'],
   ['run: node ci/java25_main_test.mjs --browser\n', 'run: node ci/java25_main_test.mjs\n'],
   ['run: node ci/java25_main_test.mjs --browser\n', 'run: node ci/java25_main_test.mjs --browser || true\n'],
@@ -283,6 +292,18 @@ expectCheckerFailure(
 expectCheckerFailure(
   'uncaught exit host gate before its completion and ledger contracts',
   { workflow: swapAdjacentSteps(realWorkflow, 'Check main exit status contracts', 'Run Java uncaught-exception exit compatibility') },
+  'remain in dependency order'
+);
+
+expectCheckerFailure(
+  'structure host gate before its parser and corpus contracts',
+  { workflow: swapAdjacentSteps(realWorkflow, 'Check phase B structural contracts', 'Run Java class-file structural compatibility') },
+  'remain in dependency order'
+);
+
+expectCheckerFailure(
+  'structure ledger upload before its executions',
+  { workflow: swapAdjacentSteps(realWorkflow, 'Run Java class-file structural compatibility', 'Upload Java class-file structural ledger') },
   'remain in dependency order'
 );
 
