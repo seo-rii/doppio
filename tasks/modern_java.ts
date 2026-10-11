@@ -5117,6 +5117,7 @@ function modernJava(grunt: IGrunt) {
       'java/lang/System.class',
       'java/lang/Thread.class',
       'java/lang/invoke/MethodHandle.class',
+      'java/lang/invoke/MethodHandleImpl.class',
       'java/lang/invoke/MethodHandles$Lookup.class',
       'java/lang/invoke/MethodHandles.class',
       'java/lang/ref/Reference.class',

@@ -46,7 +46,8 @@ const exactClasses = [
   'java/lang/System', 'java/lang/Runtime', 'java/lang/Character', 'java/lang/Math', 'java/lang/StrictMath',
   'java/lang/AbstractStringBuilder', 'java/lang/StringBuilder', 'java/lang/StringBuffer', 'java/lang/String',
   'java/util/regex/Pattern', 'java/util/concurrent/TimeUnit', 'java/time/Duration',
-  'java/lang/invoke/MethodHandles', 'java/lang/invoke/MethodHandle', 'java/lang/invoke/MethodHandles$Lookup',
+  'java/lang/invoke/MethodHandles', 'java/lang/invoke/MethodHandle', 'java/lang/invoke/MethodHandleImpl',
+  'java/lang/invoke/MethodHandles$Lookup',
   'java/nio/MappedByteBuffer'
 ];
 const expectedFrames = new Map([
@@ -60,7 +61,8 @@ const expectedFrames = new Map([
   ['sun/reflect/annotation/AnnotatedTypeFactory$AnnotatedWildcardTypeImpl.getAnnotatedUpperBounds', [36]],
   ['sun/reflect/annotation/TypeAnnotation$LocationInfo.popLocation', [25, 27]],
   ['sun/reflect/annotation/AnnotatedTypeFactory.addNesting', [9, 30, 42, 54, 77, 109, 123]],
-  ['sun/reflect/generics/reflectiveObjects/ParameterizedTypeImpl.toString', [97, 112, 124, 164, 195, 204]]
+  ['sun/reflect/generics/reflectiveObjects/ParameterizedTypeImpl.toString', [97, 112, 124, 164, 195, 204]],
+  ['java/lang/invoke/MethodHandleImpl.checkSpreadArgument', [9, 31, 34, 45, 68]]
 ]);
 let inventory;
 const filterArgumentsDescriptor = '(Ljava/lang/invoke/MethodHandle;I[Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;';
@@ -68,6 +70,8 @@ let filterArgumentsOverlay;
 let stockFilterArgument;
 const withVarargsDescriptor = '(Z)Ljava/lang/invoke/MethodHandle;';
 let withVarargsOverlay;
+const spreadArgumentDescriptor = '(Ljava/lang/Object;I)V';
+let spreadArgumentOverlay;
 
 before(async () => {
   const {readStructureLayout} = await import('./java_class_structure_test.mjs');
@@ -87,6 +91,27 @@ before(async () => {
     const beforeLayout = readStructureLayout(original);
     const afterLayout = readStructureLayout(overlaid);
     const cls = new ReferenceClassData(overlaid, null, new ClassLoader(null));
+    if (className === 'java/lang/invoke/MethodHandleImpl') {
+      assert.equal(beforeLayout.methods.entries.length, 74);
+      assert.equal(afterLayout.methods.entries.length, 74);
+      const originalPoolEnd = beforeLayout.pool.filter(Boolean).at(-1).end;
+      assert.deepEqual(overlaid.subarray(10, originalPoolEnd),
+        original.subarray(10, originalPoolEnd), 'stock constant-pool bytes remain unchanged');
+      const overlaidPoolEnd = afterLayout.pool.filter(Boolean).at(-1).end;
+      assert.deepEqual(overlaid.subarray(overlaidPoolEnd, afterLayout.methods.countOffset + 2),
+        original.subarray(originalPoolEnd, beforeLayout.methods.countOffset + 2),
+        'class metadata, interfaces, fields and method count remain unchanged');
+      assert.deepEqual(overlaid.subarray(afterLayout.methods.end), original.subarray(beforeLayout.methods.end),
+        'all class attributes remain unchanged');
+      for (const old of beforeLayout.methods.entries) {
+        if (old.name === 'checkSpreadArgument' && old.descriptor === spreadArgumentDescriptor) continue;
+        const member = afterLayout.methods.entries.find(candidate => candidate.name === old.name &&
+          candidate.descriptor === old.descriptor);
+        assert.ok(member, 'retain all 73 other stock MethodHandleImpl methods');
+        assert.deepEqual(overlaid.subarray(member.start, member.end), original.subarray(old.start, old.end),
+          'preserve the whole other stock method and all its metadata');
+      }
+    }
     if (className === 'java/lang/invoke/MethodHandle') {
       for (const old of beforeLayout.methods.entries) {
         const member = afterLayout.methods.entries.find(candidate => candidate.name === old.name &&
@@ -119,6 +144,11 @@ before(async () => {
         assert.ok(!withVarargsOverlay, 'exactly one modern withVarargs method');
         withVarargsOverlay = {member, pool: afterLayout.pool};
       }
+      if (className === 'java/lang/invoke/MethodHandleImpl' && member.name === 'checkSpreadArgument' &&
+        member.descriptor === spreadArgumentDescriptor) {
+        assert.ok(!spreadArgumentOverlay, 'exactly one stock spread validator');
+        spreadArgumentOverlay = {original, overlaid, old, member, pool: afterLayout.pool};
+      }
       const method = cls.getMethods().find(candidate => candidate.name === member.name &&
         candidate.rawDescriptor === member.descriptor);
       assert.ok(method && method.declaredCode, 'verify the retained pre-trap Code attribute');
@@ -142,10 +172,10 @@ before(async () => {
   inventory = {selected, generated, all, unchanged};
 });
 
-test('overlay inventory adds filter and varargs delegates while preserving 113 prior bodies and 1271 stock Code attributes', () => {
-  assert.equal(inventory.selected.length, 36);
-  assert.equal(inventory.generated.length, 115);
-  assert.equal(inventory.unchanged, 1271);
+test('overlay inventory adds filter, varargs and null-spread bodies while preserving 113 prior bodies and 1344 stock Code attributes', () => {
+  assert.equal(inventory.selected.length, 37);
+  assert.equal(inventory.generated.length, 116);
+  assert.equal(inventory.unchanged, 1344);
   const identity = inventory.generated.map(({className, member, bytes}) =>
     [className, member.name, member.descriptor, member.flags, member.code.maxStack, member.code.maxLocals,
       bytes.toString('hex')]);
@@ -153,7 +183,9 @@ test('overlay inventory adds filter and varargs delegates while preserving 113 p
     !(className === 'java/lang/invoke/MethodHandles' && name === 'filterArguments' &&
       descriptor === filterArgumentsDescriptor) &&
     !(className === 'java/lang/invoke/MethodHandle' && name === 'withVarargs' &&
-      descriptor === withVarargsDescriptor));
+      descriptor === withVarargsDescriptor) &&
+    !(className === 'java/lang/invoke/MethodHandleImpl' && name === 'checkSpreadArgument' &&
+      descriptor === spreadArgumentDescriptor));
   assert.equal(priorIdentity.length, 113);
   assert.equal(createHash('sha256').update(JSON.stringify(priorIdentity)).digest('hex'),
     '6aa35a51cad536fa26de66219269564fbb4124f8fbea8a2058d34b2fd937d420');
@@ -199,6 +231,70 @@ test('withVarargs is a public nonfinal instance method with an exact parsed Code
   assert.equal(pool[nameAndType.second].value, '(Ljava/lang/invoke/MethodHandle;Z)Ljava/lang/invoke/MethodHandle;');
 });
 
+test('positive-length null spreading changes only its branch and retains all non-null Code paths', () => {
+  assert.ok(spreadArgumentOverlay && spreadArgumentOverlay.old?.code);
+  const {original, overlaid, old, member, pool} = spreadArgumentOverlay;
+  assert.equal(member.flags, old.flags);
+  assert.equal(member.flags, 0x0008, 'package-private static and nonnative');
+  assert.equal(member.nameIndex, old.nameIndex);
+  assert.equal(member.descriptorIndex, old.descriptorIndex);
+  assert.equal(member.code.maxStack, old.code.maxStack);
+  assert.equal(member.code.maxLocals, old.code.maxLocals);
+  assert.equal(member.code.handlerCount, 0);
+  const retainedAttributes = (bytes, attributes, omitted) => attributes.entries
+    .filter(attribute => attribute.name !== omitted)
+    .map(attribute => ({name: attribute.name, bytes: bytes.subarray(attribute.start, attribute.end)}));
+  assert.deepEqual(retainedAttributes(overlaid, member.attributes, 'Code'),
+    retainedAttributes(original, old.attributes, 'Code'));
+  assert.deepEqual(retainedAttributes(overlaid, member.code.attributes, 'StackMapTable'),
+    retainedAttributes(original, old.code.attributes, 'StackMapTable'), 'original line-number bytes remain unchanged');
+  const entry = inventory.generated.find(candidate => candidate.className === 'java/lang/invoke/MethodHandleImpl' &&
+    candidate.member.name === 'checkSpreadArgument' && candidate.member.descriptor === spreadArgumentDescriptor);
+  assert.ok(entry, 'parsed generated Code, not a native trap');
+  const originalBytes = original.subarray(old.code.instructionsOffset,
+    old.code.instructionsOffset + old.code.codeLength);
+  assert.equal(originalBytes.length, 68);
+  assert.equal(entry.bytes.length, 76);
+  assert.deepEqual(entry.bytes.subarray(0, 6), originalBytes.subarray(0, 6));
+  assert.deepEqual(entry.bytes.subarray(8, 68), originalBytes.subarray(8, 68));
+  assert.equal(originalBytes.readUInt16BE(6), 40);
+  assert.equal(entry.bytes.readUInt16BE(6), 63);
+  const decoded = decodeMethodCode(entry.input);
+  assert.deepEqual(decoded.instructions.find(instruction => instruction.pc === 5).branchTargets, [68]);
+  const appended = decoded.instructions.filter(instruction => instruction.pc >= 68);
+  assert.deepEqual(appended.map(instruction => instruction.opcode), [0xbb, 0x59, 0xb7, 0xbf]);
+  const npeClass = pool[appended[0].cpIndex];
+  assert.equal(npeClass?.tag, 7);
+  assert.equal(pool[npeClass.first]?.value, 'java/lang/NullPointerException');
+  const constructor = pool[appended[2].cpIndex];
+  assert.equal(constructor?.tag, 10);
+  assert.equal(constructor.first, appended[0].cpIndex);
+  const nameAndType = pool[constructor.second];
+  assert.equal(nameAndType?.tag, 12);
+  assert.equal(pool[nameAndType.first]?.value, '<init>');
+  assert.equal(pool[nameAndType.second]?.value, '()V');
+  for (const frame of decoded.stackMapFrames) {
+    assert.equal(frame.entry.localsTypes.length, 2);
+    assert.equal(frame.entry.localsTypes[0].className, 'Ljava/lang/Object;');
+    assert.equal(frame.entry.localsTypes[1].tag, 1, 'second local is int');
+  }
+});
+
+test('the null-spread overlay fails closed for an unexpected stock branch or stack-map shape', () => {
+  assert.ok(spreadArgumentOverlay && spreadArgumentOverlay.old?.code);
+  const {original, old} = spreadArgumentOverlay;
+  const changedBranch = Buffer.from(original);
+  changedBranch.writeUInt16BE(39, old.code.instructionsOffset + 6);
+  assert.throws(() => applyModernBootstrapOverlays('Ljava/lang/invoke/MethodHandleImpl;', changedBranch),
+    /Unsupported stock spread argument Code shape/);
+  const changedFrames = Buffer.from(original);
+  const frames = old.code.attributes.entries.find(attribute => attribute.name === 'StackMapTable');
+  assert.ok(frames);
+  changedFrames[frames.body + 2] = 8;
+  assert.throws(() => applyModernBootstrapOverlays('Ljava/lang/invoke/MethodHandleImpl;', changedFrames),
+    /Unsupported stock spread argument stack-map shape/);
+});
+
 test('filterArguments retains public static varargs metadata and delegates its exact parsed Code body', () => {
   assert.ok(filterArgumentsOverlay && filterArgumentsOverlay.old?.code, 'stock public filterArguments method exists');
   const {original, overlaid, old, member, pool} = filterArgumentsOverlay;
@@ -242,7 +338,7 @@ test('the package-private stock filterArgument helper and all its metadata remai
     entry.member.name === 'filterArgument'), 'stock helper is not redirected or regenerated');
 });
 
-test('eleven branchful overlays declare all 43 full frames at exact instruction boundaries', () => {
+test('twelve branchful overlays declare all 48 full frames at exact instruction boundaries', () => {
   const found = new Map();
   let frameCount = 0;
   for (const entry of inventory.generated) {
@@ -259,7 +355,7 @@ test('eleven branchful overlays declare all 43 full frames at exact instruction 
     }
   }
   assert.deepEqual(found, expectedFrames);
-  assert.equal(frameCount, 43);
+  assert.equal(frameCount, 48);
 });
 
 test('removing overlay frames is rejected for every branchful bootstrap method', () => {
@@ -274,7 +370,7 @@ test('removing overlay frames is rejected for every branchful bootstrap method',
       className + '.' + member.name);
     rejected++;
   }
-  assert.equal(rejected, 11, 'bootstrap identity must not exempt missing frames');
+  assert.equal(rejected, 12, 'bootstrap identity must not exempt missing frames');
 });
 
 function verifyAll(entries) {
@@ -297,12 +393,12 @@ test('every generated overlay body passes pure decoding and type checking withou
   const {failures, obligations} = verifyAll(inventory.generated);
   assert.deepEqual(failures, []);
   assert.ok(obligations > 0, 'symbolic obligations are retained, not bypassed or claimed discharged');
-  t.diagnostic('115 generated methods checked; ' + obligations + ' metadata obligations remain for linking');
+  t.diagnostic('116 generated methods checked; ' + obligations + ' metadata obligations remain for linking');
 });
 
 test('all original and generated Code methods in transformed bootstrap classes pass pure verification', t => {
-  assert.equal(inventory.all.length, 1386);
+  assert.equal(inventory.all.length, 1460);
   const {failures, obligations} = verifyAll(inventory.all);
   assert.deepEqual(failures, []);
-  t.diagnostic('1386 methods checked; ' + obligations + ' metadata obligations remain for linking');
+  t.diagnostic('1460 methods checked; ' + obligations + ' metadata obligations remain for linking');
 });

@@ -3160,6 +3160,95 @@ function addJavaLangInvokeMethodHandleModernOverlays(data: Buffer): Buffer {
   ]);
 }
 
+function addJavaLangInvokeSpreadArgumentModernOverlay(data: Buffer): Buffer {
+  var utf8Constants: {[index: number]: string} = {},
+    cp = constantPoolEnd(data, utf8Constants),
+    initNameIndex = 0,
+    voidDescriptorIndex = 0;
+  Object.keys(utf8Constants).forEach((key: string): void => {
+    if (utf8Constants[+key] === '<init>') initNameIndex = +key;
+    if (utf8Constants[+key] === '()V') voidDescriptorIndex = +key;
+  });
+  if (initNameIndex === 0 || voidDescriptorIndex === 0) {
+    throw new Error('Spread argument overlay requires constructor constants');
+  }
+  var methods = methodsInfo(data, cp.offset),
+    methodOffset = methods.countOffset + 2;
+  for (var methodIndex = 0; methodIndex < methods.count; methodIndex++) {
+    var methodStart = methodOffset;
+    methodOffset = skipMember(data, methodStart);
+    if (utf8Constants[data.readUInt16BE(methodStart + 2)] !== 'checkSpreadArgument' ||
+        utf8Constants[data.readUInt16BE(methodStart + 4)] !== '(Ljava/lang/Object;I)V') continue;
+    var attributeOffset = methodStart + 8,
+      attributeCount = data.readUInt16BE(methodStart + 6);
+    for (var attributeIndex = 0; attributeIndex < attributeCount; attributeIndex++) {
+      var attributeStart = attributeOffset,
+        attributeNameIndex = data.readUInt16BE(attributeStart),
+        attributeEnd = attributeStart + 6 + data.readUInt32BE(attributeStart + 2);
+      attributeOffset = attributeEnd;
+      if (utf8Constants[attributeNameIndex] !== 'Code') continue;
+      var codeStart = attributeStart + 14,
+        codeLength = data.readUInt32BE(attributeStart + 10),
+        codeEnd = codeStart + codeLength,
+        originalCode = data.slice(codeStart, codeEnd);
+      if (data.readUInt16BE(methodStart) !== 0x0008 || codeLength !== 68 ||
+          data.readUInt16BE(attributeStart + 6) !== 2 || data.readUInt16BE(attributeStart + 8) !== 3 ||
+          originalCode.slice(0, 9).toString('hex') !== '2ac700081b9a0028b1' ||
+          data.readUInt16BE(codeEnd) !== 0) {
+        throw new Error('Unsupported stock spread argument Code shape');
+      }
+      var extraConstants = Buffer.concat([
+          utf8Constant('java/lang/NullPointerException'),
+          Buffer.concat([Buffer.from([7]), u2(cp.count)]),
+          Buffer.concat([Buffer.from([12]), u2(initNameIndex), u2(voidDescriptorIndex)]),
+          Buffer.concat([Buffer.from([10]), u2(cp.count + 1), u2(cp.count + 2)]),
+          utf8Constant('java/lang/Object'),
+          Buffer.concat([Buffer.from([7]), u2(cp.count + 4)])
+        ]),
+        code = Buffer.concat([
+          originalCode.slice(0, 6), u2(63), originalCode.slice(8),
+          Buffer.from([0xbb]), u2(cp.count + 1), Buffer.from([0x59, 0xb7]),
+          u2(cp.count + 3), Buffer.from([0xbf])
+        ]),
+        nestedCount = data.readUInt16BE(codeEnd + 2),
+        nestedOffset = codeEnd + 4,
+        nestedAttributes: Buffer[] = [],
+        foundFrames = false;
+      for (var nestedIndex = 0; nestedIndex < nestedCount; nestedIndex++) {
+        var nestedStart = nestedOffset,
+          nestedNameIndex = data.readUInt16BE(nestedStart);
+        nestedOffset += 6 + data.readUInt32BE(nestedStart + 2);
+        if (utf8Constants[nestedNameIndex] === 'StackMapTable') {
+          if (foundFrames || data.slice(nestedStart + 6, nestedOffset).toString('hex') !== '00040915020a') {
+            throw new Error('Unsupported stock spread argument stack-map shape');
+          }
+          foundFrames = true;
+          nestedAttributes.push(fullFrameStackMapTable(nestedNameIndex,
+            [9, 31, 34, 45, 68].map((pc: number): {pc: number; locals: Buffer[]} => ({
+              pc: pc, locals: [stackMapObject(cp.count + 5), Buffer.from([1])]
+            }))));
+        } else {
+          nestedAttributes.push(data.slice(nestedStart, nestedOffset));
+        }
+      }
+      if (!foundFrames || nestedOffset !== attributeEnd) {
+        throw new Error('Spread argument overlay requires exact stock Code attributes');
+      }
+      var withConstants = Buffer.concat([
+        data.slice(0, 8), u2(cp.count + 6), data.slice(10, cp.offset),
+        extraConstants, data.slice(cp.offset)
+      ]);
+      // Preserve every non-null instruction and null/zero return; only redirect
+      // the positive-length null branch to the modern exception type.
+      return replaceMethodCode(withConstants, cp.offset + extraConstants.length,
+        'checkSpreadArgument', '(Ljava/lang/Object;I)V', attributeNameIndex,
+        2, 3, code, undefined, undefined, nestedAttributes);
+    }
+    throw new Error('Spread argument validator is missing its Code attribute');
+  }
+  throw new Error('Missing stock spread argument validator');
+}
+
 function addJavaLangInvokeMethodHandlesLookupModernOverlays(data: Buffer): Buffer {
   var cp = constantPoolEnd(data),
     constants: Buffer[] = [],
@@ -3683,6 +3772,9 @@ export function applyModernBootstrapOverlays(typeStr: string, data: Buffer): Buf
   }
   if (typeStr === 'Ljava/lang/invoke/MethodHandle;') {
     data = addJavaLangInvokeMethodHandleModernOverlays(data);
+  }
+  if (typeStr === 'Ljava/lang/invoke/MethodHandleImpl;') {
+    data = addJavaLangInvokeSpreadArgumentModernOverlay(data);
   }
   if (typeStr === 'Ljava/lang/invoke/MethodHandles$Lookup;') {
     data = addJavaLangInvokeMethodHandlesLookupModernOverlays(data);
