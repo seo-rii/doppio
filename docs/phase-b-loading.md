@@ -341,6 +341,13 @@ a class/interface kind mismatch fails with `IncompatibleClassChangeError` before
 receiver-dependent invocation checks. Private declarations keep exact MemberName
 metadata indices without entering virtual override selection.
 
+Array `clone()` retains its public array-member contract even though execution
+reuses the exact protected bootstrap `Object.clone` declaration. Only an actual
+array symbolic owner and that exact declaration receive this exception; ordinary
+protected/private access, reference-array leaf access and invocation staticness
+checks remain intact. The original `Object.clone` flags are never made public.
+See [JLS 10.7](https://docs.oracle.com/javase/specs/jls/se25/html/jls-10.html#jls-10.7).
+
 Each real class CP entry retains its referring class identity. Symbolic owner
 access, including reference-array leaf access, precedes member cache publication.
 Runtime packages compare package spelling **and actual defining loader**. Private
@@ -382,8 +389,11 @@ actual hosts; general Lookup-mode/MethodHandle conformance remains a C dependenc
 
 Two distinct genuine corpora record unchanged old callers and separately compiled
 replacement owners, mounted as resource-only `.bin` payloads. The
-`ci/java_member_resolution_test.mjs` gate requires 22 descriptor, declaration-order
-and owner-kind scenarios per release. `ci/java_member_access_test.mjs` requires
+`ci/java_member_resolution_test.mjs` gate requires 30 descriptor, declaration-order,
+owner-kind and array-clone scenarios per release. Clone controls cover primitive,
+reference and multirank identity/shallow copying, null receivers and a separately
+evolved inaccessible reference leaf, while checking bootstrap clone flags before
+and after invocation. `ci/java_member_access_test.mjs` requires
 37 runtime-package, array-leaf, reciprocal/invalid nest, sticky linkage failure
 and transient VME scenarios per release. No caller byte patches or golden
 regeneration are used. Executable CP operands at exact instruction boundaries
