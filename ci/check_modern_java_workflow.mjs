@@ -688,7 +688,7 @@ for (const [name, fields] of [
   ]],
   ['Check phase B class derivation contracts', [
     'timeout-minutes: 3',
-    'run: node --test ci/class_derivation_test.cjs ci/class_loader_derivation_test.cjs ci/java_class_derivation_contract_test.mjs',
+    'run: node --test ci/class_derivation_test.cjs ci/class_loader_derivation_test.cjs ci/lookup_class_metadata_test.cjs ci/java_class_derivation_contract_test.mjs',
   ]],
   ['Run Java class derivation compatibility', [
     'id: java_class_derivation',
@@ -700,6 +700,24 @@ for (const [name, fields] of [
     'uses: actions/upload-artifact@v7',
     'with:',
     '  path: build/java-class-derivation-results.json',
+    '  archive: false',
+    '  if-no-files-found: error',
+    '  retention-days: 7',
+  ]],
+  ['Check phase B loading constraint contracts', [
+    'timeout-minutes: 3',
+    'run: node --test ci/loading_constraints_test.cjs ci/class_loading_constraints_test.cjs ci/member_loading_constraints_test.cjs ci/class_preparation_test.cjs ci/method_selection_test.cjs ci/java_loading_constraints_contract_test.mjs',
+  ]],
+  ['Run Java loading constraint compatibility', [
+    'id: java_loading_constraints',
+    'timeout-minutes: 15',
+    'run: node ci/java_loading_constraints_test.mjs --browser',
+  ]],
+  ['Upload Java loading constraint ledger', [
+    "if: always() && steps.java_loading_constraints.outcome != 'skipped'",
+    'uses: actions/upload-artifact@v7',
+    'with:',
+    '  path: build/java-loading-constraints-results.json',
     '  archive: false',
     '  if-no-files-found: error',
     '  retention-days: 7',
@@ -843,6 +861,9 @@ const runtimeOrder = [
   'Check phase B class derivation contracts',
   'Run Java class derivation compatibility',
   'Upload Java class derivation ledger',
+  'Check phase B loading constraint contracts',
+  'Run Java loading constraint compatibility',
+  'Upload Java loading constraint ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',

@@ -121,6 +121,8 @@
     "ci:bytecode-verification": "node ci/java_bytecode_verification_test.mjs --browser",
     "ci:class-derivation:test": "node --test ci/class_derivation_test.cjs ci/class_loader_derivation_test.cjs ci/lookup_class_metadata_test.cjs ci/java_class_derivation_contract_test.mjs",
     "ci:class-derivation": "node ci/java_class_derivation_test.mjs --browser",
+    "ci:loading-constraints:test": "node --test ci/loading_constraints_test.cjs ci/class_loading_constraints_test.cjs ci/member_loading_constraints_test.cjs ci/class_preparation_test.cjs ci/method_selection_test.cjs ci/java_loading_constraints_contract_test.mjs",
+    "ci:loading-constraints": "node ci/java_loading_constraints_test.mjs --browser",
     "ci:java25-main": "node ci/java25_main_test.mjs --browser",
     "ci:java-uncaught-exit": "node ci/java_uncaught_exit_test.mjs --browser",
     "ci:java-uncaught-exit:test": "node ci/jvm_exit_status_test.cjs && node --test ci/java_uncaught_exit_contract_test.mjs",

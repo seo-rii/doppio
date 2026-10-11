@@ -38,10 +38,21 @@ const verificationRunnerCommand = 'node ci/java_bytecode_verification_test.mjs -
 const derivationUnits = [
   'ci/class_derivation_test.cjs',
   'ci/class_loader_derivation_test.cjs',
+  'ci/lookup_class_metadata_test.cjs',
   'ci/java_class_derivation_contract_test.mjs',
 ];
 const derivationUnitCommand = `node --test ${derivationUnits.join(' ')}`;
 const derivationRunnerCommand = 'node ci/java_class_derivation_test.mjs --browser';
+const loadingConstraintUnits = [
+  'ci/loading_constraints_test.cjs',
+  'ci/class_loading_constraints_test.cjs',
+  'ci/member_loading_constraints_test.cjs',
+  'ci/class_preparation_test.cjs',
+  'ci/method_selection_test.cjs',
+  'ci/java_loading_constraints_contract_test.mjs',
+];
+const loadingConstraintUnitCommand = `node --test ${loadingConstraintUnits.join(' ')}`;
+const loadingConstraintRunnerCommand = 'node ci/java_loading_constraints_test.mjs --browser';
 const packageScripts = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).scripts;
 for (const [name, command] of [
   ['ci:java-initialization:test', initializationUnitCommand],
@@ -49,6 +60,8 @@ for (const [name, command] of [
   ['ci:bytecode-verification', verificationRunnerCommand],
   ['ci:class-derivation:test', derivationUnitCommand],
   ['ci:class-derivation', derivationRunnerCommand],
+  ['ci:loading-constraints:test', loadingConstraintUnitCommand],
+  ['ci:loading-constraints', loadingConstraintRunnerCommand],
 ]) {
   if (packageScripts[name] !== command) {
     throw new Error(`${name} must retain the complete phase B command: ${command}`);
@@ -217,6 +230,9 @@ for (const name of [
   'Check phase B class derivation contracts',
   'Run Java class derivation compatibility',
   'Upload Java class derivation ledger',
+  'Check phase B loading constraint contracts',
+  'Run Java loading constraint compatibility',
+  'Upload Java loading constraint ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -277,6 +293,21 @@ for (const [original, replacement] of [
   ["if: always() && steps.java_class_derivation.outcome != 'skipped'", "if: always() && steps.java_class_derivation.outcome == 'success'"],
   ['id: java_class_derivation\n', 'id: missing_class_derivation\n'],
   ['path: build/java-class-derivation-results.json', 'path: build/missing-derivation-ledger.json'],
+  [`run: ${loadingConstraintRunnerCommand}\n`, 'run: node ci/java_loading_constraints_test.mjs\n'],
+  [`run: ${loadingConstraintRunnerCommand}\n`, 'run: node ci/java_loading_constraints_test.mjs --native-only\n'],
+  [`run: ${loadingConstraintRunnerCommand}\n`, 'run: node ci/java_loading_constraints_test.mjs --node-only\n'],
+  [`run: ${loadingConstraintRunnerCommand}\n`, `run: ${loadingConstraintRunnerCommand} --native-only\n`],
+  [`run: ${loadingConstraintRunnerCommand}\n`, `run: ${loadingConstraintRunnerCommand} --release 21\n`],
+  [`run: ${loadingConstraintRunnerCommand}\n`, `run: ${loadingConstraintRunnerCommand} --release 25\n`],
+  [`run: ${loadingConstraintRunnerCommand}\n`, `run: ${loadingConstraintRunnerCommand} || true\n`],
+  [`run: ${loadingConstraintUnitCommand}\n`, `run: ${loadingConstraintUnitCommand} || true\n`],
+  ["if: always() && steps.java_loading_constraints.outcome != 'skipped'", 'if: success()'],
+  ["if: always() && steps.java_loading_constraints.outcome != 'skipped'", "if: always() && steps.java_loading_constraints.outcome == 'success'"],
+  ["if: always() && steps.java_loading_constraints.outcome != 'skipped'", 'if: false'],
+  ['id: java_loading_constraints\n', 'id: missing_loading_constraints\n'],
+  ['path: build/java-loading-constraints-results.json', 'path: build/missing-loading-constraints-ledger.json'],
+  ['path: build/java-loading-constraints-results.json\n          archive: false',
+    'path: build/java-loading-constraints-results.json\n          archive: true'],
   ['timeout-minutes: 130\n', 'timeout-minutes: 1300\n'],
   ['run: node ci/java25_main_test.mjs --browser\n', 'run: node ci/java25_main_test.mjs\n'],
   ['run: node ci/java25_main_test.mjs --browser\n', 'run: node ci/java25_main_test.mjs --browser || true\n'],
@@ -325,6 +356,15 @@ for (const omitted of derivationUnits) {
     `class derivation contracts omit ${omitted}`,
     { workflow: replaceRequired(realWorkflow, `run: ${derivationUnitCommand}\n`,
       `run: node --test ${derivationUnits.filter(filename => filename !== omitted).join(' ')}\n`) },
+    'exact bounded, fail-closed baseline command or artifact contract'
+  );
+}
+
+for (const omitted of loadingConstraintUnits) {
+  expectCheckerFailure(
+    `loading constraint contracts omit ${omitted}`,
+    { workflow: replaceRequired(realWorkflow, `run: ${loadingConstraintUnitCommand}\n`,
+      `run: node --test ${loadingConstraintUnits.filter(filename => filename !== omitted).join(' ')}\n`) },
     'exact bounded, fail-closed baseline command or artifact contract'
   );
 }
@@ -405,10 +445,22 @@ for (const [firstName, secondName] of [
 for (const [firstName, secondName] of [
   ['Check phase B class derivation contracts', 'Run Java class derivation compatibility'],
   ['Run Java class derivation compatibility', 'Upload Java class derivation ledger'],
-  ['Upload Java class derivation ledger', 'Check evolved switch ledger contract'],
+  ['Upload Java class derivation ledger', 'Check phase B loading constraint contracts'],
 ]) {
   expectCheckerFailure(
     `class derivation dependency reversed: ${firstName} before ${secondName}`,
+    { workflow: swapAdjacentSteps(realWorkflow, firstName, secondName) },
+    'remain in dependency order'
+  );
+}
+
+for (const [firstName, secondName] of [
+  ['Check phase B loading constraint contracts', 'Run Java loading constraint compatibility'],
+  ['Run Java loading constraint compatibility', 'Upload Java loading constraint ledger'],
+  ['Upload Java loading constraint ledger', 'Check evolved switch ledger contract'],
+]) {
+  expectCheckerFailure(
+    `loading constraint dependency reversed: ${firstName} before ${secondName}`,
     { workflow: swapAdjacentSteps(realWorkflow, firstName, secondName) },
     'remain in dependency order'
   );
