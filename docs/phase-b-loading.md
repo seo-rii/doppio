@@ -78,8 +78,8 @@ waiter and lookup paths.
 With the existing Linux x64 build prerequisites and prepared pinned toolchains:
 
 ```sh
-./node_modules/.bin/grunt --stack modern-ci-release-cli --grunt-ignore-compile-errors
-./node_modules/.bin/grunt --stack make_build_dir:release vite-release listings:release --grunt-ignore-compile-errors
+./node_modules/.bin/grunt --stack modern-ci-release-cli
+./node_modules/.bin/grunt --stack make_build_dir:release vite-release listings:release
 yarn ci:java-initialization:test
 yarn ci:java-initialization
 ```
@@ -325,10 +325,85 @@ yarn ci:loading-constraints:test
 yarn ci:loading-constraints
 ```
 
-These implementations and selected gates do not close B4. Broader member
-access/resolution, evolved invocation/default-method binaries and symbolic
-resolution failure caching remain subsequent batches. No Java SE or full
-Phase B conformance claim follows from this selected inventory.
+These implementations and selected gates do not close B4. B4c below adds member
+access/resolution and symbolic failure caching; evolved invocation/default-method
+receiver selection remains a separate batch. A full retained regression must
+also pass after the final runtime build. No Java SE or full Phase B conformance
+claim follows from this selected inventory.
+
+## B4c symbolic member resolution and access
+
+Field resolution uses both name and complete descriptor. It searches the named
+class, its direct superinterfaces recursively in declaration order, then its
+superclass. A different-descriptor child field does not hide a matching inherited
+declaration. Methodref and InterfaceMethodref retain their symbolic owner kind;
+a class/interface kind mismatch fails with `IncompatibleClassChangeError` before
+receiver-dependent invocation checks. Private declarations keep exact MemberName
+metadata indices without entering virtual override selection.
+
+Each real class CP entry retains its referring class identity. Symbolic owner
+access, including reference-array leaf access, precedes member cache publication.
+Runtime packages compare package spelling **and actual defining loader**. Private
+access compares determined nest-host identities, not NestHost spelling. The host
+must be in the same runtime package and reciprocally name the member. A missing
+or invalid host determines self without initializing, verifying or preparing the
+host; an earlier API-driven determination is respected by later access checks.
+`Class.getNestMembers` starts with that actual host and filters members by their
+actual determined host, retaining failures in the real member CP references.
+
+Successful class/member symbolic resolution and `LinkageError` failures are
+retained per CP reference; independent references remain independent. The actual
+bootstrap LinkageError hierarchy decides persistence, not an error name. Other
+Throwables leave the reference retryable. Receiver-dependent invocation errors
+do not poison successful symbolic resolution. Waiting callbacks finish once and
+receive the original guest Throwable; a transient retry cannot replace the
+previous attempt's error for its remaining waiters.
+
+Resource-error handling follows the selected pinned-native policy: an actual
+bootstrap `VirtualMachineError` during host/member lookup is propagated without
+a partial nest result or a completed host determination, allowing later retry.
+Ordinary missing-host failures still determine self and retain their CP linkage
+failure. [HotSpot's nest-host implementation](https://github.com/openjdk/jdk/blob/jdk-25-ga/src/hotspot/share/oops/instanceKlass.cpp#L250)
+and genuine Java 21/25 controls establish this distinction. JVMS
+[5.4.4](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-5.html#jvms-5.4.4)
+describes ordinary host-resolution fallback, while
+[6.3](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-6.html#jvms-6.3)
+permits resource errors during VM operation; this does not assert that 5.4.4 alone
+mandates the selected VME timing.
+
+Pinned Java 8 lambda/reflection forwarding code has narrowly scoped producer
+capabilities. They require actual bootstrap generator frames, captured inputs,
+decoded forwarding instructions and the exact installed class. They authorize
+only captured class identities, the exact target declaration and required
+reflection parent constructor. Lambda-like names, MagicAccessor inheritance,
+copied bytes and another loader do not convey authority. Generated declarations
+still pass normal verification. The Java 8 MethodHandle nest bridge waits for
+actual hosts; general Lookup-mode/MethodHandle conformance remains a C dependency.
+
+Two distinct genuine corpora record unchanged old callers and separately compiled
+replacement owners, mounted as resource-only `.bin` payloads. The
+`ci/java_member_resolution_test.mjs` gate requires 22 descriptor, declaration-order
+and owner-kind scenarios per release. `ci/java_member_access_test.mjs` requires
+37 runtime-package, array-leaf, reciprocal/invalid nest, sticky linkage failure
+and transient VME scenarios per release. No caller byte patches or golden
+regeneration are used. Executable CP operands at exact instruction boundaries
+prove the intended owner/name/descriptor and, for the missing-host control, the
+same CP entry shared by NestHost and an ordinary class literal.
+
+```sh
+yarn ci:member-resolution:test
+yarn ci:member-resolution
+yarn ci:member-access:test
+yarn ci:member-access
+```
+
+Official gates require both native releases, Node and Chromium, a clean committed
+tree and unchanged source/compiler/runtime/HEAD provenance. Attempted failures
+are retained in `build/java-member-resolution-results.json` and
+`build/java-member-access-results.json`. Native-only diagnostics and source unit
+tests are not guest-host evidence. These commands describe required gates, not a
+fresh passing result. The broader retained execution, evolved receiver dispatch,
+named-module access and general bootstrap boundaries remain explicit.
 
 ## Remaining boundaries
 
