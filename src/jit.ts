@@ -416,7 +416,7 @@ table[OpCode.IINC] = {hasBranch: false, pops: 0, pushes: 0, emit: (pops, pushes,
 // This is marked as hasBranch: true to stop further opcode inclusion during JITC. The name of "hasBranch" ought to be changed.
 table[OpCode.ATHROW] = {hasBranch: true, pops: 1, pushes: 0, emit: (pops, pushes, suffix, onSuccess, code, pc, onErrorPushes) => {
   const onError = makeOnError(onErrorPushes, pc);
-  return `${onError}t.throwException(${pops[0]});f.returnToThreadLoop=true;`;
+  return `${onError}if(!u.isNull(t,f,${pops[0]})){t.throwException(${pops[0]});f.returnToThreadLoop=true;}`;
 }};
 
 table[OpCode.GOTO] = {hasBranch: true, pops: 0, pushes: 0, emit: (pops, pushes, suffix, onSuccess, code, pc) => {

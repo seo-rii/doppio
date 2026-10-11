@@ -1929,8 +1929,11 @@ export class Opcodes {
   }
 
   public static athrow(thread: JVMThread, frame: BytecodeStackFrame) {
-    thread.throwException(frame.opStack.pop());
-    frame.returnToThreadLoop = true;
+    const throwable = frame.opStack.pop();
+    if (!isNull(thread, frame, throwable)) {
+      thread.throwException(throwable);
+      frame.returnToThreadLoop = true;
+    }
   }
 
   public static checkcast(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
