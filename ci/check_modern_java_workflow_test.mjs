@@ -78,7 +78,7 @@ const coreSemanticsUnits = ['ci/jvm_float_precision_test.cjs', 'ci/jvm_float_to_
   'ci/java_core_stack_forms_contract_test.mjs', 'ci/java_core_semantics_contract_test.mjs'];
 const coreSemanticsUnitCommand = `node --test ${coreSemanticsUnits.join(' ')}`;
 const coreSemanticsRunnerCommand = 'node ci/java_core_semantics_test.mjs --browser';
-const recordSemanticsUnits = ['ci/record_component_native_test.cjs', 'ci/record_object_methods_test.cjs',
+const recordSemanticsUnits = ['ci/record_component_native_test.cjs', 'ci/annotated_wildcard_bounds_test.cjs', 'ci/record_object_methods_test.cjs',
   'ci/java_record_semantics_contract_test.mjs'];
 const recordSemanticsUnitCommand = `node --test ${recordSemanticsUnits.join(' ')}`;
 const recordSemanticsRunnerCommand = 'node ci/java_record_semantics_test.mjs --browser';

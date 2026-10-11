@@ -796,7 +796,7 @@ for (const [name, fields] of [
   ]],
   ['Check phase B record semantics contracts', [
     'timeout-minutes: 3',
-    'run: node --test ci/record_component_native_test.cjs ci/record_object_methods_test.cjs ci/java_record_semantics_contract_test.mjs',
+    'run: node --test ci/record_component_native_test.cjs ci/annotated_wildcard_bounds_test.cjs ci/record_object_methods_test.cjs ci/java_record_semantics_contract_test.mjs',
   ]],
   ['Run Java record semantics compatibility', [
     'id: java_record_semantics',
