@@ -67,6 +67,19 @@ function signature(bytes, layout) {
   return attr ? layout.pool[bytes.readUInt16BE(attr.body)].value : null;
 }
 
+test('compiler-facing bootstrap artifact carries the same five nominal overlays as the runtime',
+  {skip: process.env.DOPPIO_VERIFY_SOURCE === '1' ? 'Requires the rebuilt compiler-facing artifact' : false}, () => {
+    const artifact = path.join(root, 'build/modern-bootstrap-overlay/modern-bootstrap.jar');
+    const entries = execFileSync('unzip', ['-Z1', artifact], {encoding: 'utf8', timeout: 10000}).trim().split('\n');
+    for (const name of nominalTypes) {
+      const entry = 'java/lang/' + name + '.class';
+      assert.equal(entries.filter(value => value === entry).length, 1, 'Exact compiler class ' + entry);
+      const bytes = execFileSync('unzip', ['-p', artifact, entry], {timeout: 10000});
+      assert.deepEqual(bytes, applyModernBootstrapOverlays('Ljava/lang/' + name + ';', stock('java/lang/' + name)),
+        'Compiler and runtime must expose identical transformed metadata for ' + name);
+    }
+  });
+
 // Real parsed rt.jar / class-library metadata and real method selection are
 // used below. Hierarchy installation and the frame-readiness seam deliberately
 // isolate dispatch; this unit does not claim full bootstrap linking or genuine
