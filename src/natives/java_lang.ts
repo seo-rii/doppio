@@ -215,8 +215,18 @@ export default function (): any {
             }
           });
         } else {
-          loader.resolveClass(thread, classname, (cls: ReferenceClassData<JVMTypes.java_lang_Object>) => {
-            if (cls != null) {
+          loader.loadClass(thread, classname, (cls: ClassData) => {
+            if (cls instanceof ArrayClassData) {
+              // Array mirrors expose their component and Object superclass
+              // immediately, but this metadata must not verify the component.
+              cls.resolve(thread, ready => {
+                if (ready !== null) {
+                  thread.asyncReturn(ready.getClassObject(thread));
+                }
+              });
+            } else if (cls != null) {
+              // A successfully defined class remains discoverable even if a
+              // later explicit linking attempt recorded a VerifyError.
               thread.asyncReturn(cls.getClassObject(thread));
             }
           });
@@ -929,21 +939,14 @@ export default function (): any {
       return null;
     }
 
-    public static 'defineClass1(Ljava/lang/String;[BIILjava/security/ProtectionDomain;Ljava/lang/String;)Ljava/lang/Class;'(thread: JVMThread, javaThis: JVMTypes.java_lang_ClassLoader, name: JVMTypes.java_lang_String, bytes: JVMTypes.JVMArray<number>, offset: number, len: number, pd: JVMTypes.java_security_ProtectionDomain, source: JVMTypes.java_lang_String): JVMTypes.java_lang_Class {
+    public static 'defineClass1(Ljava/lang/String;[BIILjava/security/ProtectionDomain;Ljava/lang/String;)Ljava/lang/Class;'(thread: JVMThread, javaThis: JVMTypes.java_lang_ClassLoader, name: JVMTypes.java_lang_String, bytes: JVMTypes.JVMArray<number>, offset: number, len: number, pd: JVMTypes.java_security_ProtectionDomain, source: JVMTypes.java_lang_String): void {
       var loader = util.getLoader(thread, javaThis),
-        type = util.int_classname(name.toString()),
-        cls = loader.defineClass(thread, type, util.byteArray2Buffer(bytes.array, offset, len), pd);
-      if (cls == null) {
-        return null;
-      }
+        type = name === null ? null : util.int_classname(name.toString());
       // Definition loads the hierarchy, but does not recursively verify code.
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      cls.resolveHierarchy(thread, (status) => {
-        // NULL status means resolution failed.
-        if (status !== null) {
-          thread.asyncReturn(cls.getClassObject(thread));
-        }
-      }, true);
+      loader.defineClass(thread, type, util.byteArray2Buffer(bytes.array, offset, len), pd, cls => {
+        if (cls !== null) thread.asyncReturn(cls.getClassObject(thread));
+      });
     }
 
     public static 'defineClass2(Ljava/lang/String;Ljava/nio/ByteBuffer;IILjava/security/ProtectionDomain;Ljava/lang/String;)Ljava/lang/Class;'(thread: JVMThread, javaThis: JVMTypes.java_lang_ClassLoader, name: JVMTypes.java_lang_String, b: JVMTypes.java_nio_ByteBuffer, off: number, len: number, pd: JVMTypes.java_security_ProtectionDomain, source: JVMTypes.java_lang_String): JVMTypes.java_lang_Class {
@@ -980,19 +983,12 @@ export default function (): any {
       }
 
       var loader = util.getLoader(thread, javaThis),
-        type = util.int_classname(name.toString()),
-        cls = loader.defineClass(thread, type, bytes, pd);
-      if (cls == null) {
-        return null;
-      }
+        type = name === null ? null : util.int_classname(name.toString());
       // A verifier may be loading this class as metadata for its superclass.
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      cls.resolveHierarchy(thread, (status) => {
-        // NULL status means resolution failed.
-        if (status !== null) {
-          thread.asyncReturn(cls.getClassObject(thread));
-        }
-      }, true);
+      loader.defineClass(thread, type, bytes, pd, cls => {
+        if (cls !== null) thread.asyncReturn(cls.getClassObject(thread));
+      });
     }
 
     public static 'resolveClass0(Ljava/lang/Class;)V'(thread: JVMThread, javaThis: JVMTypes.java_lang_ClassLoader, cls: JVMTypes.java_lang_Class): void {
@@ -1403,12 +1399,12 @@ export default function (): any {
 
   class java_lang_reflect_Proxy {
 
-    public static 'defineClass0(Ljava/lang/ClassLoader;Ljava/lang/String;[BII)Ljava/lang/Class;'(thread: JVMThread, cl: JVMTypes.java_lang_ClassLoader, name: JVMTypes.java_lang_String, bytes: JVMTypes.JVMArray<number>, offset: number, len: number): JVMTypes.java_lang_Class {
-      var loader = util.getLoader(thread, cl),
-        cls = loader.defineClass(thread, util.int_classname(name.toString()), util.byteArray2Buffer(bytes.array, offset, len), null);
-      if (cls != null) {
-        return cls.getClassObject(thread);
-      }
+    public static 'defineClass0(Ljava/lang/ClassLoader;Ljava/lang/String;[BII)Ljava/lang/Class;'(thread: JVMThread, cl: JVMTypes.java_lang_ClassLoader, name: JVMTypes.java_lang_String, bytes: JVMTypes.JVMArray<number>, offset: number, len: number): void {
+      var loader = util.getLoader(thread, cl), type = name === null ? null : util.int_classname(name.toString());
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      loader.defineClass(thread, type, util.byteArray2Buffer(bytes.array, offset, len), null, cls => {
+        if (cls !== null) thread.asyncReturn(cls.getClassObject(thread));
+      });
     }
 
   }
@@ -2621,8 +2617,7 @@ export default function (): any {
     LOOKUP_MODULE = 0x0010,
     LOOKUP_UNCONDITIONAL = 0x0020,
     LOOKUP_ORIGINAL = 0x0040,
-    LOOKUP_MODERN_MODES = 'java/lang/invoke/MethodHandles$Lookup/doppioModernModes',
-    lookupClassDefinitions: Array<{loader: ClassLoader; typeStr: string}> = [];
+    LOOKUP_MODERN_MODES = 'java/lang/invoke/MethodHandles$Lookup/doppioModernModes';
 
   class java_lang_invoke_MethodHandles$Lookup {
     public static getAllowedModes(lookup: JVMTypes.java_lang_invoke_MethodHandles$Lookup): number {
@@ -2808,38 +2803,15 @@ export default function (): any {
         return;
       }
 
-      var typeStr = parsedClass.getInternalName(),
-        reservation: {loader: ClassLoader; typeStr: string},
-        i: number;
-      if (loader.getLoadedClass(typeStr) !== null) {
-        thread.throwNewException('Ljava/lang/LinkageError;', `Duplicate class definition: ${parsedClass.getExternalName()}`);
-        return;
-      }
-      for (i = 0; i < lookupClassDefinitions.length; i++) {
-        if (lookupClassDefinitions[i].loader === loader && lookupClassDefinitions[i].typeStr === typeStr) {
-          thread.throwNewException('Ljava/lang/LinkageError;', `Duplicate class definition: ${parsedClass.getExternalName()}`);
-          return;
-        }
-      }
-
-      reservation = {loader: loader, typeStr: typeStr};
-      lookupClassDefinitions.push(reservation);
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      parsedClass.resolve(thread, (resolvedClass: ClassData) => {
-        var reservationIndex = lookupClassDefinitions.indexOf(reservation);
-        if (reservationIndex !== -1) {
-          lookupClassDefinitions.splice(reservationIndex, 1);
-        }
-        if (resolvedClass === null) {
-          return;
-        }
-        if (loader.getLoadedClass(typeStr) !== null) {
-          thread.throwNewException('Ljava/lang/LinkageError;', `Duplicate class definition: ${parsedClass.getExternalName()}`);
-          return;
-        }
-        loader.addClass(typeStr, parsedClass);
-        thread.asyncReturn(parsedClass.getClassObject(thread));
-      }, false);
+      loader.defineParsedClass(thread, parsedClass, definedClass => {
+        if (definedClass === null) return;
+        // Named derivation has succeeded. A verification failure is retained on
+        // that exact published class, not rolled back into a retryable name.
+        definedClass.resolve(thread, resolvedClass => {
+          if (resolvedClass !== null) thread.asyncReturn(definedClass.getClassObject(thread));
+        }, false);
+      });
     }
   }
 

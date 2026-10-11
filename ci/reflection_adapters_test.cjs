@@ -30,7 +30,8 @@ const {ClassLoader} = load('ClassLoader');
 const {BytecodeStackFrame, InternalStackFrame} = load('threading');
 const {ThreadStatus} = require(path.join(runtime, 'src/enums'));
 const {decodeMethodCode} = load('BytecodeVerifier');
-const {prepareReflectionClass, installReflectionAdapters, getReflectionGenerationProvenance} = load('ReflectionAdapters');
+const {prepareReflectionClass, installReflectionAdapters, getReflectionGenerationProvenance,
+  canAccessReflectionSuperclass} = load('ReflectionAdapters');
 const generatorName = 'Lsun/reflect/MethodAccessorGenerator;', actionName = 'Lsun/reflect/MethodAccessorGenerator$1;';
 const generatorPrefix = 'sun/reflect/MethodAccessorGenerator/', actionPrefix = 'sun/reflect/MethodAccessorGenerator$1/';
 const commonPrefix = 'sun/reflect/AccessorGenerator/';
@@ -116,9 +117,12 @@ function world(serialization = false, options = {}) {
     methods: [constructor('java/lang/Throwable', '(Ljava/lang/String;)V')]});
   add({name: 'java/lang/reflect/InvocationTargetException', superclass: 'java/lang/Throwable',
     methods: [constructor('java/lang/Throwable', '(Ljava/lang/Throwable;)V')]});
-  for (const name of ['ConstructorAccessorImpl', 'SerializationConstructorAccessorImpl']) {
-    add({name: 'sun/reflect/' + name, methods: [constructor()]});
-  }
+  const loadAccessorParents = () => {
+    for (const name of ['ConstructorAccessorImpl', 'SerializationConstructorAccessorImpl']) {
+      add({name: 'sun/reflect/' + name, flags: options.packagePrivateParents ? 0x20 : 0x21, methods: [constructor()]});
+    }
+  };
+  if (!options.deferAccessorParents) loadAccessorParents();
   const parent = add({name: 'probe/Parent', methods: [constructor()]}),
     child = add({name: 'probe/Child', superclass: 'probe/Parent', methods: [constructor('probe/Parent')]});
   assert.equal(child.tryToResolve(), true);
@@ -160,7 +164,7 @@ function world(serialization = false, options = {}) {
   const definition = {className: generated.name, bytes: generated.bytes, sourceBytes,
     offset: 0, length: generated.bytes.length, loader, protectionDomain: null};
   return {bootstrap, loader, loaderObject, parent, child, objectClass, generatorClass, actionClass,
-    factory, action, generateFrame, actionFrame, definerFrame, frames, thread, definition};
+    factory, action, generateFrame, actionFrame, definerFrame, frames, thread, definition, loadAccessorParents};
 }
 function parsed(w, bytes = w.definition.bytes) { return new ReferenceClassData(bytes, null, w.loader); }
 function method(cls, name) { return cls.getMethods().find(item => item.name === name); }
@@ -215,6 +219,45 @@ test('trusted ordinary and serialization accessors pass the full verifier after 
       assert.equal(m.declaredCode, null);
     }
   }
+});
+
+test('only a proven reflection candidate can derive from the exact package-private bootstrap parent', () => {
+  for (const serialization of [false, true]) {
+    const w = world(serialization, {packagePrivateParents: true}), untrusted = parsed(w), {cls, preparation} = adapted(w);
+    const parent = w.bootstrap.getLoadedClass(cls.getSuperClassReference().name);
+    assert.equal(canAccessReflectionSuperclass(untrusted, parent), false);
+    assert.equal(untrusted.tryToResolveHierarchy(), false);
+    assert.equal(canAccessReflectionSuperclass(cls, parent), true);
+    assert.equal(cls.tryToResolve(), true);
+    const lookalike = parsed(w, preparation.bytes);
+    assert.equal(canAccessReflectionSuperclass(lookalike, parent), false, 'Bytes and name do not transfer the capability');
+    assert.equal(lookalike.tryToResolveHierarchy(), false);
+    assert.throws(() => installReflectionAdapters({...preparation}, lookalike), /Unproven reflection/);
+  }
+});
+
+test('reflection superclass capability works when the real bootstrap parent loads after preparation', () => {
+  const w = world(true, {packagePrivateParents: true, deferAccessorParents: true});
+  const {cls} = adapted(w), parentName = cls.getSuperClassReference().name;
+  assert.equal(w.bootstrap.getLoadedClass(parentName), null);
+  assert.equal(cls.tryToResolveHierarchy(), false, 'Preparation does not load or invent a parent');
+  assert.equal(cls.isVerified(), false);
+  w.loadAccessorParents();
+  const parent = w.bootstrap.getLoadedClass(parentName);
+  assert.equal(canAccessReflectionSuperclass(cls, parent), true);
+  assert.equal(cls.tryToResolve(), true);
+});
+
+test('reflection superclass capability does not admit another loader or same-name parent identity', () => {
+  const w = world(true, {packagePrivateParents: true}), {cls, preparation} = adapted(w);
+  const otherLoader = new ClassLoader(w.bootstrap), parentName = cls.getSuperClassReference().name;
+  const forgedParent = new ReferenceClassData(classBytes({name: parentName.slice(1, -1), flags: 0x20}), null, otherLoader);
+  assert.equal(canAccessReflectionSuperclass(cls, forgedParent), false);
+  cls.getSuperClassReference().cls = forgedParent;
+  assert.equal(cls.tryToResolveHierarchy(), false);
+  const otherCandidate = new ReferenceClassData(preparation.bytes, null, otherLoader);
+  assert.throws(() => installReflectionAdapters(preparation, otherCandidate), /Unproven reflection/);
+  assert.equal(canAccessReflectionSuperclass(otherCandidate, w.bootstrap.getLoadedClass(parentName)), false);
 });
 
 test('exception helper adapter invokes the exact Object method instead of a virtual receiver override', () => {

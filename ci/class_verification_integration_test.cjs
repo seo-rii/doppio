@@ -396,10 +396,13 @@ function hierarchyWorld() {
   child.cls.superClassRef = new ClassReference(parent.cls.getInternalName());
   const mirror = {$cls: child.cls};
   child.cls.getClassObject = () => mirror;
-  loader.defineClass = (thread, name) => {
+  loader.defineClass = (thread, name, bytes, protectionDomain, callback, prepare) => {
     assert.equal(name, child.cls.getInternalName());
-    loader.addClass(name, child.cls);
-    return child.cls;
+    if (prepare) prepare(child.cls);
+    child.cls.resolveHierarchy(thread, admitted => {
+      if (admitted !== null) loader.addClass(name, child.cls);
+      callback(admitted);
+    }, false);
   };
   return {loader, parent, child, mirror};
 }

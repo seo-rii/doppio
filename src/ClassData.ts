@@ -18,6 +18,7 @@ import * as JVMTypes from '../includes/JVMTypes';
 import {setImmediate} from 'browserfs';
 import {validateBinaryClassName} from './classfile_validation';
 import {ClassVerification} from './ClassVerification';
+import {canAccessReflectionSuperclass} from './ReflectionAdapters';
 
 const trace = logging.trace;
 const debug = logging.debug;
@@ -659,31 +660,28 @@ export class ArrayClassData<T> extends ClassData {
     return this.superClass.fieldLookup(name);
   }
 
-  /**
-   * Resolve the class.
-   */
+  /** Array metadata does not verify or initialize its component class. */
   public resolve(thread: JVMThread, cb: (cdata: ClassData) => void, explicit: boolean = true): void {
     if (this.isResolved()) {
       // Short circuit.
       setImmediate(() => cb(this));
       return;
     }
-    asyncForEach(["Ljava/lang/Object;", this.componentClassName], (cls: string, nextItem: (err?: any) => void) => {
-      this.loader.resolveClass(thread, cls, (cdata: ClassData) => {
-        if (cdata !== null) {
-          nextItem();
-        } else {
-          nextItem("Failed.");
-        }
-      });
-    }, (err?: any) => {
-      if (!err) {
-        this.setResolved(<ReferenceClassData<JVMTypes.java_lang_Object>> this.loader.getResolvedClass("Ljava/lang/Object;"), this.loader.getResolvedClass(this.componentClassName));
-        cb(this);
-      } else {
-        cb(null);
-      }
-    });
+    this.loader.bootstrap.loadClass(thread, 'Ljava/lang/Object;', superclass => {
+      if (superclass === null) { cb(null); return; }
+      this.loader.loadClass(thread, this.componentClassName, component => {
+        if (component === null) { cb(null); return; }
+        var complete = (metadata: ClassData) => {
+          if (metadata === null) { cb(null); return; }
+          this.setResolved(<ReferenceClassData<JVMTypes.java_lang_Object>> superclass, metadata);
+          cb(this);
+        };
+        // Each rank needs its own component pointer, but an element's Code and
+        // initializer are irrelevant to creation of an array of that element.
+        if (component instanceof ArrayClassData) component.resolve(thread, complete, explicit);
+        else complete(component);
+      }, explicit);
+    }, explicit);
   }
 
   public getComponentClass(): ClassData {
@@ -701,10 +699,11 @@ export class ArrayClassData<T> extends ClassData {
 
   public tryToResolve(): boolean {
     var loader = this.loader,
-      superClassCdata = <ReferenceClassData<JVMTypes.java_lang_Object>> loader.getResolvedClass("Ljava/lang/Object;"),
-      componentClassCdata = loader.getResolvedClass(this.componentClassName);
+      superClassCdata = <ReferenceClassData<JVMTypes.java_lang_Object>> loader.bootstrap.getLoadedClass("Ljava/lang/Object;"),
+      componentClassCdata = loader.getLoadedClass(this.componentClassName);
 
-    if (superClassCdata === null || componentClassCdata === null) {
+    if (superClassCdata === null || componentClassCdata === null ||
+        componentClassCdata instanceof ArrayClassData && !componentClassCdata.tryToResolve()) {
       return false;
     } else {
       this.setResolved(superClassCdata, componentClassCdata);
@@ -732,10 +731,11 @@ export class ArrayClassData<T> extends ClassData {
       if (target.accessFlags.isInterface()) {
         // Interface reference type
         var type = target.getInternalName();
-        return type === 'Ljava/lang/Cloneable;' || type === 'Ljava/io/Serializable;';
+        return (type === 'Ljava/lang/Cloneable;' || type === 'Ljava/io/Serializable;') &&
+          target === this.loader.bootstrap.getLoadedClass(type);
       }
       // Non-interface reference type
-      return target.getInternalName() === 'Ljava/lang/Object;';
+      return target === this.loader.bootstrap.getLoadedClass('Ljava/lang/Object;');
     }
     // We are both array types, so it only matters if my component type can be
     // cast to its component type.
@@ -1503,19 +1503,36 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
 
   public isHierarchyResolved(): boolean { return super.isResolved(); }
 
+  /** JVMS 5.3.5 admission, without linking or initializing a parent. */
+  private hierarchyParentError(parent: ReferenceClassData<JVMTypes.java_lang_Object>,
+      isInterface: boolean): [string, string] {
+    var samePackage = this.loader === parent.getLoader() && this.getPackageName() === parent.getPackageName();
+    if (!parent.accessFlags.isPublic() && !samePackage &&
+        (isInterface || !canAccessReflectionSuperclass(this, parent))) {
+      return ['Ljava/lang/IllegalAccessError;', this.getExternalName() + ' cannot access ' + parent.getExternalName()];
+    }
+    if (parent.accessFlags.isInterface() !== isInterface || !isInterface && parent.accessFlags.isFinal()) {
+      return ['Ljava/lang/IncompatibleClassChangeError;', this.getExternalName() + ' has invalid ' +
+        (isInterface ? 'superinterface ' : 'superclass ') + parent.getExternalName()];
+    }
+    return null;
+  }
+
   /** Loading metadata must not recursively verify the referenced classes. */
   public tryToResolveHierarchy(ancestors: Set<ReferenceClassData<JVMTypes.java_lang_Object>> = new Set()): boolean {
     if (this.isHierarchyResolved()) return true;
     if (ancestors.has(this)) return false;
     var path = new Set(ancestors), refs = this.interfaceRefs.slice(), parents: ReferenceClassData<JVMTypes.java_lang_Object>[] = [];
     path.add(this);
-    if (this.superClassRef !== null) refs.push(this.superClassRef);
+    if (this.superClassRef !== null) refs.unshift(this.superClassRef);
     for (var i = 0; i < refs.length; i++) {
       var parent = <ReferenceClassData<JVMTypes.java_lang_Object>> (refs[i].cls || this.loader.getLoadedClass(refs[i].name));
-      if (parent === null || !(parent instanceof ReferenceClassData) || !parent.tryToResolveHierarchy(path)) return false;
+      if (parent === null || !(parent instanceof ReferenceClassData) ||
+          this.hierarchyParentError(parent, this.superClassRef === null || i !== 0) !== null ||
+          !parent.tryToResolveHierarchy(path)) return false;
       parents.push(parent);
     }
-    var superClazz = this.superClassRef !== null ? parents.pop() : null;
+    var superClazz = this.superClassRef !== null ? parents.shift() : null;
     if (this.getUnpermittedSealedSupertype(superClazz, parents) !== null) return false;
     this.setResolved(superClazz, parents);
     return true;
@@ -1619,7 +1636,7 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
       }
       // Only I am an interface
       if (!target.accessFlags.isInterface()) {
-        return target.getInternalName() === 'Ljava/lang/Object;';
+        return target === this.loader.bootstrap.getLoadedClass('Ljava/lang/Object;');
       }
     } else {
       // I am a regular class, target is an interface
@@ -1635,7 +1652,7 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
    * Returns 'true' if I implement the target interface.
    */
   public isSubinterface(target: ClassData): boolean {
-    if (this.className === target.getInternalName()) {
+    if (this === target) {
       return true;
     }
     var ifaces = this.getInterfaces();
@@ -1807,12 +1824,21 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     if (ancestors.has(this)) { fail('Ljava/lang/ClassCircularityError;', this.getExternalName()); return; }
     var path = new Set(ancestors), refs = this.interfaceRefs.slice(), parents: ReferenceClassData<JVMTypes.java_lang_Object>[] = [];
     path.add(this);
-    if (this.superClassRef !== null) refs.push(this.superClassRef);
+    if (this.superClassRef !== null) refs.unshift(this.superClassRef);
     asyncForEach(refs, (ref: ClassReference, next: (err?: any) => void) => {
       var loaded = (parent: ClassData) => {
         if (parent === null) { next(true); return; }
         if (!(parent instanceof ReferenceClassData)) {
           if (thread !== null) thread.throwNewException('Ljava/lang/IncompatibleClassChangeError;', ref.name);
+          next(true);
+          return;
+        }
+        // One constant-pool entry can appear in both super_class and interfaces.
+        // The header position, not ClassReference identity, determines its role.
+        var admissionError = this.hierarchyParentError(parent, this.superClassRef === null || parents.length !== 0);
+        if (admissionError !== null) {
+          if (thread === null) logging.error('JVM bootstrap hierarchy failed: ' + admissionError[1]);
+          else thread.throwNewException(admissionError[0], admissionError[1]);
           next(true);
           return;
         }
@@ -1822,10 +1848,10 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
         }, explicit, path);
       };
       if (ref.cls !== null) loaded(ref.cls);
-      else this.loader.loadClass(thread, ref.name, loaded, explicit);
+      else this.loader.loadClass(thread, ref.name, loaded, explicit, path);
     }, (err?: any) => {
       if (err) { cb(null); return; }
-      var superClazz = this.superClassRef !== null ? parents.pop() : null,
+      var superClazz = this.superClassRef !== null ? parents.shift() : null,
         sealedSupertype = this.getUnpermittedSealedSupertype(superClazz, parents);
       if (sealedSupertype !== null) {
         fail('Ljava/lang/IncompatibleClassChangeError;', `${this.getExternalName()} cannot inherit from sealed ${sealedSupertype.getExternalName()}`);

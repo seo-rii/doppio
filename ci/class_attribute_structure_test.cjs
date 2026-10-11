@@ -8,9 +8,25 @@ const ByteStream = require(path.join(runtimeRoot, 'src/ByteStream')).default;
 const {ConstantPool} = require(path.join(runtimeRoot, 'src/ConstantPool'));
 const {makeAttributes, Code, StackMapTable} = require(path.join(runtimeRoot, 'src/attributes'));
 const {ClassLoader} = require(path.join(runtimeRoot, 'src/ClassLoader'));
+const {ReferenceClassData} = require(path.join(runtimeRoot, 'src/ClassData'));
 
 const u2 = (value) => { const bytes = Buffer.alloc(2); bytes.writeUInt16BE(value); return bytes; };
 const u4 = (value) => { const bytes = Buffer.alloc(4); bytes.writeUInt32BE(value); return bytes; };
+
+async function defineAttributeProbe(bytes) {
+  const {poolBytes, objectClassIndex} = fixture(), loader = new ClassLoader(null), errors = [];
+  loader.bootstrap = loader;
+  const object = new ReferenceClassData(Buffer.concat([u4(0xcafebabe), u2(0), u2(52), poolBytes,
+    u2(0x21), u2(objectClassIndex), u2(0), u2(0), u2(0), u2(0), u2(0)]), null, loader);
+  object.setResolved(null, []);
+  loader.addClass('Ljava/lang/Object;', object);
+  const owner = {throwNewException(type, message) { errors.push({type, message}); },
+    // The focused attribute probes use an already-admitted Object parent.
+    // Real exception fan-out and failed admission have their own loader units.
+    runWithExceptionBoundary(operation, callback) { operation(value => callback(null, value)); }};
+  const cls = await new Promise(resolve => loader.defineClass(owner, 'LProbe;', bytes, null, resolve));
+  return {cls, errors};
+}
 
 function fixture() {
   const items = [];
@@ -153,7 +169,7 @@ test('instance ConstantValue attributes are ignored while their envelopes remain
   assert.equal(makeAttributes(table(attribute('Signature', u2(names.Probe))), pool, 'field', 65, false).length, 1);
 });
 
-test('the compiled class loader ignores non-static ConstantValue contents and duplicates', () => {
+test('the compiled class loader ignores non-static ConstantValue contents and duplicates', async () => {
   const {poolBytes, names, classIndex, objectClassIndex, attribute} = fixture();
   for (const major of [65, 69]) {
     for (const isStatic of [false, true]) {
@@ -163,9 +179,7 @@ test('the compiled class loader ignores non-static ConstantValue contents and du
           u2(0x21), u2(classIndex), u2(objectClassIndex), u2(0), u2(1),
           u2(isStatic ? 0x9 : 0x1), u2(names.element), u2(names.I), u2(attrs.length), ...attrs,
           u2(0), u2(0)]);
-        const errors = [];
-        const loader = new ClassLoader(null);
-        const cls = loader.defineClass({throwNewException(type, message) { errors.push({type, message}); }}, 'LProbe;', bytes, null);
+        const {cls, errors} = await defineAttributeProbe(bytes);
         if (isStatic) {
           assert.equal(cls, null);
           assert.equal(errors[0].type, 'Ljava/lang/ClassFormatError;');
@@ -318,7 +332,7 @@ test('annotation marker scanning stays within opaque bytes and does not reject d
   }
 });
 
-test('the compiled class loader preserves opaque annotation payloads without rejecting definition', () => {
+test('the compiled class loader preserves opaque annotation payloads without rejecting definition', async () => {
   const {poolBytes, names, classIndex, objectClassIndex, attribute} = fixture();
   const payloads = [Buffer.alloc(0), Buffer.from([0]), Buffer.from([0, 0, 255]),
     Buffer.concat([u2(1), u2(names['Ljava/lang/invoke/LambdaForm$Hidden;']), u2(1), u2(names.element), Buffer.from([255])])];
@@ -333,9 +347,7 @@ test('the compiled class loader preserves opaque annotation payloads without rej
           u2(0x21), u2(classIndex), u2(objectClassIndex), u2(0), u2(0), u2(1),
           u2(0x9), u2(names.probe), u2(names['()V']), u2(methodAttrs.length), ...methodAttrs,
           u2(classAttrs.length), ...classAttrs]);
-        const errors = [];
-        const loader = new ClassLoader(null);
-        const cls = loader.defineClass({throwNewException(type, message) { errors.push({type, message}); }}, 'LProbe;', bytes, null);
+        const {cls, errors} = await defineAttributeProbe(bytes);
         assert.deepEqual(errors, [], `${major} ${name}: ${payload.toString('hex')}`);
         assert.ok(cls);
         assert.equal(cls.getAttribute('SourceFile').filename, 'Probe.java');

@@ -3480,6 +3480,35 @@ export function applyModernBootstrapOverlays(typeStr: string, data: Buffer): Buf
   return data;
 }
 
+export type ClassDerivationPath = Set<ReferenceClassData<JVMTypes.java_lang_Object>>;
+
+interface ClassDefinitionRequest {
+  thread: JVMThread;
+  candidate: ReferenceClassData<JVMTypes.java_lang_Object>;
+  callback: (cls: ReferenceClassData<JVMTypes.java_lang_Object>) => void;
+  prepare?: (candidate: ReferenceClassData<JVMTypes.java_lang_Object>) => void;
+  ancestry: ClassDerivationPath;
+}
+
+interface PendingClassDefinition {
+  request: ClassDefinitionRequest;
+  definitions: ClassDefinitionRequest[];
+  loads: {thread: JVMThread; callback: (cls: ClassData) => void}[];
+}
+
+// Only actual Java loader invocation frames carry this context. Inferring it
+// from a thread id would mistake unrelated metadata waiters for derivation
+// cycles. A popped frame cannot leak ancestry into a subsequent invocation.
+var definitionContexts = new WeakMap<object, ClassDerivationPath>();
+function definitionAncestry(thread: JVMThread): ClassDerivationPath {
+  var stack: object[] = thread === null ? [] : (<any> thread).stack || [];
+  for (var i = stack.length - 1; i >= 0; i--) {
+    var context = definitionContexts.get(stack[i]);
+    if (context) return context;
+  }
+  return new Set();
+}
+
 /**
  * Base classloader class. Contains common class resolution and instantiation
  * logic.
@@ -3489,6 +3518,9 @@ export abstract class ClassLoader {
    * Stores loaded *reference* and *array* classes.
    */
   private loadedClasses: { [typeStr: string]: ClassData } = {};
+  /** Candidates are not part of the initiating-loader namespace until every
+   * direct-supertype admission check has succeeded. */
+  private pendingDefinitions: { [typeStr: string]: PendingClassDefinition } = {};
   /**
    * Stores callbacks that are waiting for another thread to finish loading
    * the specified class.
@@ -3547,36 +3579,112 @@ export abstract class ClassLoader {
    * @param protectionDomain The protection domain for the class (can be NULL).
    * @return The defined class, or null if there was an issue.
    */
-  public defineClass<T extends JVMTypes.java_lang_Object>(thread: JVMThread, typeStr: string, data: Buffer, protectionDomain: JVMTypes.java_security_ProtectionDomain): ReferenceClassData<T> {
-    if (this.getClass(typeStr) != null) {
-      if (thread === null) {
-        error(`JVM initialization failed: duplicate class definition ${typeStr}`);
-      } else {
-        thread.throwNewException('Ljava/lang/LinkageError;', `Duplicate class definition: ${ext_classname(typeStr)}`);
-      }
-      return null;
-    }
+  public defineClass<T extends JVMTypes.java_lang_Object>(thread: JVMThread, typeStr: string | null, data: Buffer,
+      protectionDomain: JVMTypes.java_security_ProtectionDomain, cb: (cls: ReferenceClassData<T>) => void,
+      prepare?: (candidate: ReferenceClassData<T>) => void, ancestry?: ClassDerivationPath): void {
+    var candidate: ReferenceClassData<T>;
     try {
-      var classData = new ReferenceClassData<T>(data, protectionDomain, this);
-      this.addClass(typeStr, classData);
-      if (this instanceof BootstrapClassLoader) {
-        debug(`[BOOTSTRAP] Defining class ${typeStr}`);
-      } else {
-        debug(`[CUSTOM] Defining class ${typeStr}`);
-      }
-      return classData;
+      candidate = new ReferenceClassData<T>(data, protectionDomain, this);
     } catch (e) {
-      if (thread === null) {
-        // This will only happen when we're loading java/lang/Thread for
-        // the very first time.
-        error(`JVM initialization failed: ${e}`);
-        error(e.stack);
-      } else {
-        thread.throwNewException(e instanceof ClassFileVersionError ?
-          'Ljava/lang/UnsupportedClassVersionError;' : 'Ljava/lang/ClassFormatError;',
-          e && e.message ? e.message : String(e));
+      this.definitionError(thread, e instanceof ClassFileVersionError ?
+        'Ljava/lang/UnsupportedClassVersionError;' : 'Ljava/lang/ClassFormatError;', e && e.message ? e.message : String(e));
+      cb(null);
+      return;
+    }
+    if ((candidate.accessFlags.getRawByte() & 0x8000) !== 0) {
+      this.definitionError(thread, 'Ljava/lang/NoClassDefFoundError;', 'A module descriptor does not define a class');
+      cb(null);
+      return;
+    }
+    if (typeStr !== null && typeStr !== candidate.getInternalName()) {
+      this.definitionError(thread, 'Ljava/lang/NoClassDefFoundError;',
+        ext_classname(typeStr) + ' (wrong name: ' + candidate.getExternalName() + ')');
+      cb(null);
+      return;
+    }
+    this.deriveClass({thread, candidate, callback: cb, prepare,
+      ancestry: new Set(ancestry || definitionAncestry(thread))});
+  }
+
+  /** Lookup has already parsed and checked its package before deriving this
+   * exact candidate. Later verification failure does not undo its definition. */
+  public defineParsedClass<T extends JVMTypes.java_lang_Object>(thread: JVMThread, candidate: ReferenceClassData<T>,
+      cb: (cls: ReferenceClassData<T>) => void, ancestry?: ClassDerivationPath): void {
+    if (candidate.getLoader() !== this) throw new Error('Definition candidate belongs to another loader');
+    this.deriveClass({thread, candidate, callback: cb, ancestry: new Set(ancestry || definitionAncestry(thread))});
+  }
+
+  protected definitionError(thread: JVMThread, name: string, message: string): void {
+    if (thread === null) error('JVM bootstrap definition failed: ' + name + ': ' + message);
+    else thread.throwNewException(name, message);
+  }
+
+  private deriveClass(request: ClassDefinitionRequest): void {
+    var candidate = request.candidate, name = candidate.getInternalName(), pending = this.pendingDefinitions[name];
+    if (this.getClass(name) != null) {
+      this.definitionError(request.thread, 'Ljava/lang/LinkageError;', 'Duplicate class definition: ' + candidate.getExternalName());
+      request.callback(null);
+      return;
+    }
+    if (pending) {
+      if (request.ancestry.has(pending.request.candidate)) {
+        this.definitionError(request.thread, 'Ljava/lang/ClassCircularityError;', candidate.getExternalName());
+        request.callback(null);
+      } else pending.definitions.push(request);
+      return;
+    }
+    pending = this.pendingDefinitions[name] = {request, definitions: [], loads: []};
+    var complete = (failure: JVMTypes.java_lang_Throwable, result: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+      // No failure (including a later loadClass/verification failure) may remove
+      // an already published identity. Only this reservation is being retired.
+      delete this.pendingDefinitions[name];
+      if (result !== null) this.addClass(name, result);
+      var notified = new Set<JVMThread>();
+      if (failure !== null && request.thread !== null) {
+        notified.add(request.thread);
+        request.thread.throwException(failure);
       }
-      return null;
+      request.callback(result);
+      pending.loads.forEach(waiter => {
+        if (result === null && waiter.thread !== null && !notified.has(waiter.thread)) {
+          notified.add(waiter.thread);
+          if (failure !== null) waiter.thread.throwException(failure);
+          else this.definitionError(waiter.thread, 'Ljava/lang/NoClassDefFoundError;', candidate.getExternalName());
+        }
+        waiter.callback(result);
+      });
+      // These are distinct define requests, not loads sharing the first result.
+      // A losing request checks the published identity or tries its own bytes.
+      if (pending.definitions.length !== 0) setImmediate(() => {
+        pending.definitions.forEach(next => this.deriveClass(next));
+      });
+    };
+    var admit = (done: (cls: ReferenceClassData<JVMTypes.java_lang_Object>) => void) => {
+      if (request.prepare) {
+        try { request.prepare(candidate); }
+        catch (failure) {
+          this.definitionError(request.thread, 'Ljava/lang/ClassFormatError;',
+            failure && failure.message ? failure.message : String(failure));
+          done(null);
+          return;
+        }
+      }
+      candidate.resolveHierarchy(request.thread, cls => {
+        var previous = this.getClass(name);
+        // Delegated loading can establish an initiating identity while this
+        // candidate waits for a parent. Check immediately before publication.
+        if (cls !== null && previous != null && previous !== cls) {
+          this.definitionError(request.thread, 'Ljava/lang/LinkageError;', 'Conflicting initiating-loader identity: ' + candidate.getExternalName());
+          done(null);
+        } else done(<ReferenceClassData<JVMTypes.java_lang_Object>> cls);
+      }, false, request.ancestry);
+    };
+    if (request.thread === null) {
+      admit(cls => complete(null, cls));
+    } else {
+      request.thread.runWithExceptionBoundary<ReferenceClassData<JVMTypes.java_lang_Object>>(done => {
+        admit(cls => { if (cls !== null) done(cls); });
+      }, (failure, cls) => complete(failure, failure ? null : cls));
     }
   }
 
@@ -3668,13 +3776,24 @@ export abstract class ClassLoader {
   /**
    * Asynchronously loads the given class.
    */
-  public loadClass(thread: JVMThread, typeStr: string, cb: (cdata: ClassData) => void, explicit: boolean = true): void {
+  public loadClass(thread: JVMThread, typeStr: string, cb: (cdata: ClassData) => void, explicit: boolean = true,
+      ancestry: ClassDerivationPath = new Set()): void {
     // See if we can grab this synchronously first.
     var cdata = this.getLoadedClass(typeStr);
     if (cdata) {
       setImmediate(() => {
         cb(cdata);
       });
+    } else if (this.pendingDefinitions[typeStr]) {
+      var pending = this.pendingDefinitions[typeStr];
+      if (ancestry.has(pending.request.candidate)) {
+        this.definitionError(thread, 'Ljava/lang/ClassCircularityError;', ext_classname(typeStr));
+        cb(null);
+      } else {
+        // In particular, independent verification requests on the same thread
+        // are waiters, not evidence of an inheritance cycle.
+        pending.loads.push({thread, callback: cb});
+      }
     } else {
       // Check the loadClass lock for this class.
       if (this.loadClassLocks.tryLock(typeStr, thread, cb, explicit, (failure, ownerExplicit) => {
@@ -3693,11 +3812,11 @@ export abstract class ClassLoader {
       })) {
         var load = (done: (loaded: ClassData) => void): void => {
           if (is_reference_type(typeStr)) {
-            this._loadClass(thread, typeStr, done, explicit);
+            this._loadClass(thread, typeStr, done, explicit, ancestry);
           } else {
             this.loadClass(thread, get_component_type(typeStr), component => {
               done(component === null ? null : this.getLoadedClass(typeStr));
-            }, explicit);
+            }, explicit, ancestry);
           }
         };
         if (thread === null) {
@@ -3724,7 +3843,8 @@ export abstract class ClassLoader {
    *
    * Should never be invoked directly! Use loadClass.
    */
-  protected abstract _loadClass(thread: JVMThread, typeStr: string, cb: (cdata: ClassData) => void, explicit?: boolean): void;
+  protected abstract _loadClass(thread: JVMThread, typeStr: string, cb: (cdata: ClassData) => void,
+    explicit?: boolean, ancestry?: ClassDerivationPath): void;
 
   /**
    * Convenience function: Resolve many classes. Calls cb with null should
@@ -3888,7 +4008,8 @@ export class BootstrapClassLoader extends ClassLoader {
    *
    * SHOULD ONLY BE INVOKED INTERNALLY BY THE CLASSLOADER.
    */
-  protected _loadClass(thread: JVMThread, typeStr: string, cb: (cdata: ClassData) => void, explicit: boolean = true): void {
+  protected _loadClass(thread: JVMThread, typeStr: string, cb: (cdata: ClassData) => void, explicit: boolean = true,
+      ancestry: ClassDerivationPath = new Set()): void {
     debug(`[BOOTSTRAP] Loading class ${typeStr}`);
     // This method is only valid for reference types!
     assert(is_reference_type(typeStr));
@@ -3924,14 +4045,13 @@ export class BootstrapClassLoader extends ClassLoader {
     }, (pItem?: IClasspathItem) => {
       if (pItem) {
         clsData = applyModernBootstrapOverlays(typeStr, clsData);
-        let cls = this.defineClass(thread, typeStr, clsData, null);
-        if (cls !== null) {
-          this._registerLoadedClass(clsFilePath, pItem);
-        }
-        cb(cls);
+        this.defineClass(thread, typeStr, clsData, null, cls => {
+          if (cls !== null) this._registerLoadedClass(clsFilePath, pItem);
+          cb(cls);
+        }, undefined, ancestry);
       } else {
         if (typeStr === 'Ljava/lang/Record;') {
-          let cls = this.defineClass(thread, typeStr, Buffer.from([
+          this.defineClass(thread, typeStr, Buffer.from([
             0xca, 0xfe, 0xba, 0xbe, 0x00, 0x00, 0x00, 0x34, 0x00, 0x0a,
             0x07, 0x00, 0x02,
             0x01, 0x00, 0x10, 0x6a, 0x61, 0x76, 0x61, 0x2f, 0x6c, 0x61, 0x6e, 0x67, 0x2f, 0x52, 0x65, 0x63, 0x6f, 0x72, 0x64,
@@ -3950,8 +4070,7 @@ export class BootstrapClassLoader extends ClassLoader {
             0x2a, 0xb7, 0x00, 0x08, 0xb1,
             0x00, 0x00, 0x00, 0x00,
             0x00, 0x00
-          ]), null);
-          cb(cls);
+          ]), null, cb, undefined, ancestry);
           return;
         }
         // No such class.
@@ -4024,32 +4143,44 @@ export class CustomClassLoader extends ClassLoader {
    * @param explicit 'True' if loadClass was explicitly invoked by the program,
    *   false otherwise. This changes the exception/error that we throw.
    */
-  protected _loadClass(thread: JVMThread, typeStr: string, cb: (cdata: ClassData) => void, explicit: boolean = true): void {
+  protected _loadClass(thread: JVMThread, typeStr: string, cb: (cdata: ClassData) => void, explicit: boolean = true,
+      ancestry: ClassDerivationPath = new Set()): void {
     debug(`[CUSTOM] Loading class ${typeStr}`);
     // This method is only valid for reference types!
     assert(is_reference_type(typeStr));
     // Invoke the custom class loader.
+    var stack: object[] = (<any> thread).stack || [], previousDepth = stack.length;
     this.loaderObj['loadClass(Ljava/lang/String;)Ljava/lang/Class;'](thread, [initString(this.bootstrap, ext_classname(typeStr))], (e?: JVMTypes.java_lang_Throwable, jco?: JVMTypes.java_lang_Class) => {
       if (e) {
         // Exception! There was an issue defining the class.
         // A loader may explicitly link a class before returning it. Preserve
         // verification and other linkage failures, not only format/version
         // errors, instead of hiding them as missing-class failures.
-        var linkageError = this.bootstrap.getLoadedClass('Ljava/lang/LinkageError;');
-        if (linkageError !== null && e.getClass().isCastable(linkageError)) {
-          thread.throwException(e);
-        } else {
+        var notFound = this.bootstrap.getLoadedClass('Ljava/lang/ClassNotFoundException;');
+        if (notFound !== null && e.getClass().isCastable(notFound)) {
           this.throwClassNotFoundException(thread, typeStr, explicit);
-        }
+        } else thread.throwException(e);
         cb(null);
       } else {
         // Add the class returned by loadClass, in case the classloader
         // proxied loading to another classloader.
-        var cls = jco.$cls;
+        var cls = jco && jco.$cls;
+        if (!(cls instanceof ReferenceClassData) || cls.getInternalName() !== typeStr) {
+          this.definitionError(thread, 'Ljava/lang/NoClassDefFoundError;', ext_classname(typeStr));
+          cb(null);
+          return;
+        }
+        var previous = this.getClass(typeStr);
+        if (previous != null && previous !== cls) {
+          this.definitionError(thread, 'Ljava/lang/LinkageError;', 'Conflicting initiating-loader identity: ' + ext_classname(typeStr));
+          cb(null);
+          return;
+        }
         this.addClass(typeStr, cls);
         cb(cls);
       }
     });
+    if (stack.length > previousDepth) definitionContexts.set(stack[stack.length - 1], new Set(ancestry));
   }
 
   /**

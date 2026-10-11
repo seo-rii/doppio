@@ -12,7 +12,7 @@ assert.ok(new ClassFile.ClassFileVersionError('probe') instanceof ClassFile.Clas
 
 // Structurally valid, method-free class. Header mutations are format probes,
 // not evidence of source-language support for the selected class-file version.
-function classBytes(major, minor) {
+function classBytes(major, minor, object = false) {
   const header = Buffer.alloc(10);
   header.writeUInt32BE(0xcafebabe, 0);
   header.writeUInt16BE(minor, 4);
@@ -28,25 +28,43 @@ function classBytes(major, minor) {
   const body = Buffer.alloc(14);
   body.writeUInt16BE(0x21, 0);
   body.writeUInt16BE(2, 2);
-  body.writeUInt16BE(4, 4);
-  return Buffer.concat([header, utf8('version/Probe'), Buffer.from([7, 0, 1]),
+  body.writeUInt16BE(object ? 0 : 4, 4);
+  return Buffer.concat([header, utf8(object ? 'java/lang/Object' : 'version/Probe'), Buffer.from([7, 0, 1]),
     utf8('java/lang/Object'), Buffer.from([7, 0, 3]), body]);
 }
 
+function classLoader() {
+  const loader = new ClassFile.ClassLoader(null);
+  loader.bootstrap = loader;
+  const object = new ClassFile.ReferenceClassData(classBytes(52, 0, true), null, loader);
+  object.setResolved(null, []);
+  loader.addClass('Ljava/lang/Object;', object);
+  return loader;
+}
+function definitionThread(errors) {
+  return {throwNewException(type, message) { errors.push({type, message}); },
+    // These format probes do not execute guest code or fail hierarchy checks.
+    // Dedicated loader units cover real exception-boundary failure capture.
+    runWithExceptionBoundary(operation, callback) { operation(value => callback(null, value)); }};
+}
+function define(loader, thread, data) {
+  return new Promise(resolve => loader.defineClass(thread, 'Lversion/Probe;', data, null, resolve));
+}
+async function main() {
 let scenarios = 0;
 const descriptor = 'Lversion/Probe;';
-function checkRejection(bytes, expected) {
-  const loader = new ClassFile.ClassLoader(null);
+async function checkRejection(bytes, expected) {
+  const loader = classLoader();
   const errors = [];
-  const thread = {throwNewException(type, message) { errors.push({type, message}); }};
-  assert.equal(loader.defineClass(thread, descriptor, bytes, null), null);
+  const thread = definitionThread(errors);
+  assert.equal(await define(loader, thread, bytes), null);
   assert.equal(errors.length, 1);
   assert.equal(errors[0].type, `Ljava/lang/${expected};`);
   assert.equal(typeof errors[0].message, 'string');
-  assert.deepEqual(loader.getLoadedClassNames(), []);
+  assert.deepEqual(loader.getLoadedClassNames(), ['Ljava/lang/Object;']);
   // A rejected definition must not poison a later valid definition of the name.
-  assert.ok(loader.defineClass(thread, descriptor, classBytes(52, 0), null));
-  assert.deepEqual(loader.getLoadedClassNames(), [descriptor]);
+  assert.ok(await define(loader, thread, classBytes(52, 0)));
+  assert.deepEqual(loader.getLoadedClassNames(), ['Ljava/lang/Object;', descriptor]);
   assert.equal(errors.length, 1);
 
   const lookupErrors = [];
@@ -67,20 +85,20 @@ function checkRejection(bytes, expected) {
 }
 
 for (const major of [0, 44, 71, 65535]) {
-  checkRejection(classBytes(major, 0), 'UnsupportedClassVersionError');
+  await checkRejection(classBytes(major, 0), 'UnsupportedClassVersionError');
 }
 for (const major of [56, 64, 65, 69, 70]) {
   for (const minor of [1, 65534, 65535]) {
     const bytes = classBytes(major, minor);
-    checkRejection(bytes, 'UnsupportedClassVersionError');
+    await checkRejection(bytes, 'UnsupportedClassVersionError');
     assert.throws(() => new ClassFile.ReferenceClassData(bytes), ClassFile.ClassFileVersionError);
   }
 }
 for (const major of [45, 46, 52, 55, 56, 65, 69, 70]) {
   for (const minor of major < 56 ? [0, 1, 3, 65534, 65535] : [0]) {
-    const loader = new ClassFile.ClassLoader(null);
-    const cls = loader.defineClass({throwNewException() { assert.fail('valid version rejected'); }},
-      descriptor, classBytes(major, minor), null);
+    const loader = classLoader(), errors = [];
+    const cls = await define(loader, definitionThread(errors), classBytes(major, minor));
+    assert.deepEqual(errors, []);
     assert.ok(cls);
     assert.equal(cls.majorVersion, major);
     scenarios++;
@@ -89,23 +107,23 @@ for (const major of [45, 46, 52, 55, 56, 65, 69, 70]) {
 const valid = classBytes(52, 0);
 const badMagic = Buffer.from(valid);
 badMagic[0] = 0;
-checkRejection(badMagic, 'ClassFormatError');
-for (let length = 0; length < 8; length++) checkRejection(valid.subarray(0, length), 'ClassFormatError');
+await checkRejection(badMagic, 'ClassFormatError');
+for (let length = 0; length < 8; length++) await checkRejection(valid.subarray(0, length), 'ClassFormatError');
 
 // The application loader must not replace a found-but-invalid class's Java
 // exception with ClassNotFoundException; ordinary lookup failures keep their
 // existing explicit/implicit translation.
 for (const type of ['UnsupportedClassVersionError', 'ClassFormatError', 'VerifyError', 'ClassNotFoundException']) {
   for (const explicit of type === 'ClassNotFoundException' ? [true, false] : [true]) {
-    const linkageClass = {};
+    const missingClass = {};
     const thrown = [];
     const exception = {type, getClass() { return {isCastable(target) {
-      assert.equal(target, linkageClass);
-      return type !== 'ClassNotFoundException';
+      assert.equal(target, missingClass);
+      return type === 'ClassNotFoundException';
     }}; }};
     const loader = new ClassFile.CustomClassLoader({getLoadedClass(name) {
-      assert.equal(name, 'Ljava/lang/LinkageError;');
-      return linkageClass;
+      assert.equal(name, 'Ljava/lang/ClassNotFoundException;');
+      return missingClass;
     }}, {'loadClass(Ljava/lang/String;)Ljava/lang/Class;'(thread, args, callback) { callback(exception); }});
     // Supply the minimal String/char-array constructors needed to pass the
     // class name, without booting a Java VM for this focused propagation check.
@@ -164,3 +182,5 @@ assert.deepEqual(completions, [1]);
 assert.equal(closed, 1);
 scenarios++;
 console.log(`class-file-version:${scenarios}:ok (parser, loader, Lookup, recovery, propagation, launch shutdown)`);
+}
+main().catch(error => { console.error(error); process.exitCode = 1; });

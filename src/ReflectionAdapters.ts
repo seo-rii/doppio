@@ -26,6 +26,26 @@ var generatorName = 'Lsun/reflect/MethodAccessorGenerator;',
   commonPrefix = 'sun/reflect/AccessorGenerator/',
   generateSignature = 'generate(Ljava/lang/Class;Ljava/lang/String;[Ljava/lang/Class;Ljava/lang/Class;[Ljava/lang/Class;IZZLjava/lang/Class;)Lsun/reflect/MagicAccessorImpl;';
 
+interface ReflectionSuperclassAccess {
+  bootstrap: ClassLoader;
+  loader: ClassLoader;
+  className: string;
+  superclass: string;
+}
+
+// The parent may not be loaded while the generator is preparing its bytes.
+// Retain proof of the real producer, then require the actual bootstrap parent
+// identity when hierarchy admission supplies it. No class name grants access.
+var reflectionPreparations = new WeakMap<GeneratedClassPreparation, ReflectionSuperclassAccess>(),
+  reflectionClasses = new WeakMap<ReferenceClassData<JVMTypes.java_lang_Object>, ReflectionSuperclassAccess>();
+
+export function canAccessReflectionSuperclass(candidate: ReferenceClassData<JVMTypes.java_lang_Object>,
+  parent: ReferenceClassData<JVMTypes.java_lang_Object>): boolean {
+  var access = reflectionClasses.get(candidate);
+  return !!access && candidate.getLoader() === access.loader && candidate.getInternalName() === access.className &&
+    parent.getLoader() === access.bootstrap && parent === access.bootstrap.getLoadedClass(access.superclass);
+}
+
 /**
  * The pinned Java 8 reflection generator relies on privileged bytecode shapes:
  * an exact Object.toString call on a caught exception, and serialization's
@@ -140,12 +160,19 @@ export function prepareReflectionClass(thread: JVMThread,
     spec.specialCalls.push({target, methodNames: [entryName], receiverType: declaringClass.getInternalName()});
     spec.allocations = [{allocatedClass: declaringClass, methodNames: [entryName]}];
   }
-  return prepareGeneratedClassAdapters(original, definition.bytes, spec);
+  var preparation = prepareGeneratedClassAdapters(original, definition.bytes, spec);
+  if (preparation !== null) reflectionPreparations.set(preparation, {bootstrap, loader: definition.loader,
+    className: definition.className, superclass: expectedSuperclass});
+  return preparation;
 }
 
 export function installReflectionAdapters(preparation: GeneratedClassPreparation,
   cls: ReferenceClassData<JVMTypes.java_lang_Object>): void {
+  var access = reflectionPreparations.get(preparation), superclass = cls.getSuperClassReference();
+  if (!access || cls.getLoader() !== access.loader || cls.getInternalName() !== access.className ||
+      !superclass || superclass.name !== access.superclass) throw new Error('Unproven reflection class preparation');
   installGeneratedClassAdapters(preparation, cls);
+  reflectionClasses.set(cls, access);
 }
 
 export const getReflectionGenerationProvenance = getGeneratedClassProvenance;

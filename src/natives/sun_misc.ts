@@ -786,29 +786,24 @@ export default function (): any {
     }
 
     public static 'defineClass(Ljava/lang/String;[BIILjava/lang/ClassLoader;Ljava/security/ProtectionDomain;)Ljava/lang/Class;'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, name: JVMTypes.java_lang_String, bytes: JVMTypes.JVMArray<number>, offset: number, len: number, loaderObj: JVMTypes.java_lang_ClassLoader, pd: JVMTypes.java_security_ProtectionDomain): void {
-      var loader = util.getLoader(thread, loaderObj), type = util.int_classname(name.toString()),
+      var loader = util.getLoader(thread, loaderObj), type = name === null ? null : util.int_classname(name.toString()),
         originalBytes = util.byteArray2Buffer(bytes.array, offset, len),
-        cdata: ReferenceClassData<JVMTypes.java_lang_Object>;
+        generated: ReturnType<typeof prepareReflectionClass>;
       try {
-        var generated = prepareReflectionClass(thread, {className: type, bytes: originalBytes,
+        generated = prepareReflectionClass(thread, {className: type, bytes: originalBytes,
           sourceBytes: bytes, offset, length: len, loader, protectionDomain: pd});
-        cdata = loader.defineClass(thread, type, generated === null ? originalBytes : generated.bytes, pd);
-        if (cdata !== null && generated !== null) installReflectionAdapters(generated, cdata);
       } catch (failure) {
         thread.throwNewException(failure instanceof ClassFileVersionError ?
           'Ljava/lang/UnsupportedClassVersionError;' : 'Ljava/lang/ClassFormatError;',
           failure && failure.message ? failure.message : String(failure));
         return;
       }
-      if (cdata !== null) {
-        thread.setStatus(ThreadStatus.ASYNC_WAITING);
-        // Ordinary definition must remain usable by a verifier's metadata load.
-        cdata.resolveHierarchy(thread, (cdata: ClassData) => {
-          if (cdata !== null) {
-            thread.asyncReturn(cdata.getClassObject(thread));
-          }
-        });
-      }
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      // Bind trusted generated bodies/capabilities to the actual candidate
+      // before hierarchy admission, without publishing an unfinished class.
+      loader.defineClass(thread, type, generated === null ? originalBytes : generated.bytes, pd, cdata => {
+        if (cdata !== null) thread.asyncReturn(cdata.getClassObject(thread));
+      }, candidate => { if (generated !== null) installReflectionAdapters(generated, candidate); });
     }
 
     public static 'allocateInstance(Ljava/lang/Class;)Ljava/lang/Object;'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, jco: JVMTypes.java_lang_Class): JVMTypes.java_lang_Object {
