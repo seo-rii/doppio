@@ -85,6 +85,10 @@ test('probes bind actual call owner, name, descriptor and reachable instruction,
   }
   const disconnected = graph(); disconnected.get('Core').methods.get('main([Ljava/lang/String;)V').instructions = [];
   assert.throws(() => proveCoreGroup(group(), disconnected), /Main reaches/);
+  for (const requiredOpcodes of [[], undefined, 'l2f', ['not-an-opcode'], [137]]) {
+    const changed = group(); changed.cases[0].probes[0].requiredOpcodes = requiredOpcodes;
+    assert.throws(() => proveCoreGroup(changed, graph()), /Nonempty known opcode obligations/);
+  }
 });
 
 test('constraints require decoded wide, CP-value/index and branch-distance operands', () => {

@@ -170,6 +170,9 @@ export function proveCoreGroup(group, classes) {
     assert.ok(main.found.has(entryKey), `Main reaches ${entry.id}`);
     const calls = reachable(group.mainClass, entry.entryMethod, entry.entryDescriptor);
     const proofs = entry.probes.map(probe => {
+      assert.ok(Array.isArray(probe.requiredOpcodes) && probe.requiredOpcodes.length > 0 &&
+        probe.requiredOpcodes.every(opcode => typeof opcode === 'string' && coreOpcodeNames.includes(opcode)),
+      `Nonempty known opcode obligations ${entry.id}:${probe.method}`);
       const owner = probe.className || group.mainClass;
       assert.ok(calls.found.has(key(owner, probe.method, probe.descriptor)), `Entry reaches probe ${entry.id}:${probe.method}`);
       const method = lookup(owner, probe.method, probe.descriptor), matches = [];
