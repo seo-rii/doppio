@@ -138,6 +138,8 @@
     "ci:final-language:test": "node --test ci/java_final_language_metadata_contract_test.mjs ci/java_final_language_harness_contract_test.mjs ci/java_final_language_retained_contract_test.mjs",
     "ci:final-language": "node ci/java_final_language_test.mjs --browser",
     "ci:final-language-retained": "node ci/java_final_language_retained_test.mjs --browser",
+    "ci:methodhandle-core:test": "node --test ci/java_methodhandle_core_contract_test.mjs",
+    "ci:methodhandle-core": "node ci/java_methodhandle_core_test.mjs --browser",
     "ci:java25-main": "node ci/java25_main_test.mjs --browser",
     "ci:java-uncaught-exit": "node ci/java_uncaught_exit_test.mjs --browser",
     "ci:java-uncaught-exit:test": "node ci/jvm_exit_status_test.cjs && node --test ci/java_uncaught_exit_contract_test.mjs",

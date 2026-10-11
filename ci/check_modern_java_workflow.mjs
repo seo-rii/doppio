@@ -18,6 +18,8 @@ const maximumCompilerInputBytes = 128 * 1024 * 1024;
 const finalLanguageUnitCommand = 'node --test ci/java_final_language_metadata_contract_test.mjs ci/java_final_language_harness_contract_test.mjs ci/java_final_language_retained_contract_test.mjs';
 const finalLanguageRunnerCommand = 'node ci/java_final_language_test.mjs --browser';
 const finalLanguageRetainedRunnerCommand = 'node ci/java_final_language_retained_test.mjs --browser';
+const methodHandleCoreUnitCommand = 'node --test ci/java_methodhandle_core_contract_test.mjs';
+const methodHandleCoreRunnerCommand = 'node ci/java_methodhandle_core_test.mjs --browser';
 
 function stripUnquotedComments(text) {
   return text.split('\n').map((line) => {
@@ -865,6 +867,24 @@ for (const [name, fields] of [
     '  if-no-files-found: error',
     '  retention-days: 7',
   ]],
+  ['Check phase C method handle contracts', [
+    'timeout-minutes: 3',
+    `run: ${methodHandleCoreUnitCommand}`,
+  ]],
+  ['Run Java method handle core compatibility', [
+    'id: java_methodhandle_core',
+    'timeout-minutes: 40',
+    `run: ${methodHandleCoreRunnerCommand}`,
+  ]],
+  ['Upload Java method handle core ledger', [
+    "if: always() && steps.java_methodhandle_core.outcome != 'skipped'",
+    'uses: actions/upload-artifact@v7',
+    'with:',
+    '  path: build/java-methodhandle-core-results.json',
+    '  archive: false',
+    '  if-no-files-found: error',
+    '  retention-days: 7',
+  ]],
   ['Check evolved switch ledger contract', [
     'timeout-minutes: 1',
     'run: node --test ci/java_pattern_evolution_contract_test.mjs',
@@ -1030,6 +1050,9 @@ const runtimeOrder = [
   'Upload final Java language ledger',
   'Run retained final Java language compatibility',
   'Upload retained final Java language ledger',
+  'Check phase C method handle contracts',
+  'Run Java method handle core compatibility',
+  'Upload Java method handle core ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -1050,6 +1073,11 @@ if (runtimeOrder.some((index, position) => position > 0 && index <= runtimeOrder
 for (const command of [finalLanguageUnitCommand, finalLanguageRunnerCommand, finalLanguageRetainedRunnerCommand]) {
   if (countLiteral(runtimeJob, `        run: ${command}\n`) !== 1) {
     fail(`Modern Java workflow must execute final language command exactly once: ${command}`);
+  }
+}
+for (const command of [methodHandleCoreUnitCommand, methodHandleCoreRunnerCommand]) {
+  if (countLiteral(runtimeJob, `        run: ${command}\n`) !== 1) {
+    fail(`Modern Java workflow must execute method handle core command exactly once: ${command}`);
   }
 }
 

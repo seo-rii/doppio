@@ -441,6 +441,26 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Check phase C method handle contracts
+        timeout-minutes: 3
+        run: node --test ci/java_methodhandle_core_contract_test.mjs
+
+      # C1 compares genuine javac 21/25 inputs with native, Node and Chromium.
+      # Preserve raw failures; filtered diagnostics cannot replace this gate.
+      - name: Run Java method handle core compatibility
+        id: java_methodhandle_core
+        timeout-minutes: 40
+        run: node ci/java_methodhandle_core_test.mjs --browser
+
+      - name: Upload Java method handle core ledger
+        if: always() && steps.java_methodhandle_core.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-methodhandle-core-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Check evolved switch ledger contract
         timeout-minutes: 1
         run: node --test ci/java_pattern_evolution_contract_test.mjs
