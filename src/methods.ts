@@ -581,7 +581,7 @@ class Trace {
         console.log(`Emitted trace of ${this.infos.length} ops: ` + emitted);
       }
       // f = frame, t = thread, u = util
-      return new Function("invokeExactMethod", "invokeVirtualMethod", "return function(f,t,u){" + emitted + "};")(invokeExactMethod, invokeVirtualMethod);
+      return new Function("invokeExactMethod", "invokeVirtualMethod", "invokeSpecialMethod", "return function(f,t,u){" + emitted + "};")(invokeExactMethod, invokeVirtualMethod, invokeSpecialMethod);
     } else {
       if (!RELEASE && thread.getJVM().shouldPrintJITCompilation()) {
         console.log(`Trace was cancelled`);
@@ -646,6 +646,31 @@ export function invokeExactMethod(thread: JVMThread, method: Method, receiver: J
   (<any> thread).stack.push(method.accessFlags.isNative() ? new NativeStackFrame(method, locals) : new BytecodeStackFrame(method, locals));
   thread.setStatus(ThreadStatus.RUNNABLE);
   return true;
+}
+
+/** Shared interpreter/JIT special invocation. Instruction linkage errors
+ * precede null checks; receiver-independent selection errors follow them. */
+export function invokeSpecialMethod(thread: JVMThread, caller: ReferenceClassData<JVMTypes.java_lang_Object>,
+    symbolicOwner: ClassData, resolved: Method, receiver: JVMTypes.java_lang_Object, args: any[]): boolean {
+  if (resolved.name === '<init>' && resolved.cls !== symbolicOwner) {
+    thread.throwNewException('Ljava/lang/NoSuchMethodError;', resolved.fullSignature);
+    return false;
+  }
+  if (resolved.accessFlags.isStatic()) {
+    thread.throwNewException('Ljava/lang/IncompatibleClassChangeError;', resolved.fullSignature + ' is static');
+    return false;
+  }
+  if (receiver == null) {
+    thread.throwNewException('Ljava/lang/NullPointerException;', '');
+    return false;
+  }
+  var selection = caller.selectSpecialMethod(symbolicOwner, resolved);
+  if (selection.kind !== 'selected') {
+    thread.throwNewException(selection.kind === 'conflict' ? 'Ljava/lang/IncompatibleClassChangeError;' :
+      'Ljava/lang/AbstractMethodError;', resolved.fullSignature);
+    return false;
+  }
+  return invokeExactMethod(thread, selection.method, receiver, args);
 }
 
 /** Shared interpreter/JIT/MethodHandle/reflection virtual invocation. */
@@ -1009,7 +1034,7 @@ if(invokeVirtualMethod(t,methodReference${suffix}.method,obj${suffix},args${suff
         argMaker += `args${suffix}.push(${pops.slice().reverse().join(',')});`;
       }
       return argMaker + `var methodReference${suffix}=f.method.cls.constantPool.get(${index});var obj${suffix}=${(paramSize+1)===pops.length?pops[paramSize]:"f.opStack.pop()"};f.pc=${pc};f.returnToThreadLoop=true;
-if(invokeExactMethod(t,methodReference${suffix}.method,obj${suffix},args${suffix})){${onSuccess}}else{${onError}}`;
+if(invokeSpecialMethod(t,f.method.cls,methodReference${suffix}.classInfo.cls,methodReference${suffix}.method,obj${suffix},args${suffix})){${onSuccess}}else{${onError}}`;
     }};
   }
 

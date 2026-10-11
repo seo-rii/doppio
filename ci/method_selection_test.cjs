@@ -94,11 +94,11 @@ function world() {
   const bootstrap = loader();
   let object;
   function define(name, {parent = object || null, interfaces = [], methods = [],
-      iface = false, owner = bootstrap, link = true} = {}) {
+      iface = false, owner = bootstrap, link = true, flags = null} = {}) {
     const cls = new ReferenceClassData(classBytes({name,
       superclass: parent === null ? null : parent.getInternalName().slice(1, -1),
       interfaces: interfaces.map(value => value.getInternalName().slice(1, -1)),
-      flags: iface ? 0x601 : methods.some(method => (method.flags & ABSTRACT) !== 0) ? 0x421 : 0x21,
+      flags: flags === null ? (iface ? 0x601 : methods.some(method => (method.flags & ABSTRACT) !== 0) ? 0x421 : 0x21) : flags,
       methods}), null, owner.value);
     owner.loaded.set(cls.getInternalName(), cls);
     classes.push(cls);
@@ -656,6 +656,8 @@ test('interface invocation retains receiver-membership and selected-method visib
 test('nonvirtual interpreter dispatch retains exact identity instead of a colliding owner-name alias', () => {
   const {base, reference, frame, owner, receiver} = dispatchFixture();
   const {OpCode} = require(path.join(runtime, 'src/enums'));
+  frame.method = declared(base);
+  base.constantPool.getUnchecked = () => reference;
   reference.fullSignature = reference.method.fullSignature;
   receiver[reference.fullSignature] = () => assert.fail('Special invocation used a same-name owner alias');
   load('opcodes').Opcodes.invokenonvirtual_fast(owner, frame, Buffer.from([OpCode.INVOKENONVIRTUAL_FAST, 0, 1]));
@@ -670,12 +672,333 @@ test('nonvirtual emitted JIT dispatch retains the exact Method target', () => {
   receiver[reference.fullSignature] = () => assert.fail('Special JIT invocation used an owner-name alias');
   const caller = declared(base), code = Buffer.from([OpCode.INVOKENONVIRTUAL_FAST, 0, 1]);
   caller.cls.constantPool.get = () => reference;
+  frame.method = caller;
   const emitted = caller.makeInvokeNonVirtualJitInfo(code, 0).emit([], [], 'probe',
     'f.jitCompleted = true;', code, 0, [], caller);
-  const invoke = new Function('f', 't', 'u', 'invokeExactMethod', emitted);
-  invoke(frame, owner, {isNull: load('opcodes').isNull}, load('methods').invokeExactMethod);
+  const invoke = new Function('f', 't', 'u', 'invokeExactMethod', 'invokeSpecialMethod', emitted);
+  invoke(frame, owner, {isNull: load('opcodes').isNull},
+    load('methods').invokeExactMethod, load('methods').invokeSpecialMethod);
   assert.equal(owner.stack[0].method, declared(base));
   assert.equal(frame.jitCompleted, true);
+});
+
+// Special selection is deliberately separate from virtual override selection.
+// These units inspect parsed declarations and scheduled frames, not verified
+// execution or native behavior of the deliberately constructed hierarchies.
+function specialSelected(caller, symbolicOwner, resolved, expected) {
+  assert.equal(typeof caller.selectSpecialMethod, 'function', 'Missing metadata-only special selector');
+  const result = caller.selectSpecialMethod(symbolicOwner, resolved);
+  assert.equal(result.kind, 'selected');
+  assert.equal(result.method === expected, true, 'Special selection must retain the exact Method identity');
+  return result;
+}
+
+test('special selection restarts at the direct superclass of the caller, not the resolved declaration', () => {
+  const w = world(), base = w.define('special/Base', {methods: [methodSpec()]});
+  const parent = w.define('special/Parent', {parent: base, methods: [methodSpec()]});
+  const caller = w.define('special/Caller', {parent, methods: [methodSpec()]});
+  specialSelected(caller, base, declared(base), declared(parent));
+  specialSelected(caller, caller, declared(caller), declared(caller));
+  assert.equal(caller.selectMethod(declared(base)).method === declared(caller), true,
+    'The fixture distinguishes special and virtual selection');
+});
+
+test('special selection treats ACC_SUPER as set even when its class-file bit is clear', () => {
+  const w = world(), base = w.define('special/Base', {methods: [methodSpec()]});
+  const parent = w.define('special/Parent', {parent: base, methods: [methodSpec()]});
+  const caller = w.define('special/Caller', {parent, flags: PUBLIC});
+  assert.equal(caller.accessFlags.isSuper(), false, 'The parsed fixture really omits ACC_SUPER');
+  specialSelected(caller, base, declared(base), declared(parent));
+});
+
+test('special class lookup is instance declaration lookup, not an override predicate', () => {
+  const w = world(), base = w.define('first/Base', {methods: [methodSpec(0)]});
+  const parent = w.define('other/Parent', {parent: base, methods: [methodSpec()]});
+  const caller = w.define('other/Caller', {parent});
+  assert.equal(declared(parent).canOverride(declared(base)), false);
+  // CP access is a separate prior gate; only the specified selection query is
+  // exercised for this otherwise inaccessible symbolic-reference fixture.
+  specialSelected(caller, base, declared(base), declared(parent));
+  const staticParent = w.define('special/StaticParent', {parent: base, methods: [methodSpec(PUBLIC | STATIC)]});
+  const staticCaller = w.define('special/StaticCaller', {parent: staticParent});
+  specialSelected(staticCaller, base, declared(base), declared(base));
+});
+
+test('special superclass lookup selects one concrete default and reports conflicts or missing bodies', () => {
+  const w = world(), one = w.define('special/One', {iface: true, methods: [methodSpec()]});
+  const two = w.define('special/Two', {iface: true, methods: [methodSpec()]});
+  const abstract = w.define('special/Abstract', {iface: true, methods: [methodSpec(PUBLIC | ABSTRACT)]});
+  const single = w.define('special/Single', {interfaces: [one, abstract]});
+  const conflict = w.define('special/Conflict', {interfaces: [one, two]});
+  const missing = w.define('special/Missing', {interfaces: [abstract]});
+  const singleCaller = w.define('special/SingleCaller', {parent: single});
+  specialSelected(singleCaller, single, declared(one), declared(one));
+  for (const [parent, resolved, expected, count] of [
+    [conflict, declared(one), 'conflict', 2], [missing, declared(abstract), 'missing', 1]
+  ]) {
+    const caller = w.define('special/Caller' + expected, {parent});
+    assert.equal(typeof caller.selectSpecialMethod, 'function', 'Missing special selector');
+    const result = caller.selectSpecialMethod(parent, resolved);
+    assert.equal(result.kind, expected);
+    assert.equal(result.candidates.length, count);
+  }
+});
+
+test('special class declarations mask defaults even when the selected declaration is abstract', () => {
+  const w = world(), iface = w.define('special/Role', {iface: true, methods: [methodSpec()]});
+  const parent = w.define('special/AbstractParent', {interfaces: [iface], methods: [methodSpec(PUBLIC | ABSTRACT)]});
+  const caller = w.define('special/Caller', {parent});
+  specialSelected(caller, parent, declared(iface), declared(parent));
+});
+
+test('interface-special selection stays on the symbolic interface rather than the caller defaults', () => {
+  const w = world(), root = w.define('special/Root', {iface: true, methods: [methodSpec()]});
+  const inherited = w.define('special/Inherited', {iface: true, interfaces: [root]});
+  const other = w.define('special/Other', {iface: true, methods: [methodSpec()]});
+  const caller = w.define('special/Caller', {interfaces: [inherited, other], methods: [methodSpec()]});
+  specialSelected(caller, inherited, declared(root), declared(root));
+  specialSelected(caller, other, declared(other), declared(other));
+  const reabstract = w.define('special/Reabstract', {iface: true, interfaces: [root], methods: [methodSpec(PUBLIC | ABSTRACT)]});
+  specialSelected(caller, reabstract, declared(reabstract), declared(reabstract));
+});
+
+test('special maximal interface selection deduplicates diamonds and respects reabstraction', () => {
+  const w = world(), root = w.define('special/Root', {iface: true, methods: [methodSpec()]});
+  const left = w.define('special/Left', {iface: true, interfaces: [root]});
+  const right = w.define('special/Right', {iface: true, interfaces: [root]});
+  const diamond = w.define('special/Diamond', {interfaces: [left, right]});
+  const caller = w.define('special/Caller', {parent: diamond});
+  specialSelected(caller, diamond, declared(root), declared(root));
+  const abstract = w.define('special/Reabstract', {iface: true, interfaces: [root], methods: [methodSpec(PUBLIC | ABSTRACT)]});
+  const blocked = w.define('special/Blocked', {interfaces: [abstract, right]});
+  const blockedCaller = w.define('special/BlockedCaller', {parent: blocked});
+  assert.equal(blockedCaller.selectSpecialMethod(blocked, declared(root)).kind, 'missing');
+});
+
+test('interface-special Object fallback uses the actual bootstrap public instance declaration', () => {
+  const w = world(), object = w.define('java/lang/Object', {parent: null,
+    methods: [methodSpec(PUBLIC, 'm'), methodSpec(PROTECTED, 'hidden')]});
+  const foreign = w.define('java/lang/Object', {parent: null, owner: w.loader(), methods: [methodSpec()]});
+  const iface = w.define('special/Role', {iface: true, parent: object});
+  const caller = w.define('special/Caller', {parent: object, interfaces: [iface]});
+  specialSelected(caller, iface, declared(object), declared(object));
+  assert.equal(caller.selectSpecialMethod(iface, declared(object)).method === declared(foreign), false);
+  assert.equal(caller.selectSpecialMethod(iface, declared(object, 'hidden()V')).kind, 'missing');
+});
+
+test('special private and constructor calls retain the exact declaration instead of a shadow', () => {
+  const w = world(), base = w.define('special/Base', {methods: [methodSpec(PUBLIC, '<init>')]});
+  const parent = w.define('special/Parent', {parent: base, methods: [methodSpec(PUBLIC, '<init>')]});
+  const caller = w.define('special/Caller', {parent, methods: [methodSpec(PRIVATE)]});
+  const target = w.define('special/NestTarget', {methods: [methodSpec(PRIVATE)]});
+  specialSelected(caller, caller, declared(caller), declared(caller));
+  specialSelected(caller, target, declared(target), declared(target));
+  specialSelected(caller, base, declared(base, '<init>()V'), declared(base, '<init>()V'));
+});
+
+test('special superclass recognition compares class identity, not binary-name spelling', () => {
+  const w = world(), first = w.loader(), second = w.loader();
+  const base = w.define('same/Base', {owner: first, methods: [methodSpec()]});
+  const parent = w.define('same/Parent', {owner: first, parent: base, methods: [methodSpec()]});
+  const caller = w.define('same/Caller', {owner: first, parent});
+  const foreign = w.define('same/Base', {owner: second, methods: [methodSpec()]});
+  // A real instruction must also pass verifier owner/access checks. This pure
+  // identity query must not mistake a foreign class for the actual ancestor.
+  specialSelected(caller, base, declared(base), declared(parent));
+  specialSelected(caller, foreign, declared(foreign), declared(foreign));
+});
+
+test('special metadata selection does not load, verify, prepare or initialize classes', () => {
+  const w = world(), iface = w.define('special/Role', {iface: true, methods: [methodSpec()]});
+  const parent = w.define('special/Parent', {interfaces: [iface]});
+  const caller = w.define('special/Caller', {parent});
+  for (const cls of w.classes) {
+    assert.equal(cls.isVerified(), false);
+    assert.equal(cls.isPrepared(), false);
+    for (const operation of ['resolve', 'tryToResolve', 'verify', 'initialize', 'getConstructor']) {
+      cls[operation] = () => assert.fail('Special selection attempted ' + operation);
+    }
+  }
+  specialSelected(caller, parent, declared(iface), declared(iface));
+  for (const cls of w.classes) {
+    assert.equal(cls.isVerified(), false);
+    assert.equal(cls.isPrepared(), false);
+  }
+});
+
+function specialDispatchFixture({conflict = false, descriptor = '()V'} = {}) {
+  const w = world(), signature = 'm' + descriptor;
+  let symbolicOwner, resolved, expected;
+  if (conflict) {
+    const one = w.define('special/One', {iface: true, methods: [methodSpec(PUBLIC, 'm', descriptor)]});
+    const two = w.define('special/Two', {iface: true, methods: [methodSpec(PUBLIC, 'm', descriptor)]});
+    symbolicOwner = w.define('special/Parent', {interfaces: [one, two]});
+    resolved = symbolicOwner.methodLookup(signature);
+    expected = null;
+  } else {
+    symbolicOwner = w.define('special/Base', {methods: [methodSpec(PUBLIC, 'm', descriptor)]});
+    resolved = declared(symbolicOwner, signature);
+  }
+  const parent = conflict ? symbolicOwner : w.define('special/Parent', {
+    parent: symbolicOwner, methods: [methodSpec(PUBLIC, 'm', descriptor)]});
+  if (!conflict) expected = declared(parent, signature);
+  const caller = w.define('special/Caller', {parent, methods: [methodSpec(PUBLIC, 'run')]});
+  const child = w.define('special/Receiver', {parent: caller, methods: [methodSpec(PUBLIC, 'm', descriptor)]});
+  const receiver = {getClass: () => child,
+    [signature]: () => assert.fail('Special invocation used virtual receiver dispatch'),
+    [resolved.fullSignature]: () => assert.fail('Special invocation used a text-keyed declaration alias')};
+  const args = descriptor === '(JD)V' ? [{wide: true}, null, 3.25, null] : [];
+  const reference = Object.freeze({method: resolved, signature, paramWordSize: args.length,
+    fullSignature: resolved.fullSignature, classInfo: Object.freeze({cls: symbolicOwner}), isResolved: () => true});
+  caller.constantPool.get = caller.constantPool.getUnchecked = () => reference;
+  const callerMethod = declared(caller, 'run()V');
+  const frame = {pc: 0, returnToThreadLoop: false, method: callerMethod,
+    opStack: new (load('threading').PreAllocatedStack)(args.length + 1)};
+  frame.opStack.push(receiver);
+  for (const argument of args) frame.opStack.push(argument);
+  return {w, caller, callerMethod, symbolicOwner, resolved, expected, receiver, args, reference, frame,
+    owner: invocationThread()};
+}
+
+function invokeSpecial(fixture, receiver = fixture.receiver) {
+  const invoke = load('methods').invokeSpecialMethod;
+  assert.equal(typeof invoke, 'function', 'Missing shared special invocation helper');
+  return invoke(fixture.owner, fixture.caller, fixture.symbolicOwner, fixture.resolved, receiver, fixture.args);
+}
+
+function checkSpecialFrame(fixture) {
+  assert.equal(fixture.owner.errors.length, 0);
+  assert.equal(fixture.owner.stack.length, 1);
+  assert.equal(fixture.owner.stack[0].method === fixture.expected, true,
+    'Special invocation must schedule the selected superclass Method, not the resolved or receiver Method');
+  const locals = fixture.owner.stack[0].locals;
+  assert.equal(locals.length, fixture.args.length + 1);
+  assert.equal(locals[0] === fixture.receiver, true);
+  fixture.args.forEach((argument, index) => assert.equal(locals[index + 1] === argument, true));
+  assert.equal(fixture.reference.method === fixture.resolved, true, 'Selection must not replace CP resolution');
+  assert.equal(fixture.reference.classInfo.cls === fixture.symbolicOwner, true);
+  assert.equal(fixture.reference.fullSignature, fixture.resolved.fullSignature);
+}
+
+test('shared special invocation preserves category-two slots and the original CP declaration', () => {
+  const fixture = specialDispatchFixture({descriptor: '(JD)V'}), originalArgs = fixture.args.slice();
+  assert.equal(invokeSpecial(fixture), true);
+  checkSpecialFrame(fixture);
+  fixture.args.forEach((argument, index) => assert.equal(argument === originalArgs[index], true));
+  const virtual = invocationThread();
+  assert.equal(load('methods').invokeVirtualMethod(virtual, fixture.reference.method, fixture.receiver, fixture.args), true);
+  assert.equal(virtual.stack[0].method.cls === fixture.receiver.getClass(), true,
+    'Using the same CP declaration virtually must still select the receiver override');
+});
+
+test('shared special invocation reports superclass default conflict without scheduling a body', () => {
+  const fixture = specialDispatchFixture({conflict: true});
+  assert.equal(invokeSpecial(fixture), false);
+  assert.equal(fixture.owner.errors.length, 1);
+  assert.equal(fixture.owner.errors[0].name, 'Ljava/lang/IncompatibleClassChangeError;');
+  assert.equal(fixture.owner.stack.length, 0);
+  assert.equal(fixture.reference.method === fixture.resolved, true);
+});
+
+test('shared special invocation keeps constructor, private and interface-special targets exact', () => {
+  const w = world(), base = w.define('special/Base', {methods: [methodSpec(PUBLIC, '<init>')]});
+  const iface = w.define('special/Role', {iface: true, methods: [methodSpec()]});
+  const caller = w.define('special/Caller', {parent: base, interfaces: [iface],
+    methods: [methodSpec(PRIVATE, 'secret')]});
+  const child = w.define('special/Receiver', {parent: caller,
+    methods: [methodSpec(PUBLIC, 'secret'), methodSpec()]});
+  const receiver = {getClass: () => child}, invoke = load('methods').invokeSpecialMethod;
+  assert.equal(typeof invoke, 'function', 'Missing shared special invocation helper');
+  for (const [symbolicOwner, target] of [[base, declared(base, '<init>()V')],
+    [caller, declared(caller, 'secret()V')], [iface, declared(iface)]]) {
+    const owner = invocationThread();
+    assert.equal(invoke(owner, caller, symbolicOwner, target, receiver, []), true);
+    assert.equal(owner.errors.length, 0);
+    assert.equal(owner.stack.length, 1);
+    assert.equal(owner.stack[0].method === target, true);
+    assert.equal(owner.stack[0].locals[0] === receiver, true);
+  }
+});
+
+test('special invocation orders constructor owner, staticness and null errors before selection failures', () => {
+  const w = world(), ctor = w.define('special/Ctor', {methods: [methodSpec(PUBLIC, '<init>')]});
+  const other = w.define('special/Other', {methods: [methodSpec(PUBLIC | STATIC)]});
+  const caller = w.define('special/Caller', {parent: other});
+  const invoke = load('methods').invokeSpecialMethod;
+  assert.equal(typeof invoke, 'function', 'Missing shared special invocation helper');
+  for (const [symbolicOwner, resolved, expected] of [
+    [other, declared(ctor, '<init>()V'), 'Ljava/lang/NoSuchMethodError;'],
+    [other, declared(other), 'Ljava/lang/IncompatibleClassChangeError;']
+  ]) {
+    const owner = invocationThread();
+    assert.equal(invoke(owner, caller, symbolicOwner, resolved, null, []), false);
+    assert.equal(owner.errors.length, 1);
+    assert.equal(owner.errors[0].name, expected);
+    assert.equal(owner.stack.length, 0);
+  }
+  const fixture = specialDispatchFixture({conflict: true});
+  assert.equal(invokeSpecial(fixture, null), false);
+  assert.equal(fixture.owner.errors[0].name, 'Ljava/lang/NullPointerException;');
+  assert.equal(fixture.owner.stack.length, 0);
+});
+
+test('special invocation rejects abstract class selections and missing concrete defaults with AME', () => {
+  const w = world(), abstract = w.define('special/Abstract', {methods: [methodSpec(PUBLIC | ABSTRACT)]});
+  const iface = w.define('special/Role', {iface: true, methods: [methodSpec(PUBLIC | ABSTRACT)]});
+  const missing = w.define('special/Missing', {interfaces: [iface]});
+  const invoke = load('methods').invokeSpecialMethod;
+  assert.equal(typeof invoke, 'function', 'Missing shared special invocation helper');
+  for (const [parent, resolved] of [[abstract, declared(abstract)], [missing, declared(iface)]]) {
+    const caller = w.define('special/Caller' + (parent === abstract ? 'Abstract' : 'Missing'), {parent}), owner = invocationThread();
+    assert.equal(invoke(owner, caller, parent, resolved, {getClass: () => caller}, []), false);
+    assert.equal(owner.errors.length, 1);
+    assert.equal(owner.errors[0].name, 'Ljava/lang/AbstractMethodError;');
+    assert.equal(owner.stack.length, 0);
+  }
+});
+
+test('the special interpreter selects from the caller superclass and preserves wide argument slots', () => {
+  const fixture = specialDispatchFixture({descriptor: '(JD)V'});
+  const {OpCode} = require(path.join(runtime, 'src/enums'));
+  load('opcodes').Opcodes.invokenonvirtual_fast(fixture.owner, fixture.frame,
+    Buffer.from([OpCode.INVOKENONVIRTUAL_FAST, 0, 1]));
+  checkSpecialFrame(fixture);
+  assert.equal(fixture.frame.returnToThreadLoop, true);
+});
+
+test('the resolved invokespecial interpreter path retains superclass default conflict checks', () => {
+  const fixture = specialDispatchFixture({conflict: true});
+  const {OpCode} = require(path.join(runtime, 'src/enums'));
+  const code = Buffer.from([OpCode.INVOKESPECIAL, 0, 1]);
+  load('opcodes').Opcodes.invokespecial(fixture.owner, fixture.frame, code);
+  if (fixture.owner.errors.length === 0) load('opcodes').Opcodes.invokenonvirtual_fast(fixture.owner, fixture.frame, code);
+  assert.equal(fixture.owner.errors.length, 1, 'Conflict must fail instead of invoking an arbitrary resolved default');
+  assert.equal(fixture.owner.errors[0].name, 'Ljava/lang/IncompatibleClassChangeError;');
+  assert.equal(fixture.owner.stack.length, 0);
+  assert.equal(fixture.reference.method === fixture.resolved, true);
+});
+
+for (const conflict of [false, true]) test('the special emitted JIT shares ' +
+    (conflict ? 'default-conflict failure without a target frame' : 'caller-anchored selection and wide slots'), () => {
+  const fixture = specialDispatchFixture({conflict, descriptor: '(JD)V'});
+  const {OpCode} = require(path.join(runtime, 'src/enums'));
+  const code = Buffer.from([OpCode.INVOKENONVIRTUAL_FAST, 0, 1]);
+  const emitted = fixture.callerMethod.makeInvokeNonVirtualJitInfo(code, 0).emit([], [], 'special',
+    'f.jitCompleted = true;', code, 0, [], fixture.callerMethod);
+  const invoke = new Function('f', 't', 'u', 'invokeExactMethod', 'invokeSpecialMethod', emitted);
+  invoke(fixture.frame, fixture.owner, {isNull: load('opcodes').isNull},
+    load('methods').invokeExactMethod, load('methods').invokeSpecialMethod);
+  if (conflict) {
+    assert.equal(fixture.owner.errors.length, 1, 'JIT must not execute an arbitrary resolved default');
+    assert.equal(fixture.owner.errors[0].name, 'Ljava/lang/IncompatibleClassChangeError;');
+    assert.equal(fixture.owner.stack.length, 0);
+    assert.equal(fixture.frame.jitCompleted, undefined);
+  } else {
+    checkSpecialFrame(fixture);
+    assert.equal(fixture.frame.jitCompleted, true);
+  }
+  assert.equal(fixture.reference.method === fixture.resolved, true);
+  assert.equal(fixture.frame.returnToThreadLoop, true);
 });
 
 test('static zero-argument frame locals never mutate a shared empty argument vector', () => {

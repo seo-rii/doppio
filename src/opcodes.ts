@@ -12,7 +12,7 @@ import {ClassData, ArrayClassData} from './ClassData';
 import {JVMThread, BytecodeStackFrame} from './threading';
 import {ThreadStatus, OpCode, ConstantPoolItemType, Constants} from './enums';
 import assert from './assert';
-import {Method, invokeExactMethod, invokeVirtualMethod} from './methods';
+import {Method, invokeSpecialMethod, invokeVirtualMethod} from './methods';
 import {refreshMemberNameMethodTarget} from './method_handles';
 import * as JVMTypes from '../includes/JVMTypes';
 
@@ -1553,9 +1553,6 @@ export class Opcodes {
     frame.returnToThreadLoop = true;
   }
 
-  /**
-   * XXX: Actually perform superclass method lookup.
-   */
   public static invokespecial(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
     var methodReference = <MethodReference | InterfaceMethodReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1));
@@ -1612,7 +1609,7 @@ export class Opcodes {
       curr = rawStack.curr,
       obj: JVMTypes.java_lang_Object = store[curr - (paramSize + 1)];
 
-    if (!isNull(thread, frame, obj)) {
+    {
       var args: any[];
       rawStack.curr = curr - (paramSize + 1);
       switch (paramSize) {
@@ -1635,7 +1632,7 @@ export class Opcodes {
           args = store.slice(curr - paramSize, curr);
           break;
       }
-      invokeExactMethod(thread, methodReference.method, obj, args);
+      invokeSpecialMethod(thread, method.cls, methodReference.classInfo.cls, methodReference.method, obj, args);
       frame.returnToThreadLoop = true;
     }
   }

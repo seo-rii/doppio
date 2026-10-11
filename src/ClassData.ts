@@ -1251,6 +1251,38 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     return {kind: concrete.length > 1 ? 'conflict' : 'missing', candidates};
   }
 
+  /** JVMS 6.5.invokespecial: selection starts at the symbolic owner or the
+   * caller's direct superclass, never at the receiver's class. Resolution and
+   * its declaring-loader constraints stay attached to the original Method. */
+  public selectSpecialMethod(symbolicOwner: ClassData, resolved: Method): MethodSelection {
+    var start = symbolicOwner instanceof ArrayClassData ? symbolicOwner.getSuperClass() :
+      symbolicOwner instanceof ReferenceClassData ? symbolicOwner : null;
+    // Java SE 8+ treats ACC_SUPER as set, regardless of the class-file bit/version.
+    if (resolved.name !== '<init>' && symbolicOwner instanceof ReferenceClassData &&
+        !symbolicOwner.accessFlags.isInterface() && symbolicOwner !== this && this.isSubclass(symbolicOwner)) {
+      start = this.getSuperClass();
+    }
+    if (start === null) return {kind: 'missing', candidates: []};
+    var current: ReferenceClassData<JVMTypes.java_lang_Object> = start;
+    while (current !== null) {
+      var declared = current.getEffectiveMethod(resolved.signature);
+      if (declared !== null && !declared.accessFlags.isStatic()) return {kind: 'selected', method: declared};
+      if (start.accessFlags.isInterface()) break;
+      current = current.getSuperClass();
+    }
+    if (start.accessFlags.isInterface()) {
+      var object = <ReferenceClassData<JVMTypes.java_lang_Object>> this.loader.bootstrap.getLoadedClass('Ljava/lang/Object;');
+      var objectMethod = object === null ? null : object.getEffectiveMethod(resolved.signature);
+      if (objectMethod !== null && objectMethod.accessFlags.isPublic() && !objectMethod.accessFlags.isStatic()) {
+        return {kind: 'selected', method: objectMethod};
+      }
+    }
+    var candidates = start.getMaximallySpecificInterfaceMethods(resolved.signature),
+      concrete = candidates.filter(method => !method.accessFlags.isAbstract());
+    if (concrete.length === 1) return {kind: 'selected', method: concrete[0]};
+    return {kind: concrete.length > 1 ? 'conflict' : 'missing', candidates};
+  }
+
   public getSpecificMethod(definingCls: string, sig: string): Method {
     if (this.getInternalName() === definingCls) {
       return this.getMethod(sig);
