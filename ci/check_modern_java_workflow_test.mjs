@@ -53,6 +53,27 @@ const loadingConstraintUnits = [
 ];
 const loadingConstraintUnitCommand = `node --test ${loadingConstraintUnits.join(' ')}`;
 const loadingConstraintRunnerCommand = 'node ci/java_loading_constraints_test.mjs --browser';
+const memberResolutionUnits = [
+  'ci/class_member_resolution_test.cjs',
+  'ci/java_member_resolution_contract_test.mjs',
+];
+const memberResolutionUnitCommand = `node --test ${memberResolutionUnits.join(' ')}`;
+const memberResolutionRunnerCommand = 'node ci/java_member_resolution_test.mjs --browser';
+const memberAccessUnits = [
+  'ci/symbolic_resolution_test.cjs',
+  'ci/class_access_test.cjs',
+  'ci/java_member_access_contract_test.mjs',
+];
+const memberAccessUnitCommand = `node --test ${memberAccessUnits.join(' ')}`;
+const memberAccessRunnerCommand = 'node ci/java_member_access_test.mjs --browser';
+const memberGates = [
+  {name: 'member resolution', units: memberResolutionUnits, unitCommand: memberResolutionUnitCommand,
+    runnerCommand: memberResolutionRunnerCommand, stepId: 'java_member_resolution',
+    ledger: 'build/java-member-resolution-results.json', timeout: 20},
+  {name: 'member access', units: memberAccessUnits, unitCommand: memberAccessUnitCommand,
+    runnerCommand: memberAccessRunnerCommand, stepId: 'java_member_access',
+    ledger: 'build/java-member-access-results.json', timeout: 25},
+];
 const packageScripts = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).scripts;
 for (const [name, command] of [
   ['ci:java-initialization:test', initializationUnitCommand],
@@ -62,6 +83,10 @@ for (const [name, command] of [
   ['ci:class-derivation', derivationRunnerCommand],
   ['ci:loading-constraints:test', loadingConstraintUnitCommand],
   ['ci:loading-constraints', loadingConstraintRunnerCommand],
+  ['ci:member-resolution:test', memberResolutionUnitCommand],
+  ['ci:member-resolution', memberResolutionRunnerCommand],
+  ['ci:member-access:test', memberAccessUnitCommand],
+  ['ci:member-access', memberAccessRunnerCommand],
 ]) {
   if (packageScripts[name] !== command) {
     throw new Error(`${name} must retain the complete phase B command: ${command}`);
@@ -233,6 +258,12 @@ for (const name of [
   'Check phase B loading constraint contracts',
   'Run Java loading constraint compatibility',
   'Upload Java loading constraint ledger',
+  'Check phase B member resolution contracts',
+  'Run Java member resolution compatibility',
+  'Upload Java member resolution ledger',
+  'Check phase B member access contracts',
+  'Run Java member access compatibility',
+  'Upload Java member access ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -369,6 +400,46 @@ for (const omitted of loadingConstraintUnits) {
   );
 }
 
+for (const gate of memberGates) {
+  for (const omitted of gate.units) {
+    expectCheckerFailure(
+      `${gate.name} contracts omit ${omitted}`,
+      {workflow: replaceRequired(realWorkflow, `run: ${gate.unitCommand}\n`,
+        `run: node --test ${gate.units.filter(filename => filename !== omitted).join(' ')}\n`)},
+      'exact bounded, fail-closed baseline command or artifact contract'
+    );
+  }
+  const uploadCondition = `if: always() && steps.${gate.stepId}.outcome != 'skipped'`;
+  for (const [original, replacement] of [
+    [`run: ${gate.runnerCommand}\n`, `run: ${gate.runnerCommand.replace(' --browser', '')}\n`],
+    [`run: ${gate.runnerCommand}\n`, `run: ${gate.runnerCommand.replace(' --browser', ' --node-only')}\n`],
+    [`run: ${gate.runnerCommand}\n`, `run: ${gate.runnerCommand.replace(' --browser', ' --native-only')}\n`],
+    [`run: ${gate.runnerCommand}\n`, `run: ${gate.runnerCommand} --native-only\n`],
+    [`run: ${gate.runnerCommand}\n`, `run: ${gate.runnerCommand} --release 21\n`],
+    [`run: ${gate.runnerCommand}\n`, `run: ${gate.runnerCommand} --release 25\n`],
+    [`run: ${gate.runnerCommand}\n`, `run: ${gate.runnerCommand} || true\n`],
+    [`run: ${gate.unitCommand}\n`, `run: ${gate.unitCommand} || true\n`],
+    [`id: ${gate.stepId}\n`, `id: missing_${gate.stepId}\n`],
+    [`id: ${gate.stepId}\n        timeout-minutes: ${gate.timeout}\n`,
+      `id: ${gate.stepId}\n        timeout-minutes: 1\n`],
+    [`id: ${gate.stepId}\n        timeout-minutes: ${gate.timeout}\n`,
+      `id: ${gate.stepId}\n        timeout-minutes: 1000\n`],
+    [uploadCondition, 'if: success()'],
+    [uploadCondition, `if: always() && steps.${gate.stepId}.outcome == 'success'`],
+    [uploadCondition, 'if: false'],
+    [`path: ${gate.ledger}`, `path: build/missing-${gate.stepId}-ledger.json`],
+    [`path: ${gate.ledger}\n          archive: false`, `path: ${gate.ledger}\n          archive: true`],
+    [`path: ${gate.ledger}\n          archive: false\n          if-no-files-found: error`,
+      `path: ${gate.ledger}\n          archive: false\n          if-no-files-found: warn`],
+  ]) {
+    expectCheckerFailure(
+      `changed ${gate.name} contract: ${original.trim()}`,
+      {workflow: replaceRequired(realWorkflow, original, replacement)},
+      'exact bounded, fail-closed baseline command or artifact contract'
+    );
+  }
+}
+
 expectCheckerFailure(
   'Java compatibility tooling before Chromium installation',
   { workflow: swapAdjacentSteps(realWorkflow, 'Install Java compatibility Chromium', 'Check Java compatibility baseline tooling') },
@@ -457,11 +528,26 @@ for (const [firstName, secondName] of [
 for (const [firstName, secondName] of [
   ['Check phase B loading constraint contracts', 'Run Java loading constraint compatibility'],
   ['Run Java loading constraint compatibility', 'Upload Java loading constraint ledger'],
-  ['Upload Java loading constraint ledger', 'Check evolved switch ledger contract'],
+  ['Upload Java loading constraint ledger', 'Check phase B member resolution contracts'],
 ]) {
   expectCheckerFailure(
     `loading constraint dependency reversed: ${firstName} before ${secondName}`,
     { workflow: swapAdjacentSteps(realWorkflow, firstName, secondName) },
+    'remain in dependency order'
+  );
+}
+
+for (const [firstName, secondName] of [
+  ['Check phase B member resolution contracts', 'Run Java member resolution compatibility'],
+  ['Run Java member resolution compatibility', 'Upload Java member resolution ledger'],
+  ['Upload Java member resolution ledger', 'Check phase B member access contracts'],
+  ['Check phase B member access contracts', 'Run Java member access compatibility'],
+  ['Run Java member access compatibility', 'Upload Java member access ledger'],
+  ['Upload Java member access ledger', 'Check evolved switch ledger contract'],
+]) {
+  expectCheckerFailure(
+    `member resolution/access dependency reversed: ${firstName} before ${secondName}`,
+    {workflow: swapAdjacentSteps(realWorkflow, firstName, secondName)},
     'remain in dependency order'
   );
 }

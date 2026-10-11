@@ -284,6 +284,42 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Check phase B member resolution contracts
+        timeout-minutes: 3
+        run: node --test ci/class_member_resolution_test.cjs ci/java_member_resolution_contract_test.mjs
+
+      - name: Run Java member resolution compatibility
+        id: java_member_resolution
+        timeout-minutes: 20
+        run: node ci/java_member_resolution_test.mjs --browser
+
+      - name: Upload Java member resolution ledger
+        if: always() && steps.java_member_resolution.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-member-resolution-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Check phase B member access contracts
+        timeout-minutes: 3
+        run: node --test ci/symbolic_resolution_test.cjs ci/class_access_test.cjs ci/java_member_access_contract_test.mjs
+
+      - name: Run Java member access compatibility
+        id: java_member_access
+        timeout-minutes: 25
+        run: node ci/java_member_access_test.mjs --browser
+
+      - name: Upload Java member access ledger
+        if: always() && steps.java_member_access.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-member-access-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Check evolved switch ledger contract
         timeout-minutes: 1
         run: node --test ci/java_pattern_evolution_contract_test.mjs
