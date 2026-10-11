@@ -94,6 +94,9 @@ const finalLanguageRetainedRunnerCommand = 'node ci/java_final_language_retained
 const methodHandleCoreUnits = ['ci/java_methodhandle_core_contract_test.mjs'];
 const methodHandleCoreUnitCommand = `node --test ${methodHandleCoreUnits.join(' ')}`;
 const methodHandleCoreRunnerCommand = 'node ci/java_methodhandle_core_test.mjs --browser';
+const methodHandleCollectionUnits = ['ci/java_methodhandle_collection_contract_test.mjs'];
+const methodHandleCollectionUnitCommand = `node --test ${methodHandleCollectionUnits.join(' ')}`;
+const methodHandleCollectionRunnerCommand = 'node ci/java_methodhandle_collection_test.mjs --browser';
 const memberGates = [
   {name: 'member resolution', units: memberResolutionUnits, unitCommand: memberResolutionUnitCommand,
     runnerCommand: memberResolutionRunnerCommand, stepId: 'java_member_resolution',
@@ -121,6 +124,9 @@ const memberGates = [
   {name: 'method handle core', units: methodHandleCoreUnits, unitCommand: methodHandleCoreUnitCommand,
     runnerCommand: methodHandleCoreRunnerCommand, stepId: 'java_methodhandle_core',
     ledger: 'build/java-methodhandle-core-results.json', timeout: 40},
+  {name: 'method handle collection', units: methodHandleCollectionUnits, unitCommand: methodHandleCollectionUnitCommand,
+    runnerCommand: methodHandleCollectionRunnerCommand, stepId: 'java_methodhandle_collection',
+    ledger: 'build/java-methodhandle-collection-results.json', timeout: 40},
 ];
 const packageScripts = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).scripts;
 for (const [name, command] of [
@@ -148,6 +154,8 @@ for (const [name, command] of [
   ['ci:final-language-retained', finalLanguageRetainedRunnerCommand],
   ['ci:methodhandle-core:test', methodHandleCoreUnitCommand],
   ['ci:methodhandle-core', methodHandleCoreRunnerCommand],
+  ['ci:methodhandle-collection:test', methodHandleCollectionUnitCommand],
+  ['ci:methodhandle-collection', methodHandleCollectionRunnerCommand],
 ]) {
   if (packageScripts[name] !== command) {
     throw new Error(`${name} must retain the complete compatibility command: ${command}`);
@@ -345,6 +353,9 @@ for (const name of [
   'Check phase C method handle contracts',
   'Run Java method handle core compatibility',
   'Upload Java method handle core ledger',
+  'Check phase C collection and control flow contracts',
+  'Run Java method handle collection compatibility',
+  'Upload Java method handle collection ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -658,6 +669,78 @@ for (const [original, replacement] of [
   );
 }
 
+for (const replacement of [
+  'echo method handle compatibility checked',
+  methodHandleCollectionRunnerCommand + ' --case selected',
+  methodHandleCollectionRunnerCommand + ' --group arrays',
+  methodHandleCollectionRunnerCommand + ' --fixture selected',
+  methodHandleCollectionRunnerCommand + ' --guest node',
+  methodHandleCollectionRunnerCommand + ' --skip-native',
+  methodHandleCollectionRunnerCommand + ' --allow-oracle-waiver',
+  methodHandleCollectionRunnerCommand + '; exit 0',
+  methodHandleCollectionRunnerCommand + ' | tee methodhandle-collection.log',
+  'DOPPIO_VERIFY_SOURCE=1 ' + methodHandleCollectionRunnerCommand,
+]) {
+  expectCheckerFailure(
+    `filtered or swallowed method handle collection runner: ${replacement}`,
+    {workflow: replaceRequired(realWorkflow, `run: ${methodHandleCollectionRunnerCommand}\n`, `run: ${replacement}\n`)},
+    'exact bounded, fail-closed baseline command or artifact contract'
+  );
+}
+
+for (const name of ['Check phase C collection and control flow contracts', 'Run Java method handle collection compatibility',
+  'Upload Java method handle collection ledger']) {
+  for (const field of ['if: false', 'continue-on-error: true', 'continue-on-error: false',
+    'shell: bash {0}', 'working-directory: ignored']) {
+    expectCheckerFailure(
+      `${name} gains noncanonical scheduling field ${field}`,
+      {workflow: replaceRequired(realWorkflow, `      - name: ${name}\n`, `      - name: ${name}\n        ${field}\n`)},
+      'exact bounded, fail-closed baseline command or artifact contract'
+    );
+  }
+  const start = realWorkflow.indexOf(`      - name: ${name}\n`);
+  const end = realWorkflow.indexOf('\n      - name:', start + 1) + 1;
+  if (start < 0 || end <= start) throw new Error('Missing bounded method handle collection step fixture: ' + name);
+  const block = realWorkflow.slice(start, end);
+  expectCheckerFailure(
+    `duplicate method handle collection step ${name}`,
+    {workflow: replaceRequired(realWorkflow, block, block + block)},
+    `contain the ${name} step exactly once`
+  );
+  if (name !== 'Upload Java method handle collection ledger') {
+    expectCheckerFailure(
+      `renamed duplicate method handle collection command ${name}`,
+      {workflow: replaceRequired(realWorkflow, block,
+        block + block.replace(`- name: ${name}\n`, '- name: Duplicate method handle collection command\n'))},
+      'execute method handle collection command exactly once'
+    );
+  }
+}
+
+for (const replacement of ['timeout-minutes: 0', 'timeout-minutes: 1000', 'timeout-minutes: "3"',
+  'timeout-minutes: ${{ 3 }}', 'timeout-minutes: 3\n        timeout-minutes: 3']) {
+  expectCheckerFailure(
+    `unbounded or ambiguous method handle collection contract timeout: ${replacement}`,
+    {workflow: replaceRequired(realWorkflow, 'Check phase C collection and control flow contracts\n        timeout-minutes: 3\n',
+      `Check phase C collection and control flow contracts\n        ${replacement}\n`)},
+    'exact bounded, fail-closed baseline command or artifact contract'
+  );
+}
+
+for (const [original, replacement] of [
+  ["if: always() && steps.java_methodhandle_collection.outcome != 'skipped'",
+    "if: always() && steps.java_final_language_retained.outcome != 'skipped'"],
+  ['path: build/java-methodhandle-collection-results.json', 'path: build/java-final-language-retained-results.json'],
+  ['path: build/java-methodhandle-collection-results.json\n          archive: false\n          if-no-files-found: error\n          retention-days: 7',
+    'path: build/java-methodhandle-collection-results.json\n          archive: false\n          if-no-files-found: error\n          retention-days: 0'],
+]) {
+  expectCheckerFailure(
+    `cross-wired or discarded method handle collection ledger: ${original}`,
+    {workflow: replaceRequired(realWorkflow, original, replacement)},
+    'exact bounded, fail-closed baseline command or artifact contract'
+  );
+}
+
 // B4d must execute the whole genuine two-release/three-host runner, never a
 // filtered diagnostic or a replacement command that merely reports success.
 for (const command of [
@@ -846,7 +929,10 @@ for (const [firstName, secondName] of [
   ['Upload retained final Java language ledger', 'Check phase C method handle contracts'],
   ['Check phase C method handle contracts', 'Run Java method handle core compatibility'],
   ['Run Java method handle core compatibility', 'Upload Java method handle core ledger'],
-  ['Upload Java method handle core ledger', 'Check evolved switch ledger contract'],
+  ['Upload Java method handle core ledger', 'Check phase C collection and control flow contracts'],
+  ['Check phase C collection and control flow contracts', 'Run Java method handle collection compatibility'],
+  ['Run Java method handle collection compatibility', 'Upload Java method handle collection ledger'],
+  ['Upload Java method handle collection ledger', 'Check evolved switch ledger contract'],
 ]) {
   expectCheckerFailure(
     `member resolution/access dependency reversed: ${firstName} before ${secondName}`,

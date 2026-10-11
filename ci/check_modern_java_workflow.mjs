@@ -20,6 +20,8 @@ const finalLanguageRunnerCommand = 'node ci/java_final_language_test.mjs --brows
 const finalLanguageRetainedRunnerCommand = 'node ci/java_final_language_retained_test.mjs --browser';
 const methodHandleCoreUnitCommand = 'node --test ci/java_methodhandle_core_contract_test.mjs';
 const methodHandleCoreRunnerCommand = 'node ci/java_methodhandle_core_test.mjs --browser';
+const methodHandleCollectionUnitCommand = 'node --test ci/java_methodhandle_collection_contract_test.mjs';
+const methodHandleCollectionRunnerCommand = 'node ci/java_methodhandle_collection_test.mjs --browser';
 
 function stripUnquotedComments(text) {
   return text.split('\n').map((line) => {
@@ -885,6 +887,24 @@ for (const [name, fields] of [
     '  if-no-files-found: error',
     '  retention-days: 7',
   ]],
+  ['Check phase C collection and control flow contracts', [
+    'timeout-minutes: 3',
+    `run: ${methodHandleCollectionUnitCommand}`,
+  ]],
+  ['Run Java method handle collection compatibility', [
+    'id: java_methodhandle_collection',
+    'timeout-minutes: 40',
+    `run: ${methodHandleCollectionRunnerCommand}`,
+  ]],
+  ['Upload Java method handle collection ledger', [
+    "if: always() && steps.java_methodhandle_collection.outcome != 'skipped'",
+    'uses: actions/upload-artifact@v7',
+    'with:',
+    '  path: build/java-methodhandle-collection-results.json',
+    '  archive: false',
+    '  if-no-files-found: error',
+    '  retention-days: 7',
+  ]],
   ['Check evolved switch ledger contract', [
     'timeout-minutes: 1',
     'run: node --test ci/java_pattern_evolution_contract_test.mjs',
@@ -1053,6 +1073,9 @@ const runtimeOrder = [
   'Check phase C method handle contracts',
   'Run Java method handle core compatibility',
   'Upload Java method handle core ledger',
+  'Check phase C collection and control flow contracts',
+  'Run Java method handle collection compatibility',
+  'Upload Java method handle collection ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -1078,6 +1101,11 @@ for (const command of [finalLanguageUnitCommand, finalLanguageRunnerCommand, fin
 for (const command of [methodHandleCoreUnitCommand, methodHandleCoreRunnerCommand]) {
   if (countLiteral(runtimeJob, `        run: ${command}\n`) !== 1) {
     fail(`Modern Java workflow must execute method handle core command exactly once: ${command}`);
+  }
+}
+for (const command of [methodHandleCollectionUnitCommand, methodHandleCollectionRunnerCommand]) {
+  if (countLiteral(runtimeJob, `        run: ${command}\n`) !== 1) {
+    fail(`Modern Java workflow must execute method handle collection command exactly once: ${command}`);
   }
 }
 

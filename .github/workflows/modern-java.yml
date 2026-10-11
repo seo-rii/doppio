@@ -461,6 +461,25 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Check phase C collection and control flow contracts
+        timeout-minutes: 3
+        run: node --test ci/java_methodhandle_collection_contract_test.mjs
+
+      # C2 retains its independent, complete two-release/three-host matrix.
+      - name: Run Java method handle collection compatibility
+        id: java_methodhandle_collection
+        timeout-minutes: 40
+        run: node ci/java_methodhandle_collection_test.mjs --browser
+
+      - name: Upload Java method handle collection ledger
+        if: always() && steps.java_methodhandle_collection.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-methodhandle-collection-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Check evolved switch ledger contract
         timeout-minutes: 1
         run: node --test ci/java_pattern_evolution_contract_test.mjs
