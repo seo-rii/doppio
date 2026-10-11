@@ -51,11 +51,13 @@ test('initialization requirements retain normative ownership and release referen
 test('native oracle must execute every deterministic scenario including private and synthetic methods', () => {
   const fixture = manifest().fixtures[0];
   const expected = fixture.expectedStdout.split('\n');
-  assert.equal(expected.length, 26);
+  assert.equal(expected.length, 32);
   assert.equal(expected.at(-1), '');
   assert.equal(expected.at(-2), 'INITIALIZATION_OK');
   assert.deepEqual(expected.slice(0, -2).map(line => line.split('=')[0]), [
     'order', 'repeat', 'no-clinit', 'direct-interface', 'direct-interface-parent',
+    'invokeinterface-abstract', 'invokeinterface-direct', 'invokeinterface-after-direct',
+    'invokeinterface-parent', 'invokeinterface-default', 'invokeinterface-default-child',
     'method-flags', 'non-eager-interfaces', 'synthetic-default', 'overridden-default',
     'passive-uses', 'reflective-active-use', 'declaring-members', 'declaring-child',
     'getstatic', 'putstatic', 'invokestatic', 'recursive', 'recursive-default',
@@ -64,5 +66,9 @@ test('native oracle must execute every deterministic scenario including private 
   ]);
   assert.ok(expected.includes('method-flags=PrivateOnly,NonDefaultClass'));
   assert.ok(expected.includes('synthetic-default=BridgeChild,BridgeClass'));
+  assert.ok(expected.includes('invokeinterface-abstract=<none>'));
+  assert.ok(expected.includes('invokeinterface-after-direct=<none>'));
+  assert.ok(expected.includes('invokeinterface-default=InvokeDefaultParent'));
+  assert.ok(fixture.coverage.includes('interface-instance-invocation-does-not-trigger-initialization'));
   assert.match(fixture.limitations, /not a general verifier\/linkage/);
 });

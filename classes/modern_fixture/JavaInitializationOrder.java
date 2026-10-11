@@ -122,6 +122,39 @@ public class JavaInitializationOrder {
     default int child() { return 1; }
   }
 
+  interface InvokeAbstractParent {
+    int VALUE = mark("InvokeAbstractParent");
+    int value();
+  }
+
+  interface InvokeAbstractChild extends InvokeAbstractParent {
+    int VALUE = mark("InvokeAbstractChild");
+  }
+
+  static class InvokeAbstractImplementation implements InvokeAbstractChild {
+    public int value() { return 42; }
+  }
+
+  interface InvokeDeclared {
+    int VALUE = mark("InvokeDeclared");
+    int value();
+  }
+
+  static class InvokeDeclaredImplementation implements InvokeDeclared {
+    public int value() { return 43; }
+  }
+
+  interface InvokeDefaultParent {
+    int VALUE = mark("InvokeDefaultParent");
+    default int value() { return 44; }
+  }
+
+  interface InvokeDefaultChild extends InvokeDefaultParent {
+    int VALUE = mark("InvokeDefaultChild");
+  }
+
+  static class InvokeDefaultImplementation implements InvokeDefaultChild {}
+
   interface PrivateOnly {
     int VALUE = mark("PrivateOnly");
     private int privateInstance() { return 1; }
@@ -307,6 +340,23 @@ public class JavaInitializationOrder {
     report("direct-interface", "DirectChild");
     check(DirectParent.VALUE == 1, "parent remains independently initializable");
     report("direct-interface-parent", "DirectParent");
+
+    InvokeAbstractChild inheritedCall = new InvokeAbstractImplementation();
+    InvokeDeclared declaredCall = new InvokeDeclaredImplementation();
+    check(inheritedCall.value() == 42 && declaredCall.value() == 43, "abstract interface invocation");
+    report("invokeinterface-abstract", "");
+    check(InvokeAbstractChild.VALUE == 1 && InvokeDeclared.VALUE == 1, "direct interface active use after invocation");
+    report("invokeinterface-direct", "InvokeAbstractChild,InvokeDeclared");
+    check(inheritedCall.value() == 42 && declaredCall.value() == 43, "invocation after direct child initialization");
+    report("invokeinterface-after-direct", "");
+    check(InvokeAbstractParent.VALUE == 1, "abstract declaration owner remains independently initializable");
+    report("invokeinterface-parent", "InvokeAbstractParent");
+
+    InvokeDefaultChild defaultCall = new InvokeDefaultImplementation();
+    check(defaultCall.value() == 44, "inherited default invocation");
+    report("invokeinterface-default", "InvokeDefaultParent");
+    check(InvokeDefaultChild.VALUE == 1, "inherited default leaves symbolic child independently initializable");
+    report("invokeinterface-default-child", "InvokeDefaultChild");
 
     new NonDefaultClass();
     check(!PrivateOnly.class.getDeclaredMethod("privateInstance").isDefault(),

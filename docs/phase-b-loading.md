@@ -28,7 +28,7 @@ package. Source-section counts are neither effort estimates nor pass rates.
 The [manifest](../ci/java_initialization_manifest.json) maps six selected
 requirements to one genuine source compiled by each pinned javac 21 and 25.
 There are two release cases and four required guest comparisons (Node and
-Chromium), plus their native oracles. The fixture asserts 24 deterministic
+Chromium), plus their native oracles. The fixture asserts 30 deterministic
 scenario traces and a final completion marker. Its exact stdout is part of the
 manifest, so two equally incomplete executions do not pass by merely agreeing.
 
@@ -55,6 +55,9 @@ The source fixture covers:
 - classes without their own initializer, overridden defaults and synthetic bridges;
 - direct-interface initialization and passive class literals, arrays, constants
   and `Class.forName(..., false, ...)`;
+- inherited abstract/default instance calls without initializing their symbolic
+  interfaces or abstract declaration owners, including an initialized child
+  whose parent remains independently initializable;
 - active uses of the actual declaring class, reflection, field reads/writes and
   static method calls;
 - same-thread recursive initialization and observable default field values;

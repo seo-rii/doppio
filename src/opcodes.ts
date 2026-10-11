@@ -1528,15 +1528,10 @@ export class Opcodes {
     const pc = frame.pc;
     var methodReference = <InterfaceMethodReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1));
     if (methodReference.isResolved()) {
-      if (methodReference.method.cls.isInitialized(thread)) {
-        // Rewrite to fast and rerun.
-        code[pc] = OpCode.INVOKEINTERFACE_FAST;
-      } else {
-        // Initialize our class and rerun opcode.
-        // Note that the existance of an object of an interface type does *not*
-        // mean that the interface is initialized!
-        initializeClass(thread, frame, methodReference.classInfo);
-      }
+      // JVMS 5.5: invoking an instance method is not an initialization trigger.
+      // The symbolic interface and an inherited declaration's owner can both
+      // remain uninitialized even when the receiver class is initialized.
+      code[pc] = OpCode.INVOKEINTERFACE_FAST;
     } else {
       resolveCPItem(thread, frame, methodReference);
     }

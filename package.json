@@ -113,7 +113,7 @@
     "ci:phase-a:inventory": "node ci/plan_spec_source_index.mjs --check && node ci/check_java_se_api_census.mjs && node ci/java_se_contract_sources.mjs && node ci/check_phase_a_inventory.mjs",
     "ci:phase-a:test": "node --test ci/plan_spec_source_index_test.mjs ci/check_java_se_api_census_test.mjs ci/java_se_contract_sources_test.mjs ci/check_plan_spec_obligations_test.mjs ci/check_phase_a_inventory_test.mjs ci/check_phase_a_evidence_test.mjs",
     "ci:phase-a:evidence": "node ci/check_phase_a_evidence.mjs",
-    "ci:java-initialization:test": "node --test ci/class_initialization_test.cjs ci/java_initialization_contract_test.mjs",
+    "ci:java-initialization:test": "node --test ci/class_initialization_test.cjs ci/interface_invocation_initialization_test.cjs ci/java_initialization_contract_test.mjs",
     "ci:java-initialization": "node ci/run_java_compatibility.mjs --manifest ci/java_initialization_manifest.json --output build/java-initialization-results.json --browser",
     "ci:class-structure:test": "node --test ci/class_member_structure_test.cjs ci/class_attribute_structure_test.cjs ci/java_class_structure_contract_test.mjs",
     "ci:class-structure": "node ci/java_class_structure_test.mjs --browser",
