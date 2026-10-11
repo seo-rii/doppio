@@ -22,6 +22,10 @@ function load(name) {
   return loaded.exports;
 }
 const {ClassVerification} = load('ClassVerification');
+const {decodeMethodCode} = load('BytecodeVerifier');
+const {verifyMethodTypes} = load('BytecodeTypeVerifier');
+const ByteStream = require(path.join(runtime, 'src/ByteStream')).default;
+const {ConstantPool} = require(path.join(runtime, 'src/ConstantPool'));
 const {Code} = require(path.join(runtime, 'src/attributes'));
 const {Flags} = require(path.join(runtime, 'src/util'));
 
@@ -58,6 +62,47 @@ function thread() {
       this.rejectLoad = failure => callback(failure);
       operation(value => callback(null, value));
     }};
+}
+
+// These are controlled metadata-gate fixtures, not javac/native evidence. The
+// actual constant-pool parser, instruction decoder, and type verifier create the
+// obligations: a synthetic obligation cannot accidentally hide a decoder change.
+function memberProbe(w, kind, owner, receiver = owner) {
+  const constants = [];
+  const u2 = value => { const bytes = Buffer.alloc(2); bytes.writeUInt16BE(value); return bytes; };
+  const add = (tag, ...bytes) => {
+    constants.push(Buffer.concat([Buffer.from([tag]), ...bytes]));
+    return constants.length;
+  };
+  const utf = text => { const bytes = Buffer.from(text); return add(1, u2(bytes.length), bytes); };
+  const classIndex = add(7, u2(utf(owner.slice(1, -1))));
+  const memberName = kind === 'constructor' ? '<init>' : 'restricted';
+  const memberDescriptor = kind === 'field' ? 'I' : '()V';
+  const nameAndType = add(12, u2(utf(memberName)), u2(utf(memberDescriptor)));
+  const memberIndex = add(kind === 'field' ? 9 : 10, u2(classIndex), u2(nameAndType));
+  const cp = new ConstantPool();
+  cp.parse(new ByteStream(Buffer.concat([u2(constants.length + 1), ...constants])), null, 65);
+  const bytes = kind === 'constructor'
+    ? [0xbb, ...u2(classIndex), 0xb7, ...u2(memberIndex), 0xb1]
+    : [0x2a, kind === 'field' ? 0xb4 : 0xb6, ...u2(memberIndex), ...(kind === 'field' ? [0x57] : []), 0xb1];
+  w.method.name = 'probe';
+  w.method.rawDescriptor = kind === 'constructor' ? '()V' : '(' + receiver + ')V';
+  w.method.declaredCode = new Code(1, kind === 'constructor' ? 0 : 1, [], [], Buffer.from(bytes));
+  w.cls.constantPool = cp;
+  const input = {className: w.cls.getInternalName(), superClassName: w.cls.getSuperClassReference().name,
+    majorVersion: 65, name: w.method.name, descriptor: w.method.rawDescriptor,
+    declaredAccessFlags: w.method.declaredAccessFlags, declaredCode: w.method.declaredCode, constantPool: cp};
+  return verifyMethodTypes(input, decodeMethodCode(input)).obligations;
+}
+
+function protectedBase(w, kind) {
+  const memberName = kind === 'constructor' ? '<init>' : 'restricted';
+  const member = {name: memberName, rawDescriptor: kind === 'field' ? 'I' : '()V',
+    declaredAccessFlags: 4, accessFlags: new Flags(4)};
+  const base = w.define('Lforeign/Base;', undefined, kind === 'field' ? [] : [member]);
+  if (kind === 'field') base.getFields = () => [member];
+  w.cls.getSuperClassReference = () => ({name: 'Lforeign/Base;'});
+  return base;
 }
 
 test('loaded hierarchy metadata discharges obligations without resolution or initialization', () => {
@@ -168,4 +213,72 @@ test('pre-thread bootstrap metadata loading still verifies the same obligations'
   w.requests[0].callback(w.define('Lmeta/Child;', 'Lmeta/Parent;'));
   assert.equal(result, true);
   assert.equal(gate.isVerified(), true);
+});
+
+test('unrelated constructor owners stay lazy even when their hierarchy is unavailable', () => {
+  for (const ownerLoaded of [false, true]) {
+    const w = world(), unrelatedName = 'Lmissing/NotGood;';
+    if (ownerLoaded) {
+      const unrelated = w.define(unrelatedName);
+      unrelated.getInterfaceClassReferences = () => [{name: 'Lmissing/UnavailableInterface;'}];
+    }
+    assert.deepEqual(memberProbe(w, 'constructor', unrelatedName), [{kind: 'protected', pc: 3,
+      sourceType: unrelatedName, targetType: unrelatedName, memberName: '<init>', memberDescriptor: '()V', opcode: 0xb7}]);
+    const gate = new ClassVerification(w.cls);
+    assert.equal(gate.tryToVerify(), true, ownerLoaded ? 'Unrelated owner hierarchy must remain lazy' : 'Unrelated owner must remain unloaded');
+    assert.equal(gate.isVerified(), true);
+    const caller = thread();
+    let result;
+    new ClassVerification(w.cls).verify(caller, success => { result = success; });
+    assert.equal(result, true);
+    assert.deepEqual(caller.errors, []);
+    assert.deepEqual(w.requests, []);
+    assert.equal(w.loaded.has('Lmissing/UnavailableInterface;'), false);
+    assert.equal(w.loaded.has(unrelatedName), ownerLoaded);
+  }
+});
+
+test('actual superclass protected fields and methods still load and check receiver metadata', () => {
+  for (const kind of ['field', 'method']) {
+    for (const validReceiver of [false, true]) {
+      const w = world();
+      protectedBase(w, kind);
+      const receiverName = validReceiver ? 'Lmeta/CurrentChild;' : 'Lmeta/Sibling;';
+      const obligations = memberProbe(w, kind, 'Lforeign/Base;', receiverName);
+      assert.deepEqual(obligations.map(value => value.kind), ['assignable', 'protected']);
+      const gate = new ClassVerification(w.cls), caller = thread(), results = [];
+      gate.verify(caller, success => results.push(success));
+      assert.deepEqual(results, []);
+      assert.equal(gate.isVerified(), false);
+      assert.equal(w.requests.length, 1);
+      assert.equal(w.requests[0].name, receiverName);
+      assert.equal(w.requests[0].explicit, false);
+      // Both receivers are Base subtypes. Only CurrentChild also satisfies the
+      // stricter protected rule, so ordinary assignability cannot explain the
+      // sibling's rejection.
+      w.requests[0].callback(w.define(receiverName, validReceiver ? 'Lmeta/Current;' : 'Lforeign/Base;'));
+      assert.deepEqual(results, [validReceiver]);
+      assert.equal(gate.isVerified(), validReceiver);
+      if (validReceiver) assert.deepEqual(caller.errors, []);
+      else {
+        assert.equal(caller.errors.length, 1);
+        assert.equal(caller.errors[0].name, 'Ljava/lang/VerifyError;');
+        assert.match(caller.errors[0].message, /Protected instance receiver is not assignable to the current class/);
+      }
+      assert.equal(w.requests.length, 1);
+    }
+  }
+});
+
+test('allocating a superclass with a protected constructor still checks the new receiver', () => {
+  const w = world();
+  protectedBase(w, 'constructor');
+  assert.deepEqual(memberProbe(w, 'constructor', 'Lforeign/Base;').map(value => value.kind), ['protected']);
+  const gate = new ClassVerification(w.cls), caller = thread();
+  gate.verify(caller, success => assert.equal(success, false));
+  assert.equal(gate.isVerified(), false);
+  assert.equal(caller.errors.length, 1);
+  assert.equal(caller.errors[0].name, 'Ljava/lang/VerifyError;');
+  assert.match(caller.errors[0].message, /Protected instance receiver is not assignable to the current class/);
+  assert.deepEqual(w.requests, []);
 });

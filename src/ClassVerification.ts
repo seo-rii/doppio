@@ -94,6 +94,15 @@ export class ClassVerification {
     }
     var currentClass = snapshot(self);
     this.obligations.forEach(entry => {
+      if (entry.value.kind === 'protected') {
+        // The protected receiver rule only applies to a symbolic owner in
+        // this class's superclass chain. A different descriptor cannot have
+        // that identity; do not load unrelated constructor/member owners just
+        // to discover this. Their ordinary linkage errors belong to execution.
+        var ancestor = currentClass.superclass;
+        while (ancestor !== null && ancestor.name !== entry.value.targetType) ancestor = ancestor.superclass;
+        if (ancestor === null) return;
+      }
       var result = checkVerificationObligation(entry.value, {
         currentClass, bootstrapLoader: self.getLoader().bootstrap,
         source: type(entry.value.sourceType), target: type(entry.value.targetType)
