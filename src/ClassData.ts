@@ -5,7 +5,7 @@ import {ConstantPool, ClassReference, ConstString, MethodHandle, IConstantPoolIt
 import {IAttribute, IRecordComponentInfo, makeAttributes, BootstrapMethods, ConstantValue, NestHost, NestMembers, PermittedSubclasses, RecordAttribute} from './attributes';
 import {JVMThread, InternalStackFrame, NativeStackFrame, BytecodeStackFrame} from './threading';
 import * as logging from './logging';
-import {Method, Field} from './methods';
+import {Method, Field, canOverrideMethod, invokeExactMethod, invokeVirtualMethod} from './methods';
 import {ClassLoader, CustomClassLoader} from './ClassLoader';
 import {ClassState, ConstantPoolItemType, ThreadStatus} from './enums';
 import ClassLock from './ClassLock';
@@ -26,6 +26,11 @@ const MIN_SUPPORTED_CLASSFILE_MAJOR = 45;
 const MAX_SUPPORTED_CLASSFILE_MAJOR = 70;
 
 /** Distinguishes unsupported class versions from malformed class structures. */
+/** Pure selection keeps abstract declarations and their exact owner intact.
+ * Missing implementations and conflicts become errors only at invocation. */
+export type MethodSelection = {kind: 'selected'; method: Method} |
+  {kind: 'missing' | 'conflict'; candidates: Method[]};
+
 export class ClassFileVersionError extends Error {
   constructor(message: string) {
     super(message);
@@ -944,23 +949,10 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
    * array is its *vmindex*.
    */
   protected _staticFields: Field[] = [];
-  /**
-   * Virtual method table, keyed by method signature. Unlike _vmTable,
-   * _methodLookup contains static methods and constructors, too.
-   */
-  private _methodLookup: { [signature: string]: Method } = {};
-  /**
-   * Virtual method table, keyed by vmindex. Methods originally defined by
-   * super classes are in front of methods defined in this class. Overriding
-   * methods are placed into the vmindex of the originating method.
-   */
-  protected _vmTable: Method[] = [];
-  /**
-   * Default method implementations that this class did *not* inherit, but are
-   * still invocable in the class via their full name (e.g. through an
-   * invokespecial bytecode).
-   */
-  protected _uninheritedDefaultMethods: Method[] = [];
+  /** Explicit VM overlays are not class-file declarations or reflection slots. */
+  private vmMethods: { [signature: string]: Method } = Object.create(null);
+  /** Stable slots are anchored to declarations, not ambiguous signatures. */
+  private vmOrigins: Method[] = [];
   /**
    * The ProtectionDomain for this class, specified by the application class
    * loader. NULL for bootstrap classloaded items.
@@ -1097,7 +1089,10 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
    * Get the Virtual Method table for this class.
    */
   public getVMTable(): Method[] {
-    return this._vmTable;
+    return this.vmOrigins.map(origin => {
+      var selected = this.selectMethod(origin);
+      return selected.kind === 'selected' ? selected.method : null;
+    });
   }
 
   /**
@@ -1105,17 +1100,25 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
    * virtual method table (e.g. is static or a constructor).
    */
   public getVMIndexForMethod(m: Method): number {
-    // Use M's signature, as we might override the method and use a different
-    // method object in the table for its vmindex.
-    return this._vmTable.indexOf(this.methodLookup(m.signature));
+    if (m.accessFlags.isStatic() || m.accessFlags.isPrivate() || m.name[0] === '<') return -1;
+    var index = this.vmOrigins.indexOf(m);
+    if (index === -1 && (this.isSubclass(m.cls) || this.isSubinterface(m.cls))) {
+      // VM overlays can be registered after this receiver's hierarchy was
+      // assembled. Append their exact origin without changing earlier slots.
+      index = this.vmOrigins.length;
+      this.vmOrigins.push(m);
+    }
+    return index;
   }
 
   /**
    * Returns the method corresponding to the given VMIndex.
    */
   public getMethodFromVMIndex(i: number): Method {
-    if (this._vmTable[i] !== undefined) {
-      return this._vmTable[i];
+    var origin = this.vmOrigins[i];
+    if (origin !== undefined) {
+      var selected = this.selectMethod(origin);
+      return selected.kind === 'selected' ? selected.method : null;
     }
     return null;
   }
@@ -1171,15 +1174,79 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
    * Does not search superclasses / interfaces.
    */
   public getMethod(sig: string): Method {
-    var m = this._methodLookup[sig];
-    if (m.cls === this) {
-      return m;
+    return this.getDeclaredMethod(sig);
+  }
+
+  /** Available immediately after parsing, independent of inherited tables. */
+  public getDeclaredMethod(signature: string): Method {
+    for (var i = 0; i < this.methods.length; i++) {
+      if (this.methods[i].signature === signature) return this.methods[i];
     }
     return null;
   }
 
   public getSpecificMethod(definingCls: string, sig: string): Method {
     if (this.getInternalName() === definingCls) {
+  /** Register only an explicit VM-created native declaration. Multiple CP
+   * references share one canonical identity; parsed declarations stay intact. */
+  public registerVMMethod(method: Method): Method {
+    if (method.cls !== this || method.slot !== -1 || !method.accessFlags.isNative()) {
+      throw new Error('Invalid VM method registration');
+    }
+    var previous = this.vmMethods[method.signature];
+    if (previous !== undefined) return previous;
+    this.vmMethods[method.signature] = method;
+    return method;
+  }
+
+  private getEffectiveMethod(signature: string): Method {
+    return this.vmMethods[signature] || this.getDeclaredMethod(signature);
+  }
+
+  /** All eligible superinterface declarations, preserving loader identity. */
+  private getSuperinterfaceMethods(signature?: string): Method[] {
+    var seen = new Set<ReferenceClassData<JVMTypes.java_lang_Object>>(), result: Method[] = [];
+    var visit = (cls: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+      if (seen.has(cls)) return;
+      seen.add(cls);
+      var declarations = cls.getMethods().filter(method => cls.vmMethods[method.signature] === undefined)
+        .concat(Object.keys(cls.vmMethods).map(signature => cls.vmMethods[signature]));
+      declarations.forEach(method => {
+        if (method.name[0] !== '<' && !method.accessFlags.isStatic() && !method.accessFlags.isPrivate() &&
+            (signature === undefined || method.signature === signature)) result.push(method);
+      });
+      (cls.getInterfaces() || []).forEach(visit);
+    };
+    var current: ReferenceClassData<JVMTypes.java_lang_Object> = this;
+    while (current !== null) {
+      (current.getInterfaces() || []).forEach(visit);
+      current = current.getSuperClass();
+    }
+    return result;
+  }
+
+  public getMaximallySpecificInterfaceMethods(signature: string): Method[] {
+    var methods = this.getSuperinterfaceMethods(signature);
+    return methods.filter(method => !methods.some(other => other !== method &&
+      other.cls !== method.cls && other.cls.isSubinterface(method.cls)));
+  }
+
+  /** JVMS 5.4.6. The resolved declaration, not its signature alone, anchors
+   * selection. This query never resolves, verifies or initializes a class. */
+  public selectMethod(resolved: Method): MethodSelection {
+    if (resolved.accessFlags.isPrivate()) return {kind: 'selected', method: resolved};
+    var current: ReferenceClassData<JVMTypes.java_lang_Object> = this;
+    while (current !== null) {
+      var declared = current.getEffectiveMethod(resolved.signature);
+      if (declared !== null && canOverrideMethod(declared, resolved)) return {kind: 'selected', method: declared};
+      current = current.getSuperClass();
+    }
+    var candidates = this.getMaximallySpecificInterfaceMethods(resolved.signature),
+      concrete = candidates.filter(method => !method.accessFlags.isAbstract());
+    if (concrete.length === 1) return {kind: 'selected', method: concrete[0]};
+    return {kind: concrete.length > 1 ? 'conflict' : 'missing', candidates};
+  }
+
       return this.getMethod(sig);
     }
     var searchClasses = this.interfaceClasses.slice(0), m: Method;
@@ -1208,7 +1275,10 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
    * DO NOT MUTATE!
    */
   public getUninheritedDefaultMethods(): Method[] {
-    return this._uninheritedDefaultMethods;
+    // VM overlays may be registered after hierarchy linking. Preserve their
+    // exact special-call aliases without adding them to parsed declarations.
+    return this.getSuperinterfaceMethods().filter(method => method.accessFlags.isPublic() &&
+      !method.accessFlags.isAbstract());
   }
 
   public getProtectionDomain(): JVMTypes.java_security_ProtectionDomain {
@@ -1221,57 +1291,13 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
    * http://docs.oracle.com/javase/specs/jvms/se8/html/jvms-5.html#jvms-5.4.3.3
    */
   private _resolveMethods(): void {
-    if (this.superClass !== null) {
-      // Start off with my parents' method table.
-      this._vmTable = this._vmTable.concat(this.superClass._vmTable);
-      Object.keys(this.superClass._methodLookup).forEach((m: string) => {
-        this._methodLookup[m] = this.superClass._methodLookup[m];
-      });
-    }
-
-    // My methods override my super class'.
-    this.methods.forEach((m: Method) => {
-      var superM = this._methodLookup[m.signature];
-      if (!m.isStatic && m.name !== "<init>") {
-        // Only non-static non-constructor methods are placed into the virtual
-        // method table.
-        if (superM === undefined) {
-          // New vmindex.
-          this._vmTable.push(m);
-        } else {
-          // Old vmindex. Inherit the super class method's vmindex.
-          this._vmTable[this._vmTable.indexOf(superM)] = m;
-        }
+    this.vmOrigins = this.superClass === null ? [] : this.superClass.vmOrigins.slice();
+    var interfaceMethods = this.getSuperinterfaceMethods(), seen = new Set(this.vmOrigins);
+    this.methods.concat(interfaceMethods).forEach(method => {
+      if (!method.accessFlags.isStatic() && !method.accessFlags.isPrivate() && method.name[0] !== '<' && !seen.has(method)) {
+        seen.add(method);
+        this.vmOrigins.push(method);
       }
-      this._methodLookup[m.signature] = m;
-    });
-
-    // Root out any miranda / default / static interface methods. Only install
-    // them if there are no alternatives already in the table.
-    this.interfaceClasses.forEach((iface: ReferenceClassData<JVMTypes.java_lang_Object>) => {
-      Object.keys(iface._methodLookup).forEach((ifaceMethodSig: string) => {
-        var ifaceM = iface._methodLookup[ifaceMethodSig];
-        if (this._methodLookup[ifaceMethodSig] === undefined) {
-          if (!ifaceM.isStatic) {
-            // New vmindex.
-            this._vmTable.push(ifaceM);
-          }
-          this._methodLookup[ifaceMethodSig] = ifaceM;
-        } else if (ifaceM.isDefault()) {
-          var currentMethod = this._methodLookup[ifaceMethodSig];
-          if (currentMethod.accessFlags.isAbstract() && currentMethod.cls.accessFlags.isInterface()) {
-            this._vmTable[this._vmTable.indexOf(currentMethod)] = ifaceM;
-            this._methodLookup[ifaceMethodSig] = ifaceM;
-          } else if (currentMethod.isDefault() && currentMethod.cls.accessFlags.isInterface() &&
-              ifaceM.cls.isSubinterface(currentMethod.cls)) {
-            this._vmTable[this._vmTable.indexOf(currentMethod)] = ifaceM;
-            this._methodLookup[ifaceMethodSig] = ifaceM;
-          } else {
-            // Default method; uninherited, but still callable via full signature.
-            this._uninheritedDefaultMethods.push(ifaceM);
-          }
-        }
-      });
     });
   }
 
@@ -1314,14 +1340,27 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
    * found.
    */
   public methodLookup(signature: string): Method {
-    var m = this._methodLookup[signature];
-    if (m !== undefined) {
-      return m;
+    var method = this.getEffectiveMethod(signature);
+    if (method !== null || signature[0] === '<') return method;
+    if (!this.accessFlags.isInterface()) {
+      var parent = this.superClass;
+      while (parent !== null) {
+        method = parent.getEffectiveMethod(signature);
+        if (method !== null) return method;
+        parent = parent.getSuperClass();
+      }
     } else {
-      return null;
+      var object = <ReferenceClassData<JVMTypes.java_lang_Object>> this.loader.bootstrap.getLoadedClass('Ljava/lang/Object;');
+      method = object === null ? null : object.getEffectiveMethod(signature);
+      if (method !== null && method.accessFlags.isPublic() && !method.accessFlags.isStatic()) return method;
     }
   }
 
+    var candidates = this.getMaximallySpecificInterfaceMethods(signature),
+      concrete = candidates.filter(candidate => !candidate.accessFlags.isAbstract());
+    // Resolution may choose an arbitrary eligible interface declaration when
+    // there is no unique concrete maximal method. Invocation selects again.
+    return concrete.length === 1 ? concrete[0] : candidates.length ? candidates[0] : null;
   /**
    * Performs method lookup, and includes signature polymorphic results if
    * the method is signature polymorphic.
@@ -1339,8 +1378,8 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
       // * It has a return type of Object.
       // * It has the ACC_VARARGS and ACC_NATIVE flags set.
       var polySig = `${signature.slice(0, signature.indexOf('('))}([Ljava/lang/Object;)Ljava/lang/Object;`,
-        m = this._methodLookup[polySig];
-      if (m !== undefined && m.accessFlags.isNative() && m.accessFlags.isVarArgs() && m.cls === this) {
+        m = this.getEffectiveMethod(polySig);
+      if (m !== null && m.accessFlags.isNative() && m.accessFlags.isVarArgs() && m.cls === this) {
         return m;
       }
     } else if (this.superClass !== null) {
@@ -1879,18 +1918,23 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
   }
 
   /**
-   * Find Miranda and default interface methods in this class. These
-   * methods manifest as new vmindices or interface-default replacements in the
-   * virtual method table compared with the superclass, and are not defined in
-   * this class itself.
+   * Supply native-call aliases for inherited interface signatures. Conflicting
+   * or entirely abstract candidates still need an alias that reports the
+   * guest error at invocation; constructing a class must not choose a body.
    */
   public getMirandaAndDefaultMethods(): Method[] {
     if (this.interfaceClasses.length === 0) {
       return [];
     }
-    var superClsMethodTable: Method[] = this.superClass !== null ? this.superClass.getVMTable() : [];
-    return this.getVMTable().filter((method: Method, index: number) => method.cls !== this &&
-      (index >= superClsMethodTable.length || superClsMethodTable[index] !== method));
+    var seen = new Set<string>(), aliases: Method[] = [];
+    this.getSuperinterfaceMethods().forEach(method => {
+      var own = this.getEffectiveMethod(method.signature);
+      if (seen.has(method.signature) || own !== null && !own.accessFlags.isStatic()) return;
+      seen.add(method.signature);
+      var selection = this.selectMethod(method);
+      aliases.push(selection.kind === 'selected' ? selection.method : method);
+    });
+    return aliases;
   }
 
   public outputInjectedFields(outputStream: StringOutputStream) {
@@ -1910,7 +1954,8 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
 
     var jsClassName = this.getJSClassName(),
       outputStream = new StringOutputStream(),
-      methods = this.getMethods(),
+      methods = this.getMethods().filter(method => this.vmMethods[method.signature] === undefined)
+        .concat(Object.keys(this.vmMethods).map(signature => this.vmMethods[signature])),
       mirandaAndDefaultMethods = this.getMirandaAndDefaultMethods(),
       uninheritedDefaultMethods = this.getUninheritedDefaultMethods();
 
@@ -1934,13 +1979,13 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     this._staticFields.forEach((f: Field) => f.outputJavaScriptField(jsClassName, outputStream));
 
     // Static and instance methods.
-    methods.forEach((m: Method, index: number) => m.outputJavaScriptFunction(jsClassName, outputStream, false, `methods[${index}]`));
+    methods.forEach((m: Method, index: number) => Method.prototype.outputJavaScriptFunction.call(m, jsClassName, outputStream, false, `methods[${index}]`));
 
     // Miranda and default interface methods.
-    mirandaAndDefaultMethods.forEach((m: Method, index: number) => m.outputJavaScriptFunction(jsClassName, outputStream, false, `mirandaAndDefaultMethods[${index}]`));
+    mirandaAndDefaultMethods.forEach((m: Method, index: number) => Method.prototype.outputJavaScriptFunction.call(m, jsClassName, outputStream, false, `mirandaAndDefaultMethods[${index}]`));
 
     // Uninherited default methods.
-    uninheritedDefaultMethods.forEach((m: Method, index: number) => m.outputJavaScriptFunction(jsClassName, outputStream, true, `uninheritedDefaultMethods[${index}]`));
+    uninheritedDefaultMethods.forEach((m: Method, index: number) => Method.prototype.outputJavaScriptFunction.call(m, jsClassName, outputStream, true, `uninheritedDefaultMethods[${index}]`));
 
     outputStream.write(`  return ${jsClassName};`);
 
@@ -1949,8 +1994,8 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     if (!RELEASE && thread !== null && thread.getJVM().shouldDumpCompiledCode()) {
       thread.getJVM().dumpObjectDefinition(this, evalText);
     }
-    const fcn = new Function("extendClass", "cls", "InternalStackFrame", "NativeStackFrame", "BytecodeStackFrame", "gLongZero", "CustomClassLoader", "Monitor", "thread", "getRef", "util", "methods", "mirandaAndDefaultMethods", "uninheritedDefaultMethods", evalText);
-    return fcn(extendClass, this, InternalStackFrame, NativeStackFrame, BytecodeStackFrame, gLong.ZERO, CustomClassLoader, Monitor, thread, getRef, util, methods, mirandaAndDefaultMethods, uninheritedDefaultMethods);
+    const fcn = new Function("extendClass", "cls", "InternalStackFrame", "NativeStackFrame", "BytecodeStackFrame", "gLongZero", "CustomClassLoader", "Monitor", "thread", "getRef", "util", "methods", "mirandaAndDefaultMethods", "uninheritedDefaultMethods", "invokeExactMethod", "invokeVirtualMethod", evalText);
+    return fcn(extendClass, this, InternalStackFrame, NativeStackFrame, BytecodeStackFrame, gLong.ZERO, CustomClassLoader, Monitor, thread, getRef, util, methods, mirandaAndDefaultMethods, uninheritedDefaultMethods, invokeExactMethod, invokeVirtualMethod);
   }
 
   public getConstructor(thread: JVMThread): IJVMConstructor<T> {

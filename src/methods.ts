@@ -4,7 +4,7 @@ import ByteStream from './ByteStream';
 import {IAttribute, AttributeContext, makeAttributes, Signature, RuntimeVisibleAnnotations, Code, ConstantValue, Exceptions, InnerClasses} from './attributes';
 import {ConstantPool, ConstUTF8, ClassReference, MethodReference, InterfaceMethodReference} from './ConstantPool';
 import {ReferenceClassData, ArrayClassData, ClassData} from './ClassData';
-import {JVMThread, annotateOpcode, BytecodeStackFrame} from './threading';
+import {JVMThread, annotateOpcode, BytecodeStackFrame, NativeStackFrame, InternalStackFrame} from './threading';
 import assert from './assert';
 import {ThreadStatus, OpcodeLayoutType, OpCode, OpcodeLayouts, MethodHandleReferenceKind, ConstantPoolItemType} from './enums';
 import Monitor from './Monitor';
@@ -581,7 +581,7 @@ class Trace {
         console.log(`Emitted trace of ${this.infos.length} ops: ` + emitted);
       }
       // f = frame, t = thread, u = util
-      return new Function("f", "t", "u", emitted);
+      return new Function("invokeExactMethod", "invokeVirtualMethod", "return function(f,t,u){" + emitted + "};")(invokeExactMethod, invokeVirtualMethod);
     } else {
       if (!RELEASE && thread.getJVM().shouldPrintJITCompilation()) {
         console.log(`Trace was cancelled`);
@@ -589,6 +589,96 @@ class Trace {
       return null;
     }
   }
+}
+
+/** JVMS 5.4.5, without loading descriptor types or assuming the declaring
+ * class itself implements an interface introduced by a receiver subclass.
+ * This function also accepts VM-owned structural Method declarations. */
+export function canOverrideMethod(candidate: Method, base: Method): boolean {
+  var memo = new Map<Method, Map<Method, boolean>>();
+  var check = (current: Method, inherited: Method): boolean => {
+    var results = memo.get(current);
+    if (results && results.has(inherited)) return results.get(inherited);
+    if (!results) { results = new Map(); memo.set(current, results); }
+    results.set(inherited, false);
+    if (current.signature !== inherited.signature || current.name[0] === '<' || inherited.name[0] === '<' ||
+        current.accessFlags.isStatic() || inherited.accessFlags.isStatic() ||
+        current.accessFlags.isPrivate() || inherited.accessFlags.isPrivate()) return false;
+    if (inherited.accessFlags.isPublic() || inherited.accessFlags.isProtected() ||
+        current.cls.getLoader() === inherited.cls.getLoader() && current.cls.getPackageName() === inherited.cls.getPackageName()) {
+      results.set(inherited, true);
+      return true;
+    }
+    if (current.cls.accessFlags.isInterface() || inherited.cls.accessFlags.isInterface()) return false;
+    var between: ReferenceClassData<JVMTypes.java_lang_Object>[] = [], parent = current.cls.getSuperClass();
+    while (parent !== null && parent !== inherited.cls) {
+      between.push(parent);
+      parent = parent.getSuperClass();
+    }
+    if (parent !== inherited.cls) return false;
+    for (var i = 0; i < between.length; i++) {
+      var bridge = between[i].getDeclaredMethod(current.signature);
+      if (bridge !== null && check(current, bridge) && check(bridge, inherited)) {
+        results.set(inherited, true);
+        return true;
+      }
+    }
+    return false;
+  };
+  return check(candidate, base);
+}
+
+/** Arguments already use JVM word slots, including category-two padding.
+ * The ordinary frame entry gate and monitor protocol remain authoritative. */
+export function invokeExactMethod(thread: JVMThread, method: Method, receiver: JVMTypes.java_lang_Object,
+    args: any[], cb?: (e?: JVMTypes.java_lang_Throwable, value?: any) => void): boolean {
+  if (cb) (<any> thread).stack.push(new InternalStackFrame(cb));
+  if (!method.accessFlags.isStatic() && receiver == null) {
+    thread.throwNewException('Ljava/lang/NullPointerException;', '');
+    return false;
+  }
+  if (method.accessFlags.isAbstract()) {
+    thread.throwNewException('Ljava/lang/AbstractMethodError;', method.fullSignature);
+    return false;
+  }
+  var locals = method.accessFlags.isStatic() ? (args || []) : [receiver].concat(args || []);
+  (<any> thread).stack.push(method.accessFlags.isNative() ? new NativeStackFrame(method, locals) : new BytecodeStackFrame(method, locals));
+  thread.setStatus(ThreadStatus.RUNNABLE);
+  return true;
+}
+
+/** Shared interpreter/JIT/MethodHandle/reflection virtual invocation. */
+export function invokeVirtualMethod(thread: JVMThread, resolved: Method, receiver: JVMTypes.java_lang_Object,
+    args: any[], cb?: (e?: JVMTypes.java_lang_Throwable, value?: any) => void,
+    symbolicInterface?: ReferenceClassData<JVMTypes.java_lang_Object>): boolean {
+  if (cb) (<any> thread).stack.push(new InternalStackFrame(cb));
+  if (resolved.accessFlags.isStatic()) {
+    thread.throwNewException('Ljava/lang/IncompatibleClassChangeError;', resolved.fullSignature + ' is static');
+    return false;
+  }
+  if (receiver == null) {
+    thread.throwNewException('Ljava/lang/NullPointerException;', '');
+    return false;
+  }
+  var receiverClass = receiver.getClass();
+  if (symbolicInterface && !receiverClass.isCastable(symbolicInterface)) {
+    thread.throwNewException('Ljava/lang/IncompatibleClassChangeError;', receiverClass.getExternalName() +
+      ' does not implement ' + symbolicInterface.getExternalName());
+    return false;
+  }
+  var selectingClass = receiverClass instanceof ArrayClassData ? receiverClass.getSuperClass() :
+      <ReferenceClassData<JVMTypes.java_lang_Object>> receiverClass,
+    selection = selectingClass.selectMethod(resolved);
+  if (selection.kind !== 'selected') {
+    thread.throwNewException(selection.kind === 'conflict' ? 'Ljava/lang/IncompatibleClassChangeError;' :
+      'Ljava/lang/AbstractMethodError;', resolved.fullSignature);
+    return false;
+  }
+  if (symbolicInterface && !selection.method.accessFlags.isPublic() && !selection.method.accessFlags.isPrivate()) {
+    thread.throwNewException('Ljava/lang/IllegalAccessError;', selection.method.fullSignature);
+    return false;
+  }
+  return invokeExactMethod(thread, selection.method, receiver, args);
 }
 
 export class Method extends AbstractMethodField {
@@ -806,6 +896,10 @@ export class Method extends AbstractMethodField {
     return (this.accessFlags.isPublic() && !this.accessFlags.isAbstract() && !this.isStatic && this.cls.accessFlags.isInterface());
   }
 
+  public canOverride(base: Method): boolean {
+    return canOverrideMethod(this, base);
+  }
+
   public getFullSignature(): string {
     return this.fullSignature;
   }
@@ -896,8 +990,8 @@ ${onSuccess}`;
       if ((paramSize > pops.length) && (pops.length > 0)) {
         argMaker += `args${suffix}.push(${pops.slice().reverse().join(',')});`;
       }
-      return argMaker + `var obj${suffix}=${(paramSize+1)===pops.length?pops[paramSize]:"f.opStack.pop()"};f.pc=${pc};
-if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.signature}'](t,args${suffix});f.returnToThreadLoop=true;${onSuccess}}else{${onError}}`;
+      return argMaker + `var methodReference${suffix}=f.method.cls.constantPool.get(${index});var obj${suffix}=${(paramSize+1)===pops.length?pops[paramSize]:"f.opStack.pop()"};f.pc=${pc};f.returnToThreadLoop=true;
+if(invokeVirtualMethod(t,methodReference${suffix}.method,obj${suffix},args${suffix},undefined,${code[pc] === OpCode.INVOKEINTERFACE_FAST ? `methodReference${suffix}.classInfo.cls` : 'undefined'})){${onSuccess}}else{${onError}}`;
     }};
 
   }
@@ -913,8 +1007,8 @@ if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.signature}'](t,a
       if ((paramSize > pops.length) && (pops.length > 0)) {
         argMaker += `args${suffix}.push(${pops.slice().reverse().join(',')});`;
       }
-      return argMaker + `var methodReference${suffix}=f.method.cls.constantPool.get(${index});var obj${suffix}=${(paramSize+1)===pops.length?pops[paramSize]:"f.opStack.pop()"};f.pc=${pc};
-			if(!u.isNull(t,f,obj${suffix})){var target${suffix}=obj${suffix}['${methodReference.fullSignature}'];if(typeof target${suffix}!=='function'&&methodReference${suffix}.jsConstructor!==null){target${suffix}=methodReference${suffix}.jsConstructor.prototype[methodReference${suffix}.fullSignature];}target${suffix}.call(obj${suffix},t,args${suffix});f.returnToThreadLoop=true;${onSuccess}}else{${onError}}`;
+      return argMaker + `var methodReference${suffix}=f.method.cls.constantPool.get(${index});var obj${suffix}=${(paramSize+1)===pops.length?pops[paramSize]:"f.opStack.pop()"};f.pc=${pc};f.returnToThreadLoop=true;
+if(invokeExactMethod(t,methodReference${suffix}.method,obj${suffix},args${suffix})){${onSuccess}}else{${onError}}`;
     }};
   }
 
@@ -1179,6 +1273,20 @@ if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.signature}'](t,a
       return cachedBridgeMethod;
     }
 
+    if (!this.isStatic) {
+      var target = this;
+      cachedBridgeMethod = (current, descriptor, args, callback) => {
+        if (refKind === MethodHandleReferenceKind.INVOKESPECIAL || refKind === MethodHandleReferenceKind.NEWINVOKESPECIAL) {
+          invokeExactMethod(current, target, args[0], args.slice(1), callback);
+        } else {
+          invokeVirtualMethod(current, target, args[0], args.slice(1), callback,
+            refKind === MethodHandleReferenceKind.INVOKEINTERFACE && target.cls.accessFlags.isInterface() ? target.cls : undefined);
+        }
+      };
+      this.vmTargetBridgeMethods[refKind] = cachedBridgeMethod;
+      return cachedBridgeMethod;
+    }
+
     var outStream = new StringOutputStream(),
       virtualDispatch = !(refKind === MethodHandleReferenceKind.INVOKESTATIC || refKind === MethodHandleReferenceKind.INVOKESPECIAL);
     // Args: thread, cls, util
@@ -1215,47 +1323,26 @@ if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.signature}'](t,a
    * TODO: Signature polymorphic functions...?
    */
   public outputJavaScriptFunction(jsConsName: string, outStream: StringOutputStream, nonVirtualOnly: boolean = false, methodExpression?: string): void {
-    var i: number,
-      methodExpr = methodExpression || `cls.getSpecificMethod("${this.escapedClassInternalName}", "${this.escapedSignature}")`;
-    if (this.isStatic) {
-      outStream.write(`${jsConsName}["${this.escapedFullSignature}"] = ${jsConsName}["${this.escapedSignature}"] = `);
-    } else {
-      if (!nonVirtualOnly) {
-        outStream.write(`${jsConsName}.prototype["${this.escapedSignature}"] = `);
-      }
-      outStream.write(`${jsConsName}.prototype["${this.escapedFullSignature}"] = `);
-    }
-    // cb check is boilerplate, required for natives calling into JVM land.
-    outStream.write(`(function(method) {
+    // Use public declaration metadata so explicitly registered VM bodies can
+    // share the emitter without pretending to be parsed Method instances.
+    var isStatic = this.accessFlags.isStatic(), signature = JSON.stringify(this.signature),
+      fullSignature = JSON.stringify(this.fullSignature),
+      methodExpr = methodExpression || `cls.getSpecificMethod(${JSON.stringify(this.cls.getInternalName())}, ${signature})`,
+      holder = isStatic ? jsConsName : `${jsConsName}.prototype`;
+    outStream.write(`${holder}[${fullSignature}] = (function(method) {
   return function(thread, args, cb) {
-    if (typeof cb === 'function') {
-      thread.stack.push(new InternalStackFrame(cb));
-    }
-    thread.stack.push(new ${this.isNative ? "NativeStackFrame" : "BytecodeStackFrame"}(method, `);
-    if (!this.isStatic) {
-      // Non-static functions need to add the implicit 'this' variable to the
-      // local variables.
-      outStream.write(`[this`);
-      // Give the JS engine hints about the size, type, and contents of the array
-      // by making it a literal.
-      for (i = 0; i < this.parameterWords; i++) {
-        outStream.write(`, args[${i}]`);
-      }
-      outStream.write(`]`);
-    } else {
-      // Static function doesn't need to mutate the arguments.
-      if (this.parameterWords > 0) {
-        outStream.write(`args`);
-      } else {
-        outStream.write(`[]`);
-      }
-    }
-    outStream.write(`));
-    if (thread.status !== ${ThreadStatus.RUNNABLE}) {
-      thread.setStatus(${ThreadStatus.RUNNABLE});
-    }
+    invokeExactMethod(thread, method, ${isStatic ? 'null' : 'this'}, args, cb);
   };
 })(${methodExpr});\n`);
+    if (isStatic || this.name[0] === '<') {
+      if (!nonVirtualOnly) outStream.write(`${holder}[${signature}] = ${holder}[${fullSignature}];\n`);
+    } else if (!nonVirtualOnly) {
+      outStream.write(`${holder}[${signature}] = (function(method) {
+  return function(thread, args, cb) {
+    invokeVirtualMethod(thread, method, this, args, cb);
+  };
+})(${methodExpr});\n`);
+    }
   }
 }
 

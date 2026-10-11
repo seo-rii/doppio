@@ -3343,6 +3343,7 @@ export class MethodReference implements IConstantPoolItem {
           thread.throwNewException('Ljava/lang/IllegalAccessError;', `${caller.getExternalName()} cannot access ${method.cls.getExternalName()}.${method.name}`);
           cb(false);
         } else {
+          if (syntheticMethod !== undefined && method === syntheticMethod) method = method.cls.registerVMMethod(method);
           this.setResolved(thread, method);
           cb(true);
         }
@@ -3828,6 +3829,7 @@ export class InterfaceMethodReference implements IConstantPoolItem {
           thread.throwNewException('Ljava/lang/IllegalAccessError;', `${caller.getExternalName()} cannot access ${method.cls.getExternalName()}.${method.name}`);
           cb(false);
         } else {
+          if (syntheticMethod !== undefined && method === syntheticMethod) method = method.cls.registerVMMethod(method);
           this.setResolved(thread, method);
           cb(true);
         }

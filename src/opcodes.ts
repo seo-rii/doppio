@@ -12,7 +12,7 @@ import {ClassData, ArrayClassData} from './ClassData';
 import {JVMThread, BytecodeStackFrame} from './threading';
 import {ThreadStatus, OpCode, ConstantPoolItemType, Constants} from './enums';
 import assert from './assert';
-import {Method} from './methods';
+import {Method, invokeExactMethod, invokeVirtualMethod} from './methods';
 import {refreshMemberNameMethodTarget} from './method_handles';
 import * as JVMTypes from '../includes/JVMTypes';
 
@@ -1635,12 +1635,7 @@ export class Opcodes {
           args = store.slice(curr - paramSize, curr);
           break;
       }
-      var target = (<any> obj)[methodReference.fullSignature];
-      if (typeof target !== 'function' && methodReference.jsConstructor != null) {
-        target = methodReference.jsConstructor.prototype[methodReference.fullSignature];
-      }
-      assert(typeof target === 'function', `Resolved method ${methodReference.fullSignature} isn't defined?!`, thread);
-      target.call(obj, thread, args);
+      invokeExactMethod(thread, methodReference.method, obj, args);
       frame.returnToThreadLoop = true;
     }
   }
@@ -1668,7 +1663,7 @@ export class Opcodes {
       store = rawStack.store,
       curr = rawStack.curr,
       obj: JVMTypes.java_lang_Object = store[curr - (count + 1)];
-    if (!isNull(thread, frame, obj)) {
+    {
       var args: any[];
       rawStack.curr = curr - (count + 1);
       switch (count) {
@@ -1691,12 +1686,10 @@ export class Opcodes {
           args = store.slice(curr - count, curr);
           break;
       }
-      // Use the class of the *object*.
-      assert(typeof (<any> obj)[methodReference.signature] === 'function', `Resolved method ${methodReference.signature} isn't defined?!`);
-      (<any> obj)[methodReference.signature](thread, args);
+      invokeVirtualMethod(thread, methodReference.method, obj, args, undefined,
+        code[pc] === OpCode.INVOKEINTERFACE_FAST ? <any> methodReference.classInfo.cls : undefined);
       frame.returnToThreadLoop = true;
     }
-    // Object is NULL; NPE has been thrown.
   }
 
   public static invokeinterface_fast = Opcodes.invokevirtual_fast;

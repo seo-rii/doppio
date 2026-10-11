@@ -11,6 +11,7 @@ import ThreadStatus = Doppio.VM.Enums.ThreadStatus;
 import assert = Doppio.Debug.Assert;
 import PrimitiveClassData = Doppio.VM.ClassFile.PrimitiveClassData;
 import IStackTraceFrame = Doppio.VM.Threading.IStackTraceFrame;
+import {invokeVirtualMethod} from '../methods';
 
 export default function (): any {
   class sun_reflect_ConstantPool {
@@ -187,7 +188,7 @@ export default function (): any {
           }
         }, true);
       } else {
-        (<JVMTypes.JVMFunction> (<any> obj)[m.signature])(thread, args, cb);
+        invokeVirtualMethod(thread, m, obj, args, cb);
       }
     }
   }
