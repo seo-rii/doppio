@@ -164,6 +164,7 @@ export function proveFinalGroup(group, classes) {
   if (group.id !== 'final-launcher') {
     const core = new Map([...classes].map(([name, metadata]) => [name, metadata.core]));
     const proofs = proveCoreGroup(group, core);
+    for (const proof of proofs) proof.fullSourceUnitConformanceProven = false;
     for (const [index, entry] of group.cases.entries()) for (const [n, probe] of entry.probes.entries()) {
       const owner = probe.className || group.mainClass, metadata = classes.get(owner);
       const method = metadata.core.methods.get(probe.method + probe.descriptor);

@@ -59,6 +59,7 @@ test('bootstrap proof follows decoded CP, NameAndType, MethodHandle and repeated
   for (const key of ['cpOffset', 'bootstrapOffset', 'methodHandleOffset', 'referenceIndex']) assert.ok(proof[key] > 0);
   assert.match(proof.attributeSha256, /^[a-f0-9]{64}$/);
   assert.equal(actual.dynamicBranchCoverageProven, false); assert.equal(actual.jitExecutionProven, false);
+  assert.equal(actual.fullSourceUnitConformanceProven, false);
 });
 
 test('unused CP, unrelated method, wrong bootstrap member or label inventory cannot prove a site', () => {
