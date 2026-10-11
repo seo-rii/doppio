@@ -352,8 +352,11 @@ close JVM-002 or bundle B. Evolved receiver dispatch has a dedicated host gate;
 B5 now adds a fixed 157-case core execution corpus across five related groups.
 At clean `3d6728056`, its 30 Java 21/25 native/Node/Chromium cells and all original
 323 retained fixtures pass with unchanged sources, goldens and class files.
-This selected integration evidence does not assess every source unit or complete
-the remaining record, sealed-type and final-language batches.
+B6 adds 77 selected record reflection, construction/object-method and lazy
+signature cases. At clean `db5faa90c`, all 18 Java 21/25 native/Node/Chromium
+cells and the original 323 retained fixtures pass unchanged; B5's 30 cells
+remain green. This selected integration evidence does not assess every source
+unit or complete record/bootstrap, sealed-type or final-language conformance.
 
 ### Scope and measurement
 
@@ -398,7 +401,7 @@ distinction between inventory completion and runtime conformance.
 | JVM-003 | P1; selected handles/lookups, but full conversions and executable VarHandles unclaimed in [implemented invoke slices](design/java-lang-invoke.md#implemented-slices) | Matrices for lookup/access, invocation/adaptation/combinators and field/array VarHandle read/write/CAS/update semantics. Verify memory-order requirements separately. Depends on JVM-001/002; module cases on JVM-011. |
 | JVM-004 | P1; selected indy/condy paths, with unsupported general bootstraps in [constant pool](../src/ConstantPool.ts) and [open questions](design/java-lang-invoke.md#open-design-questions) | User bootstrap handles, nested dynamic arguments, adaptation/access, success/failure caching and specified exceptions; retain lambda, concat, record and compiler probes. Depends on JVM-003. |
 | JVM-005 | P2; hidden definition/discovery explicitly missing in [core gaps](modern-java.md#known-core-lang-gaps) | Hidden class and class-data definitions, initialization, lookup privileges, nestmate options, names/descriptors and discovery restrictions match native contracts. Depends on JVM-002/003; module cases on JVM-011. |
-| JVM-006 | P1; [record gaps](modern-java.md#known-record-gaps): raw generic fallbacks, nested annotation gaps and restricted ObjectMethods fast path | Genuine javac records with generic/annotated components, constructors/accessors, object methods and reflection/handles pass; general bootstrap forms have explicit tests. Depends on JVM-001/003/004. |
+| JVM-006 | P1; [B6 selected evidence](phase-b-loading.md#b6-selected-records): 77 genuine/mutated record cases cover lazy generic and nested type-use reflection, constructors/accessors and field-backed object methods across 21/25 native/Node/Chromium. General ObjectMethods/handle/bootstrap forms remain [partial](modern-java.md#known-record-gaps); source units stay unassessed | Genuine javac records with generic/annotated components, constructors/accessors, object methods and reflection/handles pass; general bootstrap forms have explicit tests. Depends on JVM-001/003/004. |
 | JVM-007 | P1; [sealed-class gaps](modern-java.md#known-sealed-class-gaps): direct enforcement exists, reflective error fidelity remains partial | Direct and reflective custom-loader cases cover permitted parents, invalid metadata, package/module constraints and exact errors. Depends on JVM-002; module cases on JVM-011. |
 | JVM-008 | P1; selected genuine 21/25 patterns/switches/bootstrap contracts and public APIs, separately evolved sealed/enum binaries, final unnamed forms, module imports, flexible constructors and compact/instance-main startup covered on Node/Chromium; three pinned launcher differences remain explicit | Expand the selected language and public-bootstrap corpus beyond these reference/enum and evolved-binary cases. Resolve oracle differences without equating native behavior with specification requirements. Distinguish compile-time syntax from runtime/launcher obligations. Depends on JVM-001/004/006/007. |
 | JVM-009 | P0 scheduler design, then P1 selected profile; virtual threads explicitly missing in [core gaps](modern-java.md#known-core-lang-gaps) | Thread builders/start, lifecycle/join/interrupt, sleep/park, locals, executors, blocking-I/O and monitor interactions work on each required host. Do not replace virtual-thread semantics with an isVirtual flag. Depends on JVM-010 and host I/O. |

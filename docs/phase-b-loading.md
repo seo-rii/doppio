@@ -15,7 +15,7 @@ unassessed entries with a passing aggregate status.
 | B3: bytecode verification | Operand/local types, branches, handlers, uninitialized objects | Real verification before execution; separate modern stack-map and legacy policies. Depends on B2. |
 | B4: linking | Loader identity/constraints, access, resolution/default selection and failure caching | Positive, negative and evolved binaries on both hosts. Depends on B2/B3; module access needs G, general bootstraps need C. |
 | B5: retained execution | Remaining core-language, conversion, control-flow, array, object and exception contracts owned by JVM-002 | Map contract units to executable evidence; synchronization/memory-model dependencies remain D. |
-| B6: records | Component generic/type-annotation reflection, constructors, accessors and object methods | Genuine annotated/generic records and negative/general-bootstrap cases; C owns handles and general bootstrap foundations. |
+| B6: records | Component generic/type-annotation reflection, constructors, accessors and object methods | Selected 77-case corpus below; C still owns handles and general bootstrap foundations. |
 | B7: sealed types | Metadata, custom-loader enforcement, reflective errors and binary evolution | Exact error and permitted-parent cases; B4 plus G for named-module conditions. |
 | B8: final language | Patterns/switches, constructors and launcher behavior | Broader final 21/25 matrices on B6/B7/C foundations; retain specified-versus-native launcher differences. |
 
@@ -551,6 +551,68 @@ and source/runtime/input snapshots. The earlier 322/323 retained failure was
 not waived or repaired by regenerating expectations. This records the selected
 B5 exit, not exhaustive JVM-002 or Phase B completion.
 
+## B6 selected records
+
+`ci/java_record_semantics_test.mjs` executes three fixed groups on genuine
+javac 21/25 output with native `-Xverify:all`, Node and Chromium. All 18
+group/release/host cells are registered before compilation; missing or pruned
+cases, compiler failures, timeouts and incomplete traces fail the gate.
+
+| Group | Cases per release | Selected evidence |
+| --- | --- | --- |
+| Types | 29 | Raw and parameterized types, generic arrays, record-scoped type variables and recursive bounds, nested owners, wildcard bounds, complete visible type-use paths and declaration annotations, paired with ordinary fields. |
+| Semantics | 40 | Implicit, explicit, compact, auxiliary and varargs constructors; accessors and defensive copies; field-based object methods, primitive/reference/array/null behavior and original component Throwable identity. |
+| Lazy signatures | 8 | Genuine controls, missing generic classes, separately evolved generic arity and three explicit component-only malformed Signature mutations. |
+
+The first two groups execute untouched compiler output. Signature carriers and
+evolved generic classes compile separately outside the driver classpath; the
+driver loads only exact `.bin` payloads with no parent-classpath fallback.
+Malformed signatures append a UTF-8 constant and redirect only the component's
+Signature index, preserving the backing field, Code, major version and unrelated
+attributes. Independent replay, hashes and bounded metadata proofs bind every
+mutation. Generic failures remain lazy: raw component metadata is usable before
+the exact `TypeNotPresentException`, `MalformedParameterizedTypeException` or
+`GenericSignatureFormatError`. Repeated queries and controlled initialization
+markers are checked without requiring a newly allocated Throwable each time.
+
+`RecordComponent` now builds lazy generic repositories with the declaring
+record's scope and full component type-annotation bytes, reusing the bundled
+generic and annotation machinery. Lower-bounded annotated wildcards return an
+unannotated implicit Object upper bound; the target-only helper overlay retains
+all original constant-pool indices and other methods. The compiler bootstrap
+artifact is required to contain the byte-identical overlay. ObjectMethods'
+existing field-handle fast path invokes Java virtual `toString` for reference
+components and Java Float/Double conversion for primitive components, waiting
+for deferred class initialization before resuming the consumed invokedynamic
+frame. Original component exceptions propagate without a fabricated result.
+Record hash algorithms and whole string formatting remain unspecified, so
+property checks do not require one native hash or complete formatting algorithm.
+
+```sh
+yarn ci:record-semantics:test
+yarn ci:record-semantics
+```
+
+The clean official browser command checkpoints raw failures before integrity
+validation in `build/java-record-semantics-results.json`. Native-only and
+Node-only diagnostics use different, non-official ledgers. Exact compiler
+inventories, decoded executable operands and independent member/attribute
+contracts are required; static reachability is not dynamic branch/JIT coverage.
+CI checks the exact commands, timeout budgets and always-attempted evidence
+upload. All fourteen JVM-006 source units retain their original owner,
+unassessed status and false full-unit-conformance flag.
+
+At clean `db5faa90c`, strict CLI/browser builds pass; all 77 cases pass across
+18 mandatory cells and all ten genuine compiler operations succeed. Compiled
+B1–B6 units/contracts pass 753 of 754 tests, with no failures and one optional
+native-taxonomy diagnostic skip. B5 remains green in all 30 cells. Fresh
+retained execution passes the original 77 default and 246 modern fixtures;
+goldens, original class files, HEAD and source/runtime/input snapshots stay
+unchanged. The earlier B6 eight-cell failure and 322/323 retained result were
+fixed, not waived or repaired by changing expectations. This is the selected
+B6 exit, not complete JVM-006, general ObjectMethods/bootstrap support or
+Phase B conformance.
+
 ## Remaining boundaries
 
 These batches do not finish B1, JVM-002 or Phase B. B2's structural corpus does
@@ -560,4 +622,5 @@ verification rule, historical class shape or adversarial resource limit.
 Remaining initialization cases include exceptional allocation during error
 wrapping and broader concurrency/memory-model interactions. General linkage,
 module access, hidden classes and arbitrary bootstrap behavior remain separate.
-The record, sealed and final-language batches keep their existing partial status.
+The record package remains partial beyond the selected B6 evidence; sealed
+and final-language work follows in B7 and B8.
