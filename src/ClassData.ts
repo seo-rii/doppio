@@ -20,7 +20,7 @@ import {validateBinaryClassName} from './classfile_validation';
 import {ClassVerification} from './ClassVerification';
 import {ClassPreparation} from './ClassPreparation';
 import {canAccessReflectionSuperclass} from './ReflectionAdapters';
-import {isKnownNestmate} from './ClassAccess';
+import {isKnownNestmate, sameRuntimePackage} from './ClassAccess';
 
 const trace = logging.trace;
 const debug = logging.debug;
@@ -1046,6 +1046,9 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     }
     // class attributes
     this.attrs = makeAttributes(byteStream, this.constantPool, 'class', this.majorVersion);
+    if (this.accessFlags.isFinal() && this.isSealed()) {
+      throw new Error('A final class cannot have a PermittedSubclasses attribute');
+    }
     if (isModule && (this.className !== 'Lmodule-info;' || superRef !== 0 || isize !== 0 || numFields !== 0 || numMethods !== 0)) {
       throw new Error('Invalid module-info class structure');
     }
@@ -1497,6 +1500,12 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     return isKnownNestmate(this, other);
   }
 
+  /** Presence, including zero entries, determines sealed metadata. Future
+   * attributes in older class-file versions are ignored by makeAttributes. */
+  public isSealed(): boolean {
+    return this.getAttribute('PermittedSubclasses') !== null;
+  }
+
   public getPermittedSubclassNames(): string[] {
     var subclasses = <PermittedSubclasses> this.getAttribute('PermittedSubclasses');
     if (subclasses === null) {
@@ -1533,7 +1542,14 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     }
     for (var i = 0; i < directSupertypes.length; i++) {
       permittedSubclasses = directSupertypes[i].getPermittedSubclassNames();
-      if (permittedSubclasses.length > 0 && permittedSubclasses.indexOf(this.className) === -1) {
+      // Until named modules are implemented, every defining loader owns one
+      // distinct unnamed module. Initiating-loader aliases are not authority.
+      // Public children may cross packages in that module (JVMS 5.3.5), unlike
+      // the stricter unnamed-module Java source permits restriction.
+      if (directSupertypes[i].isSealed() &&
+          (this.loader !== directSupertypes[i].getLoader() ||
+           (!this.accessFlags.isPublic() && !sameRuntimePackage(this, directSupertypes[i])) ||
+           permittedSubclasses.indexOf(this.className) === -1)) {
         return directSupertypes[i];
       }
     }
