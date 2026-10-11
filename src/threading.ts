@@ -248,9 +248,9 @@ const jitUtil = {
  * Represents a stack frame for a bytecode method.
  */
 /** No native trap, interpreter instruction, monitor entry, or JIT block may run
- * while its declaring class still has unresolved verification obligations. */
-function verifiedMethodClass(thread: JVMThread, method: Method): boolean {
-  if (method.cls.isVerified()) return true;
+ * while its declaring class still has unresolved linking obligations. */
+function linkedMethodClass(thread: JVMThread, method: Method): boolean {
+  if (method.cls.isResolved()) return true;
   thread.setStatus(ThreadStatus.ASYNC_WAITING);
   method.cls.resolve(thread, cls => {
     if (cls !== null) thread.setStatus(ThreadStatus.RUNNABLE);
@@ -285,7 +285,7 @@ export class BytecodeStackFrame implements IStackFrame {
   }
 
   public run(thread: JVMThread): void {
-    if (!verifiedMethodClass(thread, this.method)) return;
+    if (!linkedMethodClass(thread, this.method)) return;
     var method = this.method, code = this.code,
       opcodeTable = LookupTable,
       traceOpcodes = !RELEASE && logLevel === LogLevel.VTRACE,
@@ -397,10 +397,10 @@ export class BytecodeStackFrame implements IStackFrame {
    * in the event that it can't actually handle it.
    */
   public scheduleException(thread: JVMThread, e: JVMTypes.java_lang_Throwable): boolean {
-    // Verification failure belongs to the caller of this method. Its own
-    // unverified handlers must not catch it and retry the entry gate forever.
+    // Linking failure belongs to the caller of this method. Its own
+    // unlinked handlers must not catch it and retry the entry gate forever.
     // No synchronized monitor has been entered on this path either.
-    if (!this.method.cls.isVerified()) return false;
+    if (!this.method.cls.isResolved()) return false;
     var codeAttr = this.method.getCodeAttribute(),
       pc = this.pc, method = this.method,
       // STEP 1: See if we can find an appropriate handler for this exception!
@@ -520,7 +520,7 @@ export class NativeStackFrame implements IStackFrame {
    * NOTE: Should only be called once.
    */
   public run(thread: JVMThread): void {
-    if (!verifiedMethodClass(thread, this.method)) return;
+    if (!linkedMethodClass(thread, this.method)) return;
     if (!RELEASE && logLevel >= LogLevel.TRACE) {
       trace(`\nT${thread.getRef()} D${thread.getStackTrace().length} Running ${this.method.getFullSignature()} [Native]:`);
     }

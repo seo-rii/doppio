@@ -18,6 +18,7 @@ import * as JVMTypes from '../includes/JVMTypes';
 import {setImmediate} from 'browserfs';
 import {validateBinaryClassName} from './classfile_validation';
 import {ClassVerification} from './ClassVerification';
+import {ClassPreparation} from './ClassPreparation';
 import {canAccessReflectionSuperclass} from './ReflectionAdapters';
 
 const trace = logging.trace;
@@ -25,12 +26,12 @@ const debug = logging.debug;
 const MIN_SUPPORTED_CLASSFILE_MAJOR = 45;
 const MAX_SUPPORTED_CLASSFILE_MAJOR = 70;
 
-/** Distinguishes unsupported class versions from malformed class structures. */
 /** Pure selection keeps abstract declarations and their exact owner intact.
  * Missing implementations and conflicts become errors only at invocation. */
 export type MethodSelection = {kind: 'selected'; method: Method} |
   {kind: 'missing' | 'conflict'; candidates: Method[]};
 
+/** Distinguishes unsupported class versions from malformed class structures. */
 export class ClassFileVersionError extends Error {
   constructor(message: string) {
     super(message);
@@ -912,6 +913,7 @@ export class ArrayClassData<T> extends ClassData {
  */
 export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends ClassData {
   private verification: ClassVerification = new ClassVerification(this);
+  private preparation: ClassPreparation = new ClassPreparation(this);
   private minorVersion: number;
   public majorVersion: number;
   public constantPool: ConstantPool;
@@ -1185,8 +1187,6 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     return null;
   }
 
-  public getSpecificMethod(definingCls: string, sig: string): Method {
-    if (this.getInternalName() === definingCls) {
   /** Register only an explicit VM-created native declaration. Multiple CP
    * references share one canonical identity; parsed declarations stay intact. */
   public registerVMMethod(method: Method): Method {
@@ -1247,6 +1247,8 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     return {kind: concrete.length > 1 ? 'conflict' : 'missing', candidates};
   }
 
+  public getSpecificMethod(definingCls: string, sig: string): Method {
+    if (this.getInternalName() === definingCls) {
       return this.getMethod(sig);
     }
     var searchClasses = this.interfaceClasses.slice(0), m: Method;
@@ -1354,13 +1356,13 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
       method = object === null ? null : object.getEffectiveMethod(signature);
       if (method !== null && method.accessFlags.isPublic() && !method.accessFlags.isStatic()) return method;
     }
-  }
-
     var candidates = this.getMaximallySpecificInterfaceMethods(signature),
       concrete = candidates.filter(candidate => !candidate.accessFlags.isAbstract());
     // Resolution may choose an arbitrary eligible interface declaration when
     // there is no unique concrete maximal method. Invocation selects again.
     return concrete.length === 1 ? concrete[0] : candidates.length ? candidates[0] : null;
+  }
+
   /**
    * Performs method lookup, and includes signature polymorphic results if
    * the method is signature polymorphic.
@@ -1535,9 +1537,18 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     return this.verification.isVerified();
   }
 
+  private getPreparation(): ClassPreparation {
+    // Preparation state is lazy for VM-created metadata as well as parsed
+    // classes; observing it performs no loading or descriptor checks.
+    if (!this.preparation) this.preparation = new ClassPreparation(this);
+    return this.preparation;
+  }
+
+  public isPrepared(): boolean { return this.getPreparation().isPrepared(); }
+
   public isResolved(): boolean {
-    // Building the hierarchy/method tables does not discharge type obligations.
-    return super.isResolved() && this.verification.isVerified();
+    // Metadata, verification and preparation are separate gates.
+    return super.isResolved() && this.verification.isVerified() && this.isPrepared();
   }
 
   public isHierarchyResolved(): boolean { return super.isResolved(); }
@@ -1583,7 +1594,7 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     for (var i = 0; i < this.interfaceClasses.length; i++) {
       if (!this.interfaceClasses[i].tryToResolve()) return false;
     }
-    return this.verification.tryToVerify();
+    return this.verification.tryToVerify() && this.getPreparation().tryToPrepare();
   }
 
   /**
@@ -1626,7 +1637,7 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
   public tryToInitialize(): boolean {
     if (this.getState() === ClassState.INITIALIZED) {
       // Already initialized.
-      return this.verification.tryToVerify();
+      return this.tryToResolve();
     }
     if (this.getState() === ClassState.ERRONEOUS || this.initLock.getOwner() !== null) {
       return false;
@@ -1843,7 +1854,7 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     // Completion callbacks run before the lock's queue is cleared. A failed
     // initializer must not look initialized to its former owner during that
     // interval, or an immediate retry could bypass the cached failure.
-    return this.verification.isVerified() && (state === ClassState.INITIALIZED ||
+    return this.verification.isVerified() && this.isPrepared() && (state === ClassState.INITIALIZED ||
       (state === ClassState.RESOLVED && thread !== null && this.initLock.getOwner() === thread));
   }
 
@@ -1901,7 +1912,7 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     });
   }
 
-  /** Full linking, including the verification gates of the type hierarchy. */
+  /** Full linking, including hierarchy verification and preparation gates. */
   public resolve(thread: JVMThread, cb: (cdata: ClassData) => void, explicit: boolean = true): void {
     this.resolveHierarchy(thread, hierarchy => {
       if (hierarchy === null) { cb(null); return; }
@@ -1912,7 +1923,10 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
         else parent.resolve(thread, linked => next(linked === null ? true : undefined), explicit);
       }, err => {
         if (err) cb(null);
-        else this.verification.verify(thread, success => cb(success ? this : null));
+        else this.verification.verify(thread, success => {
+          if (!success) cb(null);
+          else this.getPreparation().prepare(thread, prepared => cb(prepared ? this : null));
+        });
       });
     }, explicit);
   }
