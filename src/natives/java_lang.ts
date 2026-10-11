@@ -519,9 +519,8 @@ export default function (): any {
               componentObj['java/lang/reflect/RecordComponent/annotations'] = null;
             }
             if (typeAnnotationsAttr !== null) {
-              var topLevelTypeAnnotations = typeAnnotationsAttr.topLevelAnnotationBytes();
               componentObj['java/lang/reflect/RecordComponent/typeAnnotations'] =
-                topLevelTypeAnnotations !== null ? byteArrayFromBuffer(thread, topLevelTypeAnnotations) : null;
+                byteArrayFromBuffer(thread, typeAnnotationsAttr.rawBytes);
             } else {
               componentObj['java/lang/reflect/RecordComponent/typeAnnotations'] = null;
             }
