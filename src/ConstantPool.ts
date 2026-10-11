@@ -25,9 +25,21 @@ function hasClassAccess(caller: ReferenceClassData<JVMTypes.java_lang_Object>, t
     canAccessLambdaClass(caller, target) || canAccessReflectionClass(caller, target);
 }
 
+/** JLS 10.7 gives arrays a public clone operation. Its execution reuses the
+ * exact bootstrap Object declaration without changing that declaration's
+ * protected flags or granting access to any other inherited member. */
+function isPublicArrayClone(symbolicOwner: ClassData, member: Method | Field): boolean {
+  if (!(symbolicOwner instanceof ArrayClassData) || !(member instanceof Method) ||
+      member.signature !== 'clone()Ljava/lang/Object;') return false;
+  var object = symbolicOwner.getLoader().bootstrap.getLoadedClass('Ljava/lang/Object;');
+  return object instanceof ReferenceClassData && member.cls === object &&
+    member === object.getDeclaredMethod('clone()Ljava/lang/Object;');
+}
+
 function resolveExactMemberAccess(thread: JVMThread, caller: ReferenceClassData<JVMTypes.java_lang_Object>,
     member: Method | Field, symbolicOwner: ClassData, callback: (allowed: boolean | null) => void): void {
-  if (caller === null || canAccessLambdaMember(caller, member) || canAccessReflectionMember(caller, member)) callback(true);
+  if (caller === null || isPublicArrayClone(symbolicOwner, member) ||
+      canAccessLambdaMember(caller, member) || canAccessReflectionMember(caller, member)) callback(true);
   else resolveMemberAccess(thread, caller, member.cls, member.accessFlags, symbolicOwner, callback);
 }
 
@@ -702,7 +714,8 @@ export class MethodReference implements IConstantPoolItem {
       thread.throwNewException('Ljava/lang/IncompatibleClassChangeError;', `Method ${method.name} from class ${method.cls.getExternalName()} is ${isStatic ? 'not ' : ''}static.`);
       frame.returnToThreadLoop = true;
       return false;
-    } else if (!util.checkAccess(accessingCls, method.cls, method.accessFlags, method)) {
+    } else if (!isPublicArrayClone(this.classInfo.cls, method) &&
+        !util.checkAccess(accessingCls, method.cls, method.accessFlags, method)) {
       thread.throwNewException('Ljava/lang/IllegalAccessError;', `${accessingCls.getExternalName()} cannot access ${method.cls.getExternalName()}.${method.name}`);
       frame.returnToThreadLoop = true;
       return false;

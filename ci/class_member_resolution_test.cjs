@@ -28,7 +28,7 @@ function load(name) {
   }).outputText, filename);
   return loaded.exports;
 }
-const {ReferenceClassData} = load('ClassData');
+const {ReferenceClassData, ArrayClassData, PrimitiveClassData} = load('ClassData');
 const {ClassLoader} = load('ClassLoader');
 const {FieldReference, MethodReference, InterfaceMethodReference} = load('ConstantPool');
 const u2 = value => { const bytes = Buffer.alloc(2); bytes.writeUInt16BE(value); return bytes; };
@@ -58,8 +58,8 @@ function classBytes({name, parent = 'java/lang/Object', interfaces = [], flags =
     u2(field.flags ?? 1), u2(utf(field.name)), u2(utf(field.descriptor)), u2(0)]));
   const encodedMethods = methods.map(method => {
     const flags = method.flags ?? 1, nameIndex = utf(method.name), descriptorIndex = utf(method.descriptor);
-    assert.equal(method.descriptor, '()V', 'Unit methods need only a descriptor-kind control');
-    if (flags & 0x400) return Buffer.concat([u2(flags), u2(nameIndex), u2(descriptorIndex), u2(0)]);
+    if (flags & 0x500) return Buffer.concat([u2(flags), u2(nameIndex), u2(descriptorIndex), u2(0)]);
+    assert.equal(method.descriptor, '()V', 'Concrete unit methods need only a descriptor-kind control');
     const body = Buffer.concat([u2(0), u2(flags & 8 ? 0 : 1), u4(1), Buffer.from([0xb1]), u2(0), u2(0)]);
     return Buffer.concat([u2(flags), u2(nameIndex), u2(descriptorIndex), u2(1), u2(utf('Code')), u4(body.length), body]);
   });
@@ -70,7 +70,7 @@ function classBytes({name, parent = 'java/lang/Object', interfaces = [], flags =
     u2(encodedFields.length), ...encodedFields, u2(encodedMethods.length), ...encodedMethods, u2(0)]);
 }
 
-function world() {
+function world({objectMethods = []} = {}) {
   const bootstrap = new ClassLoader(null);
   bootstrap.bootstrap = bootstrap;
   bootstrap.getLoaderObject = () => null;
@@ -81,10 +81,11 @@ function world() {
     assert.equal(cls.tryToResolve(), true, 'The controlled metadata fully links before CP member lookup');
     return cls;
   }
-  const object = define({name: 'java/lang/Object', parent: null});
+  const object = define({name: 'java/lang/Object', parent: null, methods: objectMethods});
   function reference(tag, owner, name, descriptor, options = {}) {
     const caller = define({name: options.callerName || 'callers/Caller' + Object.keys(bootstrap.loadedClasses).length,
-      references: [{tag, owner: owner.getInternalName().slice(1, -1), name, descriptor}]});
+      references: [{tag, owner: owner.getInternalName().charAt(0) === '[' ? owner.getInternalName() :
+        owner.getInternalName().slice(1, -1), name, descriptor}]});
     const type = tag === 9 ? FieldReference : tag === 10 ? MethodReference : InterfaceMethodReference;
     let result;
     caller.constantPool.each((index, item) => { if (item instanceof type) result = item; });
@@ -262,4 +263,95 @@ test('successful member resolution remains valid after an instruction-specific s
   assert.equal(pair.result.isResolved(), true, 'A getfield mismatch must not poison a valid getstatic use');
   assert.equal(pair.result.hasAccess(thread, frame, true), true);
   assert.equal((await w.resolve(pair)).success, true);
+});
+
+function cloneWorld() {
+  const w = world({objectMethods: [{name: 'clone', descriptor: '()Ljava/lang/Object;', flags: 0x104}]});
+  const primitive = new PrimitiveClassData('I', w.bootstrap);
+  w.bootstrap.addClass('I', primitive);
+  const element = w.define({name: 'elements/Element'});
+  function array(component) {
+    const owner = new ArrayClassData(component.getInternalName(), w.bootstrap);
+    w.bootstrap.addClass(owner.getInternalName(), owner);
+    assert.equal(owner.tryToResolve(), true, 'The real array owner has established component metadata');
+    assert.ok(owner.getSuperClass() === w.object, 'Array superclass is the exact bootstrap Object');
+    return owner;
+  }
+  return {...w, primitive, element, array, clone: w.object.getMethods()[0]};
+}
+
+// JLS 10.7 gives arrays a public clone contract even though this runtime keeps
+// the exact protected bootstrap Object declaration as its resolved Method.
+// These parsed-metadata controls are not cloned-array execution evidence.
+for (const shape of ['primitive', 'reference', 'primitive-rank2', 'reference-rank2']) {
+  test('array clone resolves the exact protected Object declaration and permits invokevirtual: ' + shape, async () => {
+    const w = cloneWorld(), component = shape.startsWith('primitive') ? w.primitive : w.element;
+    const inner = w.array(component), owner = shape.endsWith('rank2') ? w.array(inner) : inner;
+    const pair = w.reference(10, owner, 'clone', '()Ljava/lang/Object;'), result = await w.resolve(pair);
+    assert.equal(result.success, true, 'A public array clone must resolve for an unrelated caller');
+    assert.deepEqual(result.errors, []);
+    assert.ok(pair.result.method === w.clone, 'Do not replace or copy the bootstrap clone declaration');
+    assert.ok(pair.result.method.cls === w.object, 'Keep exact defining-class identity');
+    assert.ok(pair.result.classInfo.cls === owner, 'Retain the symbolic array owner');
+    assert.equal(w.clone.accessFlags.isProtected(), true, 'Do not make ordinary Object.clone public');
+    assert.equal(w.clone.accessFlags.isPublic(), false);
+    const frame = {method: {cls: pair.caller}, returnToThreadLoop: false}, errors = [], thread = {
+      throwNewException(name) { errors.push(name); }
+    };
+    assert.equal(pair.result.hasAccess(thread, frame, false), true, 'The instruction repeats access with array semantics');
+    assert.deepEqual(errors, []);
+    assert.equal(frame.returnToThreadLoop, false);
+    assert.equal(pair.result.hasAccess(thread, frame, true), false, 'Array clone remains an instance method');
+    assert.deepEqual(errors, ['Ljava/lang/IncompatibleClassChangeError;']);
+    assert.equal(pair.result.isResolved(), true, 'An invokestatic mismatch does not poison the valid reference');
+    assert.equal(pair.result.hasAccess(thread, frame, false), true);
+    assert.equal((await w.resolve(pair)).success, true);
+    assert.equal(w.clone.accessFlags.isProtected(), true);
+  });
+}
+
+test('ordinary inherited Object.clone does not acquire the symbolic array access exception', async () => {
+  const w = cloneWorld(), owner = w.define({name: 'objects/Other'});
+  const pair = w.reference(10, owner, 'clone', '()Ljava/lang/Object;'), result = await w.resolve(pair);
+  assert.equal(result.success, false);
+  assert.deepEqual(result.errors.map(error => error.name), ['Ljava/lang/IllegalAccessError;']);
+  assert.equal(pair.result.method, null);
+  assert.equal(w.clone.accessFlags.isProtected(), true);
+});
+
+test('an unrelated ordinary protected clone declaration remains inaccessible', async () => {
+  const w = cloneWorld(), owner = w.define({name: 'objects/ProtectedClone',
+    methods: [{name: 'clone', descriptor: '()Ljava/lang/Object;', flags: 0x104}]});
+  const pair = w.reference(10, owner, 'clone', '()Ljava/lang/Object;'), result = await w.resolve(pair);
+  assert.equal(result.success, false);
+  assert.deepEqual(result.errors.map(error => error.name), ['Ljava/lang/IllegalAccessError;']);
+  assert.equal(pair.result.method, null);
+});
+
+test('an unrelated ordinary private clone declaration remains inaccessible', async () => {
+  const w = cloneWorld(), owner = w.define({name: 'objects/PrivateClone',
+    methods: [{name: 'clone', descriptor: '()Ljava/lang/Object;', flags: 0x102}]});
+  const pair = w.reference(10, owner, 'clone', '()Ljava/lang/Object;'), result = await w.resolve(pair);
+  assert.equal(result.success, false);
+  assert.deepEqual(result.errors.map(error => error.name), ['Ljava/lang/IllegalAccessError;']);
+  assert.equal(pair.result.method, null);
+});
+
+test('the array clone access exception does not match another descriptor', async () => {
+  const w = cloneWorld(), owner = w.array(w.primitive);
+  const pair = w.reference(10, owner, 'clone', '()V'), result = await w.resolve(pair);
+  assert.equal(result.success, false);
+  assert.deepEqual(result.errors.map(error => error.name), ['Ljava/lang/NoSuchMethodError;']);
+  assert.equal(pair.result.method, null);
+  assert.equal(w.clone.accessFlags.isProtected(), true);
+});
+
+test('direct Object.clone remains protected but resolves for legal subclass this or super calls', async () => {
+  const w = cloneWorld(), pair = w.reference(10, w.object, 'clone', '()Ljava/lang/Object;');
+  const result = await w.resolve(pair);
+  assert.equal(result.success, true, 'Receiver restrictions are verified separately, not an unconditional CP denial');
+  assert.deepEqual(result.errors, []);
+  assert.ok(pair.result.method === w.clone);
+  assert.equal(w.clone.accessFlags.isProtected(), true);
+  assert.equal(w.clone.accessFlags.isPublic(), false);
 });
