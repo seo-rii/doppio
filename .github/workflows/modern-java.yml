@@ -403,6 +403,44 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Check phase B final language contracts
+        timeout-minutes: 3
+        run: node --test ci/java_final_language_metadata_contract_test.mjs ci/java_final_language_harness_contract_test.mjs ci/java_final_language_retained_contract_test.mjs
+
+      # Selected 58-case B8 matrix: seven bounded javac operations, eighteen
+      # grouped host starts and thirty-six launcher host starts. The budget
+      # includes immutable metadata checks and durable ledger writes.
+      - name: Run final Java language compatibility
+        id: java_final_language
+        timeout-minutes: 60
+        run: node ci/java_final_language_test.mjs --browser
+
+      - name: Upload final Java language ledger
+        if: always() && steps.java_final_language.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-final-language-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
+      # Retain eight original source groups in eleven release cells. Each cell
+      # allows 60s compilation, 30s native and 120s per guest host: 60.5 minutes
+      # plus immutable input checks and durable ledger writes within 70 minutes.
+      - name: Run retained final Java language compatibility
+        id: java_final_language_retained
+        timeout-minutes: 70
+        run: node ci/java_final_language_retained_test.mjs --browser
+
+      - name: Upload retained final Java language ledger
+        if: always() && steps.java_final_language_retained.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-final-language-retained-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Check evolved switch ledger contract
         timeout-minutes: 1
         run: node --test ci/java_pattern_evolution_contract_test.mjs

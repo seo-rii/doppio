@@ -86,6 +86,11 @@ const sealedSemanticsUnits = ['ci/sealed_class_derivation_test.cjs', 'ci/sealed_
   'ci/java_sealed_semantics_contract_test.mjs', 'ci/native_return_boundary_test.cjs'];
 const sealedSemanticsUnitCommand = `node --test ${sealedSemanticsUnits.join(' ')}`;
 const sealedSemanticsRunnerCommand = 'node ci/java_sealed_semantics_test.mjs --browser';
+const finalLanguageUnits = ['ci/java_final_language_metadata_contract_test.mjs', 'ci/java_final_language_harness_contract_test.mjs',
+  'ci/java_final_language_retained_contract_test.mjs'];
+const finalLanguageUnitCommand = `node --test ${finalLanguageUnits.join(' ')}`;
+const finalLanguageRunnerCommand = 'node ci/java_final_language_test.mjs --browser';
+const finalLanguageRetainedRunnerCommand = 'node ci/java_final_language_retained_test.mjs --browser';
 const memberGates = [
   {name: 'member resolution', units: memberResolutionUnits, unitCommand: memberResolutionUnitCommand,
     runnerCommand: memberResolutionRunnerCommand, stepId: 'java_member_resolution',
@@ -105,6 +110,11 @@ const memberGates = [
   {name: 'sealed semantics', units: sealedSemanticsUnits, unitCommand: sealedSemanticsUnitCommand,
     runnerCommand: sealedSemanticsRunnerCommand, stepId: 'java_sealed_semantics',
     ledger: 'build/java-sealed-semantics-results.json', timeout: 40},
+  {name: 'final language', units: finalLanguageUnits, unitCommand: finalLanguageUnitCommand,
+    runnerCommand: finalLanguageRunnerCommand, stepId: 'java_final_language',
+    ledger: 'build/java-final-language-results.json', timeout: 60},
+  {name: 'retained final language', units: [], runnerCommand: finalLanguageRetainedRunnerCommand,
+    stepId: 'java_final_language_retained', ledger: 'build/java-final-language-retained-results.json', timeout: 70},
 ];
 const packageScripts = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).scripts;
 for (const [name, command] of [
@@ -127,6 +137,9 @@ for (const [name, command] of [
   ['ci:record-semantics', recordSemanticsRunnerCommand],
   ['ci:sealed-semantics:test', sealedSemanticsUnitCommand],
   ['ci:sealed-semantics', sealedSemanticsRunnerCommand],
+  ['ci:final-language:test', finalLanguageUnitCommand],
+  ['ci:final-language', finalLanguageRunnerCommand],
+  ['ci:final-language-retained', finalLanguageRetainedRunnerCommand],
 ]) {
   if (packageScripts[name] !== command) {
     throw new Error(`${name} must retain the complete phase B command: ${command}`);
@@ -316,6 +329,11 @@ for (const name of [
   'Check phase B sealed semantics contracts',
   'Run Java sealed semantics compatibility',
   'Upload Java sealed semantics ledger',
+  'Check phase B final language contracts',
+  'Run final Java language compatibility',
+  'Upload final Java language ledger',
+  'Run retained final Java language compatibility',
+  'Upload retained final Java language ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -470,7 +488,7 @@ for (const gate of memberGates) {
     [`run: ${gate.runnerCommand}\n`, `run: ${gate.runnerCommand} --release 21\n`],
     [`run: ${gate.runnerCommand}\n`, `run: ${gate.runnerCommand} --release 25\n`],
     [`run: ${gate.runnerCommand}\n`, `run: ${gate.runnerCommand} || true\n`],
-    [`run: ${gate.unitCommand}\n`, `run: ${gate.unitCommand} || true\n`],
+    ...(gate.unitCommand ? [[`run: ${gate.unitCommand}\n`, `run: ${gate.unitCommand} || true\n`]] : []),
     [`id: ${gate.stepId}\n`, `id: missing_${gate.stepId}\n`],
     [`id: ${gate.stepId}\n        timeout-minutes: ${gate.timeout}\n`,
       `id: ${gate.stepId}\n        timeout-minutes: 1\n`],
@@ -490,6 +508,71 @@ for (const gate of memberGates) {
       'exact bounded, fail-closed baseline command or artifact contract'
     );
   }
+}
+
+for (const command of [finalLanguageRunnerCommand, finalLanguageRetainedRunnerCommand]) {
+  for (const replacement of [
+    'echo final language checked', command + ' --case selected', command + ' --group final-patterns',
+    command + ' --fixture selected', command + ' --guest node', command + ' --skip-native',
+    command + ' --allow-oracle-waiver', command + '; exit 0', command + ' | tee final-language.log',
+    'DOPPIO_VERIFY_SOURCE=1 ' + command,
+  ]) {
+    expectCheckerFailure(
+      `filtered or swallowed final language runner: ${replacement}`,
+      {workflow: replaceRequired(realWorkflow, `run: ${command}\n`, `run: ${replacement}\n`)},
+      'exact bounded, fail-closed baseline command or artifact contract'
+    );
+  }
+}
+
+for (const name of ['Check phase B final language contracts', 'Run final Java language compatibility',
+  'Upload final Java language ledger', 'Run retained final Java language compatibility', 'Upload retained final Java language ledger']) {
+  for (const field of ['if: false', 'continue-on-error: true', 'continue-on-error: false', 'shell: bash {0}', 'working-directory: ignored']) {
+    expectCheckerFailure(
+      `${name} gains noncanonical scheduling field ${field}`,
+      {workflow: replaceRequired(realWorkflow, `      - name: ${name}\n`, `      - name: ${name}\n        ${field}\n`)},
+      'exact bounded, fail-closed baseline command or artifact contract'
+    );
+  }
+  const start = realWorkflow.indexOf(`      - name: ${name}\n`);
+  const end = realWorkflow.indexOf('\n      - name:', start + 1) + 1;
+  if (start < 0 || end <= start) throw new Error('Missing bounded final language step fixture: ' + name);
+  const block = realWorkflow.slice(start, end);
+  expectCheckerFailure(
+    `duplicate final language step ${name}`,
+    {workflow: replaceRequired(realWorkflow, block, block + block)},
+    `contain the ${name} step exactly once`
+  );
+  if (name === 'Check phase B final language contracts' || name.startsWith('Run ')) {
+    expectCheckerFailure(
+      `renamed duplicate final language command ${name}`,
+      {workflow: replaceRequired(realWorkflow, block, block + block.replace(`- name: ${name}\n`, '- name: Duplicate final language command\n'))},
+      'execute final language command exactly once'
+    );
+  }
+}
+
+for (const replacement of ['timeout-minutes: 0', 'timeout-minutes: 1000', 'timeout-minutes: "3"',
+  'timeout-minutes: ${{ 3 }}', 'timeout-minutes: 3\n        timeout-minutes: 3']) {
+  expectCheckerFailure(
+    `unbounded or ambiguous final language contract timeout: ${replacement}`,
+    {workflow: replaceRequired(realWorkflow, 'Check phase B final language contracts\n        timeout-minutes: 3\n',
+      `Check phase B final language contracts\n        ${replacement}\n`)},
+    'exact bounded, fail-closed baseline command or artifact contract'
+  );
+}
+
+for (const [original, replacement] of [
+  ["if: always() && steps.java_final_language.outcome != 'skipped'", "if: always() && steps.java_final_language_retained.outcome != 'skipped'"],
+  ["if: always() && steps.java_final_language_retained.outcome != 'skipped'", "if: always() && steps.java_final_language.outcome != 'skipped'"],
+  ['path: build/java-final-language-results.json', 'path: build/java-final-language-retained-results.json'],
+  ['path: build/java-final-language-retained-results.json', 'path: build/java-final-language-results.json'],
+]) {
+  expectCheckerFailure(
+    `cross-wired final language ledger: ${original}`,
+    {workflow: replaceRequired(realWorkflow, original, replacement)},
+    'exact bounded, fail-closed baseline command or artifact contract'
+  );
 }
 
 // B4d must execute the whole genuine two-release/three-host runner, never a
@@ -672,7 +755,12 @@ for (const [firstName, secondName] of [
   ['Upload Java record semantics ledger', 'Check phase B sealed semantics contracts'],
   ['Check phase B sealed semantics contracts', 'Run Java sealed semantics compatibility'],
   ['Run Java sealed semantics compatibility', 'Upload Java sealed semantics ledger'],
-  ['Upload Java sealed semantics ledger', 'Check evolved switch ledger contract'],
+  ['Upload Java sealed semantics ledger', 'Check phase B final language contracts'],
+  ['Check phase B final language contracts', 'Run final Java language compatibility'],
+  ['Run final Java language compatibility', 'Upload final Java language ledger'],
+  ['Upload final Java language ledger', 'Run retained final Java language compatibility'],
+  ['Run retained final Java language compatibility', 'Upload retained final Java language ledger'],
+  ['Upload retained final Java language ledger', 'Check evolved switch ledger contract'],
 ]) {
   expectCheckerFailure(
     `member resolution/access dependency reversed: ${firstName} before ${secondName}`,

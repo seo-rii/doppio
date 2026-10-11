@@ -15,6 +15,9 @@ const compilerInputToolPath = process.env.MODERN_JAVA_WORKFLOW_COMPILER_INPUT_TO
   path.join(repoRoot, 'ci', 'prepare_modern_java_compiler_inputs.mjs');
 const smokeScriptPattern = /^(?:clojure|groovy|jruby|kotlin|scala)[A-Za-z0-9_]*_smoke\.sh$/;
 const maximumCompilerInputBytes = 128 * 1024 * 1024;
+const finalLanguageUnitCommand = 'node --test ci/java_final_language_metadata_contract_test.mjs ci/java_final_language_harness_contract_test.mjs ci/java_final_language_retained_contract_test.mjs';
+const finalLanguageRunnerCommand = 'node ci/java_final_language_test.mjs --browser';
+const finalLanguageRetainedRunnerCommand = 'node ci/java_final_language_retained_test.mjs --browser';
 
 function stripUnquotedComments(text) {
   return text.split('\n').map((line) => {
@@ -830,6 +833,38 @@ for (const [name, fields] of [
     '  if-no-files-found: error',
     '  retention-days: 7',
   ]],
+  ['Check phase B final language contracts', [
+    'timeout-minutes: 3',
+    `run: ${finalLanguageUnitCommand}`,
+  ]],
+  ['Run final Java language compatibility', [
+    'id: java_final_language',
+    'timeout-minutes: 60',
+    `run: ${finalLanguageRunnerCommand}`,
+  ]],
+  ['Upload final Java language ledger', [
+    "if: always() && steps.java_final_language.outcome != 'skipped'",
+    'uses: actions/upload-artifact@v7',
+    'with:',
+    '  path: build/java-final-language-results.json',
+    '  archive: false',
+    '  if-no-files-found: error',
+    '  retention-days: 7',
+  ]],
+  ['Run retained final Java language compatibility', [
+    'id: java_final_language_retained',
+    'timeout-minutes: 70',
+    `run: ${finalLanguageRetainedRunnerCommand}`,
+  ]],
+  ['Upload retained final Java language ledger', [
+    "if: always() && steps.java_final_language_retained.outcome != 'skipped'",
+    'uses: actions/upload-artifact@v7',
+    'with:',
+    '  path: build/java-final-language-retained-results.json',
+    '  archive: false',
+    '  if-no-files-found: error',
+    '  retention-days: 7',
+  ]],
   ['Check evolved switch ledger contract', [
     'timeout-minutes: 1',
     'run: node --test ci/java_pattern_evolution_contract_test.mjs',
@@ -990,6 +1025,11 @@ const runtimeOrder = [
   'Check phase B sealed semantics contracts',
   'Run Java sealed semantics compatibility',
   'Upload Java sealed semantics ledger',
+  'Check phase B final language contracts',
+  'Run final Java language compatibility',
+  'Upload final Java language ledger',
+  'Run retained final Java language compatibility',
+  'Upload retained final Java language ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -1006,6 +1046,11 @@ const runtimeOrder = [
 });
 if (runtimeOrder.some((index, position) => position > 0 && index <= runtimeOrder[position - 1])) {
   fail('Modern Java runtime gates and artifact publication must remain in dependency order.');
+}
+for (const command of [finalLanguageUnitCommand, finalLanguageRunnerCommand, finalLanguageRetainedRunnerCommand]) {
+  if (countLiteral(runtimeJob, `        run: ${command}\n`) !== 1) {
+    fail(`Modern Java workflow must execute final language command exactly once: ${command}`);
+  }
 }
 
 if (!/^    needs:\s*runtime\s*$/m.test(compilerJob)) {
