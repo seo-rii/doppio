@@ -2686,3 +2686,26 @@ bootstrap, branch or initialization conformance. All 112 JVM-008 source units
 remain unassessed and dependency clauses retain their actual owners. Preview
 source forms, hosted modern javac, arbitrary bootstrap behavior, named-module
 runtime access and broader scheduler/memory-model support remain separate work.
+
+## Method-Handle Evidence Boundaries
+
+[Phase C C1](phase-c-invocation.md#c1-verified-batch-exit) adds selected
+Lookup/direct-handle, invocation/adaptation and combinator exception-order
+evidence. At clean `a99d5f74f`, all 60 cases pass across 24 pinned Java 21/25
+native/Node/Chromium cells (360 outcomes), using genuine, unchanged javac
+outputs and independently decoded symbolic call descriptors. The modern
+left-to-right `filterArguments` path preserves stock single-filter validation
+and the public method's metadata; its failure-order regression expectations
+were not relaxed.
+
+The strict builds, 853 unit/contract tests, all B1–B8 and separate retained
+language/launcher/evolved-switch host gates, original 323 fixtures and selected
+Kotlin/Scala MethodHandle compiler smokes also pass at that implementation
+commit. One existing optional unit diagnostic is skipped; no required C1
+execution is skipped. Consumer compiler smokes use Node/native Java 17 and do
+not replace the genuine 21/25 C1 host matrix.
+
+This does not establish the complete conversion lattice, arbitrary combinator
+graphs, executable VarHandles or memory ordering, general bootstrap linkage,
+hidden definitions, named-module access or the public class-file API. Source
+units remain unassessed; C2–C7 and full Phase C/package conformance are unclaimed.

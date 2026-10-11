@@ -466,6 +466,26 @@ seconds, and Scala MethodHandles smoke in 99 seconds.
   selected state-loop slices are tracked in
   `docs/design/methodhandles-control-flow.md`.
 
+## C1 Genuine Invocation Evidence
+
+The [selected C1 gate](../phase-c-invocation.md#c1-verified-batch-exit) binds
+genuine javac 21/25 outputs to exact symbolic call descriptors and fixed effect
+traces on native Java, Node and Chromium. At clean `a99d5f74f`, its 60 cases and
+360 host-qualified outcomes pass; this does not close the broader matrices in
+the open questions below.
+
+Modern `MethodHandles.filterArguments` replaces only the stock public Code body
+with a parsed, straight-line delegate to `DoppioMethodHandles`. Public static
+varargs flags and non-Code metadata are retained. The helper builds wrappers
+right-to-left, yielding the specified left-to-right filter execution and
+exception barriers. Its native bridge calls the unchanged package-private
+stock `filterArgument` factory, not the public overlay, retaining single-filter
+validation without recursive delegation. Zero/all-null filters return the
+original handle. Retained Java 8/17 fixture bytes and the original C1
+order/failure expectations remain unchanged; additional genuine regression
+subchecks cover gaps, three filters, mutable caller arrays and selected
+wide/type-changing filters.
+
 ## Open Design Questions
 
 - Whether to emulate Java 17 `MethodHandles.Lookup` access modes exactly or map

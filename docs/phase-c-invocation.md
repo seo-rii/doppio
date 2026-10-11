@@ -124,8 +124,58 @@ subsets, host/release pruning, error swallowing, scheduling waivers and
 missing/cross-wired artifacts. A local native-only or Node-only diagnostic
 cannot replace the required native/Node/Chromium matrix.
 
-Current C1 verification status: pending. The existence of this plan and CI
-command does not assert a completed execution. Record a clean implementation
-commit and verified ledger/raw-outcome counts only after the official gate
-finishes. C2–C7 and full Phase C/package conformance remain pending regardless
-of the selected C1 result.
+## C1 verified batch exit
+
+At clean implementation commit `a99d5f74f`, the selected C1 gate passes on the
+pinned Java 21/25 toolchains and both guest hosts:
+
+- 60 fixed cases: 18 adaptation, 10 invocation, 16 lookup and 16 combinator cases.
+- Eight genuine compilations, 24 untouched class files (majors 65/69, minor 0)
+  and 158 case-linked Code probes. Shared helper probes may repeat; this is not
+  a count of distinct methods or dynamic branch coverage.
+- All 24 native/Node/Chromium execution cells and 360 case outcomes pass, with
+  no failed, missing, skipped or timed-out required executions.
+
+The verified ledger SHA-256 is
+`7998b646585d647bb45748796353875b578dc7a6044f035f7a83728db04aeedd`.
+It binds the original compiler recipes, class inventory, actual Code operands,
+fixed traces and source/toolchain/runtime/Git provenance. This identifies the
+2026-10-11 execution at that implementation commit; it is not evidence for an
+arbitrary later runtime or a replacement for a fresh gate run.
+
+The first pre-fix run at `f721db405` recorded 20 passing and four failed cells:
+the two guest hosts evaluated multiple `filterArguments` filters in reverse
+order on both releases. Its raw failed ledger remains preserved (SHA-256
+`1bcd4746c6843bb7ea1d885f90ec7c2d5156bbf5bb5260aa423bea8d514d0d2d`).
+The corrected path wraps filters in reverse construction order to execute them
+left-to-right. It reuses the stock single-filter factory and retains the public
+method's original flags and non-Code attributes. Regression subchecks retain
+the original expectations and add no-op/null-filter identity, nonzero positions,
+null gaps, three-filter order, caller-array mutation isolation, selected
+wide/type-changing unary filters and first/later throwable barriers.
+
+The same clean implementation also passes:
+
+- Strict release CLI/browser builds, ES5 type checking, the actual workflow
+  checker and its mutation tests.
+- 853 unit/contract tests; one existing optional JDK error-category diagnostic
+  is skipped (854 total, zero failures).
+- All 15 B1–B8 and retained-language/launcher/evolved-switch host gates, including
+  the previously selected explicit Java 21 oracle difference in B4.
+- The original 323 fixtures (77 legacy and 246 modern), with sources, class
+  files, goldens and all four input snapshots unchanged; zero failures/timeouts.
+- The selected Kotlin 2.4.0 and Scala 2.13.18 MethodHandle compiler smokes,
+  compiled inside Doppio and checked on Node against native Java 17 using
+  lock-verified compiler inputs. These are separate selected consumer checks,
+  not a Chromium/compiler-language conformance claim.
+
+The overlay tests preserve all 113 previous generated bodies and the complete
+stock single-filter method. The new straight-line delegate yields 114 generated
+bodies and 1,271 unchanged stock Code attributes across 36 transformed classes;
+all 1,385 Code methods still pass independent decoding/type verification.
+
+C1's selected batch is verified. All broader completion flags remain false:
+full Phase C, JVM-003, source-unit/API conformance, general bootstrap dispatch,
+VarHandle execution and named-module runtime conformance are not established.
+Indexed source ownership remains unchanged. C2–C7 stay pending; the next batch
+is C2's collection, variable-arity and control-flow matrix.
