@@ -7,6 +7,10 @@ import * as BrowserFS from 'browserfs';
 // For type information
 import {ClassLoader} from './ClassLoader';
 import {ReferenceClassData, ClassData, ArrayClassData} from './ClassData';
+import {AbstractMethodField} from './methods';
+import {isKnownNestmate, sameRuntimePackage} from './ClassAccess';
+import {canAccessLambdaClass, canAccessLambdaMember} from './LambdaAdapters';
+import {canAccessReflectionClass, canAccessReflectionMember, isProvenReflectionClass} from './ReflectionAdapters';
 
 let BFSUtils = BrowserFS.BFSRequire('bfs_utils');
 
@@ -220,8 +224,16 @@ if (!Array.prototype.indexOf) {
  * n: not accessible
  */
 export function isMagicAccessor(accessingCls: ReferenceClassData<JVMTypes.java_lang_Object>): boolean {
+  if (isProvenReflectionClass(accessingCls)) return true;
+  // Stack filtering may recognize real bootstrap reflection implementation
+  // classes, but a same-spelled application class has no such authority.
+  if (!accessingCls || typeof accessingCls.getLoader !== 'function') return false;
+  var loader = accessingCls.getLoader(), bootstrap = loader && loader.bootstrap;
+  if (!bootstrap || loader !== bootstrap || bootstrap.getLoadedClass(accessingCls.getInternalName()) !== accessingCls) return false;
+  var magic = bootstrap.getLoadedClass('Lsun/reflect/MagicAccessorImpl;');
+  if (magic === null) return false;
   while (accessingCls !== null) {
-    if (accessingCls.getInternalName() === 'Lsun/reflect/MagicAccessorImpl;') {
+    if (accessingCls === magic) {
       return true;
     }
     accessingCls = accessingCls.getSuperClass();
@@ -229,22 +241,23 @@ export function isMagicAccessor(accessingCls: ReferenceClassData<JVMTypes.java_l
   return false;
 }
 
-export function checkAccess(accessingCls: ReferenceClassData<JVMTypes.java_lang_Object>, owningCls: ReferenceClassData<JVMTypes.java_lang_Object>, accessFlags: Flags): boolean {
-  if (isMagicAccessor(accessingCls)) {
-    return true;
-  }
+export function checkAccess(accessingCls: ReferenceClassData<JVMTypes.java_lang_Object>, owningCls: ReferenceClassData<JVMTypes.java_lang_Object>,
+    accessFlags: Flags, member?: AbstractMethodField): boolean {
+  // This is deliberately cache-only. Symbolic resolution must determine nest
+  // hosts asynchronously before using it; generated privileges require an exact
+  // captured declaration, never all members of the same owner.
+  if (member && member.cls === owningCls && member.accessFlags === accessFlags &&
+      (canAccessLambdaMember(accessingCls, member) || canAccessReflectionMember(accessingCls, member))) return true;
+  if (!member && accessFlags === owningCls.accessFlags &&
+      (canAccessLambdaClass(accessingCls, owningCls) || canAccessReflectionClass(accessingCls, owningCls))) return true;
   if (accessFlags.isPublic()) {
     return true;
   } else if (accessFlags.isProtected()) {
-    return accessingCls.getPackageName() === owningCls.getPackageName() || accessingCls.isSubclass(owningCls);
+    return sameRuntimePackage(accessingCls, owningCls) || accessingCls.isSubclass(owningCls);
   } else if (accessFlags.isPrivate()) {
-    var owningName = owningCls.getInternalName(),
-      lambdaProxyPrefix = 'L' + owningName.slice(1, owningName.length - 1) + '$$Lambda$';
-    // LambdaMetafactory proxy classes are VM-defined helpers with caller access.
-    return accessingCls === owningCls || accessingCls.isNestmateOf(owningCls) ||
-      accessingCls.getInternalName().indexOf(lambdaProxyPrefix) === 0;
+    return isKnownNestmate(accessingCls, owningCls);
   } else {
-    return accessingCls.getPackageName() === owningCls.getPackageName();
+    return sameRuntimePackage(accessingCls, owningCls);
   }
 }
 

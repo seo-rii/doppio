@@ -8,7 +8,7 @@ const {test} = require('node:test');
 const runtime = process.env.DOPPIO_RELEASE_CLI_ROOT || path.resolve(__dirname, '../build/release-cli');
 const sourceModules = new Set(['ClassData', 'ClassLoader', 'ConstantPool', 'threading', 'methods',
   'ClassVerification', 'ClassPreparation', 'LoadingConstraints', 'BytecodeVerifier', 'BytecodeTypeVerifier', 'VerificationRelations',
-  'ReflectionAdapters', 'GeneratedAdapters']);
+  'ReflectionAdapters', 'GeneratedAdapters', 'LambdaAdapters', 'SymbolicResolution', 'ClassAccess', 'util']);
 const cache = new Map();
 function load(name) {
   const filename = path.join(runtime, 'src', name + '.js');
@@ -396,7 +396,7 @@ function loadClassNatives() {
   const original = loaded.require.bind(loaded);
   loaded.require = id => id === '../doppiojvm' ? {
     ...Doppio, VM: {...Doppio.VM, ClassFile: {...Doppio.VM.ClassFile, ...load('ClassData')}}
-  } : original(id);
+  } : id.startsWith('../') && sourceModules.has(id.slice(3)) ? load(id.slice(3)) : original(id);
   loaded._compile(require('typescript').transpileModule(
     fs.readFileSync(path.join(__dirname, '../src/natives/java_lang.ts'), 'utf8'), {
       compilerOptions: {target: 1, module: 1}

@@ -8,7 +8,8 @@ const {test} = require('node:test');
 const ts = require('typescript');
 const runtime = process.env.DOPPIO_RELEASE_CLI_ROOT || path.resolve(__dirname, '../build/release-cli');
 const sourceModules = new Set(['LambdaAdapters', 'GeneratedAdapters', 'ClassData', 'ClassLoader', 'ConstantPool', 'threading', 'methods',
-  'ClassVerification', 'ClassPreparation', 'LoadingConstraints', 'BytecodeVerifier', 'BytecodeTypeVerifier', 'VerificationRelations']);
+  'ClassVerification', 'ClassPreparation', 'LoadingConstraints', 'BytecodeVerifier', 'BytecodeTypeVerifier', 'VerificationRelations',
+  'SymbolicResolution', 'ClassAccess', 'util', 'ReflectionAdapters']);
 const cache = new Map();
 function load(name) {
   const filename = path.join(runtime, 'src', name + '.js');
@@ -30,7 +31,8 @@ const {ClassLoader} = load('ClassLoader');
 const {BytecodeStackFrame, NativeStackFrame, InternalStackFrame} = load('threading');
 const {ThreadStatus} = require(path.join(runtime, 'src/enums'));
 const {decodeMethodCode} = load('BytecodeVerifier');
-const {prepareLambdaAnonymousClass, installLambdaAdapters, getLambdaGenerationProvenance} = load('LambdaAdapters');
+const {prepareLambdaAnonymousClass, installLambdaAdapters, getLambdaGenerationProvenance,
+  canAccessLambdaClass, canAccessLambdaMember} = load('LambdaAdapters');
 
 const factoryName = 'Ljava/lang/invoke/InnerClassLambdaMetafactory;';
 const factoryPrefix = 'java/lang/invoke/InnerClassLambdaMetafactory/';
@@ -80,22 +82,28 @@ function classBytes({name, superclass = 'java/lang/Object', flags = 0x21, interf
     u2(fieldBytes.length), ...fieldBytes, u2(methodBytes.length), ...methodBytes, u2(0)]);
 }
 
-function forwardingBytes({interfaceOwner = false, badReturn = false, extraSpecial = false} = {}) {
+function forwardingBytes({interfaceOwner = false, badReturn = false, extraSpecial = false, kind = 7} = {}) {
+  const instance = kind !== 6 && kind !== 8;
   return classBytes({name: lambdaName.slice(1, -1), flags: 0x1030, interfaces: ['probe/Function'],
-    fields: [{flags: 0x12, name: 'arg$1', descriptor: hostName}],
+    fields: instance ? [{flags: 0x12, name: 'arg$1', descriptor: hostName}] : [],
     methods: [
-      {flags: 2, name: '<init>', descriptor: '(' + hostName + ')V', stack: 2, locals: 2, code: cp => [
+      {flags: 2, name: '<init>', descriptor: instance ? '(' + hostName + ')V' : '()V', stack: 2, locals: 2, code: cp => [
         0x2a, 0xb7, ...u2(cp.method('java/lang/Object', '<init>', '()V')),
-        0x2a, 0x2b, 0xb5, ...u2(cp.field(lambdaName.slice(1, -1), 'arg$1', hostName)), 0xb1]},
-      {flags: 1, name: 'apply', descriptor: '(JD)J', stack: 5, locals: 5, code: cp => [
-        0x2a, 0xb4, ...u2(cp.field(lambdaName.slice(1, -1), 'arg$1', hostName)),
-        0x1f, 0x29, 0xb7, ...u2(cp.method('probe/Host', 'target', '(JD)J', interfaceOwner)), badReturn ? 0xaf : 0xad]},
+        ...(instance ? [0x2a, 0x2b, 0xb5, ...u2(cp.field(lambdaName.slice(1, -1), 'arg$1', hostName))] : []), 0xb1]},
+      {flags: 1, name: 'apply', descriptor: kind === 8 ? '(JD)' + hostName : '(JD)J', stack: 6, locals: 5, code: cp => [
+        ...(instance ? [0x2a, 0xb4, ...u2(cp.field(lambdaName.slice(1, -1), 'arg$1', hostName))] :
+          kind === 8 ? [0xbb, ...u2(cp.cls('probe/Host')), 0x59] : []),
+        0x1f, 0x29, kind === 5 ? 0xb6 : kind === 6 ? 0xb8 : kind === 9 ? 0xb9 : 0xb7,
+        ...u2(cp.method('probe/Host', kind === 8 ? '<init>' : 'target', kind === 8 ? '(JD)V' : '(JD)J', interfaceOwner)),
+        ...(kind === 9 ? [5, 0] : []), badReturn ? 0xaf : kind === 8 ? 0xb0 : 0xad]},
       ...(extraSpecial ? [{flags: 1, name: 'unrelated', descriptor: '(' + hostName + ')J', stack: 5, locals: 2, code: cp => [
         0x2b, 0x09, 0x0e, 0xb7, ...u2(cp.method('probe/Host', 'other', '(JD)J', interfaceOwner)), 0xad]}] : [])
     ]});
 }
 
 function world(options = {}) {
+  const kind = options.kind || 7, targetName = kind === 8 ? '<init>' : 'target',
+    targetDescriptor = kind === 8 ? '(JD)V' : '(JD)J';
   const loader = new ClassLoader(null);
   loader.bootstrap = loader;
   const add = options => {
@@ -105,20 +113,33 @@ function world(options = {}) {
   };
   add({name: 'java/lang/Object', superclass: null, methods: [
     {flags: 1, name: '<init>', descriptor: '()V', stack: 0, locals: 1, code: () => [0xb1]}]});
-  add({name: 'probe/Function', flags: 0x601, methods: [{flags: 0x401, name: 'apply', descriptor: '(JD)J'}]});
+  const functionClass = add({name: 'probe/Function', flags: 0x601,
+    methods: [{flags: 0x401, name: 'apply', descriptor: kind === 8 ? '(JD)' + hostName : '(JD)J'}]});
   const host = add({name: 'probe/Host', flags: options.interfaceOwner ? 0x601 : 0x21, methods: [
-    {flags: options.targetFlags || 2, name: 'target', descriptor: '(JD)J', stack: 2, locals: 5, code: () => [0x1f, 0xad]},
+    {flags: options.targetFlags || (kind === 6 ? 10 : 2), name: targetName, descriptor: targetDescriptor,
+      stack: 2, locals: 5, code: cp => kind === 8 ? [0x2a, 0xb7, ...u2(cp.method('java/lang/Object', '<init>', '()V')), 0xb1] :
+        [kind === 6 ? 0x1e : 0x1f, 0xad]},
     {flags: 2, name: 'other', descriptor: '(JD)J', stack: 2, locals: 5, code: () => [0x1f, 0xad]}]});
   const factoryClass = add({name: factoryName.slice(1, -1)});
   const factory = {getClass: () => factoryClass,
     [validatingPrefix + 'targetClass']: {$cls: host},
-    [validatingPrefix + 'implKind']: 7,
+    [validatingPrefix + 'implKind']: kind,
     [validatingPrefix + 'implDefiningClass']: {$cls: host},
     [validatingPrefix + 'samMethodName']: 'apply',
     [factoryPrefix + 'implMethodClassName']: 'probe/Host',
-    [factoryPrefix + 'implMethodName']: 'target',
-    [factoryPrefix + 'implMethodDesc']: '(JD)J',
+    [factoryPrefix + 'implMethodName']: targetName,
+    [factoryPrefix + 'implMethodDesc']: targetDescriptor,
     [factoryPrefix + 'lambdaClassName']: lambdaName.slice(1, -1)};
+  const methodType = (parameters, result) => ({'java/lang/invoke/MethodType/ptypes': {array: parameters.map($cls => ({$cls}))},
+    'java/lang/invoke/MethodType/rtype': {$cls: result}});
+  const primitive = name => ({getInternalName: () => name});
+  factory[validatingPrefix + 'invokedType'] = methodType(kind === 6 || kind === 8 ? [] : [host], functionClass);
+  factory[validatingPrefix + 'implMethodType'] = methodType([primitive('J'), primitive('D')], primitive(kind === 8 ? 'V' : 'J'));
+  factory[validatingPrefix + 'samMethodType'] = methodType([primitive('J'), primitive('D')], kind === 8 ? host : primitive('J'));
+  factory[validatingPrefix + 'instantiatedMethodType'] = factory[validatingPrefix + 'samMethodType'];
+  factory[validatingPrefix + 'samBase'] = {$cls: functionClass};
+  factory[validatingPrefix + 'markerInterfaces'] = {array: []};
+  factory[validatingPrefix + 'additionalBridges'] = {array: []};
   const factoryFrame = {method: {cls: factoryClass, signature: 'spinInnerClass()Ljava/lang/Class;'}, locals: [factory]};
   const nativeFrame = {method: {cls: {getInternalName: () => 'Lsun/misc/Unsafe;'},
     signature: 'defineAnonymousClass(Ljava/lang/Class;[B[Ljava/lang/Object;)Ljava/lang/Class;'}, locals: []};
@@ -269,7 +290,7 @@ test('forged lambda names or same-named custom-loader factory frames cannot auth
   }
 });
 
-test('non-special handles and anonymous definitions with CP patches are not adapted', () => {
+test('a captured handle kind must match the actual forwarding opcode and target shape', () => {
   const w = world();
   for (const kind of [5, 6, 8, 9]) {
     w.factory[validatingPrefix + 'implKind'] = kind;
@@ -277,6 +298,41 @@ test('non-special handles and anonymous definitions with CP patches are not adap
   }
   w.factory[validatingPrefix + 'implKind'] = 7;
   assert.equal(prepareLambdaAnonymousClass(w.thread, {$cls: w.host}, w.original, {array: []}), null);
+});
+
+test('trusted static and constructor forwarding retains unchanged bytes and exact member-only access', () => {
+  for (const kind of [6, 8]) {
+    const w = world({kind}), target = method(w.host, kind === 8 ? '<init>' : 'target'), {cls, preparation} = adapted(w);
+    assert.deepEqual(preparation.bytes, w.original);
+    assert.deepEqual(preparation.edits, []);
+    assert.deepEqual(preparation.adapters, []);
+    assert.equal(canAccessLambdaMember(cls, target), true);
+    assert.equal(canAccessLambdaMember(cls, method(w.host, 'other')), false, 'A host does not grant all its members');
+    assert.equal(canAccessLambdaMember(parsed(w), target), false, 'Matching bytes and name are not a generation proof');
+    assert.equal(canAccessLambdaClass(cls, w.host), true);
+    const impostor = new ReferenceClassData(classBytes({name: 'probe/Host'}), null, new ClassLoader(w.loader));
+    assert.equal(canAccessLambdaClass(cls, impostor), false);
+    assert.equal(cls.tryToResolve(), true, 'Proof-only classes still pass ordinary verification');
+    assert.deepEqual(getLambdaGenerationProvenance(cls).originalBytes, w.original);
+    assert.deepEqual(getLambdaGenerationProvenance(cls).edits, []);
+  }
+});
+
+test('lambda class permissions are limited to the captured actual type mirrors', () => {
+  const w = world({kind: 6}), allowed = w.add({name: 'probe/Captured'}), denied = w.add({name: 'probe/Unrelated'});
+  w.factory[validatingPrefix + 'instantiatedMethodType']['java/lang/invoke/MethodType/rtype'] = {$cls: allowed};
+  const {cls} = adapted(w);
+  assert.equal(canAccessLambdaClass(cls, allowed), true);
+  assert.equal(canAccessLambdaClass(cls, denied), false);
+  assert.equal(canAccessLambdaMember(cls, method(w.host, 'other')), false);
+});
+
+test('lambda preparation identity cannot be copied or reused to authorize another candidate', () => {
+  const w = world({kind: 6}), {cls, preparation} = adapted(w), lookalike = parsed(w, preparation.bytes);
+  assert.throws(() => installLambdaAdapters({...preparation}, lookalike), /Unproven lambda/);
+  assert.throws(() => installLambdaAdapters(preparation, lookalike), /Unproven lambda/);
+  assert.equal(canAccessLambdaMember(lookalike, method(w.host, 'target')), false);
+  assert.equal(canAccessLambdaMember(cls, method(w.host, 'target')), true);
 });
 
 test('unrelated invalid bytecode is still rejected after authorized adapter generation', () => {

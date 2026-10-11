@@ -1,10 +1,11 @@
-import {ReferenceClassData} from './ClassData';
+import {ArrayClassData, ClassData, ReferenceClassData} from './ClassData';
 import {ClassLoader} from './ClassLoader';
 import {MethodReference} from './ConstantPool';
 import {BytecodeFormatError, BytecodeVerificationError, decodeMethodCode} from './BytecodeVerifier';
 import {GeneratedAdapterSpec, GeneratedClassPreparation, prepareGeneratedClassAdapters,
   installGeneratedClassAdapters, getGeneratedClassProvenance} from './GeneratedAdapters';
 import {JVMThread} from './threading';
+import {AbstractMethodField, Method} from './methods';
 import * as JVMTypes from '../includes/JVMTypes';
 
 export interface ReflectionClassDefinition {
@@ -31,6 +32,9 @@ interface ReflectionSuperclassAccess {
   loader: ClassLoader;
   className: string;
   superclass: string;
+  target: Method;
+  classes: ClassData[];
+  installed?: ReferenceClassData<JVMTypes.java_lang_Object>;
 }
 
 // The parent may not be loaded while the generator is preparing its bytes.
@@ -44,6 +48,24 @@ export function canAccessReflectionSuperclass(candidate: ReferenceClassData<JVMT
   var access = reflectionClasses.get(candidate);
   return !!access && candidate.getLoader() === access.loader && candidate.getInternalName() === access.className &&
     parent.getLoader() === access.bootstrap && parent === access.bootstrap.getLoadedClass(access.superclass);
+}
+
+export function canAccessReflectionClass(caller: ReferenceClassData<JVMTypes.java_lang_Object>, target: ClassData): boolean {
+  var access = reflectionClasses.get(caller);
+  return !!access && target !== null && target !== undefined && (access.classes.indexOf(target) !== -1 ||
+    target === access.bootstrap.getLoadedClass(access.superclass));
+}
+
+export function canAccessReflectionMember(caller: ReferenceClassData<JVMTypes.java_lang_Object>, member: AbstractMethodField): boolean {
+  var access = reflectionClasses.get(caller);
+  if (!access || !member) return false;
+  if (access.target === member) return true;
+  var parent = <ReferenceClassData<JVMTypes.java_lang_Object>> access.bootstrap.getLoadedClass(access.superclass);
+  return parent !== null && member === parent.getDeclaredMethod('<init>()V');
+}
+
+export function isProvenReflectionClass(cls: ReferenceClassData<JVMTypes.java_lang_Object>): boolean {
+  return reflectionClasses.has(cls);
 }
 
 /**
@@ -161,17 +183,29 @@ export function prepareReflectionClass(thread: JVMThread,
     spec.allocations = [{allocatedClass: declaringClass, methodNames: [entryName]}];
   }
   var preparation = prepareGeneratedClassAdapters(original, definition.bytes, spec);
-  if (preparation !== null) reflectionPreparations.set(preparation, {bootstrap, loader: definition.loader,
-    className: definition.className, superclass: expectedSuperclass});
+  if (preparation !== null) {
+    var classes: ClassData[] = [];
+    var captureClass = (cls: ClassData): void => {
+      if (!(cls instanceof ReferenceClassData) && !(cls instanceof ArrayClassData)) return;
+      if (classes.indexOf(cls) !== -1) return;
+      classes.push(cls);
+      if (cls instanceof ArrayClassData) captureClass(cls.getComponentClass());
+    };
+    captureClass(declaringClass); captureClass(targetOwner); captureClass(returnType.$cls);
+    parameterTypes.array.forEach(type => captureClass(type.$cls));
+    reflectionPreparations.set(preparation, {bootstrap, loader: definition.loader,
+      className: definition.className, superclass: expectedSuperclass, target, classes});
+  }
   return preparation;
 }
 
 export function installReflectionAdapters(preparation: GeneratedClassPreparation,
   cls: ReferenceClassData<JVMTypes.java_lang_Object>): void {
   var access = reflectionPreparations.get(preparation), superclass = cls.getSuperClassReference();
-  if (!access || cls.getLoader() !== access.loader || cls.getInternalName() !== access.className ||
+  if (!access || access.installed && access.installed !== cls || cls.getLoader() !== access.loader || cls.getInternalName() !== access.className ||
       !superclass || superclass.name !== access.superclass) throw new Error('Unproven reflection class preparation');
   installGeneratedClassAdapters(preparation, cls);
+  access.installed = cls;
   reflectionClasses.set(cls, access);
 }
 

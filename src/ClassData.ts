@@ -20,6 +20,7 @@ import {validateBinaryClassName} from './classfile_validation';
 import {ClassVerification} from './ClassVerification';
 import {ClassPreparation} from './ClassPreparation';
 import {canAccessReflectionSuperclass} from './ReflectionAdapters';
+import {isKnownNestmate} from './ClassAccess';
 
 const trace = logging.trace;
 const debug = logging.debug;
@@ -1050,6 +1051,7 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     }
     var bootstrapAttribute = <BootstrapMethods> this.getAttribute('BootstrapMethods');
     this.constantPool.each((index: number, item: IConstantPoolItem) => {
+      if (item.getType() === ConstantPoolItemType.CLASS) (<ClassReference> item).setOwner(this);
       if (!isModule && (item.getType() === ConstantPoolItemType.MODULE || item.getType() === ConstantPoolItemType.PACKAGE)) {
         throw new Error('Module/package constant in a non-module class');
       }
@@ -1439,24 +1441,28 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     return results;
   }
 
-  public getNestHostName(): string {
+  public getNestHostReference(): ClassReference {
     var host = <NestHost> this.getAttribute('NestHost');
-    if (host !== null) {
-      return host.hostClass.name;
-    }
-    return this.className;
+    return host === null ? null : host.hostClass;
+  }
+
+  /** Raw attribute spelling for metadata inspection, not proof of nest access. */
+  public getNestHostName(): string {
+    var host = this.getNestHostReference();
+    return host === null ? this.className : host.name;
+  }
+
+  public getNestMemberReferences(): ClassReference[] {
+    var members = <NestMembers> this.getAttribute('NestMembers');
+    return members === null ? [] : members.classes.slice();
   }
 
   public getNestMemberNames(): string[] {
-    var members = <NestMembers> this.getAttribute('NestMembers');
-    if (members === null) {
-      return [];
-    }
-    return members.classes.map((clsRef: ClassReference) => clsRef.name);
+    return this.getNestMemberReferences().map((clsRef: ClassReference) => clsRef.name);
   }
 
   public isNestmateOf(other: ReferenceClassData<JVMTypes.java_lang_Object>): boolean {
-    return this.getNestHostName() === other.getNestHostName();
+    return isKnownNestmate(this, other);
   }
 
   public getPermittedSubclassNames(): string[] {

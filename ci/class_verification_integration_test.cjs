@@ -8,7 +8,8 @@ const {test} = require('node:test');
 const ts = require('typescript');
 const runtime = process.env.DOPPIO_RELEASE_CLI_ROOT || path.resolve(__dirname, '../build/release-cli');
 const sourceModules = new Set(['ClassData', 'ClassLoader', 'ConstantPool', 'threading', 'methods', 'ClassVerification', 'ClassPreparation', 'LoadingConstraints', 'BytecodeVerifier',
-  'BytecodeTypeVerifier', 'VerificationRelations']);
+  'BytecodeTypeVerifier', 'VerificationRelations', 'GeneratedAdapters', 'LambdaAdapters', 'ReflectionAdapters',
+  'SymbolicResolution', 'ClassAccess', 'util']);
 const cache = new Map();
 function load(name) {
   if (cache.has(name)) return cache.get(name).exports;
@@ -317,8 +318,9 @@ function sourceNativeRegistry(name, classExports = {}) {
   loaded.filename = filename;
   loaded.paths = Module._nodeModulePaths(path.dirname(filename));
   const original = loaded.require.bind(loaded);
-  loaded.require = id => id === '../ClassData' ? load('ClassData') : id === '../doppiojvm' ?
-    {...Doppio, VM: {...Doppio.VM, ClassFile: {...Doppio.VM.ClassFile, ...load('ClassData'), ...classExports}}} : original(id);
+  loaded.require = id => id === '../doppiojvm' ?
+    {...Doppio, VM: {...Doppio.VM, ClassFile: {...Doppio.VM.ClassFile, ...load('ClassData'), ...classExports}}} :
+    id.startsWith('../') && sourceModules.has(id.slice(3)) ? load(id.slice(3)) : original(id);
   loaded._compile(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/natives', name + '.ts'), 'utf8'), {
     compilerOptions: {target: ts.ScriptTarget.ES2015, module: ts.ModuleKind.CommonJS}
   }).outputText, filename);

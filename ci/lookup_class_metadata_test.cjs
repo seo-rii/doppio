@@ -7,23 +7,34 @@ const path = require('node:path');
 const {test} = require('node:test');
 const runtime = process.env.DOPPIO_RELEASE_CLI_ROOT || path.resolve(__dirname, '../build/release-cli');
 
-function nativeRegistry() {
-  const filename = path.join(runtime, 'src/natives/java_lang.js');
-  if (process.env.DOPPIO_VERIFY_SOURCE !== '1') return require(filename).default();
+const sourceModules = new Set(['doppiojvm', 'VM', 'ClassFile', 'ClassData', 'ClassLoader', 'ConstantPool', 'threading', 'methods', 'util',
+  'ClassVerification', 'ClassPreparation', 'LoadingConstraints', 'BytecodeVerifier', 'BytecodeTypeVerifier', 'VerificationRelations',
+  'GeneratedAdapters', 'LambdaAdapters', 'ReflectionAdapters', 'SymbolicResolution', 'ClassAccess', 'method_handles', 'natives/java_lang']);
+const cache = new Map();
+function load(name) {
+  const filename = path.join(runtime, 'src', name + '.js');
+  if (process.env.DOPPIO_VERIFY_SOURCE !== '1') return require(filename);
+  if (cache.has(name)) return cache.get(name).exports;
   const ts = require('typescript'), loaded = new Module(filename, module);
+  cache.set(name, loaded);
   loaded.filename = filename;
   loaded.paths = Module._nodeModulePaths(path.dirname(filename));
-  loaded._compile(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/natives/java_lang.ts'), 'utf8'), {
+  const original = loaded.require.bind(loaded);
+  loaded.require = id => {
+    const dependency = path.posix.normalize(path.posix.join(path.posix.dirname(name), id));
+    return id.startsWith('.') && sourceModules.has(dependency) ? load(dependency) : original(id);
+  };
+  loaded._compile(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src', name + '.ts'), 'utf8'), {
     compilerOptions: {target: ts.ScriptTarget.ES5, module: ts.ModuleKind.CommonJS, ignoreDeprecations: '6.0'}
   }).outputText, filename);
-  return loaded.exports.default();
+  return loaded.exports;
 }
 
-const resolveMember = nativeRegistry()['java/lang/invoke/MethodHandleNatives'][
+const resolveMember = load('natives/java_lang').default()['java/lang/invoke/MethodHandleNatives'][
   'resolve(Ljava/lang/invoke/MemberName;Ljava/lang/Class;)Ljava/lang/invoke/MemberName;'];
-const {ReferenceClassData} = require(path.join(runtime, 'src/ClassData'));
-const {Method} = require(path.join(runtime, 'src/methods'));
-const {Flags} = require(path.join(runtime, 'src/util'));
+const {ReferenceClassData} = load('ClassData');
+const {Method} = load('methods');
+const {Flags} = load('util');
 const {ThreadStatus, MethodHandleReferenceKind: Kind} = require(path.join(runtime, 'src/enums'));
 const FLAGS = 'java/lang/invoke/MemberName/flags';
 
@@ -40,6 +51,7 @@ function world(options = {}) {
   const descriptor = field ? 'I' : constructor ? '()V' : '()I';
   const initialFlags = (field ? 0x40000 : constructor ? 0x20000 : 0x10000) | (refKind << 24);
   const thread = {
+    getJVM: () => ({shouldDumpCompiledCode: () => false}),
     setStatus(status) { state.statuses.push(status); },
     asyncReturn(value) { state.returns.push(value); },
     throwException(error) { state.errors.push(error); },
@@ -115,7 +127,7 @@ function world(options = {}) {
     [FLAGS]: initialFlags
   };
   return {
-    state, clazz, declaring, member, method, targetField, initialFlags, refKind,
+    state, clazz, declaring, member, method, targetField, initialFlags, refKind, thread,
     invoke: () => resolveMember(thread, member, null),
     succeed() {
       assert.equal(state.resolutions.length, 1);
@@ -158,6 +170,115 @@ test('an already fully linked class resolves a static handle synchronously witho
   assert.equal(w.member[FLAGS], w.initialFlags | 9);
   assert.equal(w.member.vmindex, -1);
   assert.equal(typeof w.member.vmtarget, 'function');
+});
+
+function privateNestWorld(field = false, separateLoaders = false) {
+  const w = world({ready: true, field, refKind: field ? Kind.GETSTATIC : Kind.INVOKESTATIC});
+  const vme = {getInternalName: () => 'Ljava/lang/VirtualMachineError;', isSubclass(base) { return this === base; }};
+  const bootstrap = {getLoadedClass: name => name === 'Ljava/lang/VirtualMachineError;' ? vme : null};
+  const requests = [], commonLoader = {bootstrap}, lookup = Object.create(ReferenceClassData.prototype);
+  const members = ['Lfixture/Lookup;', 'Lfixture/Declaring;'];
+  const host = Object.assign(Object.create(ReferenceClassData.prototype), {
+    getInternalName: () => 'Lfixture/Host;', getPackageName: () => 'fixture', getLoader: () => commonLoader,
+    getNestHostReference: () => null, getNestMemberNames: () => members
+  });
+  const secondLoader = separateLoaders ? {bootstrap} : commonLoader;
+  const otherHost = separateLoaders ? Object.assign(Object.create(ReferenceClassData.prototype), {
+    getInternalName: host.getInternalName, getPackageName: host.getPackageName, getLoader: () => secondLoader,
+    getNestHostReference: () => null, getNestMemberNames: () => members
+  }) : host;
+  for (const [cls, name, loader] of [[lookup, members[0], commonLoader], [w.declaring, members[1], secondLoader]]) {
+    const reference = {cls: null, resolveMetadata(thread, definingLoader, caller, callback, explicit) {
+      assert.equal(definingLoader, loader); assert.equal(caller, cls); assert.equal(explicit, false);
+      requests.push({reference, callback, caller});
+    }};
+    Object.assign(cls, {getInternalName: () => name, getPackageName: () => 'fixture', getLoader: () => loader,
+      getNestHostReference: () => reference, getNestMemberNames: () => []});
+  }
+  let boundary;
+  w.thread.runWithExceptionBoundary = (operation, callback) => {
+    boundary = callback;
+    operation(value => { boundary = undefined; callback(null, value); });
+  };
+  (field ? w.targetField : w.method).accessFlags = new Flags(10);
+  return {...w, lookup, host, otherHost, requests, vme,
+    invoke: () => resolveMember(w.thread, w.member, {$cls: lookup}),
+    succeedNest(index, cls) { const request = requests[index]; request.reference.cls = cls; request.callback(true); },
+    failNest(error) { const callback = boundary; boundary = undefined; callback(error); }
+  };
+}
+
+test('private MethodHandle bridges wait for both actual nest hosts before changing Java 8 Lookup access flags', () => {
+  const w = privateNestWorld();
+  assert.equal(w.invoke(), undefined);
+  assert.equal(w.requests.length, 1);
+  assert.equal(w.requests[0].caller, w.lookup);
+  assert.equal(w.member[FLAGS], w.initialFlags);
+  assert.equal(w.member.vmtarget, undefined);
+  w.succeedNest(0, w.host);
+  assert.equal(w.requests.length, 2);
+  assert.equal(w.requests[1].caller, w.declaring);
+  assert.deepEqual(w.state.returns, []);
+  w.succeedNest(1, w.host);
+  assert.deepEqual(w.state.returns, [w.member]);
+  assert.equal(w.member[FLAGS] & 7, 1);
+  assert.deepEqual(w.state.errors, []);
+  assert.deepEqual(w.state.executions, []);
+});
+
+test('private MethodHandle fields preserve denied access when same-name nest hosts have different identities', () => {
+  const w = privateNestWorld(true, true);
+  assert.equal(w.invoke(), undefined);
+  w.succeedNest(0, w.host); w.succeedNest(1, w.otherHost);
+  assert.deepEqual(w.state.returns, [w.member]);
+  assert.equal(w.member[FLAGS] & 7, 2);
+  assert.equal(w.member.vmindex, 17);
+  assert.deepEqual(w.state.errors, []);
+});
+
+test('failed nest metadata lookup preserves private flags and its cached self fallback', () => {
+  const w = privateNestWorld();
+  assert.equal(w.invoke(), undefined);
+  w.failNest({kind: 'Ljava/lang/NoClassDefFoundError;', getClass: () => ({isSubclass: () => false})});
+  assert.equal(w.requests.length, 2);
+  w.succeedNest(1, w.host);
+  assert.equal(w.member[FLAGS] & 7, 2);
+  assert.deepEqual(w.state.errors, [], 'Nest determination consumes a failed host lookup');
+  assert.deepEqual(w.state.returns, [w.member]);
+  assert.equal(w.invoke(), w.member);
+  assert.equal(w.requests.length, 2, 'A later lookup reuses the determined self host');
+});
+
+for (const field of [false, true]) test('a nest VME preserves unresolved MethodHandle flags and permits retry: ' + (field ? 'field' : 'method'), () => {
+  const w = privateNestWorld(field), failure = {getClass: () => w.vme};
+  assert.equal(w.invoke(), undefined);
+  w.failNest(failure);
+  assert.ok(w.state.errors[0] === failure);
+  assert.equal(w.state.errors.length, 1);
+  assert.deepEqual(w.state.returns, []);
+  assert.equal(w.member[FLAGS], w.initialFlags);
+  assert.equal(w.member.vmtarget, undefined);
+  assert.equal(w.member.vmindex, undefined);
+  assert.equal(w.requests.length, 1, 'VME stops before determining the declaring host');
+  assert.equal(w.invoke(), undefined);
+  assert.equal(w.requests.length, 2, 'Transient VME did not determine a self host');
+  w.succeedNest(1, w.host);
+  w.succeedNest(2, w.host);
+  assert.deepEqual(w.state.returns, [w.member]);
+  assert.equal(w.member[FLAGS] & 7, 1);
+});
+
+test('a declaring-host VME does not undo a successfully determined referring host', () => {
+  const w = privateNestWorld(), failure = {getClass: () => w.vme};
+  w.invoke(); w.succeedNest(0, w.host); w.failNest(failure);
+  assert.ok(w.state.errors[0] === failure);
+  assert.deepEqual(w.state.returns, []);
+  assert.equal(w.member[FLAGS], w.initialFlags);
+  w.invoke();
+  assert.equal(w.requests.length, 3);
+  assert.ok(w.requests[2].caller === w.declaring);
+  w.succeedNest(2, w.host);
+  assert.deepEqual(w.state.returns, [w.member]);
 });
 
 test('hierarchy-only or verified-but-unprepared lookup metadata waits before member publication', () => {

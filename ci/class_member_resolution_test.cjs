@@ -9,7 +9,7 @@ const ts = require('typescript');
 const runtime = process.env.DOPPIO_RELEASE_CLI_ROOT || path.resolve(__dirname, '../build/release-cli');
 const sourceModules = new Set(['ClassData', 'ClassLoader', 'ConstantPool', 'threading', 'methods',
   'ClassVerification', 'ClassPreparation', 'LoadingConstraints', 'BytecodeVerifier', 'BytecodeTypeVerifier',
-  'VerificationRelations', 'GeneratedAdapters', 'LambdaAdapters', 'ReflectionAdapters']);
+  'VerificationRelations', 'GeneratedAdapters', 'LambdaAdapters', 'ReflectionAdapters', 'SymbolicResolution', 'ClassAccess', 'util']);
 const cache = new Map();
 function load(name) {
   if (process.env.DOPPIO_VERIFY_SOURCE !== '1') return require(path.join(runtime, 'src', name + '.js'));
@@ -82,14 +82,14 @@ function world() {
     return cls;
   }
   const object = define({name: 'java/lang/Object', parent: null});
-  function reference(tag, owner, name, descriptor) {
-    const caller = define({name: 'callers/Caller' + Object.keys(bootstrap.loadedClasses).length,
+  function reference(tag, owner, name, descriptor, options = {}) {
+    const caller = define({name: options.callerName || 'callers/Caller' + Object.keys(bootstrap.loadedClasses).length,
       references: [{tag, owner: owner.getInternalName().slice(1, -1), name, descriptor}]});
     const type = tag === 9 ? FieldReference : tag === 10 ? MethodReference : InterfaceMethodReference;
     let result;
     caller.constantPool.each((index, item) => { if (item instanceof type) result = item; });
     assert.ok(result);
-    assert.equal(result.classInfo.tryResolve(bootstrap), true);
+    assert.equal(result.classInfo.tryResolve(bootstrap), options.classAccess !== false);
     return {caller, result};
   }
   async function resolve(pair) {
@@ -184,3 +184,82 @@ for (const [tag, iface, allowed] of [[10, false, true], [10, true, false], [11, 
     }
   });
 }
+
+for (const tag of [9, 10, 11]) {
+  test('failed member resolution never retries the same CP entry, while a fresh reference remains independent: tag ' + tag, async () => {
+    const w = world(), owner = w.define({name: 'sticky/Owner' + tag, flags: tag === 11 ? 0x601 : 0x21,
+      fields: tag === 9 ? [{name: 'target', descriptor: 'I'}] : [],
+      methods: tag === 9 ? [] : [{name: 'target', descriptor: '()V', flags: tag === 11 ? 0x401 : 1}]});
+    const descriptor = tag === 9 ? 'I' : '()V', lookupName = tag === 9 ? 'fieldLookup' : 'methodLookup';
+    const lookup = owner[lookupName].bind(owner);
+    let available = false, lookups = 0;
+    owner[lookupName] = (...args) => { lookups++; return available ? lookup(...args) : null; };
+    if (tag === 10) owner.signaturePolymorphicAwareMethodLookup = signature => available ? lookup(signature) : null;
+    const pair = w.reference(tag, owner, 'target', descriptor), first = await w.resolve(pair), firstLookups = lookups;
+    assert.equal(first.success, false);
+    assert.equal(first.errors[0].name, tag === 9 ? 'Ljava/lang/NoSuchFieldError;' : 'Ljava/lang/NoSuchMethodError;');
+    assert.ok(firstLookups > 0);
+    available = true;
+    const repeated = await w.resolve(pair);
+    assert.equal(repeated.success, false);
+    assert.equal(repeated.errors.length, 1);
+    assert.deepEqual(repeated.errors, first.errors);
+    assert.equal(lookups, firstLookups, 'A changed declaration lookup must not revive a failed CP reference');
+    assert.equal(pair.result.isResolved(), false);
+    const independent = w.reference(tag, owner, 'target', descriptor), positive = await w.resolve(independent);
+    assert.equal(positive.success, true);
+    assert.deepEqual(positive.errors, []);
+    assert.ok(independent.result[tag === 9 ? 'field' : 'method'] === owner[tag === 9 ? 'getFields' : 'getMethods']()[0]);
+  });
+}
+
+for (const tag of [9, 10, 11]) {
+  test('an inaccessible prelinked symbolic owner fails before any inherited member is cached: tag ' + tag, async () => {
+    const w = world(), base = w.define({name: 'hidden/Base' + tag, flags: tag === 11 ? 0x601 : 0x21,
+      fields: tag === 9 ? [{name: 'target', descriptor: 'I'}] : [],
+      methods: tag === 9 ? [] : [{name: 'target', descriptor: '()V', flags: tag === 11 ? 0x401 : 1}]});
+    const owner = w.define({name: 'hidden/Child' + tag, flags: tag === 11 ? 0x600 : 0x20,
+      parent: tag === 11 ? 'java/lang/Object' : 'hidden/Base' + tag,
+      interfaces: tag === 11 ? ['hidden/Base' + tag] : []});
+    const descriptor = tag === 9 ? 'I' : '()V';
+    const pair = w.reference(tag, owner, 'target', descriptor, {classAccess: false});
+    assert.equal(owner.isResolved(), true, 'The target class remains valid and fully linked');
+    assert.equal(pair.result.classInfo.isResolved(), false, 'Loaded metadata must not bypass class access');
+    const result = await w.resolve(pair);
+    assert.equal(result.success, false);
+    assert.equal(result.errors.length, 1);
+    assert.equal(result.errors[0].name, 'Ljava/lang/IllegalAccessError;');
+    assert.equal(pair.result[tag === 9 ? 'field' : 'method'], null);
+    const allowed = w.reference(tag, owner, 'target', descriptor, {callerName: 'hidden/Allowed' + tag});
+    const positive = await w.resolve(allowed);
+    assert.equal(positive.success, true);
+    assert.deepEqual(positive.errors, []);
+    assert.ok(allowed.result[tag === 9 ? 'field' : 'method'].cls === base);
+    const repeated = await w.resolve(pair);
+    assert.equal(repeated.success, false);
+    assert.deepEqual(repeated.errors, result.errors);
+  });
+}
+
+test('symbolic owner access precedes a Methodref/interface kind error', async () => {
+  const w = world(), owner = w.define({name: 'hidden/Kind', flags: 0x600,
+    methods: [{name: 'target', descriptor: '()V', flags: 0x401}]});
+  const pair = w.reference(10, owner, 'target', '()V', {classAccess: false}), result = await w.resolve(pair);
+  assert.equal(result.success, false);
+  assert.equal(result.errors[0].name, 'Ljava/lang/IllegalAccessError;');
+  assert.equal(pair.result.method, null);
+});
+
+test('successful member resolution remains valid after an instruction-specific staticness error', async () => {
+  const w = world(), owner = w.define({name: 'fields/StaticKind', fields: [{name: 'target', descriptor: 'I', flags: 9}]});
+  const pair = w.reference(9, owner, 'target', 'I'), result = await w.resolve(pair);
+  assert.equal(result.success, true);
+  const frame = {method: {cls: pair.caller}, returnToThreadLoop: false}, errors = [], thread = {
+    throwNewException(name) { errors.push(name); }
+  };
+  assert.equal(pair.result.hasAccess(thread, frame, false), false);
+  assert.deepEqual(errors, ['Ljava/lang/IncompatibleClassChangeError;']);
+  assert.equal(pair.result.isResolved(), true, 'A getfield mismatch must not poison a valid getstatic use');
+  assert.equal(pair.result.hasAccess(thread, frame, true), true);
+  assert.equal((await w.resolve(pair)).success, true);
+});

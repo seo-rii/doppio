@@ -8,7 +8,8 @@ const {test} = require('node:test');
 const runtime = process.env.DOPPIO_RELEASE_CLI_ROOT || path.resolve(__dirname, '../build/release-cli');
 const sourceModules = new Set(['ClassData', 'ClassLoader', 'ConstantPool', 'threading', 'methods',
   'ClassVerification', 'BytecodeVerifier', 'BytecodeTypeVerifier', 'VerificationRelations',
-  'GeneratedAdapters', 'LambdaAdapters', 'ReflectionAdapters', 'LoadingConstraints', 'ClassPreparation', 'opcodes', 'method_handles']);
+  'GeneratedAdapters', 'LambdaAdapters', 'ReflectionAdapters', 'LoadingConstraints', 'ClassPreparation', 'opcodes', 'method_handles',
+  'SymbolicResolution', 'ClassAccess', 'util']);
 const cache = new Map();
 function load(name) {
   const filename = path.join(runtime, 'src', name + '.js');

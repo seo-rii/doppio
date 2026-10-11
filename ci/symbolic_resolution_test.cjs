@@ -30,7 +30,8 @@ const throwableClass = errorClass('Ljava/lang/Throwable;');
 const baseError = errorClass('Ljava/lang/Error;', throwableClass);
 const linkageError = errorClass('Ljava/lang/LinkageError;', baseError);
 const incompatibleError = errorClass('Ljava/lang/IncompatibleClassChangeError;', linkageError);
-for (const name of ['NoClassDefFoundError', 'NoSuchFieldError', 'NoSuchMethodError', 'IllegalAccessError']) {
+errorClass('Ljava/lang/NoClassDefFoundError;', linkageError);
+for (const name of ['NoSuchFieldError', 'NoSuchMethodError', 'IllegalAccessError']) {
   errorClass('Ljava/lang/' + name + ';', incompatibleError);
 }
 const vmError = errorClass('Ljava/lang/VirtualMachineError;', baseError);

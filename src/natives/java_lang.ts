@@ -20,6 +20,7 @@ import ClassLoader = Doppio.VM.ClassFile.ClassLoader;
 import * as JVMTypes from '../../includes/JVMTypes';
 import {setImmediate} from 'browserfs';
 import {refreshMemberNameMethodTarget} from '../method_handles';
+import {getKnownNestHost, resolveNestHost} from '../ClassAccess';
 
 export default function (): any {
   var debug = logging.debug;
@@ -2944,12 +2945,32 @@ export default function (): any {
       }
 
       assert((flags & MemberNameConstants.CALLER_SENSITIVE) === 0, "Not yet supported: Caller sensitive methods.");
+      // Java 8 Lookup cannot interpret NestHost/NestMembers. Determine both
+      // actual hosts before its compatibility flag adjustment. An ordinary host
+      // failure resolves to self; a VME propagates without adjusting access flags.
+      var waitForPrivateNest = (declaring: ReferenceClassData<JVMTypes.java_lang_Object>): boolean => {
+        if (lookupCls === null || lookupCls === declaring ||
+            getKnownNestHost(lookupCls) !== null && getKnownNestHost(declaring) !== null) return false;
+        thread.setStatus(ThreadStatus.ASYNC_WAITING);
+        resolveNestHost(thread, lookupCls, host => {
+          if (host === null) return;
+          resolveNestHost(thread, declaring, declaringHost => {
+            if (declaringHost === null) return;
+            var resolved = java_lang_invoke_MethodHandleNatives[
+              'resolve(Ljava/lang/invoke/MemberName;Ljava/lang/Class;)Ljava/lang/invoke/MemberName;'](
+                thread, memberName, lookupClass);
+            if (resolved !== undefined) thread.asyncReturn(resolved);
+          });
+        });
+        return true;
+      };
       switch (flags & MemberNameConstants.ALL_KINDS) {
         case MemberNameConstants.IS_CONSTRUCTOR:
         case MemberNameConstants.IS_METHOD:
           // Need to perform method lookup.
           var methodTarget = clazz.signaturePolymorphicAwareMethodLookup(name + (<JVMTypes.java_lang_invoke_MethodType> type).toString());
           if (methodTarget !== null) {
+            if (methodTarget.accessFlags.isPrivate() && waitForPrivateNest(methodTarget.cls)) return;
             flags |= methodFlags(methodTarget);
             if (methodTarget.accessFlags.isPrivate() && lookupCls !== null &&
               lookupCls !== methodTarget.cls && lookupCls.isNestmateOf(methodTarget.cls)) {
@@ -2966,6 +2987,7 @@ export default function (): any {
         case MemberNameConstants.IS_FIELD:
           var fieldTarget = clazz.fieldLookup(name);
           if (fieldTarget !== null) {
+            if (fieldTarget.accessFlags.isPrivate() && waitForPrivateNest(fieldTarget.cls)) return;
             flags |= fieldTarget.accessFlags.getRawByte();
             if (fieldTarget.accessFlags.isPrivate() && lookupCls !== null &&
               lookupCls !== fieldTarget.cls && lookupCls.isNestmateOf(fieldTarget.cls)) {

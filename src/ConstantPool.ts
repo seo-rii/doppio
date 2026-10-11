@@ -13,18 +13,34 @@ import * as JVMTypes from '../includes/JVMTypes';
 import {setImmediate} from 'browserfs';
 import {validateConstantClassName, validateMemberNameAndType, validateMethodDescriptor, validateUnqualifiedName} from './classfile_validation';
 import {getLoadingConstraints} from './LoadingConstraints';
-import {error as logError} from './logging';
+import {SymbolicResolution} from './SymbolicResolution';
+import {canAccessClass, resolveMemberAccess, getKnownNestHost, resolveNestHost, resolveNestMembers} from './ClassAccess';
+import {canAccessLambdaClass, canAccessLambdaMember} from './LambdaAdapters';
+import {canAccessReflectionClass, canAccessReflectionMember} from './ReflectionAdapters';
+
+/** Generated Java 8 forwarding code carries exact producer capabilities;
+ * ordinary classes use the unnamed-module language access rules. */
+function hasClassAccess(caller: ReferenceClassData<JVMTypes.java_lang_Object>, target: ClassData): boolean {
+  return caller === null || canAccessClass(caller, target) ||
+    canAccessLambdaClass(caller, target) || canAccessReflectionClass(caller, target);
+}
+
+function resolveExactMemberAccess(thread: JVMThread, caller: ReferenceClassData<JVMTypes.java_lang_Object>,
+    member: Method | Field, symbolicOwner: ClassData, callback: (allowed: boolean | null) => void): void {
+  if (caller === null || canAccessLambdaMember(caller, member) || canAccessReflectionMember(caller, member)) callback(true);
+  else resolveMemberAccess(thread, caller, member.cls, member.accessFlags, symbolicOwner, callback);
+}
 
 /** JVMS 5.4.3.2-4 connects the CP caller to the actual declaration owner,
  * never an intermediate class named by the symbolic reference. */
 function checkMemberLoadingConstraints(thread: JVMThread, loader: ClassLoader,
-    caller: ReferenceClassData<JVMTypes.java_lang_Object>, owner: ClassData, descriptor: string): boolean {
+    caller: ReferenceClassData<JVMTypes.java_lang_Object>, owner: ClassData, descriptor: string,
+    resolution: SymbolicResolution): boolean {
   var initiating = caller === null ? loader : caller.getLoader(),
     violation = getLoadingConstraints(initiating).imposeDescriptor(descriptor, initiating, owner.getLoader());
   if (violation === null) return true;
   var message = 'Loading constraint violation for ' + util.ext_classname(violation.name);
-  if (thread === null) logError('JVM bootstrap member resolution failed: ' + message);
-  else thread.throwNewException('Ljava/lang/LinkageError;', message);
+  resolution.throwFailure(thread, 'Ljava/lang/LinkageError;', message);
   return false;
 }
 
@@ -291,6 +307,8 @@ CP_CLASSES[ConstantPoolItemType.DOUBLE] = ConstDouble;
  * @todo Have a classloader-local cache of class reference objects.
  */
 export class ClassReference implements IConstantPoolItem {
+  private owner: ReferenceClassData<JVMTypes.java_lang_Object> = null;
+  private metadataResolution = new SymbolicResolution();
   /**
    * The name of the class, in full descriptor form, e.g.:
    * Lfoo/bar/Baz;
@@ -316,14 +334,24 @@ export class ClassReference implements IConstantPoolItem {
     this.name = name;
   }
 
+  public setOwner(owner: ReferenceClassData<JVMTypes.java_lang_Object>): void {
+    assert(this.owner === null || this.owner === owner, 'A class reference cannot move to another constant pool');
+    this.owner = owner;
+  }
+
+  public retainMetadataFailure(resolution: SymbolicResolution): void {
+    resolution.inheritFailure(this.metadataResolution);
+  }
+
   /**
    * Attempt to synchronously resolve.
    */
   public tryResolve(loader: ClassLoader): boolean {
+    if (this.metadataResolution.hasFailed()) return false;
     if (this.cls === null) {
       this.cls = <ReferenceClassData<JVMTypes.java_lang_Object>> loader.getResolvedClass(this.name);
     }
-    return this.cls !== null && this.cls.tryToResolve();
+    return this.cls !== null && this.cls.tryToResolve() && hasClassAccess(this.owner, this.cls);
   }
 
   /**
@@ -331,36 +359,48 @@ export class ClassReference implements IConstantPoolItem {
    * class initialization.
    */
   public resolve(thread: JVMThread, loader: ClassLoader, caller: ReferenceClassData<JVMTypes.java_lang_Object>, cb: (status: boolean) => void, explicit: boolean = true) {
-    // Anonymous-class patches may cache loaded metadata before verification.
-    // Retain that exact identity while still requiring full linking.
-    if (this.cls !== null) {
-      this.cls.resolve(thread, resolved => cb(resolved !== null), explicit);
-      return;
-    }
-    // Because of Java 8 anonymous classes, THIS CHECK IS REQUIRED FOR CORRECTNESS.
-    // (ClassLoaders do not know about anonymous classes, hence they are
-    //  'anonymous')
-    // (Anonymous classes are an 'Unsafe' feature, and are not part of the standard,
-    //  but they are employed for lambdas and such.)
-    // NOTE: Thread is 'null' during JVM bootstrapping.
-    if (thread !== null) {
-      var currentMethod = thread.currentMethod();
-      // The stack might be empty during resolution, which occurs during JVM bootup.
-      if (currentMethod !== null && this.name === currentMethod.cls.getInternalName()) {
-        this.setResolved(thread, currentMethod.cls);
-        this.cls.resolve(thread, resolved => cb(resolved !== null), explicit);
-        return;
-      }
-    }
-
-    loader.resolveClass(thread, this.name, (cdata: ReferenceClassData<JVMTypes.java_lang_Object>) => {
-      this.setResolved(thread, cdata);
-      cb(cdata !== null);
+    this.resolveMetadata(thread, loader, caller, success => {
+      if (!success) cb(false);
+      else this.cls.resolve(thread, resolved => cb(resolved !== null), explicit);
     }, explicit);
   }
 
-  private setResolved(thread: JVMThread, cls: ReferenceClassData<JVMTypes.java_lang_Object>) {
-    this.cls = cls;
+  /** Class-symbol resolution without verification, preparation or initialization.
+   * Nest determination may swallow this reference's failure, but must not erase
+   * it for a later ordinary use of the same constant-pool entry. */
+  public resolveMetadata(thread: JVMThread, loader: ClassLoader, caller: ReferenceClassData<JVMTypes.java_lang_Object>,
+      cb: (status: boolean) => void, explicit: boolean = false): void {
+    var accessing = this.owner === null ? caller : this.owner;
+    this.metadataResolution.resolve(thread, done => {
+      var admit = (cls: ReferenceClassData<JVMTypes.java_lang_Object> | ArrayClassData<any>) => {
+        if (cls === null) { done(false); return; }
+        if (cls instanceof ArrayClassData && !cls.isResolved()) {
+          // Newly published array mirrors do not yet have component pointers.
+          // Resolve only their passive metadata, never the reference leaf's Code.
+          cls.resolve(thread, array => admit(<ArrayClassData<any>> array), explicit);
+          return;
+        }
+        if (!hasClassAccess(accessing, cls)) {
+          this.metadataResolution.throwFailure(thread, 'Ljava/lang/IllegalAccessError;',
+            accessing.getExternalName() + ' cannot access ' + cls.getExternalName());
+          done(false);
+          return;
+        }
+        this.cls = cls;
+        done(true);
+      };
+      // Anonymous patches and self references preserve their exact metadata
+      // identity, including when it is not registered in the loader namespace.
+      if (this.cls !== null) { admit(this.cls); return; }
+      if (thread !== null) {
+        var currentMethod = thread.currentMethod();
+        if (currentMethod !== null && this.name === currentMethod.cls.getInternalName()) {
+          admit(currentMethod.cls);
+          return;
+        }
+      }
+      loader.loadClass(thread, this.name, admit, explicit);
+    }, cb);
   }
 
   public getType(): ConstantPoolItemType {
@@ -369,7 +409,10 @@ export class ClassReference implements IConstantPoolItem {
 
   public getConstant(thread: JVMThread) { return this.cls.getClassObject(thread); }
 
-  public isResolved() { return this.cls !== null && this.cls.isResolved(); }
+  public isResolved() {
+    return !this.metadataResolution.hasFailed() && this.cls !== null && this.cls.isResolved() &&
+      hasClassAccess(this.owner, this.cls);
+  }
 
   public static size: number = 1;
   public static infoByteSize: number = 2;
@@ -604,6 +647,7 @@ CP_CLASSES[ConstantPoolItemType.PACKAGE] = PackageReference;
  * ```
  */
 export class MethodReference implements IConstantPoolItem {
+  private resolution = new SymbolicResolution();
   public classInfo: ClassReference;
   public nameAndTypeInfo: NameAndTypeInfo;
   public method: Method = null;
@@ -658,7 +702,7 @@ export class MethodReference implements IConstantPoolItem {
       thread.throwNewException('Ljava/lang/IncompatibleClassChangeError;', `Method ${method.name} from class ${method.cls.getExternalName()} is ${isStatic ? 'not ' : ''}static.`);
       frame.returnToThreadLoop = true;
       return false;
-    } else if (!util.checkAccess(accessingCls, method.cls, method.accessFlags)) {
+    } else if (!util.checkAccess(accessingCls, method.cls, method.accessFlags, method)) {
       thread.throwNewException('Ljava/lang/IllegalAccessError;', `${accessingCls.getExternalName()} cannot access ${method.cls.getExternalName()}.${method.name}`);
       frame.returnToThreadLoop = true;
       return false;
@@ -707,18 +751,28 @@ export class MethodReference implements IConstantPoolItem {
   }
 
   public resolve(thread: JVMThread, loader: ClassLoader, caller: ReferenceClassData<JVMTypes.java_lang_Object>, cb: (status: boolean) => void, explicit: boolean = true) {
+    this.resolution.resolve(thread, done => this.resolveUncached(thread, loader, caller, done, explicit), cb);
+  }
+
+  private resolveUncached(thread: JVMThread, loader: ClassLoader, caller: ReferenceClassData<JVMTypes.java_lang_Object>, cb: (status: boolean) => void, explicit: boolean) {
     if (!this.classInfo.isResolved()) {
       this.classInfo.resolve(thread, loader, caller, (status: boolean) => {
         if (!status) {
+          this.classInfo.retainMetadataFailure(this.resolution);
           cb(false);
         } else {
-          this.resolve(thread, loader, caller, cb, explicit);
+          this.resolveUncached(thread, loader, caller, cb, explicit);
         }
       }, explicit);
     } else {
       var cls = this.classInfo.cls;
+      if (!hasClassAccess(caller, cls)) {
+        this.resolution.throwFailure(thread, 'Ljava/lang/IllegalAccessError;', caller.getExternalName() + ' cannot access ' + cls.getExternalName());
+        cb(false);
+        return;
+      }
       if (cls.accessFlags.isInterface()) {
-        thread.throwNewException('Ljava/lang/IncompatibleClassChangeError;', cls.getExternalName() + ' is an interface');
+        this.resolution.throwFailure(thread, 'Ljava/lang/IncompatibleClassChangeError;', cls.getExternalName() + ' is an interface');
         cb(false);
         return;
       }
@@ -3353,26 +3407,29 @@ export class MethodReference implements IConstantPoolItem {
           if (status === true) {
             this.setResolved(thread, method);
           } else {
-            thread.throwNewException('Ljava/lang/NoSuchMethodError;', `Method ${this.signature} does not exist in class ${this.classInfo.cls.getExternalName()}.`);
+            this.resolution.throwFailure(thread, 'Ljava/lang/NoSuchMethodError;', `Method ${this.signature} does not exist in class ${this.classInfo.cls.getExternalName()}.`);
           }
           cb(status);
         });
       }
       if (method !== null) {
-        if (caller !== null && !util.checkAccess(caller, method.cls, method.accessFlags)) {
-          thread.throwNewException('Ljava/lang/IllegalAccessError;', `${caller.getExternalName()} cannot access ${method.cls.getExternalName()}.${method.name}`);
-          cb(false);
-        } else {
-          if (!checkMemberLoadingConstraints(thread, loader, caller, method.cls, this.nameAndTypeInfo.descriptor)) {
+        resolveExactMemberAccess(thread, caller, method, cls, allowed => {
+          if (allowed === null) { cb(false); return; } // The original VME is already being delivered.
+          if (!allowed) {
+            this.resolution.throwFailure(thread, 'Ljava/lang/IllegalAccessError;', `${caller.getExternalName()} cannot access ${method.cls.getExternalName()}.${method.name}`);
+            cb(false);
+            return;
+          }
+          if (!checkMemberLoadingConstraints(thread, loader, caller, method.cls, this.nameAndTypeInfo.descriptor, this.resolution)) {
             cb(false);
             return;
           }
           if (syntheticMethod !== undefined && method === syntheticMethod) method = method.cls.registerVMMethod(method);
           this.setResolved(thread, method);
           cb(true);
-        }
+        });
       } else {
-        thread.throwNewException('Ljava/lang/NoSuchMethodError;', `Method ${this.signature} does not exist in class ${this.classInfo.cls.getExternalName()}.`);
+        this.resolution.throwFailure(thread, 'Ljava/lang/NoSuchMethodError;', `Method ${this.signature} does not exist in class ${this.classInfo.cls.getExternalName()}.`);
         cb(false);
       }
     }
@@ -3706,6 +3763,7 @@ CP_CLASSES[ConstantPoolItemType.METHODREF] = MethodReference;
  * ```
  */
 export class InterfaceMethodReference implements IConstantPoolItem {
+  private resolution = new SymbolicResolution();
   public classInfo: ClassReference;
   public nameAndTypeInfo: NameAndTypeInfo;
   /**
@@ -3746,7 +3804,7 @@ export class InterfaceMethodReference implements IConstantPoolItem {
       thread.throwNewException('Ljava/lang/IncompatibleClassChangeError;', `Method ${method.name} from class ${method.cls.getExternalName()} is ${isStatic ? 'not ' : ''}static.`);
       frame.returnToThreadLoop = true;
       return false;
-    } else if (!util.checkAccess(accessingCls, method.cls, method.accessFlags)) {
+    } else if (!util.checkAccess(accessingCls, method.cls, method.accessFlags, method)) {
       thread.throwNewException('Ljava/lang/IllegalAccessError;', `${accessingCls.getExternalName()} cannot access ${method.cls.getExternalName()}.${method.name}`);
       frame.returnToThreadLoop = true;
       return false;
@@ -3755,18 +3813,28 @@ export class InterfaceMethodReference implements IConstantPoolItem {
   }
 
   public resolve(thread: JVMThread, loader: ClassLoader, caller: ReferenceClassData<JVMTypes.java_lang_Object>, cb: (status: boolean) => void, explicit: boolean = true) {
+    this.resolution.resolve(thread, done => this.resolveUncached(thread, loader, caller, done, explicit), cb);
+  }
+
+  private resolveUncached(thread: JVMThread, loader: ClassLoader, caller: ReferenceClassData<JVMTypes.java_lang_Object>, cb: (status: boolean) => void, explicit: boolean) {
     if (!this.classInfo.isResolved()) {
       this.classInfo.resolve(thread, loader, caller, (status: boolean) => {
         if (!status) {
+          this.classInfo.retainMetadataFailure(this.resolution);
           cb(false);
         } else {
-          this.resolve(thread, loader, caller, cb, explicit);
+          this.resolveUncached(thread, loader, caller, cb, explicit);
         }
       }, explicit);
     } else {
       var cls = this.classInfo.cls;
+      if (!hasClassAccess(caller, cls)) {
+        this.resolution.throwFailure(thread, 'Ljava/lang/IllegalAccessError;', caller.getExternalName() + ' cannot access ' + cls.getExternalName());
+        cb(false);
+        return;
+      }
       if (!cls.accessFlags.isInterface()) {
-        thread.throwNewException('Ljava/lang/IncompatibleClassChangeError;', cls.getExternalName() + ' is not an interface');
+        this.resolution.throwFailure(thread, 'Ljava/lang/IncompatibleClassChangeError;', cls.getExternalName() + ' is not an interface');
         cb(false);
         return;
       }
@@ -3854,20 +3922,23 @@ export class InterfaceMethodReference implements IConstantPoolItem {
         method = <Method> syntheticMethod;
       }
       if (method !== null) {
-        if (caller !== null && !util.checkAccess(caller, method.cls, method.accessFlags)) {
-          thread.throwNewException('Ljava/lang/IllegalAccessError;', `${caller.getExternalName()} cannot access ${method.cls.getExternalName()}.${method.name}`);
-          cb(false);
-        } else {
-          if (!checkMemberLoadingConstraints(thread, loader, caller, method.cls, this.nameAndTypeInfo.descriptor)) {
+        resolveExactMemberAccess(thread, caller, method, cls, allowed => {
+          if (allowed === null) { cb(false); return; }
+          if (!allowed) {
+            this.resolution.throwFailure(thread, 'Ljava/lang/IllegalAccessError;', `${caller.getExternalName()} cannot access ${method.cls.getExternalName()}.${method.name}`);
+            cb(false);
+            return;
+          }
+          if (!checkMemberLoadingConstraints(thread, loader, caller, method.cls, this.nameAndTypeInfo.descriptor, this.resolution)) {
             cb(false);
             return;
           }
           if (syntheticMethod !== undefined && method === syntheticMethod) method = method.cls.registerVMMethod(method);
           this.setResolved(thread, method);
           cb(true);
-        }
+        });
       } else {
-        thread.throwNewException('Ljava/lang/NoSuchMethodError;', `Method ${this.signature} does not exist in class ${this.classInfo.cls.getExternalName()}.`);
+        this.resolution.throwFailure(thread, 'Ljava/lang/NoSuchMethodError;', `Method ${this.signature} does not exist in class ${this.classInfo.cls.getExternalName()}.`);
         cb(false);
       }
     }
@@ -3934,6 +4005,7 @@ CP_CLASSES[ConstantPoolItemType.INTERFACE_METHODREF] = InterfaceMethodReference;
  * ```
  */
 export class FieldReference implements IConstantPoolItem {
+  private resolution = new SymbolicResolution();
   public classInfo: ClassReference;
   public nameAndTypeInfo: NameAndTypeInfo;
   public field: Field = null;
@@ -3967,11 +4039,11 @@ export class FieldReference implements IConstantPoolItem {
   public hasAccess(thread: JVMThread, frame: BytecodeStackFrame, isStatic: boolean): boolean {
     var field = this.field, accessingCls = frame.method.cls;
     if (field.accessFlags.isStatic() !== isStatic) {
-      thread.throwNewException('Ljava/lang/IncompatibleClassChangeError;', `Field ${name} from class ${field.cls.getExternalName()} is ${isStatic ? 'not ' : ''}static.`);
+      thread.throwNewException('Ljava/lang/IncompatibleClassChangeError;', `Field ${field.name} from class ${field.cls.getExternalName()} is ${isStatic ? 'not ' : ''}static.`);
       frame.returnToThreadLoop = true;
       return false;
-    } else if (!util.checkAccess(accessingCls, field.cls, field.accessFlags)) {
-      thread.throwNewException('Ljava/lang/IllegalAccessError;', `${accessingCls.getExternalName()} cannot access ${field.cls.getExternalName()}.${name}`);
+    } else if (!util.checkAccess(accessingCls, field.cls, field.accessFlags, field)) {
+      thread.throwNewException('Ljava/lang/IllegalAccessError;', `${accessingCls.getExternalName()} cannot access ${field.cls.getExternalName()}.${field.name}`);
       frame.returnToThreadLoop = true;
       return false;
     }
@@ -3979,32 +4051,45 @@ export class FieldReference implements IConstantPoolItem {
   }
 
   public resolve(thread: JVMThread, loader: ClassLoader, caller: ReferenceClassData<JVMTypes.java_lang_Object>, cb: (status: boolean) => void, explicit: boolean = true) {
+    this.resolution.resolve(thread, done => this.resolveUncached(thread, loader, caller, done, explicit), cb);
+  }
+
+  private resolveUncached(thread: JVMThread, loader: ClassLoader, caller: ReferenceClassData<JVMTypes.java_lang_Object>, cb: (status: boolean) => void, explicit: boolean) {
     if (!this.classInfo.isResolved()) {
       this.classInfo.resolve(thread, loader, caller, (status: boolean) => {
         if (!status) {
+          this.classInfo.retainMetadataFailure(this.resolution);
           cb(false);
         } else {
-          this.resolve(thread, loader, caller, cb, explicit);
+          this.resolveUncached(thread, loader, caller, cb, explicit);
         }
       }, explicit);
     } else {
-      var cls = this.classInfo.cls,
-        field = cls.fieldLookup(this.nameAndTypeInfo.name, this.nameAndTypeInfo.descriptor);
+      var cls = this.classInfo.cls;
+      if (!hasClassAccess(caller, cls)) {
+        this.resolution.throwFailure(thread, 'Ljava/lang/IllegalAccessError;', caller.getExternalName() + ' cannot access ' + cls.getExternalName());
+        cb(false);
+        return;
+      }
+      var field = cls.fieldLookup(this.nameAndTypeInfo.name, this.nameAndTypeInfo.descriptor);
       if (field !== null) {
-        if (caller !== null && !util.checkAccess(caller, field.cls, field.accessFlags)) {
-          thread.throwNewException('Ljava/lang/IllegalAccessError;', `${caller.getExternalName()} cannot access ${field.cls.getExternalName()}.${field.name}`);
-          cb(false);
-        } else {
-          if (!checkMemberLoadingConstraints(thread, loader, caller, field.cls, this.nameAndTypeInfo.descriptor)) {
+        resolveExactMemberAccess(thread, caller, field, cls, allowed => {
+          if (allowed === null) { cb(false); return; }
+          if (!allowed) {
+            this.resolution.throwFailure(thread, 'Ljava/lang/IllegalAccessError;', `${caller.getExternalName()} cannot access ${field.cls.getExternalName()}.${field.name}`);
+            cb(false);
+            return;
+          }
+          if (!checkMemberLoadingConstraints(thread, loader, caller, field.cls, this.nameAndTypeInfo.descriptor, this.resolution)) {
             cb(false);
             return;
           }
           this.fullFieldName = `${util.descriptor2typestr(field.cls.getInternalName())}/${field.name}`;
           this.field = field;
           cb(true);
-        }
+        });
       } else {
-        thread.throwNewException('Ljava/lang/NoSuchFieldError;', `Field ${this.nameAndTypeInfo.name} does not exist in class ${this.classInfo.cls.getExternalName()}.`);
+        this.resolution.throwFailure(thread, 'Ljava/lang/NoSuchFieldError;', `Field ${this.nameAndTypeInfo.name} does not exist in class ${this.classInfo.cls.getExternalName()}.`);
         cb(false);
       }
     }
