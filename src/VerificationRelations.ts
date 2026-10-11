@@ -51,14 +51,17 @@ export interface VerificationRelationContext {
   readonly target: VerificationMetadataType;
 }
 
-export interface ProtectedReceiverInput {
+export interface ProtectedMemberInput {
   readonly currentClass: VerificationClassMetadata;
-  readonly bootstrapLoader: object;
   readonly owner: VerificationMetadataType;
-  readonly receiver: VerificationMetadataType;
   readonly memberName: string;
   readonly memberDescriptor: string;
   readonly opcode?: number;
+}
+
+export interface ProtectedReceiverInput extends ProtectedMemberInput {
+  readonly bootstrapLoader: object;
+  readonly receiver: VerificationMetadataType;
 }
 
 interface MemberDeclaration {
@@ -173,6 +176,19 @@ function memberDeclaration(owner: VerificationClassMetadata, name: string, descr
   return null;
 }
 
+/** Decide applicability before the gate loads the receiver's metadata. Public,
+ * private, absent and same-package members impose no protected receiver rule.
+ * Their ordinary symbolic resolution must remain lazy (JVMS 5.4.1).
+ */
+export function requiresProtectedReceiver(input: ProtectedMemberInput): boolean {
+  if (input.owner.kind !== 'class' || input.opcode === 0xb2 || input.opcode === 0xb3 || input.opcode === 0xb8) return false;
+  var owner = input.owner.classInfo;
+  if (!superclasses(input.currentClass).some(candidate => candidate.identity === owner.identity)) return false;
+  var declaration = memberDeclaration(owner, input.memberName, input.memberDescriptor);
+  return declaration !== null && (declaration.member.flags & 0x0004) !== 0 &&
+    !sameRuntimePackage(input.currentClass, declaration.owner);
+}
+
 /** Protected instance receivers (JVMS 4.10.1.8/4.10.1.9), using the actual
  * declaration holder's package as in OpenJDK's verifier is_protected_access.
  * An unrelated owner or missing member is left to ordinary execution resolution.
@@ -182,12 +198,8 @@ function memberDeclaration(owner: VerificationClassMetadata, name: string, descr
 export function checkProtectedReceiver(input: ProtectedReceiverInput): VerificationRelationResult {
   if (input.owner.kind === 'array') return accepted();
   if (input.owner.kind !== 'class') return rejected('Protected member owner must be a reference type');
-  if (input.opcode === 0xb2 || input.opcode === 0xb3 || input.opcode === 0xb8) return accepted();
+  if (!requiresProtectedReceiver(input)) return accepted();
   var owner = input.owner.classInfo;
-  if (!superclasses(input.currentClass).some(candidate => candidate.identity === owner.identity)) return accepted();
-  var declaration = memberDeclaration(owner, input.memberName, input.memberDescriptor);
-  if (declaration === null || (declaration.member.flags & 0x0004) === 0 ||
-      sameRuntimePackage(input.currentClass, declaration.owner)) return accepted();
   // Arrays expose a public clone operation even when the constant-pool owner
   // names Object's protected clone method. Do not exempt other Object members.
   if (input.opcode === 0xb6 && input.receiver.kind === 'array' &&

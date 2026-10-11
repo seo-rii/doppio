@@ -3,7 +3,7 @@ import {ClassLoader} from './ClassLoader';
 import {JVMThread} from './threading';
 import {BytecodeFormatError, BytecodeVerificationError, decodeMethodCode} from './BytecodeVerifier';
 import {VerificationObligation, verifyMethodTypes} from './BytecodeTypeVerifier';
-import {VerificationClassMetadata, VerificationMetadataType, checkVerificationObligation} from './VerificationRelations';
+import {VerificationClassMetadata, VerificationMetadataType, checkVerificationObligation, requiresProtectedReceiver} from './VerificationRelations';
 import * as JVMTypes from '../includes/JVMTypes';
 import {setImmediate} from 'browserfs';
 import {error as logError} from './logging';
@@ -94,6 +94,7 @@ export class ClassVerification {
     }
     var currentClass = snapshot(self);
     this.obligations.forEach(entry => {
+      var target: VerificationMetadataType;
       if (entry.value.kind === 'protected') {
         // The protected receiver rule only applies to a symbolic owner in
         // this class's superclass chain. A different descriptor cannot have
@@ -102,10 +103,16 @@ export class ClassVerification {
         var ancestor = currentClass.superclass;
         while (ancestor !== null && ancestor.name !== entry.value.targetType) ancestor = ancestor.superclass;
         if (ancestor === null) return;
+        target = type(entry.value.targetType);
+        // Even a superclass owner may name a public (or missing) member.
+        // Check applicability before loading a receiver that may fail to link
+        // only when this instruction is actually reached.
+        if (!requiresProtectedReceiver({currentClass, owner: target, memberName: entry.value.memberName,
+          memberDescriptor: entry.value.memberDescriptor, opcode: entry.value.opcode})) return;
       }
       var result = checkVerificationObligation(entry.value, {
         currentClass, bootstrapLoader: self.getLoader().bootstrap,
-        source: type(entry.value.sourceType), target: type(entry.value.targetType)
+        source: type(entry.value.sourceType), target: target || type(entry.value.targetType)
       });
       if (!result.ok) throw new BytecodeVerificationError(self.getInternalName() + '.' + entry.method +
         ' at bytecode ' + entry.value.pc + ': ' + result.reason);

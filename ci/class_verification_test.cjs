@@ -282,3 +282,27 @@ test('allocating a superclass with a protected constructor still checks the new 
   assert.match(caller.errors[0].message, /Protected instance receiver is not assignable to the current class/);
   assert.deepEqual(w.requests, []);
 });
+
+test('non-protected superclass members do not eagerly load an unrelated receiver', () => {
+  for (const flags of [1, 2, 0, null]) {
+    for (const receiverLoaded of [false, true]) {
+      const w = world(), receiverName = 'Lmissing/RejectedSubclass;';
+      const object = w.loaded.get('Ljava/lang/Object;');
+      object.getMethods = () => flags === null ? [] : [{name: 'restricted', rawDescriptor: '()V',
+        declaredAccessFlags: flags, accessFlags: new Flags(flags)}];
+      if (receiverLoaded) {
+        const receiver = w.define(receiverName);
+        receiver.getInterfaceClassReferences = () => [{name: 'Lmissing/UnavailableInterface;'}];
+      }
+      assert.deepEqual(memberProbe(w, 'method', 'Ljava/lang/Object;', receiverName).map(value => value.kind), ['protected']);
+      const gate = new ClassVerification(w.cls), caller = thread();
+      let result;
+      gate.verify(caller, success => { result = success; });
+      assert.equal(result, true, 'Member flags ' + flags + ', loaded receiver ' + receiverLoaded);
+      assert.equal(gate.isVerified(), true);
+      assert.deepEqual(caller.errors, []);
+      assert.deepEqual(w.requests, []);
+      assert.equal(w.loaded.has('Lmissing/UnavailableInterface;'), false);
+    }
+  }
+});

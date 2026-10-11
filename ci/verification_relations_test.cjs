@@ -19,7 +19,7 @@ loaded.filename = filename;
 loaded.require = name => assert.fail(`Pure metadata checker attempted to import ${name}`);
 loaded._compile(compiled.outputText, filename);
 const {
-  verifierAssignable, sameRuntimePackage, checkSpecialOwner, checkProtectedReceiver,
+  verifierAssignable, sameRuntimePackage, checkSpecialOwner, checkProtectedReceiver, requiresProtectedReceiver,
   checkDeclaredField, checkVerificationObligation
 } = loaded.exports;
 
@@ -84,7 +84,7 @@ function context(w, sourceType, targetType) {
 test('module has only pure relation exports and no runtime imports', () => {
   assert.deepEqual(Object.keys(loaded.exports).sort(), [
     'checkDeclaredField', 'checkProtectedReceiver', 'checkSpecialOwner', 'checkVerificationObligation',
-    'sameRuntimePackage', 'verifierAssignable'
+    'requiresProtectedReceiver', 'sameRuntimePackage', 'verifierAssignable'
   ]);
 });
 
@@ -264,6 +264,25 @@ test('non-protected, missing, unrelated and same-name-other-loader members defer
   }
   ok(checkProtectedReceiver(protectedInput(w, {memberDescriptor: 'J', receiver: ref(w.base)})));
   ok(checkProtectedReceiver(protectedInput(w, {owner: array(primitive('I')), receiver: array(primitive('I'))})));
+});
+
+test('protected applicability uses member and loader identity without receiver metadata', () => {
+  const w = world();
+  const input = protectedInput(w);
+  delete input.receiver;
+  assert.equal(requiresProtectedReceiver(input), true);
+  for (const memberName of ['publicValue', 'privateValue', 'missing']) {
+    assert.equal(requiresProtectedReceiver({...input, memberName}), false);
+  }
+  for (const opcode of [0xb2, 0xb3, 0xb8]) {
+    assert.equal(requiresProtectedReceiver({...input, opcode}), false);
+  }
+  const peer = metadata('Lbase/Peer;', {definingLoader: w.app, superclass: w.base});
+  const foreignPeer = metadata('Lbase/Peer;', {definingLoader: w.plugin, superclass: w.base});
+  assert.equal(requiresProtectedReceiver({...input, currentClass: peer}), false);
+  assert.equal(requiresProtectedReceiver({...input, currentClass: foreignPeer}), true);
+  const collision = metadata(w.base.name, {definingLoader: w.plugin, fields: [member('value', 'I')]});
+  assert.equal(requiresProtectedReceiver({...input, owner: ref(collision)}), false);
 });
 
 test('nearer declarations hide protected fields and override protected methods', () => {
