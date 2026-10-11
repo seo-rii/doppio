@@ -177,7 +177,15 @@ export default function (): any {
 
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
       if (m.accessFlags.isStatic()) {
-        (<JVMTypes.JVMFunction> (<any> cls.getConstructor(thread))[m.fullSignature])(thread, args, cb);
+        // A reflected declaration may only have hierarchy metadata loaded.
+        // Complete verification and initialization before exposing executable
+        // constructor entries. These failures belong to initialization, not
+        // the target callback that wraps InvocationTargetException.
+        cls.initialize(thread, (initializedClass: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+          if (initializedClass !== null) {
+            (<JVMTypes.JVMFunction> (<any> initializedClass.getConstructor(thread))[m.fullSignature])(thread, args, cb);
+          }
+        }, true);
       } else {
         (<JVMTypes.JVMFunction> (<any> obj)[m.signature])(thread, args, cb);
       }
