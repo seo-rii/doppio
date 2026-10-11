@@ -35,11 +35,20 @@ const verificationUnits = [
 ];
 const verificationUnitCommand = `node --test ${verificationUnits.join(' ')}`;
 const verificationRunnerCommand = 'node ci/java_bytecode_verification_test.mjs --browser';
+const derivationUnits = [
+  'ci/class_derivation_test.cjs',
+  'ci/class_loader_derivation_test.cjs',
+  'ci/java_class_derivation_contract_test.mjs',
+];
+const derivationUnitCommand = `node --test ${derivationUnits.join(' ')}`;
+const derivationRunnerCommand = 'node ci/java_class_derivation_test.mjs --browser';
 const packageScripts = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).scripts;
 for (const [name, command] of [
   ['ci:java-initialization:test', initializationUnitCommand],
   ['ci:bytecode-verification:test', verificationUnitCommand],
   ['ci:bytecode-verification', verificationRunnerCommand],
+  ['ci:class-derivation:test', derivationUnitCommand],
+  ['ci:class-derivation', derivationRunnerCommand],
 ]) {
   if (packageScripts[name] !== command) {
     throw new Error(`${name} must retain the complete phase B command: ${command}`);
@@ -205,6 +214,9 @@ for (const name of [
   'Check phase B bytecode verification contracts',
   'Run Java bytecode verification compatibility',
   'Upload Java bytecode verification ledger',
+  'Check phase B class derivation contracts',
+  'Run Java class derivation compatibility',
+  'Upload Java class derivation ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -255,6 +267,16 @@ for (const [original, replacement] of [
   ["if: always() && steps.java_bytecode_verification.outcome != 'skipped'", "if: always() && steps.java_bytecode_verification.outcome == 'success'"],
   ['id: java_bytecode_verification\n', 'id: missing_bytecode_verification\n'],
   ['path: build/java-bytecode-verification-results.json', 'path: build/missing-verification-ledger.json'],
+  [`run: ${derivationRunnerCommand}\n`, 'run: node ci/java_class_derivation_test.mjs\n'],
+  [`run: ${derivationRunnerCommand}\n`, 'run: node ci/java_class_derivation_test.mjs --native-only\n'],
+  [`run: ${derivationRunnerCommand}\n`, `run: ${derivationRunnerCommand} --native-only\n`],
+  [`run: ${derivationRunnerCommand}\n`, `run: ${derivationRunnerCommand} --release 21\n`],
+  [`run: ${derivationRunnerCommand}\n`, `run: ${derivationRunnerCommand} --release 25\n`],
+  [`run: ${derivationRunnerCommand}\n`, `run: ${derivationRunnerCommand} || true\n`],
+  ["if: always() && steps.java_class_derivation.outcome != 'skipped'", 'if: success()'],
+  ["if: always() && steps.java_class_derivation.outcome != 'skipped'", "if: always() && steps.java_class_derivation.outcome == 'success'"],
+  ['id: java_class_derivation\n', 'id: missing_class_derivation\n'],
+  ['path: build/java-class-derivation-results.json', 'path: build/missing-derivation-ledger.json'],
   ['timeout-minutes: 130\n', 'timeout-minutes: 1300\n'],
   ['run: node ci/java25_main_test.mjs --browser\n', 'run: node ci/java25_main_test.mjs\n'],
   ['run: node ci/java25_main_test.mjs --browser\n', 'run: node ci/java25_main_test.mjs --browser || true\n'],
@@ -294,6 +316,15 @@ for (const omitted of verificationUnits) {
     `bytecode verification contracts omit ${omitted}`,
     { workflow: replaceRequired(realWorkflow, `run: ${verificationUnitCommand}\n`,
       `run: node --test ${verificationUnits.filter(filename => filename !== omitted).join(' ')}\n`) },
+    'exact bounded, fail-closed baseline command or artifact contract'
+  );
+}
+
+for (const omitted of derivationUnits) {
+  expectCheckerFailure(
+    `class derivation contracts omit ${omitted}`,
+    { workflow: replaceRequired(realWorkflow, `run: ${derivationUnitCommand}\n`,
+      `run: node --test ${derivationUnits.filter(filename => filename !== omitted).join(' ')}\n`) },
     'exact bounded, fail-closed baseline command or artifact contract'
   );
 }
@@ -362,10 +393,22 @@ for (const [firstName, secondName] of [
   ['Upload Java class-file structural ledger', 'Check phase B bytecode verification contracts'],
   ['Check phase B bytecode verification contracts', 'Run Java bytecode verification compatibility'],
   ['Run Java bytecode verification compatibility', 'Upload Java bytecode verification ledger'],
-  ['Upload Java bytecode verification ledger', 'Check evolved switch ledger contract'],
+  ['Upload Java bytecode verification ledger', 'Check phase B class derivation contracts'],
 ]) {
   expectCheckerFailure(
     `bytecode verification dependency reversed: ${firstName} before ${secondName}`,
+    { workflow: swapAdjacentSteps(realWorkflow, firstName, secondName) },
+    'remain in dependency order'
+  );
+}
+
+for (const [firstName, secondName] of [
+  ['Check phase B class derivation contracts', 'Run Java class derivation compatibility'],
+  ['Run Java class derivation compatibility', 'Upload Java class derivation ledger'],
+  ['Upload Java class derivation ledger', 'Check evolved switch ledger contract'],
+]) {
+  expectCheckerFailure(
+    `class derivation dependency reversed: ${firstName} before ${secondName}`,
     { workflow: swapAdjacentSteps(realWorkflow, firstName, secondName) },
     'remain in dependency order'
   );

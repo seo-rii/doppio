@@ -248,6 +248,24 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Check phase B class derivation contracts
+        timeout-minutes: 3
+        run: node --test ci/class_derivation_test.cjs ci/class_loader_derivation_test.cjs ci/java_class_derivation_contract_test.mjs
+
+      - name: Run Java class derivation compatibility
+        id: java_class_derivation
+        timeout-minutes: 15
+        run: node ci/java_class_derivation_test.mjs --browser
+
+      - name: Upload Java class derivation ledger
+        if: always() && steps.java_class_derivation.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-class-derivation-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Check evolved switch ledger contract
         timeout-minutes: 1
         run: node --test ci/java_pattern_evolution_contract_test.mjs
