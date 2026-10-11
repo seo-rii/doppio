@@ -16,7 +16,7 @@ interface NestHostResolution {
 // VirtualMachineError interrupts the determination and permits another attempt.
 var nestHosts = new WeakMap<ReferenceClass, NestHostResolution>();
 
-function isVirtualMachineError(failure: JVMTypes.java_lang_Throwable, cls: ReferenceClass): boolean {
+export function isVirtualMachineError(failure: JVMTypes.java_lang_Throwable, cls: ReferenceClass): boolean {
   // Exception taxonomy uses the actual bootstrap identity, not a same-named
   // class from another defining loader. This check must not load another class.
   var vme = cls.getLoader().bootstrap.getLoadedClass('Ljava/lang/VirtualMachineError;');

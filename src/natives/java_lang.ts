@@ -20,7 +20,7 @@ import ClassLoader = Doppio.VM.ClassFile.ClassLoader;
 import * as JVMTypes from '../../includes/JVMTypes';
 import {setImmediate} from 'browserfs';
 import {refreshMemberNameMethodTarget} from '../method_handles';
-import {getKnownNestHost, resolveNestHost} from '../ClassAccess';
+import {getKnownNestHost, resolveNestHost, isVirtualMachineError} from '../ClassAccess';
 
 export default function (): any {
   var debug = logging.debug;
@@ -38,6 +38,57 @@ export default function (): any {
       }
     }
     return null;
+  }
+
+  /** Passive CP resolution preserves linking failure state without verifying,
+   * preparing or initializing the permitted types. Both public Class methods
+   * use this path, including pinned-native original VME propagation/retry. */
+  function permittedSubclassMetadata(thread: JVMThread,
+      owner: ReferenceClassData<JVMTypes.java_lang_Object>,
+      callback: (result: JVMTypes.JVMArray<JVMTypes.java_lang_Class>) => void): void {
+    var references = owner.getPermittedSubclassReferences(),
+      mirrors: JVMTypes.java_lang_Class[] = [],
+      index = 0,
+      advancing = false, advancePending = false, finished = false,
+      next = () => {
+        if (finished) return;
+        // A duplicate CP entry may complete synchronously from its cache.
+        // Flatten continuations instead of recursing once per permitted entry.
+        if (advancing) { advancePending = true; return; }
+        advancing = true;
+        do {
+          advancePending = false;
+          if (index === references.length) {
+            finished = true;
+            callback(util.newArrayFromData<JVMTypes.java_lang_Class>(
+              thread, thread.getBsCl(), '[Ljava/lang/Class;', mirrors));
+            break;
+          }
+          var reference = references[index++];
+          thread.runWithExceptionBoundary<ClassData>(done => {
+            reference.resolveMetadata(thread, owner.getLoader(), owner, success => {
+              // Failed symbolic resolution throws before/alongside its false
+              // callback. Only the actual exception boundary completes failure.
+              if (success) done(reference.cls);
+            }, false);
+          }, (failure, loaded) => {
+            if (failure !== null && isVirtualMachineError(failure, owner)) {
+              finished = true;
+              thread.throwException(failure);
+              return;
+            }
+            if (failure === null && loaded instanceof ReferenceClassData &&
+                (owner.accessFlags.isInterface() ? loaded.getInterfaces().indexOf(owner) !== -1 :
+                  loaded.getSuperClass() === owner)) {
+              mirrors.push(loaded.getClassObject(thread));
+            }
+            next();
+          });
+        } while (advancePending && !finished);
+        advancing = false;
+      };
+    thread.setStatus(ThreadStatus.ASYNC_WAITING);
+    next();
   }
 
   function getThrowableBacktraceFrames(throwable: JVMTypes.java_lang_Throwable): any[] {
@@ -694,37 +745,18 @@ export default function (): any {
       return type.$cls instanceof ReferenceClassData && type.$cls.isRecord();
     }
 
-    public static 'isSealed(Ljava/lang/Class;)Z'(thread: JVMThread, type: JVMTypes.java_lang_Class): boolean {
-      return type.$cls instanceof ReferenceClassData &&
-        type.$cls.getPermittedSubclassNames().length > 0;
+    public static 'isSealed(Ljava/lang/Class;)Z'(thread: JVMThread, type: JVMTypes.java_lang_Class): any {
+      if (!(type.$cls instanceof ReferenceClassData) || !type.$cls.isSealed()) {
+        return false;
+      }
+      permittedSubclassMetadata(thread, type.$cls, () => thread.asyncReturn(1));
     }
 
     public static 'getPermittedSubclasses(Ljava/lang/Class;)[Ljava/lang/Class;'(thread: JVMThread, type: JVMTypes.java_lang_Class): any {
-      if (!(type.$cls instanceof ReferenceClassData)) {
+      if (!(type.$cls instanceof ReferenceClassData) || !type.$cls.isSealed()) {
         return null;
       }
-      var permittedSubclassNames = type.$cls.getPermittedSubclassNames();
-      if (permittedSubclassNames.length === 0) {
-        return null;
-      }
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      var loader = type.$cls.getLoader(),
-        permittedSubclasses: JVMTypes.java_lang_Class[] = [],
-        i = 0,
-        resolveNext = () => {
-          if (i >= permittedSubclassNames.length) {
-            thread.asyncReturn(util.newArrayFromData<JVMTypes.java_lang_Class>(thread, thread.getBsCl(), '[Ljava/lang/Class;', permittedSubclasses));
-            return;
-          }
-          loader.resolveClass(thread, permittedSubclassNames[i++], (permittedSubclass: ClassData) => {
-            if (permittedSubclass !== null) {
-              permittedSubclasses.push(permittedSubclass.getClassObject(thread));
-              resolveNext();
-            }
-          });
-        };
-      resolveNext();
-      return null;
+      permittedSubclassMetadata(thread, type.$cls, result => thread.asyncReturn(result));
     }
 
     public static 'getPackageName(Ljava/lang/Class;)Ljava/lang/String;'(thread: JVMThread, type: JVMTypes.java_lang_Class): JVMTypes.java_lang_String {

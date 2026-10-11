@@ -1506,12 +1506,13 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     return this.getAttribute('PermittedSubclasses') !== null;
   }
 
-  public getPermittedSubclassNames(): string[] {
+  public getPermittedSubclassReferences(): ClassReference[] {
     var subclasses = <PermittedSubclasses> this.getAttribute('PermittedSubclasses');
-    if (subclasses === null) {
-      return [];
-    }
-    return subclasses.classes.map((clsRef: ClassReference) => clsRef.name);
+    return subclasses === null ? [] : subclasses.classes.slice();
+  }
+
+  public getPermittedSubclassNames(): string[] {
+    return this.getPermittedSubclassReferences().map((clsRef: ClassReference) => clsRef.name);
   }
 
   public isRecord(): boolean {
