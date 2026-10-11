@@ -2,13 +2,19 @@ import {descriptor2typestr} from './util';
 import ByteStream from './ByteStream';
 import {ConstantPool, ClassReference, ConstUTF8, IConstantPoolItem, MethodHandle, NameAndTypeInfo} from './ConstantPool';
 import {StackMapTableEntryType, ConstantPoolItemType} from './enums';
-import assert from './assert';
-import global from './global';
-
-declare var RELEASE: boolean;
-
+import {validateUnqualifiedName, validateFieldDescriptor} from './classfile_validation';
 export interface IAttributeClass {
-  parse(byteStream: ByteStream, constantPool: ConstantPool, attrLen: number, name: string): IAttribute;
+  parse(byteStream: ByteStream, constantPool: ConstantPool, attrLen: number, name: string, majorVersion?: number): IAttribute;
+}
+
+export type AttributeContext = 'class' | 'field' | 'method' | 'code' | 'record';
+
+function attributeConstant(constantPool: ConstantPool, index: number, type: ConstantPoolItemType): IConstantPoolItem {
+  var item = constantPool.get(index);
+  if (item.getType() !== type) {
+    throw new Error('Attribute constant pool entry ' + index + ' must be ' + ConstantPoolItemType[type]);
+  }
+  return item;
 }
 
 export interface IAttribute {
@@ -52,7 +58,7 @@ export class ExceptionHandler implements IAttribute {
       endPC = bytesArray.getUint16(),
       handlerPC = bytesArray.getUint16(),
       cti = bytesArray.getUint16(),
-      catchType = cti === 0 ? "<any>" : (<ClassReference> constantPool.get(cti)).name;
+      catchType = cti === 0 ? "<any>" : (<ClassReference> attributeConstant(constantPool, cti, ConstantPoolItemType.CLASS)).name;
     return new this(startPC, endPC, handlerPC, catchType);
   }
 }
@@ -80,21 +86,29 @@ export class Code implements IAttribute {
     return this.maxStack;
   }
 
-  public static parse(byteStream: ByteStream, constantPool: ConstantPool): IAttribute {
+  public getMaxLocals(): number {
+    return this.maxLocals;
+  }
+
+  public static parse(byteStream: ByteStream, constantPool: ConstantPool, attrLen?: number, name?: string, majorVersion?: number): IAttribute {
     var maxStack = byteStream.getUint16(),
       maxLocals = byteStream.getUint16(),
       codeLen = byteStream.getUint32();
-    if (codeLen === 0) {
-      throw "Error parsing code: Code length is zero";
+    if (codeLen === 0 || codeLen >= 65536) {
+      throw new Error('Code length must be between 1 and 65535: ' + codeLen);
     }
     var code = byteStream.slice(codeLen).getBuffer(),
       exceptLen = byteStream.getUint16(),
       exceptionHandlers: ExceptionHandler[] = [];
     for (var i = 0; i < exceptLen; i++) {
-      exceptionHandlers.push(<ExceptionHandler> ExceptionHandler.parse(byteStream, constantPool));
+      var handler = <ExceptionHandler> ExceptionHandler.parse(byteStream, constantPool);
+      if (handler.startPC >= handler.endPC || handler.endPC > codeLen || handler.handlerPC >= codeLen) {
+        throw new Error('Invalid Code exception handler range');
+      }
+      exceptionHandlers.push(handler);
     }
     // yes, there are even attrs on attrs. BWOM... BWOM...
-    var attrs = makeAttributes(byteStream, constantPool);
+    var attrs = makeAttributes(byteStream, constantPool, 'code', majorVersion);
     return new this(maxStack, maxLocals, exceptionHandlers, attrs, code);
   }
 
@@ -175,7 +189,7 @@ export class SourceFile implements IAttribute {
   }
 
   public static parse(byteStream: ByteStream, constantPool: ConstantPool): IAttribute {
-    return new this((<ConstUTF8> constantPool.get(byteStream.getUint16())).value);
+    return new this((<ConstUTF8> attributeConstant(constantPool, byteStream.getUint16(), ConstantPoolItemType.UTF8)).value);
   }
 }
 
@@ -186,7 +200,16 @@ export interface IStackMapTableEntry {
   locals?: string[];
   numStackItems?: number;
   stack?: string[];
+  localsTypes?: IVerificationTypeInfo[];
+  stackTypes?: IVerificationTypeInfo[];
   k?: number;
+}
+
+export interface IVerificationTypeInfo {
+  tag: number;
+  className?: string;
+  cpIndex?: number;
+  newOffset?: number;
 }
 
 export class StackMapTable implements IAttribute {
@@ -200,6 +223,10 @@ export class StackMapTable implements IAttribute {
     return 'StackMapTable';
   }
 
+  public getEntries(): IStackMapTableEntry[] {
+    return this.entries;
+  }
+
   public static parse(byteStream: ByteStream, constantPool: ConstantPool): IAttribute {
     var numEntries = byteStream.getUint16(),
       entries: IStackMapTableEntry[] = [];
@@ -210,26 +237,31 @@ export class StackMapTable implements IAttribute {
   }
 
   private static parseEntry(byteStream: ByteStream, constantPool: ConstantPool): IStackMapTableEntry {
-    var frameType = byteStream.getUint8(), locals: string[],
-      offsetDelta: number, i: number;
+    var frameType = byteStream.getUint8(), locals: IVerificationTypeInfo[],
+      offsetDelta: number, i: number, stackItem: IVerificationTypeInfo;
     if (frameType < 64) {
       return {
         type: StackMapTableEntryType.SAME_FRAME,
         offsetDelta: frameType
       };
     } else if (frameType < 128) {
+      stackItem = this.parseVerificationTypeInfo(byteStream, constantPool);
       return {
         type: StackMapTableEntryType.SAME_LOCALS_1_STACK_ITEM_FRAME,
         offsetDelta: frameType - 64,
-        stack: [this.parseVerificationTypeInfo(byteStream, constantPool)]
+        stack: [this.verificationTypeName(stackItem)],
+        stackTypes: [stackItem]
       };
     } else if (frameType < 247) {
-      // reserved for future use
+      throw new Error('Reserved StackMapTable frame type: ' + frameType);
     } else if (frameType === 247) {
+      offsetDelta = byteStream.getUint16();
+      stackItem = this.parseVerificationTypeInfo(byteStream, constantPool);
       return {
         type: StackMapTableEntryType.SAME_LOCALS_1_STACK_ITEM_FRAME_EXTENDED,
-        offsetDelta: byteStream.getUint16(),
-        stack: [this.parseVerificationTypeInfo(byteStream, constantPool)]
+        offsetDelta: offsetDelta,
+        stack: [this.verificationTypeName(stackItem)],
+        stackTypes: [stackItem]
       };
     } else if (frameType < 251) {
       return {
@@ -251,7 +283,8 @@ export class StackMapTable implements IAttribute {
       return {
         type: StackMapTableEntryType.APPEND_FRAME,
         offsetDelta: offsetDelta,
-        locals: locals
+        locals: locals.map(this.verificationTypeName),
+        localsTypes: locals
       };
     } else if (frameType === 255) {
       offsetDelta = byteStream.getUint16();
@@ -261,7 +294,7 @@ export class StackMapTable implements IAttribute {
         locals.push(this.parseVerificationTypeInfo(byteStream, constantPool));
       }
       var numStackItems = byteStream.getUint16();
-      var stack: string[] = [];
+      var stack: IVerificationTypeInfo[] = [];
       for (i = 0; i < numStackItems; i++) {
         stack.push(this.parseVerificationTypeInfo(byteStream, constantPool));
       }
@@ -269,24 +302,35 @@ export class StackMapTable implements IAttribute {
         type: StackMapTableEntryType.FULL_FRAME,
         offsetDelta: offsetDelta,
         numLocals: numLocals,
-        locals: locals,
+        locals: locals.map(this.verificationTypeName),
+        localsTypes: locals,
         numStackItems: numStackItems,
-        stack: stack
+        stack: stack.map(this.verificationTypeName),
+        stackTypes: stack
       };
     }
   }
 
-  private static parseVerificationTypeInfo(byteStream: ByteStream, constantPool: ConstantPool): string {
-    var tag = byteStream.getUint8();
-    if (tag === 7) {
-      var cls = (<ClassReference> constantPool.get(byteStream.getUint16())).name;
-      return 'class ' + (/\w/.test(cls[0]) ? descriptor2typestr(cls) : "\"" + cls + "\"");
-    } else if (tag === 8) {
-      return 'uninitialized ' + byteStream.getUint16();
-    } else {
-      var tagToType = ['bogus', 'int', 'float', 'double', 'long', 'null', 'this', 'object', 'uninitialized'];
-      return tagToType[tag];
+  private static parseVerificationTypeInfo(byteStream: ByteStream, constantPool: ConstantPool): IVerificationTypeInfo {
+    var info: IVerificationTypeInfo = {tag: byteStream.getUint8()};
+    if (info.tag === 7) {
+      info.cpIndex = byteStream.getUint16();
+      info.className = (<ClassReference> attributeConstant(constantPool, info.cpIndex, ConstantPoolItemType.CLASS)).name;
+    } else if (info.tag === 8) {
+      info.newOffset = byteStream.getUint16();
+    } else if (info.tag > 8) {
+      throw new Error('Invalid StackMapTable verification type: ' + info.tag);
     }
+    return info;
+  }
+
+  private static verificationTypeName(info: IVerificationTypeInfo): string {
+    if (info.tag === 7) {
+      return 'class ' + (/\w/.test(info.className[0]) ? descriptor2typestr(info.className) : '"' + info.className + '"');
+    } else if (info.tag === 8) {
+      return 'uninitialized ' + info.newOffset;
+    }
+    return ['bogus', 'int', 'float', 'double', 'long', 'null', 'this'][info.tag];
   }
 }
 
@@ -322,8 +366,8 @@ export class LocalVariableTable implements IAttribute {
     return {
       startPC: bytes_array.getUint16(),
       length: bytes_array.getUint16(),
-      name: (<ConstUTF8> constant_pool.get(bytes_array.getUint16())).value,
-      descriptor: (<ConstUTF8> constant_pool.get(bytes_array.getUint16())).value,
+      name: (<ConstUTF8> attributeConstant(constant_pool, bytes_array.getUint16(), ConstantPoolItemType.UTF8)).value,
+      descriptor: (<ConstUTF8> attributeConstant(constant_pool, bytes_array.getUint16(), ConstantPoolItemType.UTF8)).value,
       ref: bytes_array.getUint16()
     };
   }
@@ -359,8 +403,8 @@ export class LocalVariableTypeTable implements IAttribute {
     return {
       startPC: byteStream.getUint16(),
       length: byteStream.getUint16(),
-      name: (<ConstUTF8> constantPool.get(byteStream.getUint16())).value,
-      signature: (<ConstUTF8> constantPool.get(byteStream.getUint16())).value,
+      name: (<ConstUTF8> attributeConstant(constantPool, byteStream.getUint16(), ConstantPoolItemType.UTF8)).value,
+      signature: (<ConstUTF8> attributeConstant(constantPool, byteStream.getUint16(), ConstantPoolItemType.UTF8)).value,
       index: byteStream.getUint16()
     };
   }
@@ -383,7 +427,7 @@ export class Exceptions implements IAttribute {
     for (var i = 0; i < numExceptions; i++) {
       excRefs.push(byteStream.getUint16());
     }
-    return new this(excRefs.map((ref: number) => (<ClassReference> constantPool.get(ref)).name));
+    return new this(excRefs.map((ref: number) => (<ClassReference> attributeConstant(constantPool, ref, ConstantPoolItemType.CLASS)).name));
   }
 }
 
@@ -408,12 +452,20 @@ export class InnerClasses implements IAttribute {
   }
 
   public static parseClass(byteStream: ByteStream, constantPool: ConstantPool): IInnerClassInfo {
-    return {
+    var info = {
       innerInfoIndex: byteStream.getUint16(),
       outerInfoIndex: byteStream.getUint16(),
       innerNameIndex: byteStream.getUint16(),
       innerAccessFlags: byteStream.getUint16()
     };
+    attributeConstant(constantPool, info.innerInfoIndex, ConstantPoolItemType.CLASS);
+    if (info.outerInfoIndex !== 0) {
+      attributeConstant(constantPool, info.outerInfoIndex, ConstantPoolItemType.CLASS);
+    }
+    if (info.innerNameIndex !== 0) {
+      attributeConstant(constantPool, info.innerNameIndex, ConstantPoolItemType.UTF8);
+    }
+    return info;
   }
 }
 
@@ -429,8 +481,12 @@ export class ConstantValue implements IAttribute {
   }
 
   public static parse(bytes_array: ByteStream, constant_pool: ConstantPool): IAttribute {
-    var ref = bytes_array.getUint16();
-    return new this(constant_pool.get(ref));
+    var ref = bytes_array.getUint16(), item = constant_pool.get(ref), type = item.getType();
+    if (type !== ConstantPoolItemType.INTEGER && type !== ConstantPoolItemType.FLOAT &&
+        type !== ConstantPoolItemType.LONG && type !== ConstantPoolItemType.DOUBLE && type !== ConstantPoolItemType.STRING) {
+      throw new Error('Invalid ConstantValue constant pool entry: ' + ref);
+    }
+    return new this(item);
   }
 }
 
@@ -464,7 +520,7 @@ export class Signature implements IAttribute {
   }
 
   public static parse(byteStream: ByteStream, constantPool: ConstantPool): IAttribute {
-    return new this((<ConstUTF8> constantPool.get(byteStream.getUint16())).value);
+    return new this((<ConstUTF8> attributeConstant(constantPool, byteStream.getUint16(), ConstantPoolItemType.UTF8)).value);
   }
 }
 
@@ -494,16 +550,19 @@ export class RuntimeVisibleAnnotations implements IAttribute {
     // compiled.
     // And the 'CallerSensitive' annotation, which specifies that the function's
     // behavior differs depending on the caller.
+    var rawBytes = byteStream.read(attrLen),
+      annotationBytes = new ByteStream(rawBytes),
+      isHidden = false, isCompiled = false, isCallerSensitive = false;
 
     /**
      * Skip the current RuntimeVisibleAnnotation.
      */
     function skipAnnotation() {
-      byteStream.skip(2); // type index
-      var numValuePairs = byteStream.getUint16(),
+      annotationBytes.skip(2); // type index
+      var numValuePairs = annotationBytes.getUint16(),
         i: number;
       for (i = 0; i < numValuePairs; i++) {
-        byteStream.skip(2); // element name index
+        annotationBytes.skip(2); // element name index
         skipElementValue();
       }
     }
@@ -512,11 +571,11 @@ export class RuntimeVisibleAnnotations implements IAttribute {
      * Skip this particular element value.
      */
     function skipElementValue() {
-      var tag = String.fromCharCode(byteStream.getUint8());
+      var tag = String.fromCharCode(annotationBytes.getUint8());
       switch(tag) {
         case 'e':
           // Fall-through.
-          byteStream.skip(2);
+          annotationBytes.skip(2);
         case 'Z':
         case 'B':
         case 'C':
@@ -527,42 +586,47 @@ export class RuntimeVisibleAnnotations implements IAttribute {
         case 'D':
         case 's':
         case 'c':
-          byteStream.skip(2);
+          annotationBytes.skip(2);
           break;
         case '@':
           skipAnnotation();
           break;
         case '[':
-          var numValues = byteStream.getUint16(), i: number;
+          var numValues = annotationBytes.getUint16(), i: number;
           for (i = 0; i < numValues; i++) {
             skipElementValue();
           }
           break;
-
+        default:
+          throw new Error('Invalid annotation element value tag: ' + tag);
       }
     }
 
-    var rawBytes = byteStream.read(attrLen),
-      isHidden = false, isCompiled = false, isCallerSensitive = false;
-    byteStream.seek(byteStream.pos() - rawBytes.length);
-    var numAttributes = byteStream.getUint16(), i: number;
-    for (i = 0; i < numAttributes; i++) {
-      var typeName = (<ConstUTF8> constantPool.get(byteStream.getUint16()));
-      // Rewind.
-      byteStream.seek(byteStream.pos() - 2);
-      skipAnnotation();
-      switch (typeName.value) {
-        case 'Ljava/lang/invoke/LambdaForm$Hidden;':
-          isHidden = true;
-          break;
-        case 'Lsig/sun/reflect/CallerSensitive;':
-        case 'Ljdk/internal/reflect/CallerSensitive;':
-          isCallerSensitive = true;
-          break;
-        case 'Lsig/java/lang/invoke/LambdaForm$Compiled':
-          isCompiled = true;
-          break;
+    try {
+      var numAttributes = annotationBytes.getUint16(), i: number;
+      for (i = 0; i < numAttributes; i++) {
+        var typeName = <ConstUTF8> attributeConstant(constantPool, annotationBytes.getUint16(), ConstantPoolItemType.UTF8);
+        // Rewind the isolated marker scan, never the class-file stream.
+        annotationBytes.seek(annotationBytes.pos() - 2);
+        skipAnnotation();
+        switch (typeName.value) {
+          case 'Ljava/lang/invoke/LambdaForm$Hidden;':
+            isHidden = true;
+            break;
+          case 'Lsig/sun/reflect/CallerSensitive;':
+          case 'Ljdk/internal/reflect/CallerSensitive;':
+            isCallerSensitive = true;
+            break;
+          case 'Lsig/java/lang/invoke/LambdaForm$Compiled':
+            isCompiled = true;
+            break;
+        }
       }
+    } catch (e) {
+      // Annotation structure is interpreted by Java reflection, which owns
+      // AnnotationFormatError. Malformed opaque metadata must not become a
+      // load-time ClassFormatError just because we inspect VM marker names.
+      isHidden = isCompiled = isCallerSensitive = false;
     }
 
     return new this(rawBytes, isHidden, isCallerSensitive, isCompiled);
@@ -732,11 +796,10 @@ export class EnclosingMethod implements IAttribute {
   }
 
   public static parse(byteStream: ByteStream, constantPool: ConstantPool): IAttribute {
-    var encClass = (<ClassReference> constantPool.get(byteStream.getUint16())),
+    var encClass = (<ClassReference> attributeConstant(constantPool, byteStream.getUint16(), ConstantPoolItemType.CLASS)),
       methodRef = byteStream.getUint16(), encMethod: NameAndTypeInfo = null;
     if (methodRef > 0) {
-      encMethod = <NameAndTypeInfo> constantPool.get(methodRef);
-      assert(encMethod.getType() === ConstantPoolItemType.NAME_AND_TYPE, "Enclosing method must be a name and type info.");
+      encMethod = <NameAndTypeInfo> attributeConstant(constantPool, methodRef, ConstantPoolItemType.NAME_AND_TYPE);
     }
     return new this(encClass, encMethod);
   }
@@ -756,11 +819,26 @@ export class BootstrapMethods implements IAttribute {
     var numBootstrapMethods = byteStream.getUint16(),
       bootstrapMethods: Array<[MethodHandle, IConstantPoolItem[]]> = [];
     for (var i = 0; i < numBootstrapMethods; i++) {
-      var methodHandle = <MethodHandle> constantPool.get(byteStream.getUint16());
+      var methodHandle = <MethodHandle> attributeConstant(constantPool, byteStream.getUint16(), ConstantPoolItemType.METHOD_HANDLE);
       var numArgs = byteStream.getUint16();
       var args: IConstantPoolItem[] = [];
       for (var j = 0; j < numArgs; j++) {
-        args.push(constantPool.get(byteStream.getUint16()));
+        var argument = constantPool.get(byteStream.getUint16());
+        switch (argument.getType()) {
+          case ConstantPoolItemType.INTEGER:
+          case ConstantPoolItemType.FLOAT:
+          case ConstantPoolItemType.LONG:
+          case ConstantPoolItemType.DOUBLE:
+          case ConstantPoolItemType.CLASS:
+          case ConstantPoolItemType.STRING:
+          case ConstantPoolItemType.METHOD_HANDLE:
+          case ConstantPoolItemType.METHOD_TYPE:
+          case ConstantPoolItemType.DYNAMIC:
+            args.push(argument);
+            break;
+          default:
+            throw new Error('Invalid BootstrapMethods argument constant pool type');
+        }
       }
       bootstrapMethods.push([methodHandle, args]);
     }
@@ -780,7 +858,7 @@ export class NestHost implements IAttribute {
   }
 
   public static parse(byteStream: ByteStream, constantPool: ConstantPool): IAttribute {
-    return new this(<ClassReference> constantPool.get(byteStream.getUint16()));
+    return new this(<ClassReference> attributeConstant(constantPool, byteStream.getUint16(), ConstantPoolItemType.CLASS));
   }
 }
 
@@ -799,7 +877,7 @@ export class NestMembers implements IAttribute {
     var numClasses = byteStream.getUint16(),
       classes: ClassReference[] = [];
     for (var i = 0; i < numClasses; i++) {
-      classes.push(<ClassReference> constantPool.get(byteStream.getUint16()));
+      classes.push(<ClassReference> attributeConstant(constantPool, byteStream.getUint16(), ConstantPoolItemType.CLASS));
     }
     return new this(classes);
   }
@@ -820,7 +898,7 @@ export class PermittedSubclasses implements IAttribute {
     var numClasses = byteStream.getUint16(),
       classes: ClassReference[] = [];
     for (var i = 0; i < numClasses; i++) {
-      classes.push(<ClassReference> constantPool.get(byteStream.getUint16()));
+      classes.push(<ClassReference> attributeConstant(constantPool, byteStream.getUint16(), ConstantPoolItemType.CLASS));
     }
     return new this(classes);
   }
@@ -837,14 +915,18 @@ export class RecordAttribute implements IAttribute {
     return 'Record';
   }
 
-  public static parse(byteStream: ByteStream, constantPool: ConstantPool): IAttribute {
+  public static parse(byteStream: ByteStream, constantPool: ConstantPool, attrLen?: number, name?: string, majorVersion?: number): IAttribute {
     var numComponents = byteStream.getUint16(),
       components: IRecordComponentInfo[] = [];
     for (var i = 0; i < numComponents; i++) {
+      var componentName = (<ConstUTF8> attributeConstant(constantPool, byteStream.getUint16(), ConstantPoolItemType.UTF8)).value,
+        descriptor = (<ConstUTF8> attributeConstant(constantPool, byteStream.getUint16(), ConstantPoolItemType.UTF8)).value;
+      validateUnqualifiedName(componentName);
+      validateFieldDescriptor(descriptor);
       components.push({
-        name: (<ConstUTF8> constantPool.get(byteStream.getUint16())).value,
-        descriptor: (<ConstUTF8> constantPool.get(byteStream.getUint16())).value,
-        attrs: makeAttributes(byteStream, constantPool)
+        name: componentName,
+        descriptor: descriptor,
+        attrs: makeAttributes(byteStream, constantPool, 'record', majorVersion)
       });
     }
     return new this(components);
@@ -883,7 +965,7 @@ export class MethodParameters implements IAttribute {
     for (var i = 0; i < parameterCount; i++) {
       var nameIndex = byteStream.getUint16();
       parameters.push({
-        name: nameIndex === 0 ? null : (<ConstUTF8> constantPool.get(nameIndex)).value,
+        name: nameIndex === 0 ? null : (<ConstUTF8> attributeConstant(constantPool, nameIndex, ConstantPoolItemType.UTF8)).value,
         accessFlags: byteStream.getUint16()
       });
     }
@@ -891,48 +973,82 @@ export class MethodParameters implements IAttribute {
   }
 }
 
-export function makeAttributes(byteStream: ByteStream, constantPool: ConstantPool): IAttribute[]{
-  var attrTypes: { [name: string]: IAttributeClass } = {
-    'Code': Code,
-    'LineNumberTable': LineNumberTable,
-    'SourceFile': SourceFile,
-    'StackMapTable': StackMapTable,
-    'LocalVariableTable': LocalVariableTable,
-    'LocalVariableTypeTable': LocalVariableTypeTable,
-    'ConstantValue': ConstantValue,
-    'Exceptions': Exceptions,
-    'InnerClasses': InnerClasses,
-    'Synthetic': Synthetic,
-    'Deprecated': Deprecated,
-    'Signature': Signature,
-    'RuntimeVisibleAnnotations': RuntimeVisibleAnnotations,
-    'RuntimeVisibleTypeAnnotations': RuntimeVisibleTypeAnnotations,
-    'AnnotationDefault': AnnotationDefault,
-    'EnclosingMethod': EnclosingMethod,
-    'BootstrapMethods': BootstrapMethods,
-    'NestHost': NestHost,
-    'NestMembers': NestMembers,
-    'PermittedSubclasses': PermittedSubclasses,
-    'Record': RecordAttribute,
-    'RuntimeVisibleParameterAnnotations': RuntimeVisibleParameterAnnotations,
-    'MethodParameters': MethodParameters
-  };
-  var numAttrs = byteStream.getUint16();
-  var attrs : IAttribute[] = [];
+/** Metadata retained structurally but never exposed as runtime-visible annotations. */
+class OpaqueAttribute implements IAttribute {
+  constructor(private name: string, public rawBytes: Buffer) {}
+
+  public getName(): string {
+    return this.name;
+  }
+
+  public static parse(byteStream: ByteStream, constantPool: ConstantPool, attrLen: number, name: string): IAttribute {
+    return new this(name, byteStream.read(attrLen));
+  }
+}
+
+// Attribute recognition is location- and version-dependent (JVMS 4.7).
+// Unknown names, including future standardized attributes, remain ignorable.
+var attributeTypes: {[name: string]: {parser: IAttributeClass; contexts: AttributeContext[]; majorVersion: number; multiple?: boolean; multipleInCode?: boolean}} = {
+  'Code': {parser: Code, contexts: ['method'], majorVersion: 45},
+  'LineNumberTable': {parser: LineNumberTable, contexts: ['code'], majorVersion: 45, multiple: true},
+  'SourceFile': {parser: SourceFile, contexts: ['class'], majorVersion: 45},
+  'StackMapTable': {parser: StackMapTable, contexts: ['code'], majorVersion: 50},
+  'LocalVariableTable': {parser: LocalVariableTable, contexts: ['code'], majorVersion: 45, multiple: true},
+  'LocalVariableTypeTable': {parser: LocalVariableTypeTable, contexts: ['code'], majorVersion: 49, multiple: true},
+  'ConstantValue': {parser: ConstantValue, contexts: ['field'], majorVersion: 45},
+  'Exceptions': {parser: Exceptions, contexts: ['method'], majorVersion: 45},
+  'InnerClasses': {parser: InnerClasses, contexts: ['class'], majorVersion: 45},
+  'Synthetic': {parser: Synthetic, contexts: ['class', 'field', 'method'], majorVersion: 45, multiple: true},
+  'Deprecated': {parser: Deprecated, contexts: ['class', 'field', 'method'], majorVersion: 45, multiple: true},
+  'Signature': {parser: Signature, contexts: ['class', 'field', 'method', 'record'], majorVersion: 49},
+  'RuntimeVisibleAnnotations': {parser: RuntimeVisibleAnnotations, contexts: ['class', 'field', 'method', 'record'], majorVersion: 49},
+  'RuntimeInvisibleAnnotations': {parser: OpaqueAttribute, contexts: ['class', 'field', 'method', 'record'], majorVersion: 49},
+  // Code-level type annotations are not interpreted by class loading. Preserve
+  // their bytes without imposing a declaration-level singleton check: both
+  // native controls accept repeated opaque Code-level annotation attributes.
+  'RuntimeVisibleTypeAnnotations': {parser: RuntimeVisibleTypeAnnotations, contexts: ['class', 'field', 'method', 'code', 'record'], majorVersion: 52, multipleInCode: true},
+  'RuntimeInvisibleTypeAnnotations': {parser: OpaqueAttribute, contexts: ['class', 'field', 'method', 'code', 'record'], majorVersion: 52, multipleInCode: true},
+  'AnnotationDefault': {parser: AnnotationDefault, contexts: ['method'], majorVersion: 49},
+  'EnclosingMethod': {parser: EnclosingMethod, contexts: ['class'], majorVersion: 49},
+  'BootstrapMethods': {parser: BootstrapMethods, contexts: ['class'], majorVersion: 51},
+  'NestHost': {parser: NestHost, contexts: ['class'], majorVersion: 55},
+  'NestMembers': {parser: NestMembers, contexts: ['class'], majorVersion: 55},
+  'PermittedSubclasses': {parser: PermittedSubclasses, contexts: ['class'], majorVersion: 61},
+  'Record': {parser: RecordAttribute, contexts: ['class'], majorVersion: 60},
+  'RuntimeVisibleParameterAnnotations': {parser: RuntimeVisibleParameterAnnotations, contexts: ['method'], majorVersion: 49},
+  'RuntimeInvisibleParameterAnnotations': {parser: OpaqueAttribute, contexts: ['method'], majorVersion: 49},
+  'MethodParameters': {parser: MethodParameters, contexts: ['method'], majorVersion: 52}
+};
+
+export function makeAttributes(byteStream: ByteStream, constantPool: ConstantPool, context?: AttributeContext, majorVersion?: number, isStaticField?: boolean): IAttribute[]{
+  var numAttrs = byteStream.getUint16(),
+    attrs: IAttribute[] = [],
+    seen: {[name: string]: boolean} = Object.create(null);
   for (var i = 0; i < numAttrs; i++) {
-    var name = (<ConstUTF8> constantPool.get(byteStream.getUint16())).value;
-    var attrLen = byteStream.getUint32();
-    if (attrTypes[name] != null) {
-      var oldLen = byteStream.size();
-      var attr = attrTypes[name].parse(byteStream, constantPool, attrLen, name);
-      var newLen = byteStream.size();
-      assert((oldLen - newLen) <= attrLen, `A parsed attribute read beyond its data! ${name}`);
-      if (oldLen - newLen !== attrLen) {
-        byteStream.skip(attrLen - oldLen + newLen);
+    var name = (<ConstUTF8> attributeConstant(constantPool, byteStream.getUint16(), ConstantPoolItemType.UTF8)).value,
+      attrLen = byteStream.getUint32(),
+      type = Object.prototype.hasOwnProperty.call(attributeTypes, name) ? attributeTypes[name] : null;
+    // JVMS 4.7.2 requires ignoring ConstantValue for instance fields. Its
+    // payload (including duplicates) is opaque, but its envelope is bounded.
+    if (type !== null && !(name === 'ConstantValue' && context === 'field' && isStaticField === false) &&
+        (context === undefined || type.contexts.indexOf(context) !== -1) &&
+        (majorVersion === undefined || majorVersion >= type.majorVersion)) {
+      var payload = byteStream.slice(attrLen);
+      if (seen[name] && !type.multiple && !(context === 'code' && type.multipleInCode)) {
+        throw new Error('Duplicate ' + name + ' attribute');
+      }
+      seen[name] = true;
+      if ((name === 'NestHost' && seen['NestMembers']) || (name === 'NestMembers' && seen['NestHost'])) {
+        throw new Error('A class cannot have both NestHost and NestMembers attributes');
+      }
+      var attr = type.parser.parse(payload, constantPool, attrLen, name, majorVersion);
+      if (payload.hasBytes()) {
+        throw new Error('Invalid ' + name + ' attribute length: ' + payload.size() + ' unused bytes');
       }
       attrs.push(attr);
     } else {
-      // we must silently ignore other attrs
+      // Skip only a bounded payload: a truncated unknown attribute is still
+      // a malformed class-file envelope, not a new optional feature.
       byteStream.skip(attrLen);
     }
   }

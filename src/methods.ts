@@ -1,17 +1,18 @@
 import {Flags, descriptor2typestr, forwardResult, initString, reescapeJVMName, getTypes} from './util';
 import * as util from './util';
 import ByteStream from './ByteStream';
-import {IAttribute, makeAttributes, Signature, RuntimeVisibleAnnotations, Code, Exceptions, InnerClasses} from './attributes';
+import {IAttribute, AttributeContext, makeAttributes, Signature, RuntimeVisibleAnnotations, Code, ConstantValue, Exceptions, InnerClasses} from './attributes';
 import {ConstantPool, ConstUTF8, ClassReference, MethodReference, InterfaceMethodReference} from './ConstantPool';
 import {ReferenceClassData, ArrayClassData, ClassData} from './ClassData';
 import {JVMThread, annotateOpcode, BytecodeStackFrame} from './threading';
 import assert from './assert';
-import {ThreadStatus, OpcodeLayoutType, OpCode, OpcodeLayouts, MethodHandleReferenceKind} from './enums';
+import {ThreadStatus, OpcodeLayoutType, OpCode, OpcodeLayouts, MethodHandleReferenceKind, ConstantPoolItemType} from './enums';
 import Monitor from './Monitor';
 import StringOutputStream from './StringOutputStream';
 import * as JVMTypes from '../includes/JVMTypes';
 import global from './global';
 import {JitInfo, opJitInfo} from './jit';
+import {validateFieldDescriptor, validateMethodDescriptor, validateUnqualifiedName, validateVisibility} from './classfile_validation';
 
 declare var RELEASE: boolean;
 if (typeof RELEASE === 'undefined') global.RELEASE = false;
@@ -344,13 +345,14 @@ export class AbstractMethodField {
   /**
    * Constructs a field or method object from raw class data.
    */
-  constructor(cls: ReferenceClassData<JVMTypes.java_lang_Object>, constantPool: ConstantPool, slot: number, byteStream: ByteStream) {
+  constructor(cls: ReferenceClassData<JVMTypes.java_lang_Object>, constantPool: ConstantPool, slot: number, byteStream: ByteStream, context: AttributeContext) {
     this.cls = cls;
     this.slot = slot;
     this.accessFlags = new Flags(byteStream.getUint16());
-    this.name = (<ConstUTF8> constantPool.get(byteStream.getUint16())).value;
-    this.rawDescriptor = (<ConstUTF8> constantPool.get(byteStream.getUint16())).value;
-    this.attrs = makeAttributes(byteStream, constantPool);
+    this.name = constantPool.getTyped<ConstUTF8>(byteStream.getUint16(), ConstantPoolItemType.UTF8).value;
+    this.rawDescriptor = constantPool.getTyped<ConstUTF8>(byteStream.getUint16(), ConstantPoolItemType.UTF8).value;
+    this.attrs = makeAttributes(byteStream, constantPool, context, cls.majorVersion,
+      context === 'field' ? this.accessFlags.isStatic() : undefined);
   }
 
   public getAttribute(name: string): IAttribute {
@@ -406,7 +408,22 @@ export class Field extends AbstractMethodField {
   private defaultFieldValue: string;
 
   constructor(cls: ReferenceClassData<JVMTypes.java_lang_Object>, constantPool: ConstantPool, slot: number, byteStream: ByteStream) {
-    super(cls, constantPool, slot, byteStream);
+    super(cls, constantPool, slot, byteStream, 'field');
+    validateUnqualifiedName(this.name);
+    validateFieldDescriptor(this.rawDescriptor);
+    var flags = this.accessFlags.getRawByte();
+    validateVisibility(flags);
+    if ((flags & 0x0050) === 0x0050 ||
+        cls.accessFlags.isInterface() && ((flags & 0x0019) !== 0x0019 || (flags & (cls.majorVersion >= 49 ? 0x40c6 : 0x00c6)) !== 0)) {
+      throw new Error('Invalid field access flags: ' + this.name);
+    }
+    var constantValue = <ConstantValue> this.getAttribute('ConstantValue');
+    if (constantValue !== null && this.accessFlags.isStatic()) {
+      var expectedConstant = this.rawDescriptor === 'Ljava/lang/String;' ? ConstantPoolItemType.STRING :
+        this.rawDescriptor === 'J' ? ConstantPoolItemType.LONG : this.rawDescriptor === 'D' ? ConstantPoolItemType.DOUBLE :
+        this.rawDescriptor === 'F' ? ConstantPoolItemType.FLOAT : 'BCISZ'.indexOf(this.rawDescriptor) !== -1 ? ConstantPoolItemType.INTEGER : -1;
+      if (constantValue.value.getType() !== expectedConstant) throw new Error('ConstantValue type does not match field descriptor');
+    }
     this.fullName = `${descriptor2typestr(cls.getInternalName())}/${this.name}`;
     this.isStatic = this.accessFlags.isStatic();
     this.escapedFullName = reescapeJVMName(this.fullName);
@@ -620,12 +637,55 @@ export class Method extends AbstractMethodField {
    */
   public numBBEntries = 0;
 
+  /** Original declaration, before host trap specialization or bytecode rewriting. */
+  public declaredAccessFlags: number;
+  public declaredCode: Code;
+
   private compiledFunctions: Function[] = [];
   private failedCompile: Uint8Array = null;
   private vmTargetBridgeMethods: {[refKind: number]: (thread: JVMThread, descriptor: string, args: any[], cb?: (e?: JVMTypes.java_lang_Throwable, rv?: any) => void) => void} = {};
 
   constructor(cls: ReferenceClassData<JVMTypes.java_lang_Object>, constantPool: ConstantPool, slot: number, byteStream: ByteStream) {
-    super(cls, constantPool, slot, byteStream);
+    super(cls, constantPool, slot, byteStream, 'method');
+    var declarationFlags = this.accessFlags.getRawByte(), strict = cls.majorVersion >= 46 && cls.majorVersion <= 60 ? 0x0800 : 0;
+    var argumentWords = validateMethodDescriptor(this.rawDescriptor);
+    if (this.name === '<clinit>') {
+      if (this.rawDescriptor[this.rawDescriptor.length - 1] !== 'V' ||
+          cls.majorVersion >= 51 && (this.rawDescriptor !== '()V' || (declarationFlags & 8) === 0)) {
+        throw new Error('Invalid class initializer declaration');
+      }
+      // All other bits are ignored for class initializers (JVMS 4.6).
+      declarationFlags = (cls.majorVersion >= 51 ? declarationFlags & strict : 0) | 8;
+      this.accessFlags = new Flags(declarationFlags);
+    } else {
+      if (!cls.accessFlags.isInterface() || cls.majorVersion >= 49) validateVisibility(declarationFlags);
+      if (this.name === '<init>') {
+        if (cls.accessFlags.isInterface() || this.rawDescriptor[this.rawDescriptor.length - 1] !== 'V' ||
+            (declarationFlags & (cls.majorVersion >= 49 ? 0x0578 : 0x0538)) !== 0) throw new Error('Invalid constructor declaration');
+      } else validateUnqualifiedName(this.name, true);
+      if (!cls.accessFlags.isInterface() && this.accessFlags.isAbstract() &&
+          (declarationFlags & (0x011a | (cls.majorVersion >= 49 ? 0x0020 | strict : 0))) !== 0) {
+        throw new Error('Invalid abstract method access flags');
+      }
+      if (cls.accessFlags.isInterface()) {
+        var badInterfaceFlags = cls.majorVersion < 52 ?
+          (declarationFlags & 0x0401) !== 0x0401 || (declarationFlags & (cls.majorVersion >= 49 ? 0x093e : 0x0118)) !== 0 :
+          (declarationFlags & 0x0134) !== 0 || (declarationFlags & 3) !== 1 && (declarationFlags & 3) !== 2 ||
+          this.accessFlags.isAbstract() && (declarationFlags & (0x000a | strict)) !== 0;
+        if (badInterfaceFlags) throw new Error('Invalid interface method access flags');
+      }
+    }
+    if (!this.accessFlags.isStatic()) argumentWords++;
+    if (argumentWords > 255) throw new Error('Method parameters exceed 255 words including receiver');
+    this.declaredAccessFlags = declarationFlags;
+    this.declaredCode = <Code> this.getAttribute('Code');
+    if (this.accessFlags.isNative() || this.accessFlags.isAbstract()) {
+      if (this.declaredCode !== null) throw new Error('Code attribute on native or abstract method');
+    } else if (this.declaredCode === null) {
+      throw new Error('Missing Code attribute for method ' + this.name);
+    } else if (this.declaredCode.getMaxLocals() < argumentWords) {
+      throw new Error('Method arguments do not fit in max_locals');
+    }
     var parsedDescriptor = getTypes(this.rawDescriptor), i: number,
       p: string,
       trappedMethod: Function;

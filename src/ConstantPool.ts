@@ -11,6 +11,7 @@ import {ClassLoader} from './ClassLoader';
 import {JVMThread, BytecodeStackFrame, InternalStackFrame, NativeStackFrame} from './threading';
 import * as JVMTypes from '../includes/JVMTypes';
 import {setImmediate} from 'browserfs';
+import {validateConstantClassName, validateMemberNameAndType, validateMethodDescriptor, validateUnqualifiedName} from './classfile_validation';
 
 /**
  * Represents a constant pool item. Use the item's type to discriminate among them.
@@ -68,8 +69,8 @@ var CP_CLASSES: { [n: number]: IConstantPoolType } = {};
  */
 export class ConstUTF8 implements IConstantPoolItem {
   public value: string;
-  constructor(rawBytes: Buffer) {
-    this.value = this.bytes2str(rawBytes);
+  constructor(rawBytes: Buffer, legacyEncoding: boolean = false) {
+    this.value = this.bytes2str(rawBytes, legacyEncoding);
   }
 
   /**
@@ -80,8 +81,8 @@ export class ConstUTF8 implements IConstantPoolItem {
    * TODO: To avoid copying, create a character array for this data.
    * http://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.4.7
    */
-  private bytes2str(bytes: Buffer): string {
-    var y: number, z: number, v: number, w: number, x: number, charCode: number, idx = 0, rv = '';
+  private bytes2str(bytes: Buffer, legacyEncoding: boolean): string {
+    var y: number, z: number, x: number, charCode: number, idx = 0, rv = '';
     while (idx < bytes.length) {
       x = bytes[idx++] & 0xff;
       // While the standard specifies that surrogate pairs should be handled, it seems like
@@ -89,18 +90,26 @@ export class ConstUTF8 implements IConstantPoolItem {
       // http://hg.openjdk.java.net/jdk8u/jdk8u-dev/jdk/file/3623f1b29b58/src/share/classes/java/io/DataInputStream.java#l618
 
       // One UTF-16 character.
-      if (x <= 0x7f) {
+      if (x > 0 && x <= 0x7f) {
         // One character, one byte.
         charCode = x;
-      } else if (x <= 0xdf) {
+      } else if (x >= 0xc0 && x <= 0xdf) {
         // One character, two bytes.
         y = bytes[idx++];
+        if (y === undefined || (y & 0xc0) !== 0x80) throw new Error('Malformed modified UTF-8 continuation');
         charCode = ((x & 0x1f) << 6) + (y & 0x3f);
-      } else {
+        if (!legacyEncoding && charCode !== 0 && charCode < 0x80) throw new Error('Overlong modified UTF-8 sequence');
+      } else if (x >= 0xe0 && x <= 0xef) {
         // One character, three bytes.
         y = bytes[idx++];
         z = bytes[idx++];
+        if (y === undefined || z === undefined || (y & 0xc0) !== 0x80 || (z & 0xc0) !== 0x80) {
+          throw new Error('Malformed modified UTF-8 continuation');
+        }
         charCode = ((x & 0xf) << 12) + ((y & 0x3f) << 6) + (z & 0x3f);
+        if (!legacyEncoding && charCode < 0x800) throw new Error('Overlong modified UTF-8 sequence');
+      } else {
+        throw new Error('Invalid modified UTF-8 leading byte: ' + x);
       }
       rv += String.fromCharCode(charCode);
     }
@@ -121,7 +130,7 @@ export class ConstUTF8 implements IConstantPoolItem {
   public static infoByteSize: number = 0;
   public static fromBytes(byteStream: ByteStream, constantPool: ConstantPool): IConstantPoolItem {
     var strlen = byteStream.getUint16();
-    return new this(byteStream.read(strlen));
+    return new this(byteStream.read(strlen), constantPool.majorVersion <= 47);
   }
 }
 CP_CLASSES[ConstantPoolItemType.UTF8] = ConstUTF8;
@@ -347,8 +356,10 @@ export class ClassReference implements IConstantPoolItem {
       cpItem = constantPool.get(nameIndex);
     assert(cpItem.getType() === ConstantPoolItemType.UTF8,
       'ConstantPool ClassReference type != UTF8');
+    validateConstantClassName((<ConstUTF8> cpItem).value);
     // The ConstantPool stores class names without the L...; descriptor stuff
-    return new this(util.typestr2descriptor((<ConstUTF8> cpItem).value));
+    var name = (<ConstUTF8> cpItem).value;
+    return new this(name[0] === '[' ? name : 'L' + name + ';');
   }
 }
 CP_CLASSES[ConstantPoolItemType.CLASS] = ClassReference;
@@ -388,6 +399,13 @@ export class NameAndTypeInfo implements IConstantPoolItem {
     assert(nameConst.getType() === ConstantPoolItemType.UTF8 &&
       descriptorConst.getType() === ConstantPoolItemType.UTF8,
       'ConstantPool NameAndTypeInfo types != UTF8');
+    // Unused NameAndType entries carry grammar, not method declaration rules.
+    // Constructor return types and special invocation names are checked by the
+    // referring Methodref/InterfaceMethodref/InvokeDynamic or declaration.
+    if (descriptorConst.value[0] === '(') {
+      validateMethodDescriptor(descriptorConst.value);
+      if (nameConst.value !== '<init>' && nameConst.value !== '<clinit>') validateUnqualifiedName(nameConst.value, true);
+    } else validateMemberNameAndType(nameConst.value, descriptorConst.value, false, false);
     return new this(nameConst.value, descriptorConst.value);
   }
 }
@@ -477,6 +495,7 @@ export class MethodType implements IConstantPoolItem {
       utf8Info = <ConstUTF8> constantPool.get(descriptorIndex);
     assert(utf8Info.getType() === ConstantPoolItemType.UTF8,
       'ConstantPool MethodType type != UTF8');
+    validateMethodDescriptor(utf8Info.value);
     return new this(utf8Info.value);
   }
 }
@@ -3638,6 +3657,7 @@ export class MethodReference implements IConstantPoolItem {
     assert(classInfo.getType() === ConstantPoolItemType.CLASS &&
       nameAndTypeInfo.getType() === ConstantPoolItemType.NAME_AND_TYPE,
       'ConstantPool MethodReference types mismatch');
+    validateMemberNameAndType(nameAndTypeInfo.name, nameAndTypeInfo.descriptor, true, true);
     return new this(classInfo, nameAndTypeInfo);
   }
 }
@@ -3855,6 +3875,7 @@ export class InterfaceMethodReference implements IConstantPoolItem {
     assert(classInfo.getType() === ConstantPoolItemType.CLASS &&
       nameAndTypeInfo.getType() === ConstantPoolItemType.NAME_AND_TYPE,
       'ConstantPool InterfaceMethodReference types mismatch');
+    validateMemberNameAndType(nameAndTypeInfo.name, nameAndTypeInfo.descriptor, true, false);
     return new this(classInfo, nameAndTypeInfo);
   }
 }
@@ -3955,6 +3976,7 @@ export class FieldReference implements IConstantPoolItem {
     assert(classInfo.getType() === ConstantPoolItemType.CLASS &&
       nameAndTypeInfo.getType() === ConstantPoolItemType.NAME_AND_TYPE,
       'ConstantPool FieldReference types mismatch');
+    validateMemberNameAndType(nameAndTypeInfo.name, nameAndTypeInfo.descriptor, false, false);
     return new this(classInfo, nameAndTypeInfo);
   }
 }
@@ -5177,6 +5199,10 @@ export class DynamicConstant implements IConstantPoolItem {
       nameAndTypeInfo = <NameAndTypeInfo> constantPool.get(nameAndTypeIndex);
     assert(nameAndTypeInfo.getType() === ConstantPoolItemType.NAME_AND_TYPE,
       'ConstantPool DynamicConstant type != NAME_AND_TYPE');
+    validateMemberNameAndType(nameAndTypeInfo.name, nameAndTypeInfo.descriptor, false, false);
+    if (nameAndTypeInfo.name === '<init>' || nameAndTypeInfo.name === '<clinit>') {
+      throw new Error('Invalid dynamic constant name');
+    }
     return new this(bootstrapMethodAttrIndex, nameAndTypeInfo);
   }
 }
@@ -6286,6 +6312,7 @@ export class InvokeDynamic implements IConstantPoolItem {
       nameAndTypeInfo = <NameAndTypeInfo> constantPool.get(nameAndTypeIndex);
     assert(nameAndTypeInfo.getType() === ConstantPoolItemType.NAME_AND_TYPE,
       'ConstantPool InvokeDynamic types mismatch');
+    validateMemberNameAndType(nameAndTypeInfo.name, nameAndTypeInfo.descriptor, true, false);
     return new this(bootstrapMethodAttrIndex, nameAndTypeInfo);
   }
 }
@@ -6430,12 +6457,12 @@ export class MethodHandle implements IConstantPoolItem {
           return reference.getType() === ConstantPoolItemType.INTERFACE_METHODREF
             && (<MethodReference>reference).nameAndTypeInfo.name[0] !== '<';
         case MethodHandleReferenceKind.INVOKEVIRTUAL:
+          return reference.getType() === ConstantPoolItemType.METHODREF
+            && (<MethodReference>reference).nameAndTypeInfo.name[0] !== '<';
         case MethodHandleReferenceKind.INVOKESTATIC:
         case MethodHandleReferenceKind.INVOKESPECIAL:
-          // NOTE: Spec says METHODREF, but I've found instances where
-          // INVOKESPECIAL is used on an INTERFACE_METHODREF.
           return (reference.getType() === ConstantPoolItemType.METHODREF
-            || reference.getType() === ConstantPoolItemType.INTERFACE_METHODREF)
+            || constantPool.majorVersion >= 52 && reference.getType() === ConstantPoolItemType.INTERFACE_METHODREF)
             && (<MethodReference>reference).nameAndTypeInfo.name[0] !== '<';
         case MethodHandleReferenceKind.NEWINVOKESPECIAL:
           return reference.getType() === ConstantPoolItemType.METHODREF
@@ -6504,12 +6531,14 @@ var CONSTANT_POOL_TIER: number[] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  * Represents a constant pool for a particular class.
  */
 export class ConstantPool {
+  public majorVersion: number = 70;
   /**
    * The core constant pool array. Note that some indices are undefined.
    */
   private constantPool: IConstantPoolItem[];
 
-  public parse(byteStream: ByteStream, cpPatches: JVMTypes.JVMArray<JVMTypes.java_lang_Object> = null): ByteStream {
+  public parse(byteStream: ByteStream, cpPatches: JVMTypes.JVMArray<JVMTypes.java_lang_Object> = null, majorVersion: number = 70): ByteStream {
+    this.majorVersion = majorVersion;
     var cpCount = byteStream.getUint16(),
       // First key is the tier.
       deferredQueue: { offset: number; index: number }[][] = [[], [], []],
@@ -6521,6 +6550,7 @@ export class ConstantPool {
       itemOffset = 0,
       // Tier of the currently-being-processed item.
       itemTier = 0;
+    if (cpCount === 0) throw new Error('constant_pool_count must be positive');
     this.constantPool = new Array<IConstantPoolItem>(cpCount);
 
     // Scan for tier info.
@@ -6529,6 +6559,13 @@ export class ConstantPool {
       tag = byteStream.getUint8();
       assert(CP_CLASSES[tag] !== null && CP_CLASSES[tag] !== undefined,
         'Unknown ConstantPool tag: ' + tag);
+      if ((tag === ConstantPoolItemType.METHOD_HANDLE || tag === ConstantPoolItemType.METHOD_TYPE ||
+           tag === ConstantPoolItemType.INVOKE_DYNAMIC) && majorVersion < 51 ||
+          (tag === ConstantPoolItemType.MODULE || tag === ConstantPoolItemType.PACKAGE) && majorVersion < 53 ||
+          tag === ConstantPoolItemType.DYNAMIC && majorVersion < 55) {
+        throw new Error('Constant pool tag ' + tag + ' is invalid for class version ' + majorVersion);
+      }
+      if (idx + CP_CLASSES[tag].size > cpCount) throw new Error('Missing reserved constant-pool slot after long/double');
       itemTier = CONSTANT_POOL_TIER[tag];
       if (itemTier > 0) {
         deferredQueue[itemTier - 1].push({ offset: itemOffset, index: idx });
@@ -6603,6 +6640,12 @@ export class ConstantPool {
   public get(idx: number): IConstantPoolItem {
     assert(this.constantPool[idx] !== undefined, "Invalid ConstantPool reference.");
     return this.constantPool[idx];
+  }
+
+  public getTyped<T extends IConstantPoolItem>(idx: number, type: ConstantPoolItemType): T {
+    var item = this.get(idx);
+    if (item.getType() !== type) throw new Error('Invalid constant-pool type at index ' + idx);
+    return <T> item;
   }
 
   public getUnchecked(idx: number): IConstantPoolItem {

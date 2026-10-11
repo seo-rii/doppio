@@ -1,5 +1,4 @@
 ﻿import gLong from './gLong';
-import assert from './assert';
 
 /**
  * A ByteStream, implemented using a NodeBuffer.
@@ -9,11 +8,20 @@ export default class ByteStream {
 
   constructor(private buffer: NodeBuffer) {}
 
+  private checkAvailable(bytesCount: number): void {
+    if (typeof bytesCount !== 'number' || bytesCount !== Math.floor(bytesCount) ||
+        bytesCount < 0 || bytesCount > this.buffer.length - this._index) {
+      throw new RangeError('Invalid or truncated byte stream read: ' + bytesCount +
+        ' bytes at ' + this._index + ' of ' + this.buffer.length);
+    }
+  }
+
   /**
    * Returns the current read index, and increments the index by the indicated
    * amount.
    */
   private incIndex(inc: number): number {
+    this.checkAvailable(inc);
     var readIndex = this._index;
     this._index += inc;
     return readIndex;
@@ -24,7 +32,9 @@ export default class ByteStream {
   }
 
   public seek(idx: number) {
-    assert(idx >= 0 && idx < this.buffer.length, "Invalid seek position.");
+    if (typeof idx !== 'number' || idx !== Math.floor(idx) || idx < 0 || idx > this.buffer.length) {
+      throw new RangeError('Invalid byte stream seek position: ' + idx);
+    }
     this._index = idx;
   }
 
@@ -33,7 +43,7 @@ export default class ByteStream {
   }
 
   public skip(bytesCount: number): void {
-    this._index += bytesCount;
+    this.incIndex(bytesCount);
   }
 
   public hasBytes(): boolean {
@@ -99,18 +109,19 @@ export default class ByteStream {
   }
 
   public getInt64(): gLong {
-    var high = this.getUint32();
-    var low = this.getUint32();
+    var index = this.incIndex(8),
+      high = this.buffer.readUInt32BE(index),
+      low = this.buffer.readUInt32BE(index + 4);
     return gLong.fromBits(low, high);
   }
 
   public read(bytesCount: number): Buffer {
-    var rv = this.buffer.slice(this._index, this._index + bytesCount);
-    this._index += bytesCount;
-    return rv;
+    var index = this.incIndex(bytesCount);
+    return this.buffer.slice(index, index + bytesCount);
   }
 
   public peek(): number {
+    this.checkAvailable(1);
     return this.buffer[this._index];
   }
 
@@ -119,9 +130,7 @@ export default class ByteStream {
   }
 
   public slice(len: number): ByteStream {
-    var arr = new ByteStream(this.buffer.slice(this._index, this._index + len));
-    this._index += len;
-    return arr;
+    return new ByteStream(this.read(len));
   }
 
   public getBuffer(): NodeBuffer {

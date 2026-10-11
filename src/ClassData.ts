@@ -1,7 +1,7 @@
 import {ext_classname, Flags, descriptor2typestr, boxClassName, asyncForEach, typedArraysSupported, jvmName2JSName, initialValue} from './util';
 import * as util from './util';
 import ByteStream from './ByteStream';
-import {ConstantPool, ClassReference, ConstString, MethodHandle, IConstantPoolItem} from './ConstantPool';
+import {ConstantPool, ClassReference, ConstString, MethodHandle, IConstantPoolItem, DynamicConstant, InvokeDynamic} from './ConstantPool';
 import {IAttribute, IRecordComponentInfo, makeAttributes, BootstrapMethods, ConstantValue, NestHost, NestMembers, PermittedSubclasses, RecordAttribute} from './attributes';
 import {JVMThread, InternalStackFrame, NativeStackFrame, BytecodeStackFrame} from './threading';
 import * as logging from './logging';
@@ -16,6 +16,7 @@ import StringOutputStream from './StringOutputStream';
 import Monitor from './Monitor';
 import * as JVMTypes from '../includes/JVMTypes';
 import {setImmediate} from 'browserfs';
+import {validateBinaryClassName} from './classfile_validation';
 
 const trace = logging.trace;
 const debug = logging.debug;
@@ -986,33 +987,60 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
         "Minor version invalid: " + this.majorVersion + "." + this.minorVersion);
     }
     this.constantPool = new ConstantPool();
-    this.constantPool.parse(byteStream, cpPatches);
+    this.constantPool.parse(byteStream, cpPatches, this.majorVersion);
     // bitmask for {public,final,super,interface,abstract} class modifier
     this.accessFlags = new Flags(byteStream.getUint16());
-
-    this.className = (<ClassReference> this.constantPool.get(byteStream.getUint16())).name;
+    // Native JVMs supply ACC_ABSTRACT for pre-Java-6 interfaces.
+    if (this.majorVersion < 50 && this.accessFlags.isInterface()) {
+      this.accessFlags = new Flags(this.accessFlags.getRawByte() | 0x0400);
+    }
+    var classFlags = this.accessFlags.getRawByte(), isModule = this.majorVersion >= 53 && (classFlags & 0x8000) !== 0;
+    if (isModule ? classFlags !== 0x8000 :
+        this.accessFlags.isInterface() ? !this.accessFlags.isAbstract() || (classFlags & (this.majorVersion >= 49 ? 0x4030 : 0x0010)) !== 0 :
+        this.majorVersion >= 49 && (classFlags & 0x2000) !== 0 || this.accessFlags.isFinal() && this.accessFlags.isAbstract()) {
+      throw new Error('Invalid class access flags');
+    }
+    this.className = this.constantPool.getTyped<ClassReference>(byteStream.getUint16(), ConstantPoolItemType.CLASS).name;
+    if (this.className[0] !== 'L') throw new Error('this_class cannot be an array');
+    validateBinaryClassName(this.className.slice(1, -1));
     // super reference is 0 when there's no super (basically just java.lang.Object)
     var superRef = byteStream.getUint16();
     if (superRef !== 0) {
-      this.superClassRef = (<ClassReference> this.constantPool.get(superRef));
+      this.superClassRef = this.constantPool.getTyped<ClassReference>(superRef, ConstantPoolItemType.CLASS);
+      if (this.superClassRef.name[0] !== 'L') throw new Error('super_class cannot be an array');
+    }
+    if (!isModule && ((this.className === 'Ljava/lang/Object;') !== (superRef === 0) ||
+        this.accessFlags.isInterface() && this.superClassRef.name !== 'Ljava/lang/Object;')) {
+      throw new Error('Invalid superclass in class header');
     }
     // direct interfaces of this class
     var isize = byteStream.getUint16();
     this.interfaceRefs = new Array<ClassReference>(isize);
+    var interfaceNames: {[name: string]: boolean} = Object.create(null);
     for (i = 0; i < isize; ++i) {
-      this.interfaceRefs[i] = <ClassReference> this.constantPool.get(byteStream.getUint16());
+      var interfaceRef = this.constantPool.getTyped<ClassReference>(byteStream.getUint16(), ConstantPoolItemType.CLASS);
+      if (interfaceRef.name[0] !== 'L' || interfaceNames[interfaceRef.name]) throw new Error('Invalid or duplicate direct interface');
+      interfaceNames[interfaceRef.name] = true;
+      this.interfaceRefs[i] = interfaceRef;
     }
     // fields of this class
     var numFields = byteStream.getUint16();
     this.fields = new Array<Field>(numFields);
+    var fieldNames: {[name: string]: boolean} = Object.create(null);
     for (i = 0; i < numFields; ++i) {
-      this.fields[i] = new Field(this, this.constantPool, i, byteStream);
+      var field = new Field(this, this.constantPool, i, byteStream), fieldKey = JSON.stringify([field.name, field.rawDescriptor]);
+      if (fieldNames[fieldKey]) throw new Error('Duplicate field: ' + field.name);
+      fieldNames[fieldKey] = true;
+      this.fields[i] = field;
     }
     // class methods
     var numMethods = byteStream.getUint16();
     this.methods = new Array<Method>(numMethods);
+    var methodNames: {[name: string]: boolean} = Object.create(null);
     for (i = 0; i < numMethods; i++) {
       var m = new Method(this, this.constantPool, i, byteStream);
+      if (methodNames[m.signature]) throw new Error('Duplicate method: ' + m.signature);
+      methodNames[m.signature] = true;
       this.methods[i] = m;
     }
     if (this.className === 'Ljava/lang/ClassLoader;' &&
@@ -1020,7 +1048,20 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
       this.methods.push(makeSyntheticClassLoaderResourcesMethod(this, this.methods.length));
     }
     // class attributes
-    this.attrs = makeAttributes(byteStream, this.constantPool);
+    this.attrs = makeAttributes(byteStream, this.constantPool, 'class', this.majorVersion);
+    if (isModule && (this.className !== 'Lmodule-info;' || superRef !== 0 || isize !== 0 || numFields !== 0 || numMethods !== 0)) {
+      throw new Error('Invalid module-info class structure');
+    }
+    var bootstrapAttribute = <BootstrapMethods> this.getAttribute('BootstrapMethods');
+    this.constantPool.each((index: number, item: IConstantPoolItem) => {
+      if (!isModule && (item.getType() === ConstantPoolItemType.MODULE || item.getType() === ConstantPoolItemType.PACKAGE)) {
+        throw new Error('Module/package constant in a non-module class');
+      }
+      if ((item.getType() === ConstantPoolItemType.DYNAMIC || item.getType() === ConstantPoolItemType.INVOKE_DYNAMIC) &&
+          (bootstrapAttribute === null || (<DynamicConstant | InvokeDynamic> item).bootstrapMethodAttrIndex >= bootstrapAttribute.bootstrapMethods.length)) {
+        throw new Error('Invalid bootstrap method attribute index');
+      }
+    });
     if (byteStream.hasBytes()) {
       throw `Leftover bytes in classfile: ${byteStream}`;
     }
