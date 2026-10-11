@@ -936,9 +936,9 @@ export default function (): any {
       if (cls == null) {
         return null;
       }
-      // Ensure that this class is resolved.
+      // Definition loads the hierarchy, but does not recursively verify code.
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      cls.resolve(thread, (status) => {
+      cls.resolveHierarchy(thread, (status) => {
         // NULL status means resolution failed.
         if (status !== null) {
           thread.asyncReturn(cls.getClassObject(thread));
@@ -985,9 +985,9 @@ export default function (): any {
       if (cls == null) {
         return null;
       }
-      // Ensure that this class is resolved.
+      // A verifier may be loading this class as metadata for its superclass.
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      cls.resolve(thread, (status) => {
+      cls.resolveHierarchy(thread, (status) => {
         // NULL status means resolution failed.
         if (status !== null) {
           thread.asyncReturn(cls.getClassObject(thread));
@@ -1016,10 +1016,12 @@ export default function (): any {
       // in OpenJDK6.
       // TODO: Fix currently incorrect behavior for our JDK. Should return null, not throw an exception on failure.
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      thread.getBsCl().resolveClass(thread, type, (cls) => {
-        if (cls != null) {
-          thread.asyncReturn(cls.getClassObject(thread));
-        }
+      thread.getBsCl().loadClass(thread, type, (cls) => {
+        if (cls instanceof ReferenceClassData) {
+          cls.resolveHierarchy(thread, linked => {
+            if (linked !== null) thread.asyncReturn(linked.getClassObject(thread));
+          }, true);
+        } else if (cls !== null) thread.asyncReturn(cls.getClassObject(thread));
       }, true);
     }
 
@@ -1027,7 +1029,7 @@ export default function (): any {
       var loader = util.getLoader(thread, javaThis),
         type = util.int_classname(name.toString()),
         // Return JavaClassObject if loaded, or null otherwise.
-        cls = loader.getResolvedClass(type);
+        cls = loader.getLoadedClass(type);
       if (cls != null) {
         return cls.getClassObject(thread);
       } else {

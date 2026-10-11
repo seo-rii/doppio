@@ -12,6 +12,7 @@ import ThreadStatus = Doppio.VM.Enums.ThreadStatus;
 import ClassLoader = Doppio.VM.ClassFile.ClassLoader;
 import CustomClassLoader = Doppio.VM.ClassFile.CustomClassLoader;
 import assert = Doppio.Debug.Assert;
+import {ClassFileVersionError} from '../ClassData';
 
 export default function (): any {
   function getFieldInfo(thread: JVMThread, unsafe: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long): [any, string] {
@@ -784,12 +785,11 @@ export default function (): any {
 
     public static 'defineClass(Ljava/lang/String;[BIILjava/lang/ClassLoader;Ljava/security/ProtectionDomain;)Ljava/lang/Class;'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, name: JVMTypes.java_lang_String, bytes: JVMTypes.JVMArray<number>, offset: number, len: number, loaderObj: JVMTypes.java_lang_ClassLoader, pd: JVMTypes.java_security_ProtectionDomain): void {
       var loader = util.getLoader(thread, loaderObj),
-        cdata: ClassData = loader.defineClass(thread, util.int_classname(name.toString()), util.byteArray2Buffer(bytes.array, offset, len), pd);
+        cdata = loader.defineClass(thread, util.int_classname(name.toString()), util.byteArray2Buffer(bytes.array, offset, len), pd);
       if (cdata !== null) {
         thread.setStatus(ThreadStatus.ASYNC_WAITING);
-        // Resolve the class, since we're handing it back to the application
-        // and we expect these things to be resolved.
-        cdata.resolve(thread, (cdata: ClassData) => {
+        // Ordinary definition must remain usable by a verifier's metadata load.
+        cdata.resolveHierarchy(thread, (cdata: ClassData) => {
           if (cdata !== null) {
             thread.asyncReturn(cdata.getClassObject(thread));
           }
@@ -941,12 +941,25 @@ export default function (): any {
      * @params data      bytes of a class file
      * @params cpPatches where non-null entries exist, they replace corresponding CP entries in data
      */
-    public static 'defineAnonymousClass(Ljava/lang/Class;[B[Ljava/lang/Object;)Ljava/lang/Class;'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, hostClass: JVMTypes.java_lang_Class, data: JVMTypes.JVMArray<number>, cpPatches: JVMTypes.JVMArray<JVMTypes.java_lang_Object>): JVMTypes.java_lang_Class {
-      var anonymousClass = new ReferenceClassData(new Buffer(data.array),
-          hostClass.$cls.getProtectionDomain(), hostClass.$cls.getLoader(), cpPatches),
-        resolved = anonymousClass.tryToResolve();
-      assert(resolved, 'Unable to link anonymous class synchronously.');
-      return anonymousClass.getClassObject(thread);
+    public static 'defineAnonymousClass(Ljava/lang/Class;[B[Ljava/lang/Object;)Ljava/lang/Class;'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, hostClass: JVMTypes.java_lang_Class, data: JVMTypes.JVMArray<number>, cpPatches: JVMTypes.JVMArray<JVMTypes.java_lang_Object>): void {
+      if (hostClass === null || data === null) {
+        thread.throwNewException('Ljava/lang/NullPointerException;', '');
+        return;
+      }
+      var anonymousClass: ReferenceClassData<JVMTypes.java_lang_Object>;
+      try {
+        anonymousClass = new ReferenceClassData(new Buffer(data.array),
+          hostClass.$cls.getProtectionDomain(), hostClass.$cls.getLoader(), cpPatches);
+      } catch (failure) {
+        thread.throwNewException(failure instanceof ClassFileVersionError ?
+          'Ljava/lang/UnsupportedClassVersionError;' : 'Ljava/lang/ClassFormatError;',
+          failure && failure.message ? failure.message : String(failure));
+        return;
+      }
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      anonymousClass.resolve(thread, resolved => {
+        if (resolved !== null) thread.asyncReturn(anonymousClass.getClassObject(thread));
+      }, false);
     }
 
     /**

@@ -66,6 +66,10 @@ function world() {
     if (options.clinit) methods.push({name: '<clinit>', flags: 0x0008});
     const cls = new ReferenceClassData(classBytes(name, superclass, interfaces, !!options.interface, methods), null, options.loader || loader);
     cls.setResolved(superclass, interfaces);
+    // setResolved only assembles hierarchy tables; the fixture's linked state
+    // also requires the real verification gate before initialization begins.
+    assert.equal(cls.tryToResolve(), true, 'fixture class must verify before initialization');
+    assert.equal(cls.isInitialized(null), false, 'linking must not initialize the fixture');
     const constructor = function() {};
     if (options.clinit) {
       constructor['<clinit>()V'] = (thread, args, callback) => {

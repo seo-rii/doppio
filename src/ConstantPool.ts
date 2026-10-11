@@ -308,7 +308,7 @@ export class ClassReference implements IConstantPoolItem {
     if (this.cls === null) {
       this.cls = <ReferenceClassData<JVMTypes.java_lang_Object>> loader.getResolvedClass(this.name);
     }
-    return this.cls !== null;
+    return this.cls !== null && this.cls.tryToResolve();
   }
 
   /**
@@ -316,6 +316,12 @@ export class ClassReference implements IConstantPoolItem {
    * class initialization.
    */
   public resolve(thread: JVMThread, loader: ClassLoader, caller: ReferenceClassData<JVMTypes.java_lang_Object>, cb: (status: boolean) => void, explicit: boolean = true) {
+    // Anonymous-class patches may cache loaded metadata before verification.
+    // Retain that exact identity while still requiring full linking.
+    if (this.cls !== null) {
+      this.cls.resolve(thread, resolved => cb(resolved !== null), explicit);
+      return;
+    }
     // Because of Java 8 anonymous classes, THIS CHECK IS REQUIRED FOR CORRECTNESS.
     // (ClassLoaders do not know about anonymous classes, hence they are
     //  'anonymous')
@@ -327,7 +333,8 @@ export class ClassReference implements IConstantPoolItem {
       // The stack might be empty during resolution, which occurs during JVM bootup.
       if (currentMethod !== null && this.name === currentMethod.cls.getInternalName()) {
         this.setResolved(thread, currentMethod.cls);
-        return cb(true);
+        this.cls.resolve(thread, resolved => cb(resolved !== null), explicit);
+        return;
       }
     }
 
@@ -347,7 +354,7 @@ export class ClassReference implements IConstantPoolItem {
 
   public getConstant(thread: JVMThread) { return this.cls.getClassObject(thread); }
 
-  public isResolved() { return this.cls !== null; }
+  public isResolved() { return this.cls !== null && this.cls.isResolved(); }
 
   public static size: number = 1;
   public static infoByteSize: number = 2;
