@@ -95,17 +95,17 @@ for (let length = 0; length < 8; length++) checkRejection(valid.subarray(0, leng
 // The application loader must not replace a found-but-invalid class's Java
 // exception with ClassNotFoundException; ordinary lookup failures keep their
 // existing explicit/implicit translation.
-for (const type of ['UnsupportedClassVersionError', 'ClassFormatError', 'ClassNotFoundException']) {
+for (const type of ['UnsupportedClassVersionError', 'ClassFormatError', 'VerifyError', 'ClassNotFoundException']) {
   for (const explicit of type === 'ClassNotFoundException' ? [true, false] : [true]) {
-    const formatClass = {};
+    const linkageClass = {};
     const thrown = [];
     const exception = {type, getClass() { return {isCastable(target) {
-      assert.equal(target, formatClass);
+      assert.equal(target, linkageClass);
       return type !== 'ClassNotFoundException';
     }}; }};
     const loader = new ClassFile.CustomClassLoader({getLoadedClass(name) {
-      assert.equal(name, 'Ljava/lang/ClassFormatError;');
-      return formatClass;
+      assert.equal(name, 'Ljava/lang/LinkageError;');
+      return linkageClass;
     }}, {'loadClass(Ljava/lang/String;)Ljava/lang/Class;'(thread, args, callback) { callback(exception); }});
     // Supply the minimal String/char-array constructors needed to pass the
     // class name, without booting a Java VM for this focused propagation check.

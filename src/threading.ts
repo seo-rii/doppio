@@ -613,7 +613,8 @@ export class InternalStackFrame implements IStackFrame {
    * @param cb Callback function. Called with an exception if one occurs, or
    *   the return value from the called method, if relevant.
    */
-  constructor(cb: (e?: JVMTypes.java_lang_Throwable, rv?: any) => void) {
+  constructor(cb: (e?: JVMTypes.java_lang_Throwable, rv?: any) => void,
+      public readonly catchDirectExceptions: boolean = false) {
     this.cb = cb;
   }
 
@@ -1183,6 +1184,35 @@ export class JVMThread implements Thread {
   }
 
   /**
+   * Run metadata loading behind a guest exception boundary. Unlike a Java
+   * method call, a loader may throw directly from an asynchronous callback.
+   * The normal internal-frame rule would discard the boundary in that case.
+   * Only a successful operation calls done; a failed loader throws on this
+   * thread, preserving its original Java Throwable for verification caching.
+   */
+  public runWithExceptionBoundary<T>(operation: (done: (value: T) => void) => void,
+      cb: (error: JVMTypes.java_lang_Throwable, value?: T) => void): void {
+    // A pending I/O operation must not let the scheduler run this boundary
+    // without a value. Java loader calls may make the thread runnable again.
+    this.setStatus(ThreadStatus.ASYNC_WAITING);
+    var completed = false,
+      boundary = new InternalStackFrame((error?: JVMTypes.java_lang_Throwable) => {
+        assert(!completed, 'Exception boundary already completed');
+        assert(error !== null && error !== undefined, 'Metadata boundary resumed without a result');
+        completed = true;
+        cb(error);
+      }, true);
+    this.stack.push(boundary);
+    operation((value: T) => {
+      assert(!completed, 'Exception boundary already completed');
+      assert(this.stack[this.stack.length - 1] === boundary, 'Metadata completed while Java frames remain active');
+      completed = true;
+      this.stack.pop();
+      cb(null, value);
+    });
+  }
+
+  /**
    * Throws the given JVM exception. Causes the thread to unwind the stack until
    * it can find a stack frame that can handle the exception.
    *
@@ -1206,7 +1236,8 @@ export class JVMThread implements Thread {
     // Stack may actually be empty, so guard against this.
     if (idx >= 0) {
       // An internal stack frame cannot process its own thrown exception.
-      if (stack[idx].type === StackFrameType.INTERNAL) {
+      if (stack[idx].type === StackFrameType.INTERNAL &&
+          !(<InternalStackFrame> stack[idx]).catchDirectExceptions) {
         stack.pop();
         idx--;
       }

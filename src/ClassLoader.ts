@@ -1,6 +1,5 @@
 import {ClassData, ReferenceClassData, ArrayClassData, PrimitiveClassData, ClassFileVersionError} from './ClassData';
 import {JVMThread} from './threading';
-import ClassLock from './ClassLock';
 import {IClasspathItem, ClasspathFactory} from './classpath';
 import {TriState} from './enums';
 import {get_component_type, is_array_type, is_primitive_type, is_reference_type, asyncForEach, ext_classname, descriptor2typestr, asyncFind, initString} from './util';
@@ -3343,9 +3342,17 @@ function addJavaNioMappedByteBufferModernOverlays(data: Buffer): Buffer {
  */
 class ClassLocks {
   /**
-   * typrStr => array of callbacks to trigger when operation completes.
+   * Load locks retain every waiting thread so an owner's Java exception can
+   * reach all callers, not just the thread that performed the actual load.
+   * Initialization locks have different failure rules and retain their
+   * separate ClassLock implementation.
    */
-  private locks: { [typeStr: string]: ClassLock } = {};
+  private locks: { [typeStr: string]: {
+    thread: JVMThread;
+    cb: (cdata: ClassData) => void;
+    explicit: boolean;
+    onFailure: (failure: JVMTypes.java_lang_Throwable, ownerExplicit: boolean) => void;
+  }[] } = {};
 
   constructor() {}
 
@@ -3354,20 +3361,29 @@ class ClassLocks {
    * the lock. If it is taken, we enqueue the callback.
    * NOTE: For convenience, will handle triggering the owner's callback as well.
    */
-  public tryLock(typeStr: string, thread: JVMThread, cb: (cdata: ClassData) => void): boolean {
+  public tryLock(typeStr: string, thread: JVMThread, cb: (cdata: ClassData) => void,
+      explicit: boolean, onFailure: (failure: JVMTypes.java_lang_Throwable, ownerExplicit: boolean) => void): boolean {
     if (typeof this.locks[typeStr] === 'undefined') {
-      this.locks[typeStr] = new ClassLock();
+      this.locks[typeStr] = [];
     }
-    return this.locks[typeStr].tryLock(thread, cb);
+    return this.locks[typeStr].push({thread, cb, explicit, onFailure}) === 1;
   }
 
   /**
    * Releases the lock on the given string.
    */
-  public unlock(typeStr: string, cdata: ClassData): void {
-    this.locks[typeStr].unlock(cdata);
-    // No need for this lock to remain.
+  public unlock(typeStr: string, cdata: ClassData, failure: JVMTypes.java_lang_Throwable = null): void {
+    var waiters = this.locks[typeStr], notified = new Set<JVMThread>();
+    // A callback may retry synchronously. It must acquire a new queue, not
+    // append to the queue that this completion is about to discard.
     delete this.locks[typeStr];
+    waiters.forEach(waiter => {
+      if (failure !== null && waiter.thread !== null && !notified.has(waiter.thread)) {
+        notified.add(waiter.thread);
+        waiter.onFailure(failure, waiters[0].explicit);
+      }
+      waiter.cb(cdata);
+    });
   }
 
   /**
@@ -3376,7 +3392,7 @@ class ClassLocks {
    */
   public getOwner(typeStr: string): JVMThread {
     if (this.locks[typeStr]) {
-      return this.locks[typeStr].getOwner();
+      return this.locks[typeStr][0].thread;
     }
     return null;
   }
@@ -3661,20 +3677,42 @@ export abstract class ClassLoader {
       });
     } else {
       // Check the loadClass lock for this class.
-      if (this.loadClassLocks.tryLock(typeStr, thread, cb)) {
-        // Async it is!
-        if (is_reference_type(typeStr)) {
-          this._loadClass(thread, typeStr, (cdata) => {
-            this.loadClassLocks.unlock(typeStr, cdata);
-          }, explicit);
+      if (this.loadClassLocks.tryLock(typeStr, thread, cb, explicit, (failure, ownerExplicit) => {
+        var name = failure.getClass().getInternalName();
+        // A shared load can have both explicit Java callers and implicit VM
+        // callers. Only missing-class errors change category between them;
+        // format, version, verification and other linking errors retain their
+        // original Throwable identity.
+        if (ownerExplicit !== explicit &&
+            ((!explicit && name === 'Ljava/lang/ClassNotFoundException;') ||
+             (explicit && name === 'Ljava/lang/NoClassDefFoundError;'))) {
+          this.throwClassNotFoundException(thread, typeStr, explicit);
         } else {
-          // Array
-          this.loadClass(thread, get_component_type(typeStr), (cdata) => {
-            if (cdata != null) {
-              // Synchronously will work now.
-              this.loadClassLocks.unlock(typeStr, this.getLoadedClass(typeStr));
-            }
-          }, explicit);
+          thread.throwException(failure);
+        }
+      })) {
+        var load = (done: (loaded: ClassData) => void): void => {
+          if (is_reference_type(typeStr)) {
+            this._loadClass(thread, typeStr, done, explicit);
+          } else {
+            this.loadClass(thread, get_component_type(typeStr), component => {
+              done(component === null ? null : this.getLoadedClass(typeStr));
+            }, explicit);
+          }
+        };
+        if (thread === null) {
+          // Before java.lang.Thread exists, bootstrap errors are diagnostic
+          // plus a null result; there is no guest Throwable to capture yet.
+          load(loaded => this.loadClassLocks.unlock(typeStr, loaded));
+        } else {
+          // A null callback accompanies an exception thrown by the loader.
+          // Capture that exception before releasing callbacks, including when
+          // an array's component load fails behind a nested load boundary.
+          thread.runWithExceptionBoundary<ClassData>(done => {
+            load(loaded => { if (loaded !== null) done(loaded); });
+          }, (failure, loaded) => {
+            this.loadClassLocks.unlock(typeStr, failure ? null : loaded, failure);
+          });
         }
       }
     }
@@ -3754,7 +3792,9 @@ export abstract class ClassLoader {
    * If the program explicitly called loadClass, then we throw the ClassNotFoundException.
    */
   protected throwClassNotFoundException(thread: JVMThread, typeStr: string, explicit: boolean): void {
-    thread.throwNewException(explicit ? 'Ljava/lang/ClassNotFoundException;' : 'Ljava/lang/NoClassDefFoundError;', `Cannot load class: ${ext_classname(typeStr)}`);
+    var message = `Cannot load class: ${ext_classname(typeStr)}`;
+    if (thread === null) error('JVM bootstrap loading failed: ' + message);
+    else thread.throwNewException(explicit ? 'Ljava/lang/ClassNotFoundException;' : 'Ljava/lang/NoClassDefFoundError;', message);
   }
 
   /**
@@ -3992,10 +4032,11 @@ export class CustomClassLoader extends ClassLoader {
     this.loaderObj['loadClass(Ljava/lang/String;)Ljava/lang/Class;'](thread, [initString(this.bootstrap, ext_classname(typeStr))], (e?: JVMTypes.java_lang_Throwable, jco?: JVMTypes.java_lang_Class) => {
       if (e) {
         // Exception! There was an issue defining the class.
-        // A malformed or unsupported class was found, not absent. Preserve its
-        // Java format/version error instead of hiding it as a lookup failure.
-        var formatError = this.bootstrap.getLoadedClass('Ljava/lang/ClassFormatError;');
-        if (formatError !== null && e.getClass().isCastable(formatError)) {
+        // A loader may explicitly link a class before returning it. Preserve
+        // verification and other linkage failures, not only format/version
+        // errors, instead of hiding them as missing-class failures.
+        var linkageError = this.bootstrap.getLoadedClass('Ljava/lang/LinkageError;');
+        if (linkageError !== null && e.getClass().isCastable(linkageError)) {
           thread.throwException(e);
         } else {
           this.throwClassNotFoundException(thread, typeStr, explicit);
