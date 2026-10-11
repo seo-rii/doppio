@@ -490,6 +490,67 @@ do not establish guest execution. These selected cases do not prove every
 linking rule or complete JVM-002; broader retained execution is B5, module access
 is G, and arbitrary bootstrap/Lookup behavior remains C.
 
+## B5 selected retained execution
+
+`ci/java_core_semantics_test.mjs` runs a fixed five-group corpus on genuine
+javac 21/25 output, matching native Java with `-Xverify:all`, Node and Chromium.
+Every group/release/host cell is registered before compilation. Missing,
+duplicate, pruned, timed-out or otherwise incomplete cells cannot become passes.
+Expected ordered traces are checked independently of native/guest agreement.
+
+| Group | Cases per release | Selected evidence |
+| --- | --- | --- |
+| Numeric | 48 | Integer/long operations, binary32/64 arithmetic, comparisons and conversion boundaries, including direct long-to-float rounding. |
+| Arrays and objects | 40 | Primitive/reference arrays, covariance and store failures, null/bounds/evaluation order, field/cast/identity behavior and exact nominal ConstantDesc interfaces. |
+| Control and frames | 26 | Branches, switches, returns, wide locals/increments, wide constant-pool loads and actual long branch operands. |
+| Exceptions | 18 | Null and non-null throws, handler selection, original Throwable identity, finally and suppression/abrupt-completion behavior. |
+| Explicit stack forms | 25 | Seventeen modern category-one/two stack forms and eight explicitly mutated major-49/50 subroutine/finally payloads. |
+
+The first 132 cases execute untouched compiler-produced bytes. The stack group
+keeps its genuine modern carrier compilation outside the runtime classpath;
+each resource-only payload records replayable edits, original/result hashes and
+decoded operands. Historical mutations are not presented as genuine legacy
+compiler output. The driver has no parent-classpath payload fallback.
+Independent instruction decoding binds each ordinary entry to its reachable
+parameterized probe and actual operands, rather than treating an opcode-looking
+constant-pool byte as an instruction. These are static bytecode/call-graph
+checks, not dynamic branch coverage or proof of JIT execution.
+
+Both interpreter and emitted JIT throw a guest `NullPointerException` for null
+`athrow` and enforce reference-array component compatibility before writing.
+Null and bounds errors retain their precedence, failed stores leave the array
+unchanged, and checks use actual defining-loader identities. The corrected
+store check exposed a retained ConstantDesc failure: Integer, Long, Float,
+Double and String had direct-call support but lacked the real interface role.
+Their bootstrap overlays now append that exact role, generic interface
+signature and native typed/erased bridge declarations, preserving original
+members and Code. Both calls ignore null/non-null Lookup and return the receiver.
+The compiler-facing bootstrap artifact carries byte-identical transformations;
+Boolean, Byte, Short, Character and Object still do not acquire ConstantDesc.
+This does not add Constable or general constant/bootstrap resolution.
+
+```sh
+yarn ci:core-semantics:test
+yarn ci:core-semantics
+```
+
+The official command requires a clean unchanged committed tree and both releases
+on all three hosts. It checkpoints raw compiler/execution failures before
+integrity validation in `build/java-core-semantics-results.json`; native-only
+and Node-only diagnostics use distinct, non-official ledgers. CI validates the
+exact unit/host commands and timeout budgets and uploads the official ledger
+even on failure. Source-index references retain their original owner and
+unassessed status; passing a selected case does not close a source section.
+
+At clean `3d6728056`, strict CLI/browser builds pass, all 157 cases pass in all
+30 mandatory cells, and all twelve genuine compilation operations pass. The
+compiled B1–B5 unit/contract run has 706 passes, no failures and one optional
+native-taxonomy diagnostic skip. Fresh retained execution passes the original
+77 default and 246 modern fixtures, with unchanged goldens, class files, HEAD
+and source/runtime/input snapshots. The earlier 322/323 retained failure was
+not waived or repaired by regenerating expectations. This records the selected
+B5 exit, not exhaustive JVM-002 or Phase B completion.
+
 ## Remaining boundaries
 
 These batches do not finish B1, JVM-002 or Phase B. B2's structural corpus does

@@ -348,8 +348,12 @@ verification batches have dedicated genuine Java 21/25 host gates. Verification
 and preparation guard linking and execution. Linking adds actual loader
 constraints, exact symbolic member resolution and runtime-package/nest access
 gates with separate genuine evolved-binary corpora. These selected gates do not
-close JVM-002 or bundle B; evolved receiver dispatch and fresh retained-runtime
-regression evidence remain required as well.
+close JVM-002 or bundle B. Evolved receiver dispatch has a dedicated host gate;
+B5 now adds a fixed 157-case core execution corpus across five related groups.
+At clean `3d6728056`, its 30 Java 21/25 native/Node/Chromium cells and all original
+323 retained fixtures pass with unchanged sources, goldens and class files.
+This selected integration evidence does not assess every source unit or complete
+the remaining record, sealed-type and final-language batches.
 
 ### Scope and measurement
 
