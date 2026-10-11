@@ -195,7 +195,23 @@ export class Opcodes {
 
   public static iastore = Opcodes._astore_32;
   public static fastore = Opcodes._astore_32;
-  public static aastore = Opcodes._astore_32;
+  public static aastore(thread: JVMThread, frame: BytecodeStackFrame) {
+    const stack = frame.opStack, value = stack.pop(), index = stack.pop(),
+      array = <JVMTypes.JVMArray<any>> stack.pop();
+    if (isNull(thread, frame, array)) return;
+    if (index < 0 || index >= array.array.length) {
+      throwException(thread, frame, 'Ljava/lang/ArrayIndexOutOfBoundsException;',
+        `${index} not in length ${array.array.length} array of type ${array.getClass().getInternalName()}`);
+      return;
+    }
+    const component = (<ArrayClassData<any>> array.getClass()).getComponentClass();
+    if (value !== null && !value.getClass().isCastable(component)) {
+      throwException(thread, frame, 'Ljava/lang/ArrayStoreException;', value.getClass().getInternalName());
+      return;
+    }
+    array.array[index] = value;
+    frame.pc++;
+  }
   public static bastore = Opcodes._astore_32;
   public static castore = Opcodes._astore_32;
   public static sastore = Opcodes._astore_32;

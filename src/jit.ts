@@ -257,7 +257,24 @@ u.throwException(t,f,'Ljava/lang/ArrayIndexOutOfBoundsException;',""+${pops[1]}+
 
 table[OpCode.IASTORE] = astore32;
 table[OpCode.FASTORE] = astore32;
-table[OpCode.AASTORE] = astore32;
+table[OpCode.AASTORE] = {hasBranch: false, pops: 3, pushes: 0,
+  emit: (pops, pushes, suffix, onSuccess, code, pc, onErrorPushes) => {
+    const onError = makeOnError(onErrorPushes, pc);
+    return `
+if(${pops[2]}==null){
+${onError}
+u.throwException(t,f,'Ljava/lang/NullPointerException;',"");
+}else{
+var len${suffix}=${pops[2]}.array.length;
+if(${pops[1]}<0||${pops[1]}>=len${suffix}){
+${onError}
+u.throwException(t,f,'Ljava/lang/ArrayIndexOutOfBoundsException;',""+${pops[1]}+" not in length "+len${suffix}+" array of type "+${pops[2]}.getClass().getInternalName());
+}else if(${pops[0]}!==null&&!${pops[0]}.getClass().isCastable(${pops[2]}.getClass().getComponentClass())){
+${onError}
+u.throwException(t,f,'Ljava/lang/ArrayStoreException;',${pops[0]}.getClass().getInternalName());
+}else{${pops[2]}.array[${pops[1]}]=${pops[0]};${onSuccess}}
+}`;
+  }};
 table[OpCode.BASTORE] = astore32;
 table[OpCode.CASTORE] = astore32;
 table[OpCode.SASTORE] = astore32;
