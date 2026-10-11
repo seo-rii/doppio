@@ -14,6 +14,7 @@ import CustomClassLoader = Doppio.VM.ClassFile.CustomClassLoader;
 import assert = Doppio.Debug.Assert;
 import {ClassFileVersionError} from '../ClassData';
 import {prepareLambdaAnonymousClass, installLambdaAdapters} from '../LambdaAdapters';
+import {prepareReflectionClass, installReflectionAdapters} from '../ReflectionAdapters';
 
 export default function (): any {
   function getFieldInfo(thread: JVMThread, unsafe: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long): [any, string] {
@@ -785,8 +786,20 @@ export default function (): any {
     }
 
     public static 'defineClass(Ljava/lang/String;[BIILjava/lang/ClassLoader;Ljava/security/ProtectionDomain;)Ljava/lang/Class;'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, name: JVMTypes.java_lang_String, bytes: JVMTypes.JVMArray<number>, offset: number, len: number, loaderObj: JVMTypes.java_lang_ClassLoader, pd: JVMTypes.java_security_ProtectionDomain): void {
-      var loader = util.getLoader(thread, loaderObj),
-        cdata = loader.defineClass(thread, util.int_classname(name.toString()), util.byteArray2Buffer(bytes.array, offset, len), pd);
+      var loader = util.getLoader(thread, loaderObj), type = util.int_classname(name.toString()),
+        originalBytes = util.byteArray2Buffer(bytes.array, offset, len),
+        cdata: ReferenceClassData<JVMTypes.java_lang_Object>;
+      try {
+        var generated = prepareReflectionClass(thread, {className: type, bytes: originalBytes,
+          sourceBytes: bytes, offset, length: len, loader, protectionDomain: pd});
+        cdata = loader.defineClass(thread, type, generated === null ? originalBytes : generated.bytes, pd);
+        if (cdata !== null && generated !== null) installReflectionAdapters(generated, cdata);
+      } catch (failure) {
+        thread.throwNewException(failure instanceof ClassFileVersionError ?
+          'Ljava/lang/UnsupportedClassVersionError;' : 'Ljava/lang/ClassFormatError;',
+          failure && failure.message ? failure.message : String(failure));
+        return;
+      }
       if (cdata !== null) {
         thread.setStatus(ThreadStatus.ASYNC_WAITING);
         // Ordinary definition must remain usable by a verifier's metadata load.
