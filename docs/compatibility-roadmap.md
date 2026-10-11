@@ -343,8 +343,10 @@ passing one batch never closes the others.
 
 The [Phase B batch plan](phase-b-loading.md) separates initialization, structural
 validation, verification, linking, retained execution, records, sealed types and
-final-language work. Its first initialization slice has a dedicated six-requirement
-manifest and genuine Java 21/25 host gate; it does not close JVM-002 or bundle B.
+final-language work. Its initialization, class-file structure and bytecode
+verification batches have dedicated genuine Java 21/25 host gates. Verification
+now guards linking and execution; these selected corpora do not close JVM-002
+or bundle B, and retained-runtime regression evidence is required as well.
 
 ### Scope and measurement
 
@@ -385,7 +387,7 @@ distinction between inventory completion and runtime conformance.
 | ID | Priority and current evidence | Exit evidence and main dependencies |
 | --- | --- | --- |
 | JVM-001 | P0; pinned true-javac 21/25 corpus plus 27 admission cases, including four untouched controls and explicit negative/header mutations | Require the complete seed and admission corpus on native Java, Node and Chromium with current-commit, source/class/runtime hashes and retained raw results. The [execution evidence gate](../ci/check_phase_a_evidence.mjs) fails on stale, dirty, missing, skipped or timed-out evidence. Broader verification and linkage are B/C work; W-JAVA21/25 remain partial. |
-| JVM-002 | P1; [initialization slice](phase-b-loading.md) adds ordered superinterface prerequisites, fast-path/owner-state checks and selected failure caching; general bytecode verification is not an enforcement phase and remaining contracts stay unassessed | Spec-mapped valid/malformed corpus for format, stack maps, operand/local types, branches, linking/default resolution and initialization order/failure caching, including exact specified errors. Depends on JVM-001; module access also needs JVM-011. |
+| JVM-002 | P1; [Phase B foundations](phase-b-loading.md) enforce structural and pre-execution type verification, loader-aware metadata obligations and selected initialization order/failure rules. Dedicated native/Node/Chromium corpora cover those slices; remaining linkage, retained-language and exhaustive verifier contracts are not established | Spec-mapped valid/malformed corpus for format, stack maps, operand/local types, branches, linking/default resolution and initialization order/failure caching, including exact specified errors. Depends on JVM-001; module access also needs JVM-011. |
 | JVM-003 | P1; selected handles/lookups, but full conversions and executable VarHandles unclaimed in [implemented invoke slices](design/java-lang-invoke.md#implemented-slices) | Matrices for lookup/access, invocation/adaptation/combinators and field/array VarHandle read/write/CAS/update semantics. Verify memory-order requirements separately. Depends on JVM-001/002; module cases on JVM-011. |
 | JVM-004 | P1; selected indy/condy paths, with unsupported general bootstraps in [constant pool](../src/ConstantPool.ts) and [open questions](design/java-lang-invoke.md#open-design-questions) | User bootstrap handles, nested dynamic arguments, adaptation/access, success/failure caching and specified exceptions; retain lambda, concat, record and compiler probes. Depends on JVM-003. |
 | JVM-005 | P2; hidden definition/discovery explicitly missing in [core gaps](modern-java.md#known-core-lang-gaps) | Hidden class and class-data definitions, initialization, lookup privileges, nestmate options, names/descriptors and discovery restrictions match native contracts. Depends on JVM-002/003; module cases on JVM-011. |

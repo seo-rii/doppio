@@ -151,6 +151,12 @@ do not recursively verify dependencies. Explicit linking, initialization and
 bytecode/native execution require the verification gate. Failed verification
 cannot be caught by an unverified method's own handlers. Concurrent waiters
 share the result; a metadata loading failure retains its guest Throwable.
+Protected-member checks first establish whether the receiver rule applies;
+unrelated symbolic owners and non-protected members do not cause otherwise
+unnecessary receiver loads before their instructions execute. Native allocation
+and static reflective invocation also wait for successful verification and
+initialization, preserving the original failure instead of accessing an
+unverified executable constructor.
 
 This separation follows [JVMS 25 §5.4.1](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-5.html#jvms-5.4.1):
 loading a type while verifying another type does not require verifying that
@@ -164,6 +170,20 @@ checks all 1,385 methods from the 36 transformed classes, verifies that 1,273
 original Code attributes remain byte-identical, and rejects ten controls with
 required frames removed. These decoder/type tests are not, by themselves,
 evidence that metadata obligations or Java execution succeeded.
+
+The pinned Java 8 lambda and reflection generators also rely on privileged
+special-call shapes which ordinary class files cannot use. Their VM definition
+hooks recognize the actual bootstrap producer and its captured metadata, then
+emit typed private native adapters for exact, nonvirtual calls. Serialization
+uses a separate allocation adapter at the original allocation instruction and
+an exact superclass-constructor adapter. Instruction widths and handler ranges
+are preserved. The original bytes, transformed bytes and per-instruction edits
+remain available as generation provenance; every transformed Code attribute
+still passes through the ordinary verifier. A generated name or inheritance
+from `MagicAccessorImpl` does not authorize this transformation. Unit tests
+cover untrusted inputs, unrelated invalid code, exact target identity and
+verification/initialization failure propagation. Retained Java execution is
+required in addition to those unit checks.
 
 `ci/java_bytecode_verification_test.mjs` compiles genuine Java 21 and 25
 fixtures. Its 66 bytecode cases include untouched compiler output, valid
