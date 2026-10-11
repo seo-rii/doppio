@@ -3669,15 +3669,28 @@ export abstract class ClassLoader {
           return;
         }
       }
-      candidate.resolveHierarchy(request.thread, cls => {
-        var previous = this.getClass(name);
-        // Delegated loading can establish an initiating identity while this
-        // candidate waits for a parent. Check immediately before publication.
-        if (cls !== null && previous != null && previous !== cls) {
-          this.definitionError(request.thread, 'Ljava/lang/LinkageError;', 'Conflicting initiating-loader identity: ' + candidate.getExternalName());
-          done(null);
-        } else done(<ReferenceClassData<JVMTypes.java_lang_Object>> cls);
-      }, false, request.ancestry);
+      // OpenJDK parses/loads direct interface metadata before fetching the
+      // superclass. Preserve that observable Java loader order without
+      // publishing CP resolution or changing superclass-first admission.
+      // The candidate stays private and must participate in cycle detection
+      // even during this anticipatory metadata load.
+      var path = new Set(request.ancestry);
+      path.add(candidate);
+      asyncForEach(candidate.getInterfaceClassReferences(), (ref, next) => {
+        if (ref.cls !== null) next();
+        else this.loadClass(request.thread, ref.name, loaded => next(loaded === null ? true : undefined), false, path);
+      }, failure => {
+        if (failure) { done(null); return; }
+        candidate.resolveHierarchy(request.thread, cls => {
+          var previous = this.getClass(name);
+          // Delegated loading can establish an initiating identity while this
+          // candidate waits for a parent. Check immediately before publication.
+          if (cls !== null && previous != null && previous !== cls) {
+            this.definitionError(request.thread, 'Ljava/lang/LinkageError;', 'Conflicting initiating-loader identity: ' + candidate.getExternalName());
+            done(null);
+          } else done(<ReferenceClassData<JVMTypes.java_lang_Object>> cls);
+        }, false, request.ancestry);
+      });
     };
     if (request.thread === null) {
       admit(cls => complete(null, cls));

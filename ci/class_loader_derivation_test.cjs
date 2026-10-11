@@ -33,12 +33,18 @@ const u2 = value => { const b = Buffer.alloc(2); b.writeUInt16BE(value); return 
 
 // These small parsed classes isolate loader lifecycle behavior. Genuine javac
 // inheritance/evolution and native/browser comparisons belong to the B4a corpus.
-function bytes(name, superclass = 'java/lang/Object') {
+function bytes(name, superclass = 'java/lang/Object', interfaces = [], flags = 0x21) {
   const utf = text => Buffer.concat([Buffer.from([1]), u2(Buffer.byteLength(text)), Buffer.from(text)]);
-  const constants = [utf(name), Buffer.from([7, 0, 1])];
-  if (superclass !== null) constants.push(utf(superclass), Buffer.from([7, 0, 3]));
+  const constants = [];
+  function cls(text) {
+    constants.push(utf(text));
+    const index = constants.length;
+    constants.push(Buffer.concat([Buffer.from([7]), u2(index)]));
+    return constants.length;
+  }
+  const self = cls(name), parent = superclass === null ? 0 : cls(superclass), roles = interfaces.map(cls);
   return Buffer.concat([Buffer.from([0xca, 0xfe, 0xba, 0xbe, 0, 0, 0, 52]), u2(constants.length + 1), ...constants,
-    u2(0x21), u2(2), u2(superclass === null ? 0 : 4), u2(0), u2(0), u2(0), u2(0)]);
+    u2(flags), u2(self), u2(parent), u2(roles.length), ...roles.map(u2), u2(0), u2(0), u2(0)]);
 }
 function throwable(name) { return {getClass: () => ({getInternalName: () => name})}; }
 function thread() {
@@ -85,6 +91,66 @@ function delayed(w, owner, name, results) {
   return {get candidate() { return candidate; }, complete() { finish(candidate); },
     fail(error) { owner.throwException(error); finish(null); drain(owner); }};
 }
+
+for (const parsed of [false, true]) {
+  test((parsed ? 'parsed Lookup' : 'named') + ' definition loads interface metadata before its superclass without linking descriptor classes', async () => {
+    const w = world(), owner = thread(), requests = [], metadata = [];
+    w.loader._loadClass = (current, name, callback) => {
+      requests.push(name);
+      const cls = new ReferenceClassData(bytes(name.slice(1, -1), 'java/lang/Object', [],
+        name.includes('Role') ? 0x601 : 0x21), null, w.loader);
+      cls.setResolved(w.object, []);
+      w.loader.addClass(name, cls);
+      metadata.push(cls);
+      callback(cls);
+    };
+    const data = bytes('scope/Ordered', 'scope/Parent', ['scope/RoleA', 'scope/RoleB']);
+    let candidate;
+    const result = await new Promise(resolve => {
+      if (parsed) {
+        candidate = new ReferenceClassData(data, null, w.loader);
+        w.loader.defineParsedClass(owner, candidate, resolve);
+      } else w.loader.defineClass(owner, 'Lscope/Ordered;', data, null, resolve, cls => { candidate = cls; });
+    });
+    assert.equal(result, candidate);
+    assert.deepEqual(requests, ['Lscope/RoleA;', 'Lscope/RoleB;', 'Lscope/Parent;']);
+    assert.ok(metadata.every(cls => !cls.isVerified() && !cls.isInitialized(null)));
+    assert.equal(candidate.getSuperClassReference().cls, null);
+    assert.ok(candidate.getInterfaceClassReferences().every(ref => ref.cls === null));
+    assert.equal(candidate.isVerified(), false);
+  });
+}
+
+test('interface preloading does not admit an interface before rejecting a final superclass', async () => {
+  const w = world(), owner = thread(), results = [], requests = [];
+  w.loader._loadClass = (current, name, callback) => {
+    requests.push(name);
+    const cls = new ReferenceClassData(bytes(name.slice(1, -1), 'java/lang/Object', [],
+      name === 'Lscope/Role;' ? 0x601 : 0x31), null, w.loader);
+    cls.setResolved(w.object, []);
+    w.loader.addClass(name, cls);
+    callback(cls);
+  };
+  w.loader.defineClass(owner, 'Lscope/Rejected;', bytes('scope/Rejected', 'scope/Final', ['scope/Role']), null,
+    value => results.push(value));
+  for (let i = 0; i < 100 && results.length === 0; i++) { await tick(); drain(owner); }
+  assert.deepEqual(requests, ['Lscope/Role;', 'Lscope/Final;']);
+  assert.deepEqual(results, [null]);
+  assert.equal(owner.errors[0].getClass().getInternalName(), 'Ljava/lang/IncompatibleClassChangeError;');
+  assert.equal(w.loader.getLoadedClass('Lscope/Rejected;'), null);
+});
+
+test('interface preloading carries the private candidate ancestry and cannot deadlock on itself', () => {
+  const w = world(), owner = thread(), results = [];
+  w.loader.defineClass(owner, 'Lscope/Recursive;', bytes('scope/Recursive', 'java/lang/Object', ['scope/Recursive']), null,
+    value => results.push(value));
+  drain(owner);
+  assert.deepEqual(results, [null]);
+  assert.equal(owner.errors[0].getClass().getInternalName(), 'Ljava/lang/ClassCircularityError;');
+  assert.equal(w.loader.getLoadedClass('Lscope/Recursive;'), null);
+  assert.deepEqual(Object.keys(w.loader.pendingDefinitions), []);
+  assert.deepEqual(Object.keys(w.loader.loadClassLocks.locks), []);
+});
 
 test('pending definitions are absent from published name and array views', () => {
   const w = world(), owner = thread(), results = [], pending = delayed(w, owner, 'scope/Pending', results);

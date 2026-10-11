@@ -211,6 +211,11 @@ this clean-tree execution evidence.
 
 Named definition reserves a parsed candidate privately, admits its superclass
 before its direct superinterfaces, and only then publishes its identity.
+Direct interface metadata is fetched before the superclass, matching the
+observable Java loader order of the pinned OpenJDK hosts; this anticipatory
+load neither verifies the interface nor publishes constant-pool resolution.
+Superclass-first admission remains a separate check, and the unpublished
+candidate participates in cycle detection during both steps.
 Pending candidates are absent from loaded-class and array queries. Admission
 rejects wrong names, module descriptors, circular hierarchies, wrong parent
 kinds, final superclasses and inaccessible parents. Runtime packages include
