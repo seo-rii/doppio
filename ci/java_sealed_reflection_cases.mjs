@@ -13,7 +13,7 @@ const declaration = (shortName, flags, superName = 'java.lang.Object', interface
   permits: permits === null ? null : permits.map(name),
   ...(passiveInitializer ? {passiveInitializer} : {}),
 });
-const initializer = {owner: mainClass, name: 'noteInitialization', descriptor: '(I)V'};
+const initializer = argumentValue => ({owner: mainClass, name: 'noteInitialization', descriptor: '(I)V', argumentValue});
 const declarations = {
   ClassRoot: declaration('ClassRoot', classFlags(ABSTRACT), 'java.lang.Object', [], ['OpenLeaf', 'SealedChild', 'FinalLeaf']),
   FinalLeaf: declaration('FinalLeaf', classFlags(FINAL), name('ClassRoot')),
@@ -33,8 +33,8 @@ const declarations = {
   InferredEnum: declaration('InferredEnum', classFlags(FINAL | ENUM), 'java.lang.Enum', [name('InferredInterface')]),
   OrdinaryClass: declaration('OrdinaryClass', classFlags(FINAL)),
   OrdinaryInterface: declaration('OrdinaryInterface', interfaceFlags),
-  PassiveRoot: declaration('PassiveRoot', classFlags(), 'java.lang.Object', [], ['PassiveLeaf'], initializer),
-  PassiveLeaf: declaration('PassiveLeaf', classFlags(FINAL), name('PassiveRoot'), [], null, initializer),
+  PassiveRoot: declaration('PassiveRoot', classFlags(), 'java.lang.Object', [], ['PassiveLeaf'], initializer(1)),
+  PassiveLeaf: declaration('PassiveLeaf', classFlags(FINAL), name('PassiveRoot'), [], null, initializer(2)),
 };
 const operand = (owner, member, descriptor, opcode = 'invokevirtual', tag = 10) => ({opcode, tag, owner, name: member, descriptor});
 const classOperand = (member, descriptor) => operand('java.lang.Class', member, descriptor);
