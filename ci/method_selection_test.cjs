@@ -849,7 +849,8 @@ function specialDispatchFixture({conflict = false, descriptor = '()V'} = {}) {
     [resolved.fullSignature]: () => assert.fail('Special invocation used a text-keyed declaration alias')};
   const args = descriptor === '(JD)V' ? [{wide: true}, null, 3.25, null] : [];
   const reference = Object.freeze({method: resolved, signature, paramWordSize: args.length,
-    fullSignature: resolved.fullSignature, classInfo: Object.freeze({cls: symbolicOwner}), isResolved: () => true});
+    fullSignature: resolved.fullSignature, classInfo: Object.freeze({cls: symbolicOwner}), isResolved: () => true,
+    hasAccess: load('ConstantPool').MethodReference.prototype.hasAccess});
   caller.constantPool.get = caller.constantPool.getUnchecked = () => reference;
   const callerMethod = declared(caller, 'run()V');
   const frame = {pc: 0, returnToThreadLoop: false, method: callerMethod,

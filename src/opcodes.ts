@@ -1285,6 +1285,7 @@ export class Opcodes {
     var fieldInfo = <FieldReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1));
     assert(fieldInfo.getType() === ConstantPoolItemType.FIELDREF);
     if (fieldInfo.isResolved()) {
+      if (!fieldInfo.hasAccess(thread, frame, true)) return;
       // Get the *actual* class that owns this field.
       // This may not be initialized if it's an interface, so we need to check.
       var fieldOwnerCls = fieldInfo.field.cls;
@@ -1340,6 +1341,7 @@ export class Opcodes {
     assert(fieldInfo.getType() === ConstantPoolItemType.FIELDREF);
 
     if (fieldInfo.isResolved()) {
+      if (!fieldInfo.hasAccess(thread, frame, true)) return;
       // Get the *actual* class that owns this field.
       // This may not be initialized if it's an interface, so we need to check.
       var fieldOwnerCls = fieldInfo.field.cls;
@@ -1391,27 +1393,18 @@ export class Opcodes {
 
   public static getfield(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
-    var fieldInfo = <FieldReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1)),
-      loader = frame.getLoader(),
-      obj = frame.opStack.top();
+    var fieldInfo = <FieldReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1));
     assert(fieldInfo.getType() === ConstantPoolItemType.FIELDREF);
-    // Check if the object is null; if we do not do this before get_class, then
-    // we might try to get a class that we have not initialized!
-    if (!isNull(thread, frame, obj)) {
-      // cls is guaranteed to be in the inheritance hierarchy of obj, so it must be
-      // initialized. However, it may not be loaded in the current class's
-      // ClassLoader...
-      if (fieldInfo.isResolved()) {
+    if (fieldInfo.isResolved()) {
+      // Resolution and instruction linkage errors precede the receiver NPE.
+      if (!fieldInfo.hasAccess(thread, frame, false)) return;
+      if (!isNull(thread, frame, frame.opStack.top())) {
         var field = fieldInfo.field;
-        if (field.rawDescriptor == 'J' || field.rawDescriptor == 'D') {
-          code[pc] = OpCode.GETFIELD_FAST64;
-        } else {
-          code[pc] = OpCode.GETFIELD_FAST32;
-        }
-        // Rerun opcode
-      } else {
-        resolveCPItem(thread, frame, fieldInfo);
+        code[pc] = field.rawDescriptor === 'J' || field.rawDescriptor === 'D' ?
+          OpCode.GETFIELD_FAST64 : OpCode.GETFIELD_FAST32;
       }
+    } else {
+      resolveCPItem(thread, frame, fieldInfo);
     }
   }
 
@@ -1438,18 +1431,11 @@ export class Opcodes {
   public static putfield(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
     var fieldInfo = <FieldReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1)),
-      loader = frame.getLoader(),
-      isLong = fieldInfo.nameAndTypeInfo.descriptor == 'J' || fieldInfo.nameAndTypeInfo.descriptor == 'D',
-      obj = frame.opStack.fromTop(isLong ? 2 : 1);
+      isLong = fieldInfo.nameAndTypeInfo.descriptor == 'J' || fieldInfo.nameAndTypeInfo.descriptor == 'D';
     assert(fieldInfo.getType() === ConstantPoolItemType.FIELDREF);
-
-    // Check if the object is null; if we do not do this before get_class, then
-    // we might try to get a class that we have not initialized!
-    if (!isNull(thread, frame, obj)) {
-      // cls is guaranteed to be in the inheritance hierarchy of obj, so it must be
-      // initialized. However, it may not be loaded in the current class's
-      // ClassLoader...
-      if (fieldInfo.isResolved()) {
+    if (fieldInfo.isResolved()) {
+      if (!fieldInfo.hasAccess(thread, frame, false)) return;
+      if (!isNull(thread, frame, frame.opStack.fromTop(isLong ? 2 : 1))) {
         var field = fieldInfo.field;
         if (isLong) {
           code[pc] = OpCode.PUTFIELD_FAST64;
@@ -1459,9 +1445,9 @@ export class Opcodes {
         // Stash the resolved full field name.
         fieldInfo.fullFieldName = `${descriptor2typestr(field.cls.getInternalName())}/${fieldInfo.nameAndTypeInfo.name}`;
         // Rerun opcode
-      } else {
-        resolveCPItem(thread, frame, fieldInfo);
       }
+    } else {
+      resolveCPItem(thread, frame, fieldInfo);
     }
   }
 
@@ -1502,6 +1488,7 @@ export class Opcodes {
     // must be loaded because it is in the object's inheritance hierarchy,
     // it needs to be present in the current classloader.
     if (methodReference.isResolved()) {
+      if (!methodReference.hasAccess(thread, frame, false)) return;
       var m = methodReference.method;
       if (m.isSignaturePolymorphic()) {
         switch (m.name) {
@@ -1528,6 +1515,7 @@ export class Opcodes {
     const pc = frame.pc;
     var methodReference = <InterfaceMethodReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1));
     if (methodReference.isResolved()) {
+      if (!methodReference.hasAccess(thread, frame, false)) return;
       // JVMS 5.5: invoking an instance method is not an initialization trigger.
       // The symbolic interface and an inherited declaration's owner can both
       // remain uninitialized even when the receiver class is initialized.
@@ -1557,6 +1545,7 @@ export class Opcodes {
     const pc = frame.pc;
     var methodReference = <MethodReference | InterfaceMethodReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1));
     if (methodReference.isResolved()) {
+      if (!methodReference.hasAccess(thread, frame, false)) return;
       // Rewrite and rerun.
       code[pc] = OpCode.INVOKENONVIRTUAL_FAST;
     } else {
@@ -1568,6 +1557,7 @@ export class Opcodes {
     const pc = frame.pc;
     var methodReference = <MethodReference | InterfaceMethodReference> frame.method.cls.constantPool.get(code.readUInt16BE(pc + 1));
     if (methodReference.isResolved()) {
+      if (!methodReference.hasAccess(thread, frame, true)) return;
       var m = methodReference.method;
       if (m.cls.isInitialized(thread)) {
         var newOpcode: OpCode = OpCode.INVOKESTATIC_FAST;

@@ -27,6 +27,12 @@ function invocation({declaringInitialized = false, symbolicInitialized = false, 
     convertArgs: (thread, args) => [thread, ...args], getNativeFunction: () => () => { events.push('invoked'); return 7; }};
   const reference = {
     isResolved: () => true,
+    // This initialization-only fake represents an already-accessible instance
+    // reference; real CP access and staticness are covered by their own units.
+    hasAccess(owner, callingFrame, isStatic) {
+      assert.equal(isStatic, false);
+      return true;
+    },
     method: resolved,
     classInfo: {cls: symbolic, isResolved: () => true},
     signature,
