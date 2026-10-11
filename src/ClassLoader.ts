@@ -109,10 +109,33 @@ function methodsInfo(data: Buffer, cpEnd: number): { countOffset: number; count:
   return { countOffset: countOffset, count: methodsCount, endOffset: offset };
 }
 
+function stackMapObject(classIndex: number): Buffer {
+  return Buffer.concat([Buffer.from([7]), u2(classIndex)]);
+}
+
+/** Overlay branch targets have empty operand stacks. Explicit full frames keep
+ * their locals independent of encoding choices made for preceding targets. */
+function fullFrameStackMapTable(nameIndex: number,
+    frames: {pc: number; locals: Buffer[]}[]): Buffer {
+  var previousPC = -1,
+    entries = frames.map((frame: {pc: number; locals: Buffer[]}): Buffer => {
+      if (frame.pc <= previousPC) throw new Error('Overlay stack-map frames must be ordered');
+      var delta = frame.pc - previousPC - 1;
+      previousPC = frame.pc;
+      return Buffer.concat([
+        Buffer.from([255]), u2(delta), u2(frame.locals.length),
+        Buffer.concat(frame.locals), u2(0)
+      ]);
+    }),
+    payload = Buffer.concat([u2(entries.length), Buffer.concat(entries)]);
+  return Buffer.concat([u2(nameIndex), u4(payload.length), payload]);
+}
+
 function replaceMethodCode(data: Buffer, cpEnd: number, name: string, descriptor: string,
     codeNameIndex: number, maxStack: number, maxLocals: number, code: Buffer,
-    accessFlags?: number, additionalAttributes?: Buffer[]): Buffer {
-  var cp = constantPoolEnd(data),
+    accessFlags?: number, additionalAttributes?: Buffer[], codeAttributes: Buffer[] = []): Buffer {
+  var nestedCodeAttributes = Buffer.concat(codeAttributes),
+    cp = constantPoolEnd(data),
     utf8Constants: {[index: number]: string} = {},
     constantOffset = 10,
     constantLength: number,
@@ -174,13 +197,14 @@ function replaceMethodCode(data: Buffer, cpEnd: number, name: string, descriptor
       if (utf8Constants[attributeNameIndex] === 'Code') {
         replacementAttributes.push(Buffer.concat([
           u2(codeNameIndex),
-          u4(12 + code.length),
+          u4(12 + code.length + nestedCodeAttributes.length),
           u2(maxStack),
           u2(maxLocals),
           u4(code.length),
           code,
           u2(0),
-          u2(0)
+          u2(codeAttributes.length),
+          nestedCodeAttributes
         ]));
         foundCode = true;
       } else {
@@ -300,6 +324,10 @@ function addJavaLangReflectExecutableReceiverModernOverlays(data: Buffer,
     makeParameterizedTypeMethodIndex = addMemberRef(
       10, parameterizedTypeImplClassIndex, 'make',
       '(Ljava/lang/Class;[Ljava/lang/reflect/Type;Ljava/lang/reflect/Type;)Lsun/reflect/generics/reflectiveObjects/ParameterizedTypeImpl;'),
+    stackMapNameIndex = addUtf8('StackMapTable'),
+    receiverClassIndex = constructor ? addClass('java/lang/reflect/Constructor') : executableClassIndex,
+    typeClassIndex = addClass('java/lang/reflect/Type'),
+    typeVariablesClassIndex = addClass('[Ljava/lang/reflect/TypeVariable;'),
     extraConstants = Buffer.concat(constants),
     withConstants = Buffer.concat([
       data.slice(0, 8),
@@ -346,7 +374,14 @@ function addJavaLangReflectExecutableReceiverModernOverlays(data: Buffer,
     ]);
   }
 
-  var withReceiver = replaceMethodCode(
+  var receiverType = stackMapObject(receiverClassIndex),
+    classType = stackMapObject(classClassIndex),
+    receiverFrames = fullFrameStackMapTable(stackMapNameIndex, constructor ? [
+      {pc: 16, locals: [receiverType, classType, classType]},
+      {pc: 27, locals: [receiverType, classType, classType, classType]},
+      {pc: 39, locals: [receiverType, classType, classType, classType]}
+    ] : [{pc: 12, locals: [receiverType]}]),
+    withReceiver = replaceMethodCode(
     withConstants,
     cp.offset + extraConstants.length,
     'getAnnotatedReceiverType',
@@ -354,7 +389,7 @@ function addJavaLangReflectExecutableReceiverModernOverlays(data: Buffer,
     codeNameIndex,
     6,
     constructor ? 4 : 1,
-    receiverCode);
+    receiverCode, undefined, undefined, [receiverFrames]);
   if (constructor) {
     return withReceiver;
   }
@@ -374,6 +409,13 @@ function addJavaLangReflectExecutableReceiverModernOverlays(data: Buffer,
       Buffer.from([0x2b, 0x2d, 0x19, 0x04, 0xb8]), u2(makeParameterizedTypeMethodIndex),
       Buffer.from([0xb0])
     ]),
+    parameterizeLocals = [receiverType, classType, classType, stackMapObject(typeVariablesClassIndex)],
+    parameterizeFrames = fullFrameStackMapTable(stackMapNameIndex, [
+      {pc: 24, locals: parameterizeLocals},
+      {pc: 31, locals: parameterizeLocals},
+      {pc: 38, locals: parameterizeLocals},
+      {pc: 60, locals: parameterizeLocals.concat([stackMapObject(typeClassIndex)])}
+    ]),
     methods = methodsInfo(withReceiver, cp.offset + extraConstants.length),
     parameterizeMethod = Buffer.concat([
       u2(0),
@@ -381,13 +423,14 @@ function addJavaLangReflectExecutableReceiverModernOverlays(data: Buffer,
       u2(parameterizeDescriptorIndex),
       u2(2),
       u2(codeNameIndex),
-      u4(12 + parameterizeCode.length),
+      u4(12 + parameterizeCode.length + parameterizeFrames.length),
       u2(3),
       u2(5),
       u4(parameterizeCode.length),
       parameterizeCode,
       u2(0),
-      u2(0),
+      u2(1),
+      parameterizeFrames,
       u2(signatureNameIndex),
       u4(2),
       u2(parameterizeSignatureIndex)
@@ -482,6 +525,8 @@ function addJavaLangReflectAccessibleObjectModernOverlays(data: Buffer): Buffer 
       10, accessibleObjectClassIndex, 'setAccessible', '(Z)V'),
     constructorGetDeclaringClassMethodIndex = addMemberRef(
       10, constructorClassIndex, 'getDeclaringClass', '()Ljava/lang/Class;'),
+    stackMapNameIndex = addUtf8('StackMapTable'),
+    objectClassIndex = addClass('java/lang/Object'),
     extraConstants = Buffer.concat(constants),
     withConstants = Buffer.concat([
       data.slice(0, 8),
@@ -536,19 +581,41 @@ function addJavaLangReflectAccessibleObjectModernOverlays(data: Buffer): Buffer 
       u2(callerSensitiveDescriptorIndex),
       u2(0)
     ]),
+    accessibleObjectType = stackMapObject(accessibleObjectClassIndex),
+    objectType = stackMapObject(objectClassIndex),
+    classType = stackMapObject(classClassIndex),
+    accessLocals = [accessibleObjectType, objectType, accessibleObjectType,
+      stackMapObject(memberClassIndex), classType, Buffer.from([1])],
+    accessTargetLocals = accessLocals.concat([objectType]),
+    canAccessFrames = fullFrameStackMapTable(stackMapNameIndex, [
+      {pc: 14, locals: [accessibleObjectType, objectType, accessibleObjectType]},
+      {pc: 57, locals: accessLocals},
+      {pc: 70, locals: accessLocals},
+      {pc: 78, locals: accessLocals},
+      {pc: 84, locals: accessLocals},
+      {pc: 96, locals: accessLocals},
+      {pc: 99, locals: accessTargetLocals},
+      {pc: 108, locals: accessTargetLocals},
+      {pc: 133, locals: accessTargetLocals.concat([classType])}
+    ]),
+    trySetAccessibleFrames = fullFrameStackMapTable(stackMapNameIndex, [
+      {pc: 17, locals: [accessibleObjectType]},
+      {pc: 41, locals: [accessibleObjectType, accessibleObjectType]}
+    ]),
     canAccessMethod = Buffer.concat([
       u2(0x0011),
       u2(canAccessNameIndex),
       u2(canAccessDescriptorIndex),
       u2(2),
       u2(codeNameIndex),
-      u4(12 + canAccessCode.length),
+      u4(12 + canAccessCode.length + canAccessFrames.length),
       u2(4),
       u2(8),
       u4(canAccessCode.length),
       canAccessCode,
       u2(0),
-      u2(0),
+      u2(1),
+      canAccessFrames,
       callerSensitiveAnnotation
     ]),
     trySetAccessibleMethod = Buffer.concat([
@@ -557,13 +624,14 @@ function addJavaLangReflectAccessibleObjectModernOverlays(data: Buffer): Buffer 
       u2(trySetAccessibleDescriptorIndex),
       u2(2),
       u2(codeNameIndex),
-      u4(12 + trySetAccessibleCode.length),
+      u4(12 + trySetAccessibleCode.length + trySetAccessibleFrames.length),
       u2(2),
       u2(2),
       u4(trySetAccessibleCode.length),
       trySetAccessibleCode,
       u2(0),
-      u2(0),
+      u2(1),
+      trySetAccessibleFrames,
       callerSensitiveAnnotation
     ]),
     methods = methodsInfo(withConstants, cp.offset + extraConstants.length);
@@ -714,6 +782,9 @@ function addAnnotatedOwnerTypeModernOverlay(data: Buffer, typeStr: string): Buff
           '(Ljava/lang/reflect/ParameterizedType;Lsun/reflect/annotation/TypeAnnotation$LocationInfo;[Lsun/reflect/annotation/TypeAnnotation;[Lsun/reflect/annotation/TypeAnnotation;Ljava/lang/reflect/AnnotatedElement;)V'),
         illegalStateConstructorIndex = addMemberRef(
           10, illegalStateExceptionClassIndex, '<init>', '(Ljava/lang/String;)V'),
+        stackMapNameIndex = addUtf8('StackMapTable'),
+        typeClassIndex = addClass('java/lang/reflect/Type'),
+        annotationsClassIndex = addClass('[Lsun/reflect/annotation/TypeAnnotation;'),
         ownerCode: Buffer;
 
       if (typeStr ===
@@ -761,19 +832,40 @@ function addAnnotatedOwnerTypeModernOverlay(data: Buffer, typeStr: string): Buff
         ]);
       }
 
+      var typeType = stackMapObject(typeClassIndex),
+        locationType = stackMapObject(locationInfoClassIndex),
+        annotationsType = stackMapObject(annotationsClassIndex),
+        baseOwner = typeStr === 'Lsun/reflect/annotation/AnnotatedTypeFactory$AnnotatedTypeBaseImpl;',
+        ownerLocals = baseOwner ? [stackMapObject(baseImplClassIndex), typeType,
+          stackMapObject(classClassIndex)] : [stackMapObject(parameterizedImplClassIndex),
+          stackMapObject(parameterizedTypeClassIndex), typeType],
+        locatedOwnerLocals = ownerLocals.concat([locationType]),
+        annotatedOwnerLocals = locatedOwnerLocals.concat([annotationsType, annotationsType]),
+        ownerFrames = fullFrameStackMapTable(stackMapNameIndex, baseOwner ? [
+          {pc: 23, locals: ownerLocals.slice(0, 2)},
+          {pc: 37, locals: ownerLocals},
+          {pc: 67, locals: locatedOwnerLocals},
+          {pc: 81, locals: annotatedOwnerLocals}
+        ] : [
+          {pc: 21, locals: ownerLocals},
+          {pc: 51, locals: locatedOwnerLocals},
+          {pc: 65, locals: annotatedOwnerLocals},
+          {pc: 93, locals: annotatedOwnerLocals}
+        ]);
       method = Buffer.concat([
         u2(0x0001),
         u2(ownerNameIndex),
         u2(ownerDescriptorIndex),
         u2(1),
         u2(codeNameIndex),
-        u4(12 + ownerCode.length),
+        u4(12 + ownerCode.length + ownerFrames.length),
         u2(7),
         u2(6),
         u4(ownerCode.length),
         ownerCode,
         u2(0),
-        u2(0)
+        u2(1),
+        ownerFrames
       ]);
     }
   }
@@ -855,6 +947,7 @@ function addTypeAnnotationLocationInfoModernOverlay(data: Buffer): Buffer {
     constructorIndex = addMemberRef(
       10, locationInfoClassIndex, '<init>',
       '(I[Lsun/reflect/annotation/TypeAnnotation$LocationInfo$Location;)V'),
+    stackMapNameIndex = addUtf8('StackMapTable'),
     popCode = Buffer.concat([
       Buffer.from([0x2a, 0xb4]), u2(depthFieldIndex),
       Buffer.from([0x99, 0x00, 0x15, 0x2a, 0xb4]), u2(locationsFieldIndex),
@@ -869,19 +962,25 @@ function addTypeAnnotationLocationInfoModernOverlay(data: Buffer): Buffer {
       u2(depthFieldIndex), Buffer.from([0x04, 0x64, 0x2c, 0xb7]),
       u2(constructorIndex), Buffer.from([0xb0])
     ]),
+    popLocals = [stackMapObject(locationInfoClassIndex), Buffer.from([1])],
+    popFrames = fullFrameStackMapTable(stackMapNameIndex, [
+      {pc: 25, locals: popLocals},
+      {pc: 27, locals: popLocals}
+    ]),
     method = Buffer.concat([
       u2(0x0001),
       u2(popNameIndex),
       u2(popDescriptorIndex),
       u2(1),
       u2(codeNameIndex),
-      u4(12 + popCode.length),
+      u4(12 + popCode.length + popFrames.length),
       u2(6),
       u2(3),
       u4(popCode.length),
       popCode,
       u2(0),
-      u2(0)
+      u2(1),
+      popFrames
     ]),
     extraConstants = Buffer.concat(constants),
     withConstants = Buffer.concat([
@@ -966,6 +1065,8 @@ function addAnnotatedTypeFactoryNestingModernOverlay(data: Buffer): Buffer {
       11, parameterizedTypeClassIndex, 'getOwnerType', '()Ljava/lang/reflect/Type;'),
     getRawTypeMethodIndex = addMemberRef(
       11, parameterizedTypeClassIndex, 'getRawType', '()Ljava/lang/reflect/Type;'),
+    stackMapNameIndex = addUtf8('StackMapTable'),
+    typeClassIndex = addClass('java/lang/reflect/Type'),
     nestingCode = Buffer.concat([
       Buffer.from([0x2a, 0xb8]), u2(isArrayMethodIndex),
       Buffer.from([0x99, 0x00, 0x05, 0x2b, 0xb0, 0x2a, 0xc1]), u2(classClassIndex),
@@ -989,6 +1090,18 @@ function addAnnotatedTypeFactoryNestingModernOverlay(data: Buffer): Buffer {
       u2(pushInnerMethodIndex), Buffer.from([0xb8]), u2(addNestingMethodIndex),
       Buffer.from([0xb0, 0x2b, 0xb0])
     ]),
+    nestingLocals = [stackMapObject(typeClassIndex), stackMapObject(locationInfoClassIndex)],
+    classNestingLocals = nestingLocals.concat([stackMapObject(classClassIndex)]),
+    parameterizedNestingLocals = nestingLocals.concat([stackMapObject(parameterizedTypeClassIndex)]),
+    nestingFrames = fullFrameStackMapTable(stackMapNameIndex, [
+      {pc: 9, locals: nestingLocals},
+      {pc: 30, locals: classNestingLocals},
+      {pc: 42, locals: classNestingLocals},
+      {pc: 54, locals: nestingLocals},
+      {pc: 77, locals: parameterizedNestingLocals},
+      {pc: 109, locals: parameterizedNestingLocals},
+      {pc: 123, locals: nestingLocals}
+    ]),
     extraConstants = Buffer.concat(constants),
     withConstants = Buffer.concat([
       data.slice(0, 8),
@@ -1006,7 +1119,7 @@ function addAnnotatedTypeFactoryNestingModernOverlay(data: Buffer): Buffer {
     codeNameIndex,
     2,
     3,
-    nestingCode);
+    nestingCode, undefined, undefined, [nestingFrames]);
 }
 
 function addParameterizedTypeImplModernOverlay(data: Buffer): Buffer {
@@ -1099,7 +1212,9 @@ function addParameterizedTypeImplModernOverlay(data: Buffer): Buffer {
       10, stringJoinerClassIndex, 'add',
       '(Ljava/lang/CharSequence;)Ljava/util/StringJoiner;'),
     stringJoinerToStringIndex = addMemberRef(
-      10, stringJoinerClassIndex, 'toString', '()Ljava/lang/String;');
+      10, stringJoinerClassIndex, 'toString', '()Ljava/lang/String;'),
+    stackMapNameIndex = addUtf8('StackMapTable'),
+    typesClassIndex = addClass('[Ljava/lang/reflect/Type;');
 
   if (dollarStringIndex > 255 || emptyStringIndex > 255 ||
       separatorStringIndex > 255 || prefixStringIndex > 255 || suffixStringIndex > 255) {
@@ -1159,6 +1274,17 @@ function addParameterizedTypeImplModernOverlay(data: Buffer): Buffer {
       Buffer.from([0xb0])
     ]);
 
+  var toStringLocals = [stackMapObject(parameterizedTypeImplClassIndex), stackMapObject(stringBuilderClassIndex)],
+    loopLocals = toStringLocals.concat([stackMapObject(stringJoinerClassIndex), stackMapObject(typesClassIndex),
+      Buffer.from([1]), Buffer.from([1])]),
+    toStringFrames = fullFrameStackMapTable(stackMapNameIndex, [
+      {pc: 97, locals: toStringLocals},
+      {pc: 112, locals: toStringLocals},
+      {pc: 124, locals: toStringLocals},
+      {pc: 164, locals: loopLocals},
+      {pc: 195, locals: loopLocals},
+      {pc: 204, locals: toStringLocals}
+    ]);
   return replaceMethodCode(
     withConstants,
     cp.offset + extraConstants.length,
@@ -1167,7 +1293,7 @@ function addParameterizedTypeImplModernOverlay(data: Buffer): Buffer {
     codeNameIndex,
     5,
     7,
-    code);
+    code, undefined, undefined, [toStringFrames]);
 }
 
 function addStaticNoopModernOverlay(data: Buffer, name: string, descriptor: string,
