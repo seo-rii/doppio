@@ -19,8 +19,9 @@ export const finalRetainedFixtures = Object.freeze([
   Object.freeze({id: 'unnamed-variables-patterns', releases: Object.freeze([25])})
 ]);
 export const finalRetainedScope = 'B8 retained final-language seed slices; the full seed, launcher and evolved-switch gates remain independently mandatory.';
-const expectedCases = [21, 25].flatMap(release => finalRetainedFixtures.filter(fixture => fixture.releases.includes(release))
-  .map(fixture => `${fixture.id}:jdk${release}`));
+const expectedEntries = [21, 25].flatMap(release => finalRetainedFixtures.filter(fixture => fixture.releases.includes(release))
+  .map(fixture => ({id: `${fixture.id}:jdk${release}`, fixtureId: fixture.id, release})));
+const expectedCases = expectedEntries.map(entry => entry.id);
 
 export function createFinalRetainedManifest(seed) {
   validateManifest(seed);
@@ -49,7 +50,9 @@ export function assertFinalRetainedEvidence(ledger, {browser = true} = {}) {
   assert.equal(ledger.source.commit, ledger.sourceAtEnd.commit, 'Unchanged retained HEAD');
   assert.equal(ledger.source.trackedDirty, false, 'Clean retained inputs');
   assert.equal(ledger.sourceAtEnd.trackedDirty, false, 'Clean retained final inputs');
-  for (const entry of ledger.cases) {
+  for (const [index, entry] of ledger.cases.entries()) {
+    assert.equal(entry.fixtureId, expectedEntries[index].fixtureId, 'Actual retained fixture identity');
+    assert.equal(entry.release, expectedEntries[index].release, 'Actual retained release identity');
     assert.equal(entry.status, 'passed');
     assert.ok(Array.isArray(entry.classes) && entry.classes.length > 0, 'Original class-byte evidence');
     for (const file of entry.classes) {
@@ -65,6 +68,13 @@ export function assertFinalRetainedEvidence(ledger, {browser = true} = {}) {
     for (const field of ['nativeSucceeded', 'doppioSucceeded', 'stdoutEqual', 'stderrEqual',
       ...(browser ? ['browserSucceeded', 'browserStdoutEqual', 'browserStderrEqual'] : [])])
       assert.equal(entry.comparison[field], true, 'Exact successful retained comparison');
+    const normalize = value => {assert.equal(typeof value, 'string'); return value.replaceAll('\r\n', '\n');};
+    assert.equal(normalize(entry.doppio.stdout), normalize(entry.native.stdout), 'Actual native/Node retained stdout equality');
+    assert.equal(normalize(entry.doppio.stderr), normalize(entry.native.stderr), 'Actual native/Node retained stderr equality');
+    if (browser) {
+      assert.equal(normalize(entry.browser.stdout), normalize(entry.native.stdout), 'Actual native/Chromium retained stdout equality');
+      assert.equal(normalize(entry.browser.stderr), normalize(entry.native.stderr), 'Actual native/Chromium retained stderr equality');
+    }
     if (entry.id.startsWith('switch-bootstrap-contracts:')) {
       assert.equal(entry.classGenerator?.path, 'ci/generate_switch_bootstrap_fixture.mjs', 'Explicit generated companion provenance');
       assert.match(entry.classGenerator.sha256, /^[a-f0-9]{64}$/);
