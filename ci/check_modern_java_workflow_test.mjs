@@ -73,6 +73,11 @@ const invocationEvolutionUnits = [
 ];
 const invocationEvolutionUnitCommand = `node --test ${invocationEvolutionUnits.join(' ')}`;
 const invocationEvolutionRunnerCommand = 'node ci/java_invocation_evolution_test.mjs --browser';
+const coreSemanticsUnits = ['ci/jvm_float_precision_test.cjs', 'ci/jvm_float_to_long_test.cjs',
+  'ci/array_store_semantics_test.cjs', 'ci/athrow_semantics_test.cjs', 'ci/java_core_bytecode_test.mjs',
+  'ci/java_core_stack_forms_contract_test.mjs', 'ci/java_core_semantics_contract_test.mjs'];
+const coreSemanticsUnitCommand = `node --test ${coreSemanticsUnits.join(' ')}`;
+const coreSemanticsRunnerCommand = 'node ci/java_core_semantics_test.mjs --browser';
 const memberGates = [
   {name: 'member resolution', units: memberResolutionUnits, unitCommand: memberResolutionUnitCommand,
     runnerCommand: memberResolutionRunnerCommand, stepId: 'java_member_resolution',
@@ -83,6 +88,9 @@ const memberGates = [
   {name: 'invocation evolution', units: invocationEvolutionUnits, unitCommand: invocationEvolutionUnitCommand,
     runnerCommand: invocationEvolutionRunnerCommand, stepId: 'java_invocation_evolution',
     ledger: 'build/java-invocation-evolution-results.json', timeout: 20},
+  {name: 'core semantics', units: coreSemanticsUnits, unitCommand: coreSemanticsUnitCommand,
+    runnerCommand: coreSemanticsRunnerCommand, stepId: 'java_core_semantics',
+    ledger: 'build/java-core-semantics-results.json', timeout: 45},
 ];
 const packageScripts = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).scripts;
 for (const [name, command] of [
@@ -99,6 +107,8 @@ for (const [name, command] of [
   ['ci:member-access', memberAccessRunnerCommand],
   ['ci:invocation-evolution:test', invocationEvolutionUnitCommand],
   ['ci:invocation-evolution', invocationEvolutionRunnerCommand],
+  ['ci:core-semantics:test', coreSemanticsUnitCommand],
+  ['ci:core-semantics', coreSemanticsRunnerCommand],
 ]) {
   if (packageScripts[name] !== command) {
     throw new Error(`${name} must retain the complete phase B command: ${command}`);
@@ -626,7 +636,10 @@ for (const [firstName, secondName] of [
   ['Upload Java member access ledger', 'Check phase B invocation evolution contracts'],
   ['Check phase B invocation evolution contracts', 'Run Java invocation evolution compatibility'],
   ['Run Java invocation evolution compatibility', 'Upload Java invocation evolution ledger'],
-  ['Upload Java invocation evolution ledger', 'Check evolved switch ledger contract'],
+  ['Upload Java invocation evolution ledger', 'Check phase B core semantics contracts'],
+  ['Check phase B core semantics contracts', 'Run Java core semantics compatibility'],
+  ['Run Java core semantics compatibility', 'Upload Java core semantics ledger'],
+  ['Upload Java core semantics ledger', 'Check evolved switch ledger contract'],
 ]) {
   expectCheckerFailure(
     `member resolution/access dependency reversed: ${firstName} before ${secondName}`,
