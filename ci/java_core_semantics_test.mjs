@@ -8,7 +8,7 @@ import numeric from './java_core_numeric_cases.mjs';
 import arraysObjects from './java_core_arrays_objects_cases.mjs';
 import control from './java_core_control_cases.mjs';
 import exceptions from './java_core_exceptions_cases.mjs';
-import {inspectCoreClasses, proveCoreGroup} from './java_core_bytecode.mjs';
+import {coreOpcodeNames, inspectCoreClasses, proveCoreGroup} from './java_core_bytecode.mjs';
 import {inspectClassFiles, runCommand, runtimeSnapshot, validateToolchains} from './run_java_compatibility.mjs';
 import {treeDigest} from './prepare_java_compatibility_toolchains.mjs';
 import {assertDerivationProvenance} from './java_class_derivation_test.mjs';
@@ -16,10 +16,19 @@ import {assertDerivationProvenance} from './java_class_derivation_test.mjs';
 const harnessPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(harnessPath), '..');
 const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+const freezeContract = value => {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    for (const child of Object.values(value)) freezeContract(child);
+    Object.freeze(value);
+  }
+  return value;
+};
 export const coreLedgerScope = 'JVM-002 B5 selected core numeric, array, object, frame, control-flow and exception contracts';
-export const coreGroups = [numeric, arraysObjects, control, exceptions];
+export const coreGroups = freezeContract([numeric, arraysObjects, control, exceptions]);
 export const coreTimeouts = {compileMs: 60_000, nativeMs: 30_000, guestMs: 60_000};
-export const coreRequiredHosts = ['native', 'node', 'chromium'];
+export const coreRequiredHosts = Object.freeze(['native', 'node', 'chromium']);
+const coreRequiredReleases = Object.freeze([21, 25]);
+const coreModes = Object.freeze(['browser', 'native-only', 'diagnostic']);
 
 export function coreSourceUnits(group, index) {
   const units = new Map(index.units.map(unit => [unit.id, unit]));
@@ -42,18 +51,27 @@ export function coreSourceUnits(group, index) {
 }
 
 export function validateCoreGroups(groups = coreGroups) {
-  const allIds = new Set();
+  assert.ok(Array.isArray(groups) && groups.length > 0, 'A nonempty mandatory group array is required');
+  const allIds = new Set(), groupIds = new Set();
   for (const group of groups) {
     assert.match(group.id, /^[a-z][a-z0-9-]*$/);
+    assert.ok(!groupIds.has(group.id), 'Unique mandatory group id'); groupIds.add(group.id);
     assert.match(group.source, /^classes\/modern_fixture\/[A-Za-z0-9]+\.java$/);
     assert.match(group.mainClass, /^classes\.modern_test\.[A-Za-z0-9]+$/);
     assert.match(group.completionMarker, /^CORE_[A-Z_]+_OK$/);
-    assert.ok(group.cases.length > 0);
+    assert.ok(Array.isArray(group.cases) && group.cases.length > 0, 'A nonempty mandatory case array is required');
     for (const entry of group.cases) {
       assert.match(entry.id, /^[a-z][a-z0-9-]*$/); assert.ok(!allIds.has(entry.id), 'Unique mandatory case id'); allIds.add(entry.id);
       assert.equal(entry.entryDescriptor, '()V'); assert.match(entry.entryMethod, /^case[A-Za-z0-9]+$/);
-      assert.ok(entry.trace.length > 0 && entry.trace.every(event => typeof event === 'string' && !/[\r\n]/.test(event)));
-      assert.ok(entry.probes.length > 0, `${entry.id}: actual executable opcode probes`);
+      assert.ok(Array.isArray(entry.trace) && entry.trace.length > 0 &&
+        entry.trace.every(event => typeof event === 'string' && !/[\r\n]/.test(event)));
+      assert.ok(Array.isArray(entry.probes) && entry.probes.length > 0, `${entry.id}: actual executable opcode probes`);
+      for (const probe of entry.probes) {
+        assert.ok(Array.isArray(probe?.requiredOpcodes) && probe.requiredOpcodes.length > 0,
+          `${entry.id}: a nonempty required opcode array is required`);
+        for (const opcode of probe.requiredOpcodes) assert.ok(typeof opcode === 'string' && coreOpcodeNames.includes(opcode),
+          `${entry.id}: known required opcode mnemonic`);
+      }
     }
     if (group.generatedSources) assert.deepEqual(group.generatedSources(), group.generatedSources(), 'Deterministic generated genuine sources');
   }
@@ -72,14 +90,68 @@ export function assertCoreResult(result, group, label = group.id) {
 }
 
 export function createCoreLedger(mode = 'browser', groups = coreGroups) {
-  return {schemaVersion: 1, scope: coreLedgerScope, status: 'running', requestedMode: mode,
+  assert.ok(coreModes.includes(mode), 'Known core execution mode');
+  const caseCount = validateCoreGroups(groups);
+  assert.deepEqual(groups.map(group => group.id), coreGroups.map(group => group.id), 'Exact mandatory group inventory');
+  for (const [index, group] of groups.entries()) {
+    const expected = coreGroups[index];
+    assert.deepEqual(group.cases, expected.cases, 'Exact mandatory group case contracts');
+    for (const key of ['source', 'mainClass', 'completionMarker', 'generatedSources'])
+      assert.equal(group[key], expected[key], 'Exact mandatory group compiler inputs');
+  }
+  const ledger = {schemaVersion: 1, scope: coreLedgerScope, status: 'running', requestedMode: mode,
     officialGate: mode === 'browser', phaseBComplete: false, jvm002Complete: false,
     fullSourceUnitConformanceProven: false, startedAt: new Date().toISOString(),
-    requiredReleases: [21, 25], requiredHosts: coreRequiredHosts,
-    caseCount: validateCoreGroups(groups), results: [21, 25].flatMap(release => groups.map(group => ({
-      release, group: group.id, status: 'not-run', cases: group.cases, operations: [],
+    requiredReleases: [...coreRequiredReleases], requiredHosts: [...coreRequiredHosts],
+    caseCount, results: coreRequiredReleases.flatMap(release => groups.map(group => ({
+      release, group: group.id, status: 'not-run', cases: structuredClone(group.cases), operations: [],
       executions: coreRequiredHosts.map(host => ({host, status: 'not-run', reason: 'awaiting compilation'}))
     })))};
+  assertCoreLedgerInventory(ledger, {phase: 'initial'});
+  return ledger;
+}
+
+/** Validate against the canonical corpus, never against a caller-pruned ledger. */
+export function assertCoreLedgerInventory(ledger, {phase = 'inventory'} = {}) {
+  assert.ok(['inventory', 'initial', 'terminal'].includes(phase), 'Known inventory validation phase');
+  assert.equal(ledger.schemaVersion, 1, 'Exact mandatory ledger schema');
+  assert.equal(ledger.scope, coreLedgerScope, 'Exact mandatory ledger scope');
+  assert.ok(coreModes.includes(ledger.requestedMode), 'Known core execution mode');
+  assert.equal(ledger.officialGate, ledger.requestedMode === 'browser', 'Execution mode and official gate must agree');
+  assert.deepEqual(ledger.requiredReleases, coreRequiredReleases, 'Exact mandatory release inventory');
+  assert.deepEqual(ledger.requiredHosts, coreRequiredHosts, 'Exact mandatory host inventory');
+  assert.equal(ledger.caseCount, validateCoreGroups(), 'Exact mandatory case count');
+  const expected = coreRequiredReleases.flatMap(release => coreGroups.map(group => ({release, group})));
+  assert.ok(Array.isArray(ledger.results), 'Exact mandatory group/release inventory');
+  assert.deepEqual(ledger.results.map(record => [record.release, record.group]),
+    expected.map(record => [record.release, record.group.id]), 'Exact mandatory group/release inventory');
+  const selectedHosts = ledger.requestedMode === 'native-only' ? ['native'] :
+    ledger.requestedMode === 'diagnostic' ? ['native', 'node'] : coreRequiredHosts;
+  if (phase === 'initial') assert.equal(ledger.status, 'running', 'Fresh mandatory execution ledger');
+  for (const [index, record] of ledger.results.entries()) {
+    assert.deepEqual(record.cases, expected[index].group.cases, 'Exact mandatory case contracts');
+    assert.ok(Array.isArray(record.operations), 'Mandatory compiler operation records');
+    assert.ok(Array.isArray(record.executions), 'Exact mandatory host execution inventory');
+    assert.deepEqual(record.executions.map(cell => cell.host), coreRequiredHosts, 'Exact mandatory host execution inventory');
+    assert.ok(['not-run', 'running', 'passed', 'failed'].includes(record.status), 'Known mandatory group status');
+    if (phase === 'initial') {
+      assert.equal(record.status, 'not-run', 'Fresh mandatory group execution');
+      assert.equal(record.operations.length, 0, 'Do not overwrite prior mandatory compiler attempts');
+    }
+    if (phase === 'terminal') assert.ok(['passed', 'failed'].includes(record.status), 'Terminal mandatory group status');
+    for (const cell of record.executions) {
+      assert.ok(['not-run', 'running', 'passed', 'failed'].includes(cell.status), 'Known mandatory host status');
+      if (phase === 'initial') {
+        assert.equal(cell.status, 'not-run', 'Fresh mandatory host execution');
+        assert.ok(!Object.hasOwn(cell, 'result') && !Object.hasOwn(cell, 'outcomes'), 'Do not overwrite prior mandatory host evidence');
+      }
+      if (phase === 'terminal') {
+        assert.notEqual(cell.status, 'running', 'Terminal mandatory host status');
+        if (!selectedHosts.includes(cell.host)) assert.equal(cell.status, 'not-run', 'Excluded diagnostic host remains mandatory and not-run');
+        else if (record.status === 'passed') assert.equal(cell.status, 'passed', 'Every selected mandatory host must pass');
+      }
+    }
+  }
 }
 
 export function writeCoreLedger(filename, ledger) {
@@ -121,6 +193,24 @@ const integrity = check => {
   try { check(); } catch (error) { throw new CoreIntegrityError(error.message, {cause: error}); }
 };
 
+export function assertCoreCompilerSources(sourceDigests) {
+  integrity(() => {
+    assert.ok(Array.isArray(sourceDigests) && sourceDigests.length > 0, 'Pre-javac source digests are required');
+    assert.deepEqual(sourceDigests.map(source => ({path: source.path, sha256: digest(fs.readFileSync(source.path))})),
+      sourceDigests, 'Immutable compiler sources from pre-javac hashes');
+  });
+}
+
+// Keep this ordering explicit and independently testable: an unsuccessful javac
+// attempt may also corrupt inputs, and neither fact may erase its raw result.
+export async function checkCoreCompilation(operation, execute, verifyIntegrity, checkpoint = () => {}) {
+  operation.result = await execute();
+  checkpoint();
+  await verifyIntegrity();
+  assert.equal(operation.result.status, 'passed', operation.result.stderr);
+  assert.equal(operation.result.stdout + operation.result.stderr, '', 'Clean genuine compilation');
+}
+
 async function provenance() {
   const read = async args => {
     const result = await runCommand('git', args, {cwd: repoRoot, timeoutMs: 10_000});
@@ -131,7 +221,7 @@ async function provenance() {
 }
 
 export async function runCoreSemantics(ledger, {checkpoint = () => {}} = {}) {
-  assert.ok(['browser', 'native-only', 'diagnostic'].includes(ledger.requestedMode));
+  assertCoreLedgerInventory(ledger, {phase: 'initial'});
   const nativeOnly = ledger.requestedMode === 'native-only', browser = ledger.requestedMode === 'browser';
   const hosts = nativeOnly ? ['native'] : browser ? coreRequiredHosts : ['native', 'node'];
   const lockPath = path.join(repoRoot, 'ci/java_compatibility_toolchains.lock.json');
@@ -188,21 +278,20 @@ export async function runCoreSemantics(ledger, {checkpoint = () => {}} = {}) {
           sourceRecords.push({...source, path: filename, sha256: digest(source.text)});
         }
         record.sources = sourceRecords;
+        const sourceDigests = sourceRecords.map(source => ({path: source.path, sha256: source.sha256}));
+        assertCoreCompilerSources(sourceDigests);
         const operation = {command: path.join(prepared.home, 'bin/javac'), arguments: ['--release', String(record.release),
           '-encoding', 'UTF-8', '-proc:none', '-g', '-classpath', emptySourcepath, '-sourcepath', emptySourcepath, '-d', output,
           ...sourceRecords.map(source => source.path)], destination: output};
         record.operations.push(operation); checkpoint();
-        operation.result = await runCommand(operation.command, operation.arguments, {cwd: directory, timeoutMs: coreTimeouts.compileMs});
-        checkpoint();
-        assert.equal(operation.result.status, 'passed', operation.result.stderr);
-        assert.equal(operation.result.stdout + operation.result.stderr, '', 'Clean genuine compilation');
+        await checkCoreCompilation(operation, () => runCommand(operation.command, operation.arguments,
+          {cwd: directory, timeoutMs: coreTimeouts.compileMs}),
+        () => { checkGlobal(); assertCoreCompilerSources(sourceDigests); }, checkpoint);
         record.classFiles = inspectClassFiles(output, record.release, group.mainClass);
         record.bytecodeProofs = proveCoreGroup(group, inspectCoreClasses(output, record.classFiles));
         record.classpath = {directory: output, treeSha256: treeDigest(output), genuineCompilerBytes: true, fallbackPayloadClassFiles: false};
-        const sources = () => sourceRecords.map(source => ({path: source.path, sha256: digest(fs.readFileSync(source.path))}));
-        const sourceDigests = sources();
         const checkLocal = () => integrity(() => {
-          assert.deepEqual(sources(), sourceDigests, 'Immutable compiler sources');
+          assertCoreCompilerSources(sourceDigests);
           assert.equal(treeDigest(output), record.classpath.treeSha256, 'Immutable genuine runtime classpath');
           assert.deepEqual(inspectClassFiles(output, record.release, group.mainClass), record.classFiles, 'Genuine class versions and hashes');
         });
@@ -231,6 +320,7 @@ export async function runCoreSemantics(ledger, {checkpoint = () => {}} = {}) {
     else assert.deepEqual(ledger.gitEnd, ledger.gitStart, 'Unchanged diagnostic source state');
     ledger.browserIntegrity = session ? session.verifyIntegrity() : null;
     ledger.inputIntegrity = {unchanged: true, verifiedAtEnd: true};
+    assertCoreLedgerInventory(ledger, {phase: 'terminal'});
     ledger.status = ledger.results.every(record => record.status === 'passed') ? 'passed' : 'failed';
     ledger.summary = {executionCells: ledger.results.flatMap(record => record.executions).length,
       passed: ledger.results.flatMap(record => record.executions).filter(cell => cell.status === 'passed').length,

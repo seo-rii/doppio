@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -7,6 +8,7 @@ import {fileURLToPath} from 'node:url';
 import {coreGroups, coreRequiredHosts, coreTimeouts, coreSourceUnits, validateCoreGroups,
   createCoreLedger, assertCoreResult, writeCoreLedger, checkCoreExecution, CoreIntegrityError}
   from './java_core_semantics_test.mjs';
+import * as core from './java_core_semantics_test.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const index = JSON.parse(fs.readFileSync(path.join(root, 'ci/plan_spec_source_index.json')));
@@ -58,6 +60,146 @@ test('all native and guest execution cells are registered as not-run before the 
   assert.equal(createCoreLedger('native-only').officialGate, false);
   assert.equal(createCoreLedger('diagnostic').officialGate, false);
   assert.deepEqual(coreTimeouts, {compileMs: 60000, nativeMs: 30000, guestMs: 60000});
+});
+
+test('group validation rejects empty or duplicate groups and empty opcode contracts', () => {
+  assert.throws(() => validateCoreGroups([]), /nonempty/);
+  const duplicate = structuredClone(coreGroups[0]);
+  duplicate.cases = duplicate.cases.map(entry => ({...entry, id: 'duplicate-' + entry.id}));
+  assert.throws(() => validateCoreGroups([coreGroups[0], duplicate]), /Unique mandatory group/);
+  for (const requiredOpcodes of [undefined, null, [], {}, 'iadd', ['not-an-opcode'], [null], ['iadd', 1], Array(1)]) {
+    const group = structuredClone(coreGroups[0]);
+    group.cases[0].probes[0].requiredOpcodes = requiredOpcodes;
+    assert.throws(() => validateCoreGroups([group]), /required opcode/);
+  }
+  const missing = structuredClone(coreGroups[0]); delete missing.cases[0].probes[0].requiredOpcodes;
+  assert.throws(() => validateCoreGroups([missing]), /required opcode/);
+  for (const probes of [undefined, null, {}, [], 'iadd']) {
+    const group = structuredClone(coreGroups[0]); group.cases[0].probes = probes;
+    assert.throws(() => validateCoreGroups([group]), /executable opcode probes/);
+  }
+});
+
+test('ledger constructor rejects unknown modes and incomplete mandatory group profiles', () => {
+  assert.throws(() => createCoreLedger('unknown'), /mode/);
+  assert.throws(() => createCoreLedger('browser', []), /nonempty/);
+  assert.throws(() => createCoreLedger('browser', coreGroups.slice(1)), /mandatory group/);
+  assert.throws(() => createCoreLedger('browser', [...coreGroups].reverse()), /mandatory group/);
+  const changed = coreGroups.map(group => ({...group, cases: structuredClone(group.cases)}));
+  changed[0].cases.pop();
+  assert.throws(() => createCoreLedger('browser', changed), /mandatory.*case/);
+});
+
+const invalidInventories = [
+  ledger => { ledger.results = []; },
+  ledger => { ledger.results.pop(); },
+  ledger => { ledger.results[1] = structuredClone(ledger.results[0]); },
+  ledger => { ledger.results.reverse(); },
+  ledger => { ledger.results[0].group = 'unknown'; },
+  ledger => { ledger.results[0].release = 22; },
+  ledger => { ledger.requiredReleases = [21]; },
+  ledger => { ledger.requiredReleases = [21, 21]; },
+  ledger => { ledger.requiredHosts = ['native']; },
+  ledger => { ledger.requiredHosts = ['native', 'node', 'node']; },
+  ledger => { ledger.results[0].executions = []; },
+  ledger => { ledger.results[0].executions.pop(); },
+  ledger => { ledger.results[0].executions[2] = structuredClone(ledger.results[0].executions[1]); },
+  ledger => { ledger.results[0].executions.reverse(); },
+  ledger => { ledger.results[0].cases = []; },
+  ledger => { ledger.results[0].cases.pop(); },
+  ledger => { ledger.results[0].cases[1] = structuredClone(ledger.results[0].cases[0]); },
+  ledger => { ledger.results[0].cases.reverse(); },
+  ledger => { ledger.results[0].cases[0].trace = ['changed expectation']; },
+  ledger => { ledger.results[0].cases[0].probes[0].requiredOpcodes = []; },
+  ledger => { ledger.caseCount--; },
+  ledger => { ledger.officialGate = false; },
+  ledger => { ledger.requestedMode = 'native-only'; },
+  ledger => { ledger.requestedMode = 'unknown'; }
+];
+
+test('ledger inventory rejects pruned, duplicate and changed mandatory contracts at entry and terminal', () => {
+  for (const mutate of invalidInventories) for (const phase of ['initial', 'terminal']) {
+    const ledger = createCoreLedger(); mutate(ledger);
+    assert.throws(() => core.assertCoreLedgerInventory(ledger, {phase}), /mandatory|mode|official/);
+  }
+  for (const mode of ['browser', 'native-only', 'diagnostic']) {
+    const ledger = createCoreLedger(mode);
+    assert.doesNotThrow(() => core.assertCoreLedgerInventory(ledger, {phase: 'initial'}));
+    for (const record of ledger.results) {
+      record.status = 'passed';
+      for (const cell of record.executions) {
+        if (mode === 'browser' || cell.host === 'native' || mode === 'diagnostic' && cell.host === 'node') cell.status = 'passed';
+      }
+    }
+    assert.doesNotThrow(() => core.assertCoreLedgerInventory(ledger, {phase: 'terminal'}));
+    ledger.results[0].executions[0].status = 'not-run';
+    assert.throws(() => core.assertCoreLedgerInventory(ledger, {phase: 'terminal'}), /mandatory/);
+  }
+});
+
+test('ledger case and host arrays cannot mutate canonical contracts or another release', () => {
+  assert.throws(() => coreGroups.pop(), TypeError);
+  assert.throws(() => coreGroups[0].cases.pop(), TypeError);
+  assert.throws(() => { coreGroups[0].cases[0].trace[0] = 'changed'; }, TypeError);
+  assert.throws(() => { coreGroups[0].cases[0].probes[0].requiredOpcodes = []; }, TypeError);
+  const ledger = createCoreLedger(), count = coreGroups[0].cases.length;
+  ledger.results[0].cases.pop();
+  ledger.results[0].cases[0].trace[0] = 'changed';
+  ledger.requiredHosts.pop();
+  assert.equal(coreGroups[0].cases.length, count);
+  assert.notEqual(coreGroups[0].cases[0].trace[0], 'changed');
+  assert.equal(ledger.results[coreGroups.length].cases.length, count);
+  assert.notEqual(ledger.results[coreGroups.length].cases[0].trace[0], 'changed');
+  assert.deepEqual(coreRequiredHosts, ['native', 'node', 'chromium']);
+});
+
+test('run entry rejects malformed inventories before any toolchain or subprocess operation', async () => {
+  const original = fs.readFileSync;
+  fs.readFileSync = function(filename, ...args) {
+    assert.ok(!String(filename).endsWith('java_compatibility_toolchains.lock.json'), 'Invalid inventory reached toolchain I/O');
+    return original.call(this, filename, ...args);
+  };
+  try {
+    for (const mutate of invalidInventories) {
+      const ledger = createCoreLedger(); mutate(ledger);
+      await assert.rejects(core.runCoreSemantics(ledger), /mandatory|mode|official/);
+    }
+  } finally { fs.readFileSync = original; }
+});
+
+test('compiler integrity uses pre-javac hashes and preserves raw results even when compilation failed', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'doppio-core-source-integrity-'));
+  try {
+    const filename = path.join(directory, 'Generated.java');
+    const original = 'class Generated {}\n';
+    const sha256 = crypto.createHash('sha256').update(original).digest('hex');
+    for (const status of ['passed', 'failed']) {
+      fs.writeFileSync(filename, original);
+      const sources = [{path: filename, sha256}], operation = {}, checkpoints = [];
+      const raw = {status, exitCode: status === 'passed' ? 0 : 1, stdout: '', stderr: status === 'passed' ? '' : 'javac failed\n'};
+      await assert.rejects(core.checkCoreCompilation(operation, async () => {
+        fs.writeFileSync(filename, original + '// changed during compilation\n'); return raw;
+      }, () => core.assertCoreCompilerSources(sources), () => checkpoints.push(structuredClone(operation))), CoreIntegrityError);
+      assert.deepEqual(operation.result, raw);
+      assert.deepEqual(checkpoints[0].result, raw, 'Raw compiler output precedes the integrity rejection');
+      assert.equal(sources[0].sha256, sha256, 'Original baseline is not refreshed after javac');
+    }
+    fs.writeFileSync(filename, original);
+    assert.doesNotThrow(() => core.assertCoreCompilerSources([{path: filename, sha256}]));
+  } finally { fs.rmSync(directory, {recursive: true, force: true}); }
+});
+
+test('ordinary failed compilation still checks integrity before reporting its retained compiler error', async () => {
+  const operation = {}, order = [];
+  const raw = {status: 'failed', exitCode: 1, stdout: '', stderr: 'independent javac failure'};
+  await assert.rejects(core.checkCoreCompilation(operation, async () => { order.push('execute'); return raw; },
+    () => { order.push('integrity'); }, () => { order.push('checkpoint'); }), /independent javac failure/);
+  assert.deepEqual(order, ['execute', 'checkpoint', 'integrity']);
+  assert.deepEqual(operation.result, raw);
+  const accepted = {};
+  await core.checkCoreCompilation(accepted, async () => ({status: 'passed', exitCode: 0, stdout: '', stderr: ''}),
+    () => { order.push('verified'); });
+  assert.equal(accepted.result.status, 'passed');
 });
 
 test('oracle rejects missing, reordered, duplicate or extra events and exact failure substitutions', () => {
