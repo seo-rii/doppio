@@ -361,10 +361,13 @@ cells, B1–B6 host gates and the original 323 retained fixtures pass unchanged.
 This selected integration evidence does not assess every source unit or
 complete record/bootstrap, sealed-type or final-language conformance.
 B8 adds a fixed 58-case final-language corpus in five groups with group-specific
-21/25 applicability and actual per-case launcher startup. Native-first outcomes
-pass, while its clean full-host integration exit is pending. Existing final
-language/bootstrap fixtures, launcher oracle differences and evolved switches
-remain separate required evidence; all 112 JVM-008 source units stay unassessed.
+21/25 applicability and actual per-case launcher startup. At clean `f8d41537b`,
+all 21 mandatory native/Node/Chromium cells pass, alongside 33 retained language
+host executions, the existing launcher/evolved-switch gates, B1–B7 and the
+original 323 retained fixtures. All 834 mandatory compiled units/contracts pass
+(one optional diagnostic is skipped). This completes the selected B1–B8 batch
+plan, not full Phase B conformance. Launcher oracle differences remain explicit;
+all 112 JVM-008 source units stay unassessed.
 
 ### Scope and measurement
 
@@ -411,7 +414,7 @@ distinction between inventory completion and runtime conformance.
 | JVM-005 | P2; hidden definition/discovery explicitly missing in [core gaps](modern-java.md#known-core-lang-gaps) | Hidden class and class-data definitions, initialization, lookup privileges, nestmate options, names/descriptors and discovery restrictions match native contracts. Depends on JVM-002/003; module cases on JVM-011. |
 | JVM-006 | P1; [B6 selected evidence](phase-b-loading.md#b6-selected-records): 77 genuine/mutated record cases cover lazy generic and nested type-use reflection, constructors/accessors and field-backed object methods across 21/25 native/Node/Chromium. General ObjectMethods/handle/bootstrap forms remain [partial](modern-java.md#known-record-gaps); source units stay unassessed | Genuine javac records with generic/annotated components, constructors/accessors, object methods and reflection/handles pass; general bootstrap forms have explicit tests. Depends on JVM-001/003/004. |
 | JVM-007 | P1; [B7 selected evidence](phase-b-loading.md#b7-selected-sealed-types): 62 genuine/mutated cases cover direct derivation identities, passive reflection, bounded invalid metadata and original loader/VirtualMachineError boundaries across 21/25 native/Node/Chromium; source units remain unassessed and named-module runtime behavior unclaimed | Expand beyond the selected corpus for complete class-file, reflection and derivation contracts. Named-module access and ownership require JVM-011. Depends on JVM-002. |
-| JVM-008 | P1; retained genuine patterns/switches/bootstrap APIs, evolved binaries, final unnamed/module-import/constructor and compact/instance-main slices have selected Node/Chromium evidence; [B8 expansion](phase-b-loading.md#b8-selected-final-language) adds 58 fixed cases with native-first checks and pending full-host integration. Three existing pinned launcher differences remain explicit; all 112 source units stay unassessed | Expand beyond selected cases and resolve oracle differences without equating native behavior with specification requirements. Distinguish source acceptance, compiler lowering, runtime and actual launcher obligations. Depends on JVM-001/004/006/007. |
+| JVM-008 | P1; retained genuine patterns/switches/bootstrap APIs, evolved binaries, final unnamed/module-import/constructor and compact/instance-main slices have selected Node/Chromium evidence; [B8 expansion](phase-b-loading.md#b8-selected-final-language) passes 58 fixed cases in all 21 applicable native/Node/Chromium cells at clean `f8d41537b`, with separately passing retained, launcher and evolved-switch gates. Three existing pinned launcher differences remain explicit; all 112 source units stay unassessed | Expand beyond selected cases and resolve oracle differences without equating native behavior with specification requirements. Distinguish source acceptance, compiler lowering, runtime and actual launcher obligations. Depends on JVM-001/004/006/007. |
 | JVM-009 | P0 scheduler design, then P1 selected profile; virtual threads explicitly missing in [core gaps](modern-java.md#known-core-lang-gaps) | Thread builders/start, lifecycle/join/interrupt, sleep/park, locals, executors, blocking-I/O and monitor interactions work on each required host. Do not replace virtual-thread semantics with an isVirtual flag. Depends on JVM-010 and host I/O. |
 | JVM-010 | P0 execution/memory-model design; [concurrent gaps](modern-java.md#known-concurrent-gaps) explicitly exclude broader scheduling/backpressure/memory-safety | Defined execution model plus synchronization, visibility/atomics, cancellation/completion and scheduling contracts tested without timing-only assertions or demanding one nondeterministic ordering. Shared foundation for JVM-009 and LIB-002/003; depends on JVM-003. |
 | JVM-011 | P0 design, P2 implementation; [boundary](support.md#explicit-boundaries): named modules and strong encapsulation absent | Module resolution/layers, ownership, services, readability and qualified exports/opens have positive and negative reflection/lookup fixtures. Publish expanded support only after those pass. Depends on JVM-002/003. |

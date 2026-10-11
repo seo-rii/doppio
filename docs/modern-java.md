@@ -2677,11 +2677,12 @@ expanded.
 ## Final-Language Evidence Boundaries
 
 The [B8 selected corpus](phase-b-loading.md#b8-selected-final-language) adds
-58 fixed final-language and actual-startup cases. Native-first checks pass on
-the applicable pinned Java 21/25 toolchains; its complete clean Node/Chromium
-integration exit remains pending. Independent decoded bootstrap and startup
-declaration evidence is not full language, compiler, bootstrap, branch or
-initialization conformance. All 112 JVM-008 source units remain unassessed and
-dependency clauses retain their actual owners. Preview source forms, hosted
-modern javac, arbitrary bootstrap behavior, named-module runtime access and
-broader scheduler/memory-model support remain separate work.
+58 fixed final-language and actual-startup cases. At clean `f8d41537b`, all 21
+applicable pinned Java 21/25 native/Node/Chromium cells and the separate retained
+language, existing launcher and evolved-switch gates pass. B1–B7 host gates and
+the original 323 retained fixtures also pass unchanged. Independent decoded
+bootstrap and startup declaration evidence is not full language, compiler,
+bootstrap, branch or initialization conformance. All 112 JVM-008 source units
+remain unassessed and dependency clauses retain their actual owners. Preview
+source forms, hosted modern javac, arbitrary bootstrap behavior, named-module
+runtime access and broader scheduler/memory-model support remain separate work.

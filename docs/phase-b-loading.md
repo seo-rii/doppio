@@ -711,12 +711,24 @@ comparisons, not preview source-language conformance. The full seed, existing
 separately evolved enum/sealed switch gate remain independently mandatory.
 Module-import retention proves compiler lowering only, not runtime JPMS.
 
-Native-first checks pass all authored case outcomes on the applicable locked
-toolchains, but the full clean-commit Node/Chromium and retained B8 integration
-exit is still pending. All 112 JVM-008 source units remain unassessed; constructor
-and other dependency clauses retain their original owners. No full source-unit,
-class-file, initialization, bootstrap, module, JVM-008 or Phase B completion
-claim follows from this selected corpus.
+At clean `f8d41537b`, strict CLI/browser builds and all 21 mandatory cells pass,
+with seven genuine compiler operations and 54 actual program executions. The
+independent retained gate passes all eleven release entries on all three hosts.
+The existing 23-case launcher suite passes its 46 guest checks while preserving
+the three explicit pinned-native oracle differences; the evolved enum/sealed
+switch gate also passes. All eight B1–B4 gates, B5/B6/B7 and the original 323
+retained fixtures remain green. B1–B8 compiled units/contracts pass 834 of 835
+tests, with no failures or cancellations and one optional native-taxonomy
+diagnostic skip; ES5 typechecking and the actual/mutation CI checkers pass.
+
+An initial over-parallel run hit existing compiler and execution time limits.
+Its failed ledgers remain retained. Rerunning the same clean commit with at most
+two heavy batches passes without changing input bytes, expectations or limits.
+This records the selected B8 integration exit, not full language conformance.
+All 112 JVM-008 source units remain unassessed; constructor and other dependency
+clauses retain their original owners. No full source-unit, class-file,
+initialization, bootstrap, module, JVM-008 or Phase B completion claim follows
+from this selected corpus.
 
 ## Remaining boundaries
 
@@ -728,5 +740,5 @@ Remaining initialization cases include exceptional allocation during error
 wrapping and broader concurrency/memory-model interactions. General linkage,
 module access, hidden classes and arbitrary bootstrap behavior remain separate.
 The record, sealed and final-language packages remain partial beyond selected
-B6/B7/B8 evidence. B8 integration evidence is required before its batch exit;
-even a passing selected batch does not close every source-unit obligation.
+B6/B7/B8 evidence. The selected B1–B8 batch exits are recorded above; they do not
+close every source-unit obligation.
