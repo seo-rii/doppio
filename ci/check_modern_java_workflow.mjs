@@ -760,7 +760,7 @@ for (const [name, fields] of [
   ]],
   ['Check phase B invocation evolution contracts', [
     'timeout-minutes: 1',
-    'run: node --test ci/java_invocation_evolution_contract_test.mjs',
+    'run: node --test ci/method_selection_test.cjs ci/opcode_member_kind_test.cjs ci/java_invocation_evolution_contract_test.mjs',
   ]],
   ['Run Java invocation evolution compatibility', [
     'id: java_invocation_evolution',

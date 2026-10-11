@@ -66,7 +66,11 @@ const memberAccessUnits = [
 ];
 const memberAccessUnitCommand = `node --test ${memberAccessUnits.join(' ')}`;
 const memberAccessRunnerCommand = 'node ci/java_member_access_test.mjs --browser';
-const invocationEvolutionUnits = ['ci/java_invocation_evolution_contract_test.mjs'];
+const invocationEvolutionUnits = [
+  'ci/method_selection_test.cjs',
+  'ci/opcode_member_kind_test.cjs',
+  'ci/java_invocation_evolution_contract_test.mjs',
+];
 const invocationEvolutionUnitCommand = `node --test ${invocationEvolutionUnits.join(' ')}`;
 const invocationEvolutionRunnerCommand = 'node ci/java_invocation_evolution_test.mjs --browser';
 const memberGates = [

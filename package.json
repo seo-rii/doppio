@@ -127,7 +127,7 @@
     "ci:member-resolution": "node ci/java_member_resolution_test.mjs --browser",
     "ci:member-access:test": "node --test ci/symbolic_resolution_test.cjs ci/class_access_test.cjs ci/java_member_access_contract_test.mjs",
     "ci:member-access": "node ci/java_member_access_test.mjs --browser",
-    "ci:invocation-evolution:test": "node --test ci/java_invocation_evolution_contract_test.mjs",
+    "ci:invocation-evolution:test": "node --test ci/method_selection_test.cjs ci/opcode_member_kind_test.cjs ci/java_invocation_evolution_contract_test.mjs",
     "ci:invocation-evolution": "node ci/java_invocation_evolution_test.mjs --browser",
     "ci:java25-main": "node ci/java25_main_test.mjs --browser",
     "ci:java-uncaught-exit": "node ci/java_uncaught_exit_test.mjs --browser",

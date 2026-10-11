@@ -322,7 +322,7 @@ jobs:
 
       - name: Check phase B invocation evolution contracts
         timeout-minutes: 1
-        run: node --test ci/java_invocation_evolution_contract_test.mjs
+        run: node --test ci/method_selection_test.cjs ci/opcode_member_kind_test.cjs ci/java_invocation_evolution_contract_test.mjs
 
       # Six javac operations (60s each) plus six native/Node/Chromium executions
       # (120s each), with two minutes for integrity checks and final ledger writes.
