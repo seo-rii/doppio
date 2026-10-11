@@ -2825,16 +2825,12 @@ export class MethodReference implements IConstantPoolItem {
 	                  if (!(cls instanceof ReferenceClassData)) {
 	                    return javaThis;
 	                  }
-	                  var nestHostName = cls.getNestHostName();
-	                  if (nestHostName === cls.getInternalName()) {
-	                    return javaThis;
-	                  }
+	                  var knownHost = getKnownNestHost(cls);
+	                  if (knownHost !== null) return knownHost.getClassObject(thread);
 	                  thread.setStatus(ThreadStatus.ASYNC_WAITING);
-	                  cls.getLoader().resolveClass(thread, nestHostName, (nestHost: ClassData) => {
-	                    if (nestHost !== null) {
-	                      thread.asyncReturn(nestHost.getClassObject(thread));
-	                    }
-	                  });
+	                  setImmediate(() => resolveNestHost(thread, <ReferenceClassData<JVMTypes.java_lang_Object>> cls, nestHost => {
+	                    if (nestHost !== null) thread.asyncReturn(nestHost.getClassObject(thread));
+	                  }));
 	                  return null;
 	                }
 	                if (classNestSignature === 'isNestmateOf(Ljava/lang/Class;)Z') {
@@ -2842,43 +2838,25 @@ export class MethodReference implements IConstantPoolItem {
 	                    thread.throwNewException('Ljava/lang/NullPointerException;', '');
 	                    return null;
 	                  }
-	                  if (!(cls instanceof ReferenceClassData) || !(otherClass.$cls instanceof ReferenceClassData)) {
-	                    return cls === otherClass.$cls ? 1 : 0;
-	                  }
-	                  return cls.getNestHostName() === otherClass.$cls.getNestHostName() ? 1 : 0;
+	                  if (cls === otherClass.$cls) return 1;
+	                  if (!(cls instanceof ReferenceClassData) || !(otherClass.$cls instanceof ReferenceClassData)) return 0;
+	                  var leftHost = getKnownNestHost(cls), rightHost = getKnownNestHost(otherClass.$cls);
+	                  if (leftHost !== null && rightHost !== null) return leftHost === rightHost ? 1 : 0;
+	                  thread.setStatus(ThreadStatus.ASYNC_WAITING);
+	                  setImmediate(() => resolveNestHost(thread, <ReferenceClassData<JVMTypes.java_lang_Object>> cls, nestHost => {
+	                    if (nestHost !== null) resolveNestHost(thread, <ReferenceClassData<JVMTypes.java_lang_Object>> otherClass.$cls,
+	                      otherHost => { if (otherHost !== null) thread.asyncReturn(nestHost === otherHost ? 1 : 0); });
+	                  }));
+	                  return null;
 	                }
 	                if (!(cls instanceof ReferenceClassData)) {
 	                  return util.newArrayFromData<JVMTypes.java_lang_Class>(thread, thread.getBsCl(), '[Ljava/lang/Class;', [javaThis]);
 	                }
 	                thread.setStatus(ThreadStatus.ASYNC_WAITING);
-	                var loader = cls.getLoader();
-	                loader.resolveClass(thread, cls.getNestHostName(), (nestHost: ReferenceClassData<JVMTypes.java_lang_Object>) => {
-	                  if (nestHost === null) {
-	                    return;
-	                  }
-	                  var names = [nestHost.getInternalName()].concat(nestHost.getNestMemberNames()),
-	                    seen: {[name: string]: boolean} = {},
-	                    members: JVMTypes.java_lang_Class[] = [],
-	                    i = 0,
-	                    resolveNext = () => {
-	                      while (i < names.length && seen[names[i]]) {
-	                        i++;
-	                      }
-	                      if (i >= names.length) {
-	                        thread.asyncReturn(util.newArrayFromData<JVMTypes.java_lang_Class>(thread, thread.getBsCl(), '[Ljava/lang/Class;', members));
-	                        return;
-	                      }
-	                      var name = names[i++];
-	                      seen[name] = true;
-	                      loader.resolveClass(thread, name, (member: ClassData) => {
-	                        if (member !== null) {
-	                          members.push(member.getClassObject(thread));
-	                          resolveNext();
-	                        }
-	                      });
-	                    };
-	                  resolveNext();
-	                });
+	                setImmediate(() => resolveNestMembers(thread, <ReferenceClassData<JVMTypes.java_lang_Object>> cls, members => {
+	                  if (members !== null) thread.asyncReturn(util.newArrayFromData<JVMTypes.java_lang_Class>(
+	                    thread, thread.getBsCl(), '[Ljava/lang/Class;', members.map(member => member.getClassObject(thread))));
+	                }));
 	                return null;
 	              };
 	            },
