@@ -361,6 +361,27 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Check phase B record semantics contracts
+        timeout-minutes: 3
+        run: node --test ci/record_component_native_test.cjs ci/record_object_methods_test.cjs ci/java_record_semantics_contract_test.mjs
+
+      # Ten bounded javac operations (60s) and six group/release executions
+      # on native (30s), Node (60s) and Chromium (60s): 25 minutes plus five
+      # minutes for immutable metadata checks and durable ledger writes.
+      - name: Run Java record semantics compatibility
+        id: java_record_semantics
+        timeout-minutes: 30
+        run: node ci/java_record_semantics_test.mjs --browser
+
+      - name: Upload Java record semantics ledger
+        if: always() && steps.java_record_semantics.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-record-semantics-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Check evolved switch ledger contract
         timeout-minutes: 1
         run: node --test ci/java_pattern_evolution_contract_test.mjs
