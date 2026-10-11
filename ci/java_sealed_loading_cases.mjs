@@ -40,14 +40,14 @@ export function loadingCompilationUnits() {
       source('p.OtherImpl', 'public final class OtherImpl implements I')
     ]),
     unit('loading-crosspackage', [
-      {binaryName: 'module-info', text: 'module b7.sealed { }\n'},
+      {binaryName: 'module-info', text: 'module doppio.sealed { }\n'},
       source('p.Base', 'public sealed class Base permits sealedloader.q.PublicChild, sealedloader.q.PackageChild', false),
       source('p.I', 'public sealed interface I permits sealedloader.q.PublicImpl, sealedloader.q.PackageImpl', false),
       source('q.PublicChild', 'public final class PublicChild extends sealedloader.p.Base', false),
       source('q.PackageChild', 'public final class PackageChild extends sealedloader.p.Base', false),
       source('q.PublicImpl', 'public final class PublicImpl implements sealedloader.p.I', false),
       source('q.PackageImpl', 'public final class PackageImpl implements sealedloader.p.I', false)
-    ], false, 'named-module-source', 'b7.sealed')
+    ], false, 'named-module-source', 'doppio.sealed')
   ];
 }
 
