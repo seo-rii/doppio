@@ -814,7 +814,7 @@ for (const [name, fields] of [
   ]],
   ['Check phase B sealed semantics contracts', [
     'timeout-minutes: 3',
-    'run: node --test ci/sealed_class_derivation_test.cjs ci/sealed_class_reflection_test.cjs ci/java_sealed_semantics_contract_test.mjs',
+    'run: node --test ci/sealed_class_derivation_test.cjs ci/sealed_class_reflection_test.cjs ci/java_sealed_semantics_contract_test.mjs ci/native_return_boundary_test.cjs',
   ]],
   ['Run Java sealed semantics compatibility', [
     'id: java_sealed_semantics',

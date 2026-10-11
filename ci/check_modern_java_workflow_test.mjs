@@ -83,7 +83,7 @@ const recordSemanticsUnits = ['ci/record_component_native_test.cjs', 'ci/annotat
 const recordSemanticsUnitCommand = `node --test ${recordSemanticsUnits.join(' ')}`;
 const recordSemanticsRunnerCommand = 'node ci/java_record_semantics_test.mjs --browser';
 const sealedSemanticsUnits = ['ci/sealed_class_derivation_test.cjs', 'ci/sealed_class_reflection_test.cjs',
-  'ci/java_sealed_semantics_contract_test.mjs'];
+  'ci/java_sealed_semantics_contract_test.mjs', 'ci/native_return_boundary_test.cjs'];
 const sealedSemanticsUnitCommand = `node --test ${sealedSemanticsUnits.join(' ')}`;
 const sealedSemanticsRunnerCommand = 'node ci/java_sealed_semantics_test.mjs --browser';
 const memberGates = [
