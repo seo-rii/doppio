@@ -66,6 +66,9 @@ const memberAccessUnits = [
 ];
 const memberAccessUnitCommand = `node --test ${memberAccessUnits.join(' ')}`;
 const memberAccessRunnerCommand = 'node ci/java_member_access_test.mjs --browser';
+const invocationEvolutionUnits = ['ci/java_invocation_evolution_contract_test.mjs'];
+const invocationEvolutionUnitCommand = `node --test ${invocationEvolutionUnits.join(' ')}`;
+const invocationEvolutionRunnerCommand = 'node ci/java_invocation_evolution_test.mjs --browser';
 const memberGates = [
   {name: 'member resolution', units: memberResolutionUnits, unitCommand: memberResolutionUnitCommand,
     runnerCommand: memberResolutionRunnerCommand, stepId: 'java_member_resolution',
@@ -73,6 +76,9 @@ const memberGates = [
   {name: 'member access', units: memberAccessUnits, unitCommand: memberAccessUnitCommand,
     runnerCommand: memberAccessRunnerCommand, stepId: 'java_member_access',
     ledger: 'build/java-member-access-results.json', timeout: 25},
+  {name: 'invocation evolution', units: invocationEvolutionUnits, unitCommand: invocationEvolutionUnitCommand,
+    runnerCommand: invocationEvolutionRunnerCommand, stepId: 'java_invocation_evolution',
+    ledger: 'build/java-invocation-evolution-results.json', timeout: 20},
 ];
 const packageScripts = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).scripts;
 for (const [name, command] of [
@@ -87,6 +93,8 @@ for (const [name, command] of [
   ['ci:member-resolution', memberResolutionRunnerCommand],
   ['ci:member-access:test', memberAccessUnitCommand],
   ['ci:member-access', memberAccessRunnerCommand],
+  ['ci:invocation-evolution:test', invocationEvolutionUnitCommand],
+  ['ci:invocation-evolution', invocationEvolutionRunnerCommand],
 ]) {
   if (packageScripts[name] !== command) {
     throw new Error(`${name} must retain the complete phase B command: ${command}`);
@@ -264,6 +272,9 @@ for (const name of [
   'Check phase B member access contracts',
   'Run Java member access compatibility',
   'Upload Java member access ledger',
+  'Check phase B invocation evolution contracts',
+  'Run Java invocation evolution compatibility',
+  'Upload Java invocation evolution ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -440,6 +451,71 @@ for (const gate of memberGates) {
   }
 }
 
+// B4d must execute the whole genuine two-release/three-host runner, never a
+// filtered diagnostic or a replacement command that merely reports success.
+for (const command of [
+  'echo invocation compatibility checked',
+  invocationEvolutionRunnerCommand + ' --case default-interface-positive',
+  invocationEvolutionRunnerCommand + ' --guest node',
+  invocationEvolutionRunnerCommand + ' --skip-native',
+  invocationEvolutionRunnerCommand + ' --allow-oracle-waiver',
+  invocationEvolutionRunnerCommand + '; exit 0',
+  invocationEvolutionRunnerCommand + ' | tee invocation.log',
+  'DOPPIO_VERIFY_SOURCE=1 ' + invocationEvolutionRunnerCommand,
+]) {
+  expectCheckerFailure(
+    `incomplete or non-failing evolved invocation runner: ${command}`,
+    {workflow: replaceRequired(realWorkflow, `run: ${invocationEvolutionRunnerCommand}\n`, `run: ${command}\n`)},
+    'exact bounded, fail-closed baseline command or artifact contract'
+  );
+}
+
+for (const name of ['Check phase B invocation evolution contracts', 'Run Java invocation evolution compatibility',
+  'Upload Java invocation evolution ledger']) {
+  for (const field of ['if: false', 'continue-on-error: false', 'shell: bash {0}', 'working-directory: ignored']) {
+    expectCheckerFailure(
+      `${name} gains noncanonical scheduling field ${field}`,
+      {workflow: replaceRequired(realWorkflow, `      - name: ${name}\n`, `      - name: ${name}\n        ${field}\n`)},
+      'exact bounded, fail-closed baseline command or artifact contract'
+    );
+  }
+  const start = realWorkflow.indexOf(`      - name: ${name}\n`);
+  const end = realWorkflow.indexOf('\n      - name:', start + 1) + 1;
+  if (start < 0 || end <= start) throw new Error('Missing bounded invocation step fixture: ' + name);
+  const block = realWorkflow.slice(start, end);
+  expectCheckerFailure(
+    `duplicate evolved invocation step ${name}`,
+    {workflow: replaceRequired(realWorkflow, block, block + block)},
+    `contain the ${name} step exactly once`
+  );
+}
+
+for (const replacement of ['timeout-minutes: 0', 'timeout-minutes: 1000', 'timeout-minutes: "1"',
+  'timeout-minutes: ${{ 1 }}', 'timeout-minutes: 1\n        timeout-minutes: 1']) {
+  expectCheckerFailure(
+    `unbounded or ambiguous evolved invocation contract timeout: ${replacement}`,
+    {workflow: replaceRequired(realWorkflow,
+      'Check phase B invocation evolution contracts\n        timeout-minutes: 1\n',
+      `Check phase B invocation evolution contracts\n        ${replacement}\n`)},
+    'exact bounded, fail-closed baseline command or artifact contract'
+  );
+}
+
+for (const [original, replacement] of [
+  ['id: java_invocation_evolution\n        timeout-minutes: 20\n', 'id: java_invocation_evolution\n'],
+  ['id: java_invocation_evolution\n        timeout-minutes: 20\n', 'id: java_invocation_evolution\n        timeout-minutes: "20"\n'],
+  ["if: always() && steps.java_invocation_evolution.outcome != 'skipped'", "if: always() && steps.java_member_access.outcome != 'skipped'"],
+  ["if: always() && steps.java_invocation_evolution.outcome != 'skipped'", 'if: failure()'],
+  ['path: build/java-invocation-evolution-results.json\n          archive: false\n          if-no-files-found: error\n          retention-days: 7',
+    'path: build/java-invocation-evolution-results.json\n          archive: false\n          if-no-files-found: error\n          retention-days: 1'],
+]) {
+  expectCheckerFailure(
+    `incomplete invocation timeout or attempted-step ledger contract: ${original}`,
+    {workflow: replaceRequired(realWorkflow, original, replacement)},
+    'exact bounded, fail-closed baseline command or artifact contract'
+  );
+}
+
 expectCheckerFailure(
   'Java compatibility tooling before Chromium installation',
   { workflow: swapAdjacentSteps(realWorkflow, 'Install Java compatibility Chromium', 'Check Java compatibility baseline tooling') },
@@ -543,7 +619,10 @@ for (const [firstName, secondName] of [
   ['Upload Java member resolution ledger', 'Check phase B member access contracts'],
   ['Check phase B member access contracts', 'Run Java member access compatibility'],
   ['Run Java member access compatibility', 'Upload Java member access ledger'],
-  ['Upload Java member access ledger', 'Check evolved switch ledger contract'],
+  ['Upload Java member access ledger', 'Check phase B invocation evolution contracts'],
+  ['Check phase B invocation evolution contracts', 'Run Java invocation evolution compatibility'],
+  ['Run Java invocation evolution compatibility', 'Upload Java invocation evolution ledger'],
+  ['Upload Java invocation evolution ledger', 'Check evolved switch ledger contract'],
 ]) {
   expectCheckerFailure(
     `member resolution/access dependency reversed: ${firstName} before ${secondName}`,

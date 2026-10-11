@@ -320,6 +320,26 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Check phase B invocation evolution contracts
+        timeout-minutes: 1
+        run: node --test ci/java_invocation_evolution_contract_test.mjs
+
+      # Six javac operations (60s each) plus six native/Node/Chromium executions
+      # (120s each), with two minutes for integrity checks and final ledger writes.
+      - name: Run Java invocation evolution compatibility
+        id: java_invocation_evolution
+        timeout-minutes: 20
+        run: node ci/java_invocation_evolution_test.mjs --browser
+
+      - name: Upload Java invocation evolution ledger
+        if: always() && steps.java_invocation_evolution.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-invocation-evolution-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Check evolved switch ledger contract
         timeout-minutes: 1
         run: node --test ci/java_pattern_evolution_contract_test.mjs
