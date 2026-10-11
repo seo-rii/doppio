@@ -207,6 +207,58 @@ errors and completion traces. CI uploads failures too. Source-transpiled
 lifecycle units and local precommit diagnostics are explicitly separate from
 this clean-tree execution evidence.
 
+## B4a class derivation and loader identity
+
+Named definition reserves a parsed candidate privately, admits its superclass
+before its direct superinterfaces, and only then publishes its identity.
+Pending candidates are absent from loaded-class and array queries. Admission
+rejects wrong names, module descriptors, circular hierarchies, wrong parent
+kinds, final superclasses and inaccessible parents. Runtime packages include
+the defining loader, so matching package names alone do not grant access.
+Failed derivation releases only its own reservation; a successful definition
+remains registered if subsequent verification or user loader code fails.
+Competing definitions wait and then check their own request against the result.
+
+Hierarchy ancestry follows actual Java loader invocation frames. Independent
+metadata requests on the same thread can wait for a candidate without being
+misclassified as an inheritance cycle. Loader return values must have the
+requested name and a reference-class identity. Non-missing-class exceptions
+retain their original guest Throwable. Interfaces and array marker supertypes
+use actual class identities, including the bootstrap Object, Cloneable and
+Serializable classes, rather than equal names from different loaders.
+
+Noninitializing `Class.forName` returns loaded metadata. An array query prepares
+each rank's component and bootstrap superclass pointers without verifying or
+initializing the element class, even if that element previously failed
+verification. Explicit component linking and active use still take the full
+verification gate. Trusted reflection superclass access is attached to the
+proven generator preparation and exact candidate; admission requires the actual
+bootstrap parent identity, including when that parent loads after preparation.
+
+`ci/java_class_derivation_test.mjs` compiles the genuine driver and separate
+parent/interface variants with each pinned javac 21/25. Its 36 scenarios cover
+exact/null names, wrong-name and malformed-byte retries, duplicate and initiating
+loader identities, separately compiled hierarchy evolution, runtime-package
+access, independent/delegated identities, Lookup publication after VerifyError,
+passive arrays, circularity and module descriptors. Payloads are resource-only
+`.bin` files; their compiled `.class` trees stay outside the driver classpath.
+The five explicit binary mutations retain replayable edits and genuine original
+headers. Exact traces include failure phase, publication and initialization
+effects, rather than only comparing two final output streams.
+
+```sh
+yarn ci:class-derivation:test
+yarn ci:class-derivation
+```
+
+The cross-host gate requires native Java, Node and Chromium on both releases,
+clean unchanged committed sources, immutable compiler/runtime inputs and a
+retained `build/java-class-derivation-results.json` ledger on success or failure.
+The lifecycle and parsed-hierarchy units supplement that gate with pending
+definitions, waiters and native-entry controls. B4a does not close B4: loading
+constraints, member access/resolution, default selection and symbolic failure
+caching remain dependent batches.
+
 ## Remaining boundaries
 
 These batches do not finish B1, JVM-002 or Phase B. B2's structural corpus does
