@@ -57,6 +57,7 @@ const expectedFrames = new Map([
   ['java/lang/reflect/AccessibleObject.trySetAccessible', [17, 41]],
   ['sun/reflect/annotation/AnnotatedTypeFactory$AnnotatedTypeBaseImpl.getAnnotatedOwnerType', [23, 37, 67, 81]],
   ['sun/reflect/annotation/AnnotatedTypeFactory$AnnotatedParameterizedTypeImpl.getAnnotatedOwnerType', [21, 51, 65, 93]],
+  ['sun/reflect/annotation/AnnotatedTypeFactory$AnnotatedWildcardTypeImpl.getAnnotatedUpperBounds', [36]],
   ['sun/reflect/annotation/TypeAnnotation$LocationInfo.popLocation', [25, 27]],
   ['sun/reflect/annotation/AnnotatedTypeFactory.addNesting', [9, 30, 42, 54, 77, 109, 123]],
   ['sun/reflect/generics/reflectiveObjects/ParameterizedTypeImpl.toString', [97, 112, 124, 164, 195, 204]]
@@ -111,24 +112,31 @@ before(async () => {
   inventory = {selected, generated, all, unchanged};
 });
 
-test('overlay inventory preserves all 112 generated instruction bodies and 1273 stock Code attributes', () => {
+test('overlay inventory preserves all 113 generated instruction bodies and 1272 stock Code attributes', () => {
   assert.equal(inventory.selected.length, 36);
-  assert.equal(inventory.generated.length, 112);
-  assert.equal(inventory.unchanged, 1273);
+  assert.equal(inventory.generated.length, 113);
+  assert.equal(inventory.unchanged, 1272);
   const identity = inventory.generated.map(({className, member, bytes}) =>
     [className, member.name, member.descriptor, member.flags, member.code.maxStack, member.code.maxLocals,
       bytes.toString('hex')]);
-  // Captured before adding StackMapTable metadata; CP additions must stay after
-  // existing entries so no instruction operand or stack/local limit changes.
-  assert.equal(createHash('sha256').update(JSON.stringify(identity)).digest('hex'),
+  // The original 112 generated bodies retain their pre-StackMapTable identity;
+  // appending the wildcard bounds overlay must not rewrite any other body.
+  const previousIdentity = identity.filter(([className, name]) =>
+    className !== 'sun/reflect/annotation/AnnotatedTypeFactory$AnnotatedWildcardTypeImpl' ||
+    name !== 'getAnnotatedUpperBounds');
+  assert.equal(previousIdentity.length, 112);
+  assert.equal(createHash('sha256').update(JSON.stringify(previousIdentity)).digest('hex'),
     '74ad687fb07685b7c66dec51de7b8d7c6249e987ceb50b5f9f88014621b1ef30');
+  // This exact inventory additionally binds the new target Code body and limits.
+  assert.equal(createHash('sha256').update(JSON.stringify(identity)).digest('hex'),
+    '6aa35a51cad536fa26de66219269564fbb4124f8fbea8a2058d34b2fd937d420');
   for (const name of ['java/lang/Object', 'java/lang/reflect/AnnotatedElement', 'java/lang/reflect/Type']) {
     const original = execFileSync('unzip', ['-p', rtJar, name + '.class'], {timeout: 10000});
     assert.deepEqual(applyModernBootstrapOverlays('L' + name + ';', original), original);
   }
 });
 
-test('ten branchful overlays declare all 42 full frames at exact instruction boundaries', () => {
+test('eleven branchful overlays declare all 43 full frames at exact instruction boundaries', () => {
   const found = new Map();
   let frameCount = 0;
   for (const entry of inventory.generated) {
@@ -145,7 +153,7 @@ test('ten branchful overlays declare all 42 full frames at exact instruction bou
     }
   }
   assert.deepEqual(found, expectedFrames);
-  assert.equal(frameCount, 42);
+  assert.equal(frameCount, 43);
 });
 
 test('removing overlay frames is rejected for every branchful bootstrap method', () => {
@@ -160,7 +168,7 @@ test('removing overlay frames is rejected for every branchful bootstrap method',
       className + '.' + member.name);
     rejected++;
   }
-  assert.equal(rejected, 10, 'bootstrap identity must not exempt missing frames');
+  assert.equal(rejected, 11, 'bootstrap identity must not exempt missing frames');
 });
 
 function verifyAll(entries) {
@@ -183,7 +191,7 @@ test('every generated overlay body passes pure decoding and type checking withou
   const {failures, obligations} = verifyAll(inventory.generated);
   assert.deepEqual(failures, []);
   assert.ok(obligations > 0, 'symbolic obligations are retained, not bypassed or claimed discharged');
-  t.diagnostic('112 generated methods checked; ' + obligations + ' metadata obligations remain for linking');
+  t.diagnostic('113 generated methods checked; ' + obligations + ' metadata obligations remain for linking');
 });
 
 test('all original and generated Code methods in transformed bootstrap classes pass pure verification', t => {

@@ -892,6 +892,95 @@ function addAnnotatedOwnerTypeModernOverlay(data: Buffer, typeStr: string): Buff
   ]);
 }
 
+/** Java 8 omitted the implicit Object upper bound of a lower-bounded wildcard.
+ * Its annotations belong only to the lower bound, never to that implicit bound. */
+function addAnnotatedWildcardBoundsModernOverlay(data: Buffer): Buffer {
+  var cp = constantPoolEnd(data),
+    constants: Buffer[] = [],
+    nextIndex = cp.count;
+
+  function addConstant(constant: Buffer): number {
+    constants.push(constant);
+    return nextIndex++;
+  }
+
+  function addUtf8(value: string): number {
+    return addConstant(utf8Constant(value));
+  }
+
+  function addClass(name: string): number {
+    var nameIndex = addUtf8(name);
+    return addConstant(Buffer.concat([Buffer.from([7]), u2(nameIndex)]));
+  }
+
+  function addMemberRef(tag: number, ownerIndex: number, name: string,
+      descriptor: string): number {
+    var nameIndex = addUtf8(name),
+      descriptorIndex = addUtf8(descriptor),
+      nameAndTypeIndex = addConstant(Buffer.concat([
+        Buffer.from([12]), u2(nameIndex), u2(descriptorIndex)
+      ]));
+    return addConstant(Buffer.concat([
+      Buffer.from([tag]), u2(ownerIndex), u2(nameAndTypeIndex)
+    ]));
+  }
+
+  var codeNameIndex = addUtf8('Code'),
+    stackMapNameIndex = addUtf8('StackMapTable'),
+    wildcardImplClassIndex = addClass(
+      'sun/reflect/annotation/AnnotatedTypeFactory$AnnotatedWildcardTypeImpl'),
+    baseImplClassIndex = addClass(
+      'sun/reflect/annotation/AnnotatedTypeFactory$AnnotatedTypeBaseImpl'),
+    wildcardTypeClassIndex = addClass('java/lang/reflect/WildcardType'),
+    annotatedTypeClassIndex = addClass('java/lang/reflect/AnnotatedType'),
+    objectClassIndex = addClass('java/lang/Object'),
+    typeAnnotationClassIndex = addClass('sun/reflect/annotation/TypeAnnotation'),
+    locationClassIndex = addClass('sun/reflect/annotation/TypeAnnotation$LocationInfo'),
+    factoryClassIndex = addClass('sun/reflect/annotation/AnnotatedTypeFactory'),
+    hasUpperBoundsMethodIndex = addMemberRef(
+      10, wildcardImplClassIndex, 'hasUpperBounds', '()Z'),
+    getWildcardTypeMethodIndex = addMemberRef(
+      10, wildcardImplClassIndex, 'getWildcardType', '()Ljava/lang/reflect/WildcardType;'),
+    getUpperBoundsMethodIndex = addMemberRef(
+      11, wildcardTypeClassIndex, 'getUpperBounds', '()[Ljava/lang/reflect/Type;'),
+    getAnnotatedBoundsMethodIndex = addMemberRef(
+      10, wildcardImplClassIndex, 'getAnnotatedBounds',
+      '([Ljava/lang/reflect/Type;)[Ljava/lang/reflect/AnnotatedType;'),
+    baseLocationFieldIndex = addMemberRef(
+      9, locationClassIndex, 'BASE_LOCATION',
+      'Lsun/reflect/annotation/TypeAnnotation$LocationInfo;'),
+    getDeclMethodIndex = addMemberRef(
+      10, baseImplClassIndex, 'getDecl', '()Ljava/lang/reflect/AnnotatedElement;'),
+    buildAnnotatedTypeMethodIndex = addMemberRef(
+      10, factoryClassIndex, 'buildAnnotatedType',
+      '(Ljava/lang/reflect/Type;Lsun/reflect/annotation/TypeAnnotation$LocationInfo;[Lsun/reflect/annotation/TypeAnnotation;[Lsun/reflect/annotation/TypeAnnotation;Ljava/lang/reflect/AnnotatedElement;)Ljava/lang/reflect/AnnotatedType;'),
+    code = Buffer.concat([
+      Buffer.from([0x2a, 0xb7]), u2(hasUpperBoundsMethodIndex),
+      Buffer.from([0x9a, 0x00, 0x20, 0x04, 0xbd]), u2(annotatedTypeClassIndex),
+      Buffer.from([0x59, 0x03, 0x13]), u2(objectClassIndex),
+      Buffer.from([0xb2]), u2(baseLocationFieldIndex),
+      Buffer.from([0x03, 0xbd]), u2(typeAnnotationClassIndex),
+      Buffer.from([0x03, 0xbd]), u2(typeAnnotationClassIndex),
+      Buffer.from([0x2a, 0xb6]), u2(getDeclMethodIndex),
+      Buffer.from([0xb8]), u2(buildAnnotatedTypeMethodIndex),
+      Buffer.from([0x53, 0xb0, 0x2a, 0x2a, 0xb7]), u2(getWildcardTypeMethodIndex),
+      Buffer.from([0xb9]), u2(getUpperBoundsMethodIndex), Buffer.from([0x01, 0x00, 0xb7]),
+      u2(getAnnotatedBoundsMethodIndex), Buffer.from([0xb0])
+    ]),
+    frames = fullFrameStackMapTable(stackMapNameIndex, [
+      {pc: 36, locals: [stackMapObject(wildcardImplClassIndex)]}
+    ]),
+    extraConstants = Buffer.concat(constants),
+    withConstants = Buffer.concat([
+      data.slice(0, 8), u2(nextIndex), data.slice(10, cp.offset),
+      extraConstants, data.slice(cp.offset)
+    ]);
+
+  return replaceMethodCode(withConstants, cp.offset + extraConstants.length,
+    'getAnnotatedUpperBounds', '()[Ljava/lang/reflect/AnnotatedType;',
+    codeNameIndex, 8, 1, code, undefined, undefined, [frames]);
+}
+
 function addTypeAnnotationLocationInfoModernOverlay(data: Buffer): Buffer {
   var cp = constantPoolEnd(data),
     constants: Buffer[] = [],
@@ -3496,6 +3585,9 @@ export function applyModernBootstrapOverlays(typeStr: string, data: Buffer): Buf
       typeStr !== 'Ljava/lang/reflect/AnnotatedElement;') ||
       typeStr.indexOf('Lsun/reflect/annotation/AnnotatedTypeFactory$Annotated') === 0) {
     data = addAnnotatedOwnerTypeModernOverlay(data, typeStr);
+  }
+  if (typeStr === 'Lsun/reflect/annotation/AnnotatedTypeFactory$AnnotatedWildcardTypeImpl;') {
+    data = addAnnotatedWildcardBoundsModernOverlay(data);
   }
   if (typeStr === 'Lsun/reflect/annotation/TypeAnnotation$LocationInfo;') {
     data = addTypeAnnotationLocationInfoModernOverlay(data);
