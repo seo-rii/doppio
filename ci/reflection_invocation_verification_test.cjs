@@ -27,13 +27,15 @@ const {ThreadStatus} = require(path.join(runtime, 'src/enums'));
 // initialization gate. Lifecycle/verification integration is tested separately;
 // these units are not native-JVM or class-file corpus evidence.
 function fixture(options = {}) {
-  const state = {phase: 'verification', initialization: [], constructors: 0, invocations: [],
+  const state = {phase: 'verification', initialization: [], constructors: 0, invocations: [], selections: [],
     statuses: [], returns: [], errors: [], boxes: [], wrapperLoads: [], wrappers: []};
   const method = {signature: 'target()' + (options.returnType || 'V'),
     fullSignature: 'fixture/Reflected/target()' + (options.returnType || 'V'),
     returnType: options.returnType || 'V', parameterTypes: options.parameterTypes || [],
     accessFlags: new Flags(options.instance ? 1 : 9)};
   const thread = {
+    stack: [],
+    framePop() { return this.stack.pop(); },
     setStatus(status) { state.statuses.push(status); },
     asyncReturn(value) { state.returns.push(value); },
     throwException(error) { state.errors.push(error); },
@@ -70,7 +72,15 @@ function fixture(options = {}) {
       state.boxes.push(boxed);
       return boxed;
     }}}};
-  const receiver = {[method.signature]: target};
+  const implementation = {...method, cls, accessFlags: new Flags(0x101), getNativeFunction: () => target};
+  const receiver = {
+    getClass: () => ({selectMethod(resolved) {
+      assert.equal(resolved, method, 'Selection must retain the reflected declaration identity');
+      state.selections.push(resolved);
+      return {kind: 'selected', method: implementation};
+    }}),
+    [method.signature]() { assert.fail('Reflection must not dispatch through a receiver string alias'); }
+  };
   function completeInitialization() {
     assert.equal(state.initialization.length, 1);
     state.phase = 'ready';
@@ -95,7 +105,7 @@ function fixture(options = {}) {
     assert.equal(state.wrappers.length, 1);
     return state.wrappers[0];
   }
-  return {state, method, thread, cls, mObj, receiver, constructor, completeInitialization, failInitialization, constructWrapper};
+  return {state, method, implementation, thread, cls, mObj, receiver, constructor, completeInitialization, failInitialization, constructWrapper};
 }
 
 test('static reflective invocation waits for both verification and initialization before constructor access', () => {
@@ -235,10 +245,16 @@ test('instance reflection retains virtual receiver dispatch without initializing
   invoke(w.thread, w.mObj, w.receiver, {array: [argument]});
   assert.deepEqual(w.state.initialization, []);
   assert.equal(w.state.constructors, 0);
-  assert.equal(w.state.invocations.length, 1);
-  assert.equal(w.state.invocations[0].receiver, w.receiver);
-  assert.equal(w.state.invocations[0].args[0], argument);
-  w.state.invocations[0].callback(null, result);
+  assert.deepEqual(w.state.selections, [w.method]);
+  assert.deepEqual(w.state.invocations, [], 'Dispatch schedules the selected body without executing it');
+  assert.equal(w.thread.stack.length, 2, 'One completion callback and one selected target frame');
+  const callback = w.thread.stack[0], target = w.thread.stack[1];
+  assert.equal(target.method, w.implementation);
+  assert.deepEqual(target.args, [w.receiver, argument]);
+  w.thread.stack.pop();
+  callback.scheduleResume(w.thread, result);
+  callback.run(w.thread);
+  assert.deepEqual(w.thread.stack, []);
   assert.deepEqual(w.state.boxes, []);
   assert.equal(w.state.returns[0], result);
 });
