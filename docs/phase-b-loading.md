@@ -267,6 +267,69 @@ definitions, waiters and native-entry controls. B4a does not close B4: loading
 constraints, member access/resolution, default selection and symbolic failure
 caching remain dependent batches.
 
+## B4b preparation and loading constraints
+
+Initiating-loader records and descriptor constraints share a per-VM registry
+keyed by the actual bootstrap loader, not Java's null bootstrap mirror. A
+constraint connects actual class identities transitively; failed records and
+merges leave their previous groups intact. Arrays constrain their reference
+leaf, and primitive descriptors impose no reference constraint. These checks
+never load, verify or initialize descriptor classes. A later conflicting
+definition or delegated loader return fails before initiating publication;
+already published defining identities and independent corrected retries remain.
+
+Full linking now requires both successful verification and preparation.
+Hierarchy-only derivation and passive metadata queries do neither. Preparation
+connects each declared override to its ancestor declaration owners (JVMS 5.4.2
+Rule 1), and an inherited selected owner to its superinterface owner (Rule 2).
+An independent child's loader does not enter an inherited-owner constraint.
+Selected abstract superclass declarations still retain their owner. Failed
+preparation keeps its first guest Throwable and does not reimpose constraints;
+waiting callbacks complete without allowing the failed class's own handlers,
+interpreter, native body, JIT or initialization to bypass the preparation gate.
+
+Field, method and interface-method resolution impose descriptor constraints
+against the actual inherited declaration owner after access checks and before
+publishing CP member/constructor caches. Naming an intermediary symbolic class
+does not substitute that class's loader for the declaration owner. Pure method
+selection distinguishes missing implementations and conflicting defaults,
+preserves private/static exclusions and runtime-package override chains, and
+defers invocation errors to the actual call. Virtual execution is anchored to
+the resolved declaration rather than an ambiguous string alias. Explicit
+VM-native overlays have their own canonical identity without becoming genuine
+class-file declarations or reflection slots.
+
+`ci/java_loading_constraints_test.mjs` compiles the genuine driver and 38 separate
+payload classes with each pinned javac 21/25. Its 31 required scenarios cover
+three-loader declared/inherited constraints, scalar/array/return leaves,
+inherited field/static/interface declaration owners, late descriptor loading,
+failed transitive merging and corrected delegation after failure. Compiled
+payloads remain resource-only `.bin` files outside the driver classpath. The
+gate requires native Java, Node and Chromium on both releases and retains an
+unchanged-source/compiler/runtime ledger at
+`build/java-loading-constraints-results.json`, including attempted failures.
+
+One scenario has an explicit oracle boundary: both pinned natives accept a
+prepared abstract child whose selected abstract superclass and default
+interface have conflicting descriptor identities. Its genuine `<clinit>` proves
+native preparation completed. The stated [JVMS preparation](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-5.html#jvms-5.4.2)
+and [selection](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-5.html#jvms-5.4.6)
+rules instead require the inherited-owner constraint, so Node and Chromium
+must reject it before initialization. Separate pinned-native and normative
+profiles retain exact phase, publication and initializer traces. The ledger
+explicitly identifies 30 agreement cases plus one normative-boundary case;
+this is not a claim of strict native parity for all 31 cases.
+
+```sh
+yarn ci:loading-constraints:test
+yarn ci:loading-constraints
+```
+
+These implementations and selected gates do not close B4. Broader member
+access/resolution, evolved invocation/default-method binaries and symbolic
+resolution failure caching remain subsequent batches. No Java SE or full
+Phase B conformance claim follows from this selected inventory.
+
 ## Remaining boundaries
 
 These batches do not finish B1, JVM-002 or Phase B. B2's structural corpus does
