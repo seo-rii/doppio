@@ -5793,6 +5793,9 @@ export class InvokeDynamic implements IConstantPoolItem {
         // The Java APIs define decimal/scientific rendering and binary32
         // precision; JavaScript's numeric formatter is not an equivalent.
         var wrapper = type === 'F' ? 'java/lang/Float' : 'java/lang/Double';
+        // initializeClass defers even its already-initialized fast path. The
+        // invocation has consumed its arguments and must not run again yet.
+        thread.setStatus(ThreadStatus.ASYNC_WAITING);
         thread.getBsCl().initializeClass(thread, 'L' + wrapper + ';', (cls: ReferenceClassData<any>) => {
           if (cls === null) {
             return; // Class initialization already propagated its guest error.

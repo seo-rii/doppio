@@ -21,6 +21,9 @@ function load() {
 }
 const {InvokeDynamic} = load();
 const Long = require(path.join(runtime, 'src/gLong')).default;
+const {PreAllocatedStack} = require(path.join(runtime, 'src/threading'));
+const {LookupTable} = require(path.join(runtime, 'src/opcodes'));
+const {OpCode, ThreadStatus} = require(path.join(runtime, 'src/enums'));
 
 // Actual fast-path evaluator with controlled Java callbacks, not genuine
 // compiler/host evidence. The separate B6 corpus supplies that evidence. String
@@ -31,8 +34,9 @@ class JavaString {
 class CharArray {
   constructor(thread, length) { this.array = Array(length).fill(0); }
 }
-function environment(renderFloating = (type, value, callback) => callback(null, javaText(type + ':' + value))) {
-  const events = [], pending = [], errors = [];
+function environment(renderFloating = (type, value, callback) => callback(null, javaText(type + ':' + value)),
+    {deferInitialization = false} = {}) {
+  const events = [], pending = [], errors = [], initializations = [];
   const loader = {
     getResolvedClass(name) {
       assert.equal(name, 'Ljava/lang/String;');
@@ -55,13 +59,17 @@ function environment(renderFloating = (type, value, callback) => callback(null, 
         events.push(['floating', type, parameters[0]]);
         renderFloating(type, parameters[0], callback);
       }};
-      complete({getConstructor: () => constructor});
+      const cls = {getConstructor: () => constructor};
+      if (deferInitialization) initializations.push({complete, cls});
+      else complete(cls);
     }
   };
-  const thread = {getBsCl: () => loader,
+  const thread = {status: ThreadStatus.RUNNABLE, getBsCl: () => loader,
+    getStatus() { return this.status; },
+    setStatus(status) { this.status = status; },
     throwException(error) { errors.push(error); },
     throwNewException(name) { assert.fail('Unexpected guest error ' + name); }};
-  return {thread, events, pending, errors};
+  return {thread, events, pending, errors, initializations};
 }
 const javaText = value => ({toString: () => value});
 function site(components, method = 'toString') {
@@ -79,6 +87,70 @@ function evaluate(callSite, env, receiver, other) {
     (error, result) => callbacks.push({error, result}));
   return callbacks;
 }
+
+function invokeOpcode(callSite, env, receiver) {
+  // Use the actual invocation opcode and operand stack. Only class-library
+  // initialization/conversion callbacks are controlled; no scheduler or
+  // complete guest execution is claimed by this unit.
+  callSite.paramWordSize = 1;
+  callSite.getCallSiteObject = () => [{vmtarget: null}, null];
+  const opStack = new PreAllocatedStack(3);
+  opStack.push(receiver);
+  const frame = {pc: 0, opStack, returnToThreadLoop: false,
+    method: {fullSignature: 'record/Unit.toString()Ljava/lang/String;',
+      cls: {constantPool: {getUnchecked(index) {
+        assert.equal(index, 1); return callSite;
+      }}}}};
+  LookupTable[OpCode.INVOKEDYNAMIC_FAST](env.thread, frame,
+    Buffer.from([OpCode.INVOKEDYNAMIC_FAST, 0, 1, 0, 0]));
+  return frame;
+}
+
+test('actual invokedynamic suspends after consuming the receiver until deferred F and D initialization completes', () => {
+  const env = environment(undefined, {deferInitialization: true});
+  const frame = invokeOpcode(site([['single', 'F'], ['wide', 'D']]), env,
+    {'record/Unit/single': 1.5, 'record/Unit/wide': -0});
+  assert.equal(frame.returnToThreadLoop, true);
+  assert.equal(frame.pc, 0, 'No PC advancement while initialization is pending');
+  assert.deepEqual(frame.opStack.getRaw(), [], 'The receiver has already been consumed');
+  assert.equal(env.thread.getStatus(), ThreadStatus.ASYNC_WAITING, 'Do not reexecute the same invocation with an empty stack');
+  assert.equal(env.initializations.length, 1);
+  const single = env.initializations.shift(); single.complete(single.cls);
+  assert.equal(frame.pc, 0);
+  assert.deepEqual(frame.opStack.getRaw(), []);
+  assert.equal(env.thread.getStatus(), ThreadStatus.ASYNC_WAITING, 'D initialization is a separate pending operation');
+  assert.equal(env.initializations.length, 1);
+  const wide = env.initializations.shift(); wide.complete(wide.cls);
+  assert.equal(frame.pc, 3, 'Exactly one invocation completion');
+  assert.equal(env.thread.getStatus(), ThreadStatus.RUNNABLE);
+  assert.equal(frame.opStack.getRaw().length, 1);
+  assert.ok(frame.opStack.getRaw()[0] instanceof JavaString);
+  assert.deepEqual(env.errors, []);
+});
+
+test('deferred floating conversion failure preserves Throwable identity without advancing the actual opcode', () => {
+  const failure = {}, env = environment((type, value, complete) => complete(failure), {deferInitialization: true});
+  const frame = invokeOpcode(site([['single', 'F']]), env, {'record/Unit/single': 1.5});
+  assert.equal(env.thread.getStatus(), ThreadStatus.ASYNC_WAITING);
+  const pending = env.initializations.shift(); pending.complete(pending.cls);
+  assert.deepEqual(env.errors, [failure]);
+  assert.ok(env.errors[0] === failure);
+  assert.equal(frame.pc, 0);
+  assert.deepEqual(frame.opStack.getRaw(), []);
+});
+
+test('deferred initializer error is propagated once without a fabricated successful opcode result', () => {
+  const failure = {}, env = environment(() => assert.fail('No conversion after failed initialization'), {deferInitialization: true});
+  const frame = invokeOpcode(site([['wide', 'D']]), env, {'record/Unit/wide': 2.5});
+  assert.equal(env.thread.getStatus(), ThreadStatus.ASYNC_WAITING);
+  // The actual loader throws on this thread before completing with null.
+  env.thread.throwException(failure);
+  env.initializations.shift().complete(null);
+  assert.deepEqual(env.errors, [failure]);
+  assert.ok(env.errors[0] === failure);
+  assert.equal(frame.pc, 0);
+  assert.deepEqual(frame.opStack.getRaw(), []);
+});
 
 test('empty records allocate a Java string without component calls', () => {
   const env = environment(), callbacks = evaluate(site([]), env, {});
