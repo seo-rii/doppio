@@ -662,8 +662,8 @@ export class ArrayClassData<T> extends ClassData {
     return this.superClass.methodLookup(signature);
   }
 
-  public fieldLookup(name: string): Field {
-    return this.superClass.fieldLookup(name);
+  public fieldLookup(name: string, descriptor?: string): Field {
+    return this.superClass.fieldLookup(name, descriptor);
   }
 
   /** Array metadata does not verify or initialize its component class. */
@@ -1393,13 +1393,24 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
   /**
    * Looks up a field with the given name. Returns null if no method found.
    */
-  public fieldLookup(name: string): Field {
-    var f = this._fieldLookup[name];
-    if (f !== undefined) {
-      return f;
-    } else {
-      return null;
-    }
+  public fieldLookup(name: string, descriptor?: string): Field {
+    if (descriptor === undefined) return this._fieldLookup[name] || null;
+    var seen = new Set<ReferenceClassData<JVMTypes.java_lang_Object>>();
+    var visit = (cls: ReferenceClassData<JVMTypes.java_lang_Object>): Field => {
+      if (cls === null || seen.has(cls)) return null;
+      seen.add(cls);
+      var fields = cls.getFields();
+      for (var i = 0; i < fields.length; i++) {
+        if (fields[i].name === name && fields[i].rawDescriptor === descriptor) return fields[i];
+      }
+      var interfaces = cls.getInterfaces() || [];
+      for (var j = 0; j < interfaces.length; j++) {
+        var field = visit(interfaces[j]);
+        if (field !== null) return field;
+      }
+      return visit(cls.getSuperClass());
+    };
+    return visit(this);
   }
 
   public getAttribute(name: string): IAttribute {

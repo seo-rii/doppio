@@ -3979,7 +3979,7 @@ export class FieldReference implements IConstantPoolItem {
       }, explicit);
     } else {
       var cls = this.classInfo.cls,
-        field = cls.fieldLookup(this.nameAndTypeInfo.name);
+        field = cls.fieldLookup(this.nameAndTypeInfo.name, this.nameAndTypeInfo.descriptor);
       if (field !== null) {
         if (caller !== null && !util.checkAccess(caller, field.cls, field.accessFlags)) {
           thread.throwNewException('Ljava/lang/IllegalAccessError;', `${caller.getExternalName()} cannot access ${field.cls.getExternalName()}.${field.name}`);
