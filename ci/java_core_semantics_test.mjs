@@ -8,6 +8,7 @@ import numeric from './java_core_numeric_cases.mjs';
 import arraysObjects from './java_core_arrays_objects_cases.mjs';
 import control from './java_core_control_cases.mjs';
 import exceptions from './java_core_exceptions_cases.mjs';
+import stackForms, {mutateCoreStackPayload, inspectCoreStackPayload} from './java_core_stack_forms_cases.mjs';
 import {coreOpcodeNames, inspectCoreClasses, proveCoreGroup} from './java_core_bytecode.mjs';
 import {inspectClassFiles, runCommand, runtimeSnapshot, validateToolchains} from './run_java_compatibility.mjs';
 import {treeDigest} from './prepare_java_compatibility_toolchains.mjs';
@@ -24,7 +25,7 @@ const freezeContract = value => {
   return value;
 };
 export const coreLedgerScope = 'JVM-002 B5 selected core numeric, array, object, frame, control-flow and exception contracts';
-export const coreGroups = freezeContract([numeric, arraysObjects, control, exceptions]);
+export const coreGroups = freezeContract([numeric, arraysObjects, control, exceptions, stackForms]);
 export const coreTimeouts = {compileMs: 60_000, nativeMs: 30_000, guestMs: 60_000};
 export const coreRequiredHosts = Object.freeze(['native', 'node', 'chromium']);
 const coreRequiredReleases = Object.freeze([21, 25]);
@@ -74,6 +75,7 @@ export function validateCoreGroups(groups = coreGroups) {
       }
     }
     if (group.generatedSources) assert.deepEqual(group.generatedSources(), group.generatedSources(), 'Deterministic generated genuine sources');
+    if (group.carrierSources) assert.deepEqual(group.carrierSources(), group.carrierSources(), 'Deterministic genuine mutation carrier sources');
   }
   return allIds.size;
 }
@@ -96,7 +98,7 @@ export function createCoreLedger(mode = 'browser', groups = coreGroups) {
   for (const [index, group] of groups.entries()) {
     const expected = coreGroups[index];
     assert.deepEqual(group.cases, expected.cases, 'Exact mandatory group case contracts');
-    for (const key of ['source', 'mainClass', 'completionMarker', 'generatedSources'])
+    for (const key of ['source', 'mainClass', 'completionMarker', 'kind', 'generatedSources', 'carrierSources'])
       assert.equal(group[key], expected[key], 'Exact mandatory group compiler inputs');
   }
   const ledger = {schemaVersion: 1, scope: coreLedgerScope, status: 'running', requestedMode: mode,
@@ -211,6 +213,36 @@ export async function checkCoreCompilation(operation, execute, verifyIntegrity, 
   assert.equal(operation.result.stdout + operation.result.stderr, '', 'Clean genuine compilation');
 }
 
+/** The carrier .class is never a runnable fallback for a resource payload. */
+export function assertCoreStackClasspath(directory, driverClasses, payloads) {
+  const driverPaths = [
+    'classes/modern_test/JavaCoreStackForms$PayloadLoader.class',
+    'classes/modern_test/JavaCoreStackForms.class'
+  ];
+  assert.deepEqual(driverClasses.map(file => file.path).sort(), driverPaths, 'Exact two genuine stack driver classes');
+  assert.deepEqual(payloads.map(payload => [payload.id, payload.resourcePath]),
+    stackForms.cases.map(entry => [entry.id, entry.payload.resource]), 'Exact mandatory resource payload inventory');
+  const expected = [...driverClasses.map(file => ({path: file.path, size: file.size, sha256: file.sha256})),
+    ...payloads.map(payload => ({path: payload.resourcePath, size: payload.size, sha256: payload.mutatedSha256}))]
+    .sort((a, b) => a.path.localeCompare(b.path));
+  const actual = [];
+  const visit = location => {
+    for (const name of fs.readdirSync(location)) {
+      const filename = path.join(location, name), stat = fs.lstatSync(filename);
+      assert.ok(!stat.isSymbolicLink(), 'No linked stack runtime input');
+      if (stat.isDirectory()) visit(filename);
+      else {
+        assert.ok(stat.isFile(), 'Regular stack runtime input');
+        actual.push({path: path.relative(directory, filename).split(path.sep).join('/'), size: stat.size,
+          sha256: digest(fs.readFileSync(filename))});
+      }
+    }
+  };
+  visit(directory);
+  assert.deepEqual(actual.sort((a, b) => a.path.localeCompare(b.path)), expected,
+    'Exact resource-only stack classpath; no fallback, missing, extra or changed bytes');
+}
+
 async function provenance() {
   const read = async args => {
     const result = await runCommand('git', args, {cwd: repoRoot, timeoutMs: 10_000});
@@ -231,11 +263,11 @@ export async function runCoreSemantics(ledger, {checkpoint = () => {}} = {}) {
   const indexPath = path.join(repoRoot, 'ci/plan_spec_source_index.json'), index = JSON.parse(fs.readFileSync(indexPath));
   ledger.sourceUnits = coreGroups.map(group => ({group: group.id, cases: coreSourceUnits(group, index)}));
   const relativeInputs = ['ci/java_core_semantics_test.mjs', 'ci/java_core_semantics_contract_test.mjs',
-    'ci/java_core_bytecode.mjs', 'ci/java_core_bytecode_test.mjs', 'ci/java_class_structure_test.mjs',
+    'ci/java_core_bytecode.mjs', 'ci/java_core_bytecode_test.mjs', 'ci/java_core_stack_forms_contract_test.mjs', 'ci/java_class_structure_test.mjs',
     'ci/java_class_derivation_test.mjs', 'ci/run_java_compatibility.mjs', 'ci/prepare_java_compatibility_toolchains.mjs',
     'ci/java_compatibility_browser.mjs', 'ci/plan_spec_source_index.json', 'package.json', 'yarn.lock',
-    '.github/workflows/modern-java.yml', ...coreGroups.flatMap(group => [group.source, `ci/java_core_${
-      group.id === 'arrays-objects' ? 'arrays_objects' : group.id}_cases.mjs`])];
+    '.github/workflows/modern-java.yml', ...coreGroups.flatMap(group => [group.source,
+      `ci/java_core_${group.id.replaceAll('-', '_')}_cases.mjs`])];
   const inputPaths = [...relativeInputs.map(relative => path.join(repoRoot, relative)), lockPath, markerPath, process.execPath];
   const inputs = () => inputPaths.map(filename => ({path: filename, size: fs.statSync(filename).size, sha256: digest(fs.readFileSync(filename))}));
   ledger.inputDigests = inputs(); ledger.node = {version: process.version, executable: process.execPath};
@@ -271,12 +303,13 @@ export async function runCoreSemantics(ledger, {checkpoint = () => {}} = {}) {
       try {
         checkGlobal();
         const sourceRecords = [{path: path.join(repoRoot, group.source), sha256: digest(fs.readFileSync(path.join(repoRoot, group.source)))}];
-        for (const source of group.generatedSources?.() || []) {
+        const materializeSources = (sources, kind) => sources.map(source => {
           assert.match(source.binaryName, /^[A-Za-z0-9_$]+(?:\.[A-Za-z0-9_$]+)*$/);
-          const filename = path.join(directory, 'sources', source.binaryName.replaceAll('.', '/') + '.java');
+          const filename = path.join(directory, kind, source.binaryName.replaceAll('.', '/') + '.java');
           fs.mkdirSync(path.dirname(filename), {recursive: true}); fs.writeFileSync(filename, source.text, {flag: 'wx', mode: 0o600});
-          sourceRecords.push({...source, path: filename, sha256: digest(source.text)});
-        }
+          return {...source, path: filename, sha256: digest(source.text)};
+        });
+        sourceRecords.push(...materializeSources(group.generatedSources?.() || [], 'sources'));
         record.sources = sourceRecords;
         const sourceDigests = sourceRecords.map(source => ({path: source.path, sha256: source.sha256}));
         assertCoreCompilerSources(sourceDigests);
@@ -288,20 +321,75 @@ export async function runCoreSemantics(ledger, {checkpoint = () => {}} = {}) {
           {cwd: directory, timeoutMs: coreTimeouts.compileMs}),
         () => { checkGlobal(); assertCoreCompilerSources(sourceDigests); }, checkpoint);
         record.classFiles = inspectClassFiles(output, record.release, group.mainClass);
-        record.bytecodeProofs = proveCoreGroup(group, inspectCoreClasses(output, record.classFiles));
-        record.classpath = {directory: output, treeSha256: treeDigest(output), genuineCompilerBytes: true, fallbackPayloadClassFiles: false};
+        if (group.kind === 'explicit-byte-mutation') {
+          const carrierSources = materializeSources(group.carrierSources(), 'carrier-sources');
+          sourceDigests.push(...carrierSources.map(source => ({path: source.path, sha256: source.sha256})));
+          assertCoreCompilerSources(sourceDigests);
+          const carrierOutput = path.join(directory, 'compilations', 'carrier');
+          fs.mkdirSync(carrierOutput, {recursive: true});
+          const carrierOperation = {kind: 'genuine-mutation-carrier', command: operation.command,
+            arguments: ['--release', String(record.release), '-encoding', 'UTF-8', '-proc:none', '-g',
+              '-classpath', emptySourcepath, '-sourcepath', emptySourcepath, '-d', carrierOutput,
+              ...carrierSources.map(source => source.path)], destination: carrierOutput};
+          record.carrierSources = carrierSources; record.operations.push(carrierOperation); checkpoint();
+          await checkCoreCompilation(carrierOperation, () => runCommand(carrierOperation.command, carrierOperation.arguments,
+            {cwd: directory, timeoutMs: coreTimeouts.compileMs}),
+          () => { checkGlobal(); assertCoreCompilerSources(sourceDigests); }, checkpoint);
+          const originals = inspectClassFiles(carrierOutput, record.release, 'corehistorical.Target');
+          assert.deepEqual(originals.map(file => file.path), ['corehistorical/Target.class'], 'Separate single genuine carrier');
+          record.originals = {directory: carrierOutput, classFiles: originals, treeSha256: treeDigest(carrierOutput),
+            genuineCompilerBytes: true, runtimeClasspathEntry: false};
+          const original = fs.readFileSync(path.join(carrierOutput, originals[0].path));
+          record.payloads = [];
+          for (const entry of group.cases) {
+            const mutation = mutateCoreStackPayload(original, entry);
+            assert.equal(mutation.originalSha256, originals[0].sha256, 'Mutation starts from untouched genuine bytes');
+            assert.equal(digest(original), originals[0].sha256, 'Original carrier buffer remains unchanged');
+            const replayed = mutation.edits.slice().sort((a, b) => b.offset - a.offset).reduce((bytes, edit) => {
+              assert.equal(original.subarray(edit.offset, edit.offset + edit.removeBytes).toString('hex'), edit.beforeHex);
+              return Buffer.concat([bytes.subarray(0, edit.offset), Buffer.from(edit.insertHex, 'hex'),
+                bytes.subarray(edit.offset + edit.removeBytes)]);
+            }, Buffer.from(original));
+            assert.ok(replayed.equals(mutation.bytes), 'Exact independently replayed original-to-payload edits');
+            assert.equal(digest(mutation.bytes), mutation.mutatedSha256);
+            const proof = inspectCoreStackPayload(mutation.bytes, entry);
+            const filename = path.join(output, entry.payload.resource);
+            fs.mkdirSync(path.dirname(filename), {recursive: true});
+            fs.writeFileSync(filename, mutation.bytes, {flag: 'wx', mode: 0o600});
+            record.payloads.push({id: entry.id, kind: entry.kind, resourcePath: entry.payload.resource,
+              originalSha256: mutation.originalSha256, mutatedSha256: mutation.mutatedSha256,
+              size: mutation.bytes.length, edits: mutation.edits, proof});
+            checkpoint();
+          }
+          record.bytecodeProofs = {kind: group.kind, cases: record.payloads.map(payload => payload.proof),
+            invocationRoute: 'manifest-controlled resource-only child-first loader and reflective target invocation',
+            staticCallReachabilityProven: false, jitExecutionProven: false, dynamicBranchCoverageProven: false};
+          assertCoreStackClasspath(output, record.classFiles, record.payloads);
+        } else record.bytecodeProofs = proveCoreGroup(group, inspectCoreClasses(output, record.classFiles));
+        record.classpath = {directory: output, treeSha256: treeDigest(output),
+          genuineCompilerBytes: group.kind !== 'explicit-byte-mutation', driverGenuineCompilerBytes: true,
+          payloadKind: group.kind || 'genuine-compiler-bytes', fallbackPayloadClassFiles: false};
+        const programArguments = group.kind === 'explicit-byte-mutation' ? group.cases.map(entry => entry.id) : [];
+        record.programArguments = programArguments;
         const checkLocal = () => integrity(() => {
           assertCoreCompilerSources(sourceDigests);
-          assert.equal(treeDigest(output), record.classpath.treeSha256, 'Immutable genuine runtime classpath');
+          assert.equal(treeDigest(output), record.classpath.treeSha256, 'Immutable runtime classpath');
           assert.deepEqual(inspectClassFiles(output, record.release, group.mainClass), record.classFiles, 'Genuine class versions and hashes');
+          if (record.originals) {
+            assert.equal(treeDigest(record.originals.directory), record.originals.treeSha256, 'Immutable genuine carrier tree');
+            assert.deepEqual(inspectClassFiles(record.originals.directory, record.release, 'corehistorical.Target'),
+              record.originals.classFiles, 'Immutable genuine original class versions and hashes');
+            assertCoreStackClasspath(output, record.classFiles, record.payloads);
+          }
         });
         for (const cell of record.executions) {
           if (!hosts.includes(cell.host)) { cell.reason = 'explicit diagnostic mode excludes this mandatory host'; checkpoint(); continue; }
           checkGlobal(); checkLocal();
           await checkCoreExecution(cell, group, () => cell.host === 'chromium' ? session.execute({classesPath: output,
-            mainClass: group.mainClass, arguments: [], timeoutMs: coreTimeouts.guestMs, standardInput: ''}) : runCommand(
+            mainClass: group.mainClass, arguments: programArguments, timeoutMs: coreTimeouts.guestMs, standardInput: ''}) : runCommand(
             cell.host === 'native' ? path.join(prepared.home, 'bin/java') : process.execPath,
-            [...(cell.host === 'native' ? [] : ['--no-deprecation', runnerPath]), '-cp', output, group.mainClass],
+            [...(cell.host === 'native' ? ['-Xverify:all'] : ['--no-deprecation', runnerPath]), '-cp', output,
+              group.mainClass, ...programArguments],
             {cwd: directory, timeoutMs: cell.host === 'native' ? coreTimeouts.nativeMs : coreTimeouts.guestMs, standardInput: ''}),
           () => { checkGlobal(); checkLocal(); }, checkpoint);
         }

@@ -16,10 +16,12 @@ const success = group => ({status: 'passed', exitCode: 0, signal: null, error: n
   outputLimitExceeded: false, stderr: '', stdout: group.cases.flatMap(entry => entry.trace.map(event => `${entry.id}=${event}`))
     .concat([group.completionMarker, '']).join('\n')});
 
-test('B5 genuine corpus has exactly four mandatory groups and 130 independently fixed scenarios', () => {
+test('B5 corpus has five mandatory groups and 155 independently fixed genuine or explicit-mutation scenarios', () => {
   assert.deepEqual(coreGroups.map(group => [group.id, group.cases.length]),
-    [['numeric', 48], ['arrays-objects', 38], ['control', 26], ['exceptions', 18]]);
-  assert.equal(validateCoreGroups(), 130);
+    [['numeric', 48], ['arrays-objects', 38], ['control', 26], ['exceptions', 18], ['stack-forms', 25]]);
+  assert.equal(validateCoreGroups(), 155);
+  assert.equal(coreGroups[4].kind, 'explicit-byte-mutation');
+  assert.equal(coreGroups[4].cases.filter(entry => entry.payload.major !== 'original-modern').length, 8);
   const numeric = coreGroups[0];
   assert.deepEqual(numeric.cases.find(entry => entry.id === 'l2f').trace, ['df000000,5f000000,5e800001,de800001']);
   assert.equal(coreGroups[1].cases.flatMap(entry => entry.trace).length, 180);
@@ -49,7 +51,8 @@ test('source-unit references bind both actual edition indices without promoting 
 
 test('all native and guest execution cells are registered as not-run before the first compile', () => {
   const ledger = createCoreLedger();
-  assert.equal(ledger.results.length, 8); assert.equal(ledger.caseCount, 130);
+  assert.equal(ledger.results.length, 10); assert.equal(ledger.caseCount, 155);
+  assert.equal(ledger.results.flatMap(record => record.executions).length, 30);
   assert.deepEqual(coreRequiredHosts, ['native', 'node', 'chromium']);
   for (const record of ledger.results) {
     assert.equal(record.status, 'not-run'); assert.deepEqual(record.executions.map(cell => cell.host), coreRequiredHosts);
@@ -88,6 +91,44 @@ test('ledger constructor rejects unknown modes and incomplete mandatory group pr
   const changed = coreGroups.map(group => ({...group, cases: structuredClone(group.cases)}));
   changed[0].cases.pop();
   assert.throws(() => createCoreLedger('browser', changed), /mandatory.*case/);
+  for (const replacement of [{kind: 'genuine-compiler-bytes'}, {carrierSources: () => []}]) {
+    const profile = [...coreGroups]; profile[4] = {...profile[4], ...replacement};
+    assert.throws(() => createCoreLedger('browser', profile), /mandatory group compiler inputs/);
+  }
+});
+
+test('stack runtime inventory forbids parent carriers, missing resources, extra files and changed bytes', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'doppio-core-stack-inventory-'));
+  const hash = value => crypto.createHash('sha256').update(value).digest('hex');
+  // Metadata-only inventory inputs: bytecode semantics and genuine compilation
+  // are proven separately, not inferred from these deliberately arbitrary bytes.
+  const emit = (relative, bytes) => {
+    const filename = path.join(directory, relative);
+    fs.mkdirSync(path.dirname(filename), {recursive: true}); fs.writeFileSync(filename, bytes);
+    return {path: relative, size: bytes.length, sha256: hash(bytes)};
+  };
+  try {
+    const drivers = ['classes/modern_test/JavaCoreStackForms.class',
+      'classes/modern_test/JavaCoreStackForms$PayloadLoader.class'].map(name => emit(name, Buffer.from(name)));
+    const payloads = coreGroups[4].cases.map(entry => {
+      const file = emit(entry.payload.resource, Buffer.from(entry.id));
+      return {id: entry.id, resourcePath: file.path, size: file.size, mutatedSha256: file.sha256};
+    });
+    const check = () => core.assertCoreStackClasspath(directory, drivers, payloads);
+    assert.doesNotThrow(check);
+    const fallback = emit('corehistorical/Target.class', Buffer.from('carrier fallback')).path;
+    assert.throws(check, /resource-only stack classpath/); fs.unlinkSync(path.join(directory, fallback));
+    assert.throws(() => core.assertCoreStackClasspath(directory, drivers.slice(0, 1), payloads), /two genuine stack driver/);
+    assert.throws(() => core.assertCoreStackClasspath(directory, drivers, payloads.slice(1)), /mandatory resource/);
+    const resource = path.join(directory, payloads[0].resourcePath), saved = fs.readFileSync(resource);
+    fs.unlinkSync(resource); assert.throws(check, /resource-only stack classpath/);
+    fs.writeFileSync(resource, Buffer.alloc(saved.length, 0)); assert.throws(check, /resource-only stack classpath/);
+    fs.writeFileSync(resource, saved); assert.doesNotThrow(check);
+    const extra = path.join(directory, 'extra.bin'); fs.writeFileSync(extra, 'extra');
+    assert.throws(check, /resource-only stack classpath/); fs.unlinkSync(extra);
+    fs.symlinkSync(resource, extra); assert.throws(check, /No linked stack runtime input/); fs.unlinkSync(extra);
+    assert.doesNotThrow(check);
+  } finally { fs.rmSync(directory, {recursive: true, force: true}); }
 });
 
 const invalidInventories = [
@@ -249,7 +290,7 @@ test('atomic ledgers preserve failure/not-run cells and refuse diagnostics over 
     writeCoreLedger(filename, ledger);
     const saved = JSON.parse(fs.readFileSync(filename));
     assert.equal(saved.results[0].executions[0].result.stdout, 'partial');
-    assert.equal(saved.results[7].executions[2].status, 'not-run');
+    assert.equal(saved.results[9].executions[2].status, 'not-run');
     assert.throws(() => writeCoreLedger(filename, createCoreLedger('native-only')), /Diagnostics/);
     const link = path.join(directory, 'link.json'); fs.symlinkSync(filename, link);
     assert.throws(() => writeCoreLedger(link, ledger), /Regular unlinked/);
