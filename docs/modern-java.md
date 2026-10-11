@@ -2673,3 +2673,15 @@ expanded.
   The selected malformed-attribute, old-major, duplicate/array and passive
   verification cases do not establish every class-file or reflection contract;
   all JVM-007 source units remain unassessed.
+
+## Final-Language Evidence Boundaries
+
+The [B8 selected corpus](phase-b-loading.md#b8-selected-final-language) adds
+58 fixed final-language and actual-startup cases. Native-first checks pass on
+the applicable pinned Java 21/25 toolchains; its complete clean Node/Chromium
+integration exit remains pending. Independent decoded bootstrap and startup
+declaration evidence is not full language, compiler, bootstrap, branch or
+initialization conformance. All 112 JVM-008 source units remain unassessed and
+dependency clauses retain their actual owners. Preview source forms, hosted
+modern javac, arbitrary bootstrap behavior, named-module runtime access and
+broader scheduler/memory-model support remain separate work.

@@ -661,6 +661,63 @@ All eight JVM-007 source units remain unassessed with false full-unit flags.
 This records the selected B7 exit, not complete sealed-type, class-file,
 initialization, module or Phase B conformance.
 
+## B8 selected final language
+
+`ci/java_final_language_test.mjs` fixes five groups and 58 logical cases before
+toolchain or execution I/O. Final Java 21 forms compile on both 21 and 25;
+constructor, unnamed-resource and expanded startup cases use final Java 25.
+No preview class files, patched majors, payload transformations or parent
+classpath fallback are accepted.
+
+| Group | Cases | Releases | Selected evidence |
+| --- | --- | --- | --- |
+| Patterns | 16 | 21, 25 | Selector and guard abrupt completion, null unboxing, restart, original accessor Error causes, explicit/inferred generic bindings and safe wildcard mismatch. |
+| Switch flow | 14 | 21, 25 | Null/default selection, legal zero-variable record fallthrough, arrow isolation, yield/finally precedence, nested targets, labeled transfers and category-2/reference results. |
+| Constructors | 10 | 25 | Actual argument/delegation/super/initializer/prologue failures, qualified-primary order/null handling and original Throwable identities. |
+| Unnamed resources | 6 | 25 | Acquisition/body/close failures, reverse closing, null resources and exact primary/suppressed references through catch/finally. |
+| Launcher | 12 | 25 | Actual per-case VM initial classes/interfaces, inherited and default mains, class override, abstract static startup, invalid signatures and initialization failures. |
+
+Seven genuine javac operations emit an exact declared class inventory. The
+88 release-qualified case obligations run on native `-Xverify:all`, Node and
+Chromium in 21 mandatory group/release/host cells. The first four groups need
+18 program executions; launcher cells contain twelve actual startups each,
+bringing the total to 54 program executions. The launcher container has no
+wrapper main, and its compiler output may not ordinarily call any main method.
+Abstract-interface failure binds real abstract metadata, not fabricated Code.
+
+Independent decoded evidence binds reachable pattern sites through actual
+invokedynamic/NameAndType/BootstrapMethods/MethodHandle entries and exact ordered
+Class labels, including repeated labels. Launcher proofs bind exact declared
+main/constructor/class-initializer inventories, access flags, Code presence and
+direct hierarchy identities. These are selected compiler/declaration facts,
+not full bootstrap support, dynamic branch coverage or a proof of every launch
+selection rule. Program prefailure traces are fixed independently from
+source-fixed host diagnostic formats; unknown diagnostics and forbidden main
+or constructor output fail rather than being discarded.
+
+```sh
+yarn ci:final-language:test
+yarn ci:final-language
+yarn ci:final-language-retained
+```
+
+The new-case ledger is `build/java-final-language-results.json`. A separate
+retained ledger, `build/java-final-language-retained-results.json`, preserves
+eight original seed fixtures and eleven release-qualified entries, or 33 host
+executions. Its one generated bootstrap companion stays explicitly generated;
+primitive-selector API regressions remain pinned-native implementation-sensitive
+comparisons, not preview source-language conformance. The full seed, existing
+23-case launcher suite (including three explicit oracle differences), and
+separately evolved enum/sealed switch gate remain independently mandatory.
+Module-import retention proves compiler lowering only, not runtime JPMS.
+
+Native-first checks pass all authored case outcomes on the applicable locked
+toolchains, but the full clean-commit Node/Chromium and retained B8 integration
+exit is still pending. All 112 JVM-008 source units remain unassessed; constructor
+and other dependency clauses retain their original owners. No full source-unit,
+class-file, initialization, bootstrap, module, JVM-008 or Phase B completion
+claim follows from this selected corpus.
+
 ## Remaining boundaries
 
 These batches do not finish B1, JVM-002 or Phase B. B2's structural corpus does
@@ -670,5 +727,6 @@ verification rule, historical class shape or adversarial resource limit.
 Remaining initialization cases include exceptional allocation during error
 wrapping and broader concurrency/memory-model interactions. General linkage,
 module access, hidden classes and arbitrary bootstrap behavior remain separate.
-The record and sealed packages remain partial beyond the selected B6/B7
-evidence; final-language work follows in B8.
+The record, sealed and final-language packages remain partial beyond selected
+B6/B7/B8 evidence. B8 integration evidence is required before its batch exit;
+even a passing selected batch does not close every source-unit obligation.
