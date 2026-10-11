@@ -236,7 +236,10 @@ Noninitializing `Class.forName` returns loaded metadata. An array query prepares
 each rank's component and bootstrap superclass pointers without verifying or
 initializing the element class, even if that element previously failed
 verification. Explicit component linking and active use still take the full
-verification gate. Trusted reflection superclass access is attached to the
+linking gate. Binding a Lookup member completes that gate before publishing
+native method indices or static-method bridges, without running the target's
+class initializer; linking failures retain their original guest Throwable.
+Trusted reflection superclass access is attached to the
 proven generator preparation and exact candidate; admission requires the actual
 bootstrap parent identity, including when that parent loads after preparation.
 

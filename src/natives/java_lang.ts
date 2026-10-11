@@ -2928,6 +2928,21 @@ export default function (): any {
         return;
       }
 
+      // Passive class lookup only derives hierarchy metadata. Binding a member
+      // needs full linking before publishing VM indices or constructing a static
+      // method bridge, but must not run the target's class initializer.
+      if (!clazz.isResolved()) {
+        thread.setStatus(ThreadStatus.ASYNC_WAITING);
+        clazz.resolve(thread, (linked: ClassData) => {
+          if (linked === null) return;
+          var resolved = java_lang_invoke_MethodHandleNatives[
+            'resolve(Ljava/lang/invoke/MemberName;Ljava/lang/Class;)Ljava/lang/invoke/MemberName;'](
+              thread, memberName, lookupClass);
+          if (resolved !== undefined) thread.asyncReturn(resolved);
+        }, false);
+        return;
+      }
+
       assert((flags & MemberNameConstants.CALLER_SENSITIVE) === 0, "Not yet supported: Caller sensitive methods.");
       switch (flags & MemberNameConstants.ALL_KINDS) {
         case MemberNameConstants.IS_CONSTRUCTOR:
