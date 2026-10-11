@@ -805,8 +805,10 @@ export default function (): any {
         return new (cls.getConstructor(thread))(thread);
       } else {
         thread.setStatus(ThreadStatus.ASYNC_WAITING);
-        cls.initialize(thread, () => {
-          thread.asyncReturn(new (cls.getConstructor(thread))(thread));
+        cls.initialize(thread, (initialized: ClassData) => {
+          if (initialized !== null) {
+            thread.asyncReturn(new ((<ReferenceClassData<JVMTypes.java_lang_Object>> initialized).getConstructor(thread))(thread));
+          }
         });
       }
     }
