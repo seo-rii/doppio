@@ -60,6 +60,7 @@ function invocation({declaringInitialized = false, symbolicInitialized = false, 
     stack: [], status: ThreadStatus.RUNNABLE,
     getStatus() { return this.status; },
     currentMethod() { return this.stack.at(-1)?.method || null; },
+    isCurrentFrame(frame) { return this.stack.at(-1) === frame; },
     setStatus(status) { this.status = status; events.push(status); },
     asyncReturn(value) { assert.equal(value, 7); this.stack.pop(); },
     throwNewException(type) { events.push(type); }

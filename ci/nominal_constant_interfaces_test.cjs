@@ -127,6 +127,7 @@ function threadFor(receiverClass) {
     stack: [], status: ThreadStatus.RUNNABLE,
     getStatus() { return this.status; },
     currentMethod() { return this.stack.at(-1)?.method || null; },
+    isCurrentFrame(frame) { return this.stack.at(-1) === frame; },
     setStatus(status) { this.status = status; },
     asyncReturn(value) { returned.push(value); this.stack.pop(); },
     throwNewException(name) { errors.push(name); },

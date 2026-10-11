@@ -238,6 +238,7 @@ function dispatch({upper = false, declaration = {marker: 'declaring element'}, a
   const thread = {stack: [], status: ThreadStatus.RUNNABLE, jitDisabled: true,
     getStatus() { return this.status; }, setStatus(value) { this.status = value; },
     currentMethod() { return this.stack.at(-1)?.method || null; }, getBsCl: () => bootstrap,
+    isCurrentFrame(frame) { return this.stack.at(-1) === frame; },
     getJVM: () => ({getNative() { assert.fail('Only declared callee seams are permitted'); }}),
     throwNewException(name) { assert.fail('Unexpected guest exception ' + name); },
     asyncReturn(value) { this.stack.pop(); if (this.stack.length) this.stack.at(-1).scheduleResume(this, value); else returned.push(value); }
