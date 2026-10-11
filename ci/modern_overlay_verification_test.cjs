@@ -66,6 +66,8 @@ let inventory;
 const filterArgumentsDescriptor = '(Ljava/lang/invoke/MethodHandle;I[Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;';
 let filterArgumentsOverlay;
 let stockFilterArgument;
+const withVarargsDescriptor = '(Z)Ljava/lang/invoke/MethodHandle;';
+let withVarargsOverlay;
 
 before(async () => {
   const {readStructureLayout} = await import('./java_class_structure_test.mjs');
@@ -85,6 +87,15 @@ before(async () => {
     const beforeLayout = readStructureLayout(original);
     const afterLayout = readStructureLayout(overlaid);
     const cls = new ReferenceClassData(overlaid, null, new ClassLoader(null));
+    if (className === 'java/lang/invoke/MethodHandle') {
+      for (const old of beforeLayout.methods.entries) {
+        const member = afterLayout.methods.entries.find(candidate => candidate.name === old.name &&
+          candidate.descriptor === old.descriptor);
+        assert.ok(member, 'retain every stock MethodHandle method');
+        assert.deepEqual(overlaid.subarray(member.start, member.end), original.subarray(old.start, old.end),
+          'preserve the whole stock MethodHandle method and all its metadata');
+      }
+    }
     for (const member of afterLayout.methods.entries) {
       if (!member.code) continue;
       const code = member.code;
@@ -101,6 +112,12 @@ before(async () => {
         member.descriptor === '(Ljava/lang/invoke/MethodHandle;ILjava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;') {
         assert.ok(!stockFilterArgument, 'exactly one stock filterArgument helper');
         stockFilterArgument = {original, overlaid, old, member};
+      }
+      if (className === 'java/lang/invoke/MethodHandle' && member.name === 'withVarargs' &&
+        member.descriptor === withVarargsDescriptor) {
+        assert.equal(old, undefined, 'withVarargs is absent from the stock Java 8 hierarchy');
+        assert.ok(!withVarargsOverlay, 'exactly one modern withVarargs method');
+        withVarargsOverlay = {member, pool: afterLayout.pool};
       }
       const method = cls.getMethods().find(candidate => candidate.name === member.name &&
         candidate.rawDescriptor === member.descriptor);
@@ -125,16 +142,18 @@ before(async () => {
   inventory = {selected, generated, all, unchanged};
 });
 
-test('overlay inventory preserves 113 prior bodies and adds one filter delegate while retaining 1271 stock Code attributes', () => {
+test('overlay inventory adds filter and varargs delegates while preserving 113 prior bodies and 1271 stock Code attributes', () => {
   assert.equal(inventory.selected.length, 36);
-  assert.equal(inventory.generated.length, 114);
+  assert.equal(inventory.generated.length, 115);
   assert.equal(inventory.unchanged, 1271);
   const identity = inventory.generated.map(({className, member, bytes}) =>
     [className, member.name, member.descriptor, member.flags, member.code.maxStack, member.code.maxLocals,
       bytes.toString('hex')]);
   const priorIdentity = identity.filter(([className, name, descriptor]) =>
-    className !== 'java/lang/invoke/MethodHandles' || name !== 'filterArguments' ||
-    descriptor !== filterArgumentsDescriptor);
+    !(className === 'java/lang/invoke/MethodHandles' && name === 'filterArguments' &&
+      descriptor === filterArgumentsDescriptor) &&
+    !(className === 'java/lang/invoke/MethodHandle' && name === 'withVarargs' &&
+      descriptor === withVarargsDescriptor));
   assert.equal(priorIdentity.length, 113);
   assert.equal(createHash('sha256').update(JSON.stringify(priorIdentity)).digest('hex'),
     '6aa35a51cad536fa26de66219269564fbb4124f8fbea8a2058d34b2fd937d420');
@@ -150,6 +169,34 @@ test('overlay inventory preserves 113 prior bodies and adds one filter delegate 
     const original = execFileSync('unzip', ['-p', rtJar, name + '.class'], {timeout: 10000});
     assert.deepEqual(applyModernBootstrapOverlays('L' + name + ';', original), original);
   }
+});
+
+test('withVarargs is a public nonfinal instance method with an exact parsed Code delegate', () => {
+  assert.ok(withVarargsOverlay);
+  const {member, pool} = withVarargsOverlay;
+  assert.equal(member.flags, 0x0001, 'public, nonfinal, nonnative and nonvarargs');
+  assert.deepEqual(member.attributes.entries.map(attribute => attribute.name), ['Code']);
+  assert.equal(member.code.maxStack, 2);
+  assert.equal(member.code.maxLocals, 2);
+  assert.equal(member.code.handlerCount, 0);
+  assert.deepEqual(member.code.attributes.entries, []);
+  const entry = inventory.generated.find(candidate => candidate.className === 'java/lang/invoke/MethodHandle' &&
+    candidate.member.name === 'withVarargs' && candidate.member.descriptor === withVarargsDescriptor);
+  assert.ok(entry, 'parsed generated Code, not a native trap');
+  const decoded = decodeMethodCode(entry.input);
+  assert.deepEqual(decoded.instructions.map(instruction => instruction.opcode), [0x2a, 0x1b, 0xb8, 0xb0]);
+  assert.equal(entry.bytes.length, 6);
+  const target = pool[decoded.instructions[2].cpIndex];
+  assert.equal(target?.tag, 10);
+  assert.equal(pool[target.first]?.tag, 7);
+  assert.equal(pool[pool[target.first].first]?.tag, 1);
+  assert.equal(pool[pool[target.first].first].value, 'java/lang/invoke/DoppioMethodHandleVarargs');
+  const nameAndType = pool[target.second];
+  assert.equal(nameAndType?.tag, 12);
+  assert.equal(pool[nameAndType.first]?.tag, 1);
+  assert.equal(pool[nameAndType.first].value, 'withVarargs');
+  assert.equal(pool[nameAndType.second]?.tag, 1);
+  assert.equal(pool[nameAndType.second].value, '(Ljava/lang/invoke/MethodHandle;Z)Ljava/lang/invoke/MethodHandle;');
 });
 
 test('filterArguments retains public static varargs metadata and delegates its exact parsed Code body', () => {
@@ -250,12 +297,12 @@ test('every generated overlay body passes pure decoding and type checking withou
   const {failures, obligations} = verifyAll(inventory.generated);
   assert.deepEqual(failures, []);
   assert.ok(obligations > 0, 'symbolic obligations are retained, not bypassed or claimed discharged');
-  t.diagnostic('114 generated methods checked; ' + obligations + ' metadata obligations remain for linking');
+  t.diagnostic('115 generated methods checked; ' + obligations + ' metadata obligations remain for linking');
 });
 
 test('all original and generated Code methods in transformed bootstrap classes pass pure verification', t => {
-  assert.equal(inventory.all.length, 1385);
+  assert.equal(inventory.all.length, 1386);
   const {failures, obligations} = verifyAll(inventory.all);
   assert.deepEqual(failures, []);
-  t.diagnostic('1385 methods checked; ' + obligations + ' metadata obligations remain for linking');
+  t.diagnostic('1386 methods checked; ' + obligations + ' metadata obligations remain for linking');
 });

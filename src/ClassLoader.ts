@@ -3107,13 +3107,25 @@ function addJavaLangInvokeMethodHandleModernOverlays(data: Buffer): Buffer {
       ['asCollector', '(ILjava/lang/Class;I)Ljava/lang/invoke/MethodHandle;'],
       ['asSpreader', '(ILjava/lang/Class;I)Ljava/lang/invoke/MethodHandle;']
     ],
+    delegateIndex = cp.count + overlays.length * 2,
+    delegateDescriptor = '(Ljava/lang/invoke/MethodHandle;Z)Ljava/lang/invoke/MethodHandle;',
+    delegateConstants = Buffer.concat([
+      utf8Constant('withVarargs'),
+      utf8Constant('(Z)Ljava/lang/invoke/MethodHandle;'),
+      utf8Constant('Code'),
+      utf8Constant('java/lang/invoke/DoppioMethodHandleVarargs'),
+      Buffer.concat([Buffer.from([7]), u2(delegateIndex + 3)]),
+      utf8Constant(delegateDescriptor),
+      Buffer.concat([Buffer.from([12]), u2(delegateIndex), u2(delegateIndex + 5)]),
+      Buffer.concat([Buffer.from([10]), u2(delegateIndex + 4), u2(delegateIndex + 6)])
+    ]),
     extraConstants = Buffer.concat(overlays.reduce((constants: Buffer[], overlay: string[]) => {
       constants.push(utf8Constant(overlay[0]), utf8Constant(overlay[1]));
       return constants;
-    }, [])),
+    }, []).concat([delegateConstants])),
     withConstants = Buffer.concat([
       data.slice(0, 8),
-      u2(cp.count + overlays.length * 2),
+      u2(delegateIndex + 8),
       data.slice(10, cp.offset),
       extraConstants,
       data.slice(cp.offset)
@@ -3128,13 +3140,22 @@ function addJavaLangInvokeMethodHandleModernOverlays(data: Buffer): Buffer {
         u2(descriptorIndex),
         u2(0)
       ]);
-    }));
+    })),
+    delegateCode = Buffer.concat([
+      Buffer.from([0x2a, 0x1b, 0xb8]), u2(delegateIndex + 7), Buffer.from([0xb0])
+    ]),
+    delegate = Buffer.concat([
+      u2(0x0001), u2(delegateIndex), u2(delegateIndex + 1), u2(1),
+      u2(delegateIndex + 2), u4(12 + delegateCode.length),
+      u2(2), u2(2), u4(delegateCode.length), delegateCode, u2(0), u2(0)
+    ]);
 
   return Buffer.concat([
     withConstants.slice(0, methods.countOffset),
-    u2(methods.count + overlays.length),
+    u2(methods.count + overlays.length + 1),
     withConstants.slice(methods.countOffset + 2, methods.endOffset),
     methodData,
+    delegate,
     withConstants.slice(methods.endOffset)
   ]);
 }
