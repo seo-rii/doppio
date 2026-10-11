@@ -641,7 +641,8 @@ export function invokeExactMethod(thread: JVMThread, method: Method, receiver: J
     thread.throwNewException('Ljava/lang/AbstractMethodError;', method.fullSignature);
     return false;
   }
-  var locals = method.accessFlags.isStatic() ? (args || []) : [receiver].concat(args || []);
+  // Callee locals are writable, including when callers share the empty argument vector.
+  var locals = method.accessFlags.isStatic() ? (args || []).slice() : [receiver].concat(args || []);
   (<any> thread).stack.push(method.accessFlags.isNative() ? new NativeStackFrame(method, locals) : new BytecodeStackFrame(method, locals));
   thread.setStatus(ThreadStatus.RUNNABLE);
   return true;

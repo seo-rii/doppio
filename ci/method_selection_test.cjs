@@ -639,3 +639,39 @@ test('nonvirtual emitted JIT dispatch retains the exact Method target', () => {
   assert.equal(owner.stack[0].method, declared(base));
   assert.equal(frame.jitCompleted, true);
 });
+
+test('static zero-argument frame locals never mutate a shared empty argument vector', () => {
+  const w = world(), cls = w.define('scope/StaticLocals', {methods:[methodSpec(PUBLIC | STATIC)]});
+  const owner = invocationThread(), args = [], method = declared(cls);
+  load('methods').invokeExactMethod(owner, method, null, args);
+  owner.stack[0].opStack.push({marker:'local'});
+  load('opcodes').Opcodes.astore_0(owner, owner.stack[0]);
+  assert.deepEqual(args, []);
+  load('methods').invokeExactMethod(owner, method, null, args);
+  assert.notEqual(owner.stack[0].locals, owner.stack[1].locals);
+  assert.deepEqual(owner.stack[1].locals, []);
+});
+test('a prior static local store cannot add arguments to a later no-argument instance call', () => {
+  const w = world(), cls = w.define('scope/MixedLocals', {methods:[
+    methodSpec(PUBLIC | STATIC, 'staticBody'), methodSpec(PUBLIC, 'instanceBody')]});
+  const owner = invocationThread(), args = [], receiver = {getClass:()=>cls};
+  load('methods').invokeExactMethod(owner, declared(cls, 'staticBody()V'), null, args);
+  owner.stack[0].opStack.push({marker:'static-local'});
+  load('opcodes').Opcodes.astore_0(owner, owner.stack[0]);
+  load('methods').invokeExactMethod(owner, declared(cls, 'instanceBody()V'), receiver, args);
+  assert.equal(owner.stack[1].locals.length, 1);
+  assert.equal(owner.stack[1].locals[0], receiver);
+});
+test('static category-two arguments keep word padding while callee local stores remain isolated', () => {
+  const w = world(), cls = w.define('scope/WideLocals', {methods:[methodSpec(PUBLIC | STATIC, 'wide', '(JD)V')]});
+  const owner = invocationThread(), originalLong = {}, replacementLong = {}, args = [originalLong,null,2.5,null];
+  load('methods').invokeExactMethod(owner, declared(cls, 'wide(JD)V'), null, args);
+  const frame = owner.stack[0];
+  assert.deepEqual(frame.locals, args);
+  frame.opStack.pushWithNull(replacementLong);
+  load('opcodes').Opcodes.lstore_0(owner, frame);
+  frame.opStack.pushWithNull(6.25);
+  load('opcodes').Opcodes.dstore_2(owner, frame);
+  assert.deepEqual(args, [originalLong,null,2.5,null]);
+  assert.deepEqual(frame.locals, [replacementLong,undefined,6.25,undefined]);
+});
