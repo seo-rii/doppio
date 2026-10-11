@@ -5,7 +5,7 @@ Phase C owns `JVM-003`, `JVM-004`, `JVM-005` and `LIB-007` from the
 B1–B8 loading, verification, linking and language foundation; that foundation
 does not establish general method-handle, bootstrap or module conformance.
 This is an ordered batch plan, not a single feature, effort estimate or new
-support level. The current implementation batch is C1. Later batches below
+support level. The current implementation batch is C2. Later batches below
 remain pending and may need further subdivision before implementation.
 
 ## Batches and dependencies
@@ -71,6 +71,35 @@ and [JVMS 25 §5.4.3.5](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms
 Native execution is an independent oracle check, not permission to erase a
 specification difference or infer behavior for unexecuted cases.
 
+## C2 selected scope
+
+C2 uses a separate fixed 48-case inventory, with 16 cases in each group:
+
+- Array adapters: selected trailing and positioned collectors/spreaders over
+  `Object[]`, `int[]`, `long[]` and `double[]`; empty/null array behavior,
+  element/return identity, wide prefix/suffix routing and failure before target
+  effects. Zero-length collector array sharing is deliberately not asserted.
+- Variable arity and routing: lookup flags, the distinction between statically
+  array-typed and `Object`-typed arguments, fixed-arity normalization,
+  `withVarargs`, array/List `invokeWithArguments`, selected nonzero/wide
+  collect/permute/insert/drop routes and leading-prefix spread invokers.
+- Control flow: selected while/do-while, both counted-loop overloads, explicit
+  and default iterators, one/two-state general loops, null/default/varargs
+  helpers, exclusive table-switch branches and original component exceptions.
+
+These are finite selected shapes, not an exhaustive array/conversion lattice,
+arbitrary loop graph, maximum-slot boundary or complete API contract. The
+reference documents and independent genuine compiler/host evidence follow the
+same requirements as C1. C1's inventory and results remain separate.
+
+The Java 21/25 counted-range API body pseudocode orders `end`, `start`, `init`,
+while its generic-loop API Note places clauses in `end`, `init`, `start` order.
+Tests observing that order or its exception barriers explicitly use
+`pinned-native-regression`, not a claim to resolve the documentation conflict.
+See the [Java 21 counted-range contract](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/invoke/MethodHandles.html#countedLoop(java.lang.invoke.MethodHandle,java.lang.invoke.MethodHandle,java.lang.invoke.MethodHandle,java.lang.invoke.MethodHandle))
+and [Java 25 counted-range contract](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/invoke/MethodHandles.html#countedLoop(java.lang.invoke.MethodHandle,java.lang.invoke.MethodHandle,java.lang.invoke.MethodHandle,java.lang.invoke.MethodHandle)).
+No other case is promoted merely by agreeing with native output.
+
 ## Evidence and retained compatibility
 
 The C1 gate must retain the genuine compiler recipes and raw outcomes from each
@@ -123,6 +152,24 @@ ledger after success or failure. The workflow checker rejects diagnostic
 subsets, host/release pruning, error swallowing, scheduling waivers and
 missing/cross-wired artifacts. A local native-only or Node-only diagnostic
 cannot replace the required native/Node/Chromium matrix.
+
+## Reproduce and interpret C2
+
+After the same strict CLI/browser builds and pinned-toolchain preparation:
+
+```sh
+yarn ci:methodhandle-collection:test
+yarn ci:methodhandle-collection
+```
+
+The full command is `node ci/java_methodhandle_collection_test.mjs --browser`;
+its ledger is `build/java-methodhandle-collection-results.json`. All six
+release/group recipes and 18 native/Node/Chromium cells are mandatory. The
+shared evidence protocol retains C1's compiler, raw failure, Code operand,
+ordered trace and source/runtime/toolchain/Git integrity checks. Separate
+literal inventories and ledger namespaces prevent C1/C2 substitution; their
+contract suites exercise the same adversarial checks. Filtered diagnostics
+never replace official results or claim a full Phase C/API exit.
 
 ## C1 verified batch exit
 
