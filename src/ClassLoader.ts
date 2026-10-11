@@ -3075,6 +3075,32 @@ function addJavaLangInvokeMethodHandlesModernOverlays(data: Buffer): Buffer {
   ]);
 }
 
+/** Java 8 wraps filters in the opposite execution order from the modern API.
+ * Replace only this public Code body, retaining flags and non-Code attributes;
+ * the helper reuses the unchanged stock single-filter implementation. */
+function addJavaLangInvokeFilterArgumentsModernOverlay(data: Buffer): Buffer {
+  var cp = constantPoolEnd(data),
+    descriptor = '(Ljava/lang/invoke/MethodHandle;I[Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;',
+    extraConstants = Buffer.concat([
+      utf8Constant('Code'),
+      utf8Constant('java/lang/invoke/DoppioMethodHandles'),
+      Buffer.concat([Buffer.from([7]), u2(cp.count + 1)]),
+      utf8Constant('filterArguments'),
+      utf8Constant(descriptor),
+      Buffer.concat([Buffer.from([12]), u2(cp.count + 3), u2(cp.count + 4)]),
+      Buffer.concat([Buffer.from([10]), u2(cp.count + 2), u2(cp.count + 5)])
+    ]),
+    withConstants = Buffer.concat([
+      data.slice(0, 8), u2(cp.count + 7), data.slice(10, cp.offset),
+      extraConstants, data.slice(cp.offset)
+    ]),
+    code = Buffer.concat([
+      Buffer.from([0x2a, 0x1b, 0x2c, 0xb8]), u2(cp.count + 6), Buffer.from([0xb0])
+    ]);
+  return replaceMethodCode(withConstants, cp.offset + extraConstants.length,
+    'filterArguments', descriptor, cp.count, 3, 3, code);
+}
+
 function addJavaLangInvokeMethodHandleModernOverlays(data: Buffer): Buffer {
   var cp = constantPoolEnd(data),
     overlays = [
@@ -3632,6 +3658,7 @@ export function applyModernBootstrapOverlays(typeStr: string, data: Buffer): Buf
   }
   if (typeStr === 'Ljava/lang/invoke/MethodHandles;') {
     data = addJavaLangInvokeMethodHandlesModernOverlays(data);
+    data = addJavaLangInvokeFilterArgumentsModernOverlay(data);
   }
   if (typeStr === 'Ljava/lang/invoke/MethodHandle;') {
     data = addJavaLangInvokeMethodHandleModernOverlays(data);

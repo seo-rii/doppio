@@ -2774,6 +2774,29 @@ export default function (): any {
   }
 
   class java_lang_invoke_DoppioMethodHandles {
+    public static 'filterArgumentBase(Ljava/lang/invoke/MethodHandle;ILjava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;'(
+      thread: JVMThread,
+      target: JVMTypes.java_lang_invoke_MethodHandle,
+      pos: number,
+      filter: JVMTypes.java_lang_invoke_MethodHandle
+    ): void {
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      thread.getBsCl().initializeClass(thread, 'Ljava/lang/invoke/MethodHandles;', (cdata: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+        if (cdata === null) return;
+        // Call the untouched package-private Java 8 single-filter factory,
+        // never the public filterArguments overlay (which would recurse).
+        (<any> cdata.getConstructor(thread))[
+          'java/lang/invoke/MethodHandles/filterArgument(Ljava/lang/invoke/MethodHandle;ILjava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;'
+        ](thread, [target, pos, filter], (e?: JVMTypes.java_lang_Throwable, rv?: JVMTypes.java_lang_invoke_MethodHandle) => {
+          if (e) {
+            thread.throwException(e);
+          } else {
+            thread.asyncReturn(rv);
+          }
+        });
+      });
+    }
+
     public static 'lookupModes(Ljava/lang/invoke/MethodHandles$Lookup;)I'(
       thread: JVMThread,
       lookup: JVMTypes.java_lang_invoke_MethodHandles$Lookup

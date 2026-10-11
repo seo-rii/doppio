@@ -63,6 +63,9 @@ const expectedFrames = new Map([
   ['sun/reflect/generics/reflectiveObjects/ParameterizedTypeImpl.toString', [97, 112, 124, 164, 195, 204]]
 ]);
 let inventory;
+const filterArgumentsDescriptor = '(Ljava/lang/invoke/MethodHandle;I[Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;';
+let filterArgumentsOverlay;
+let stockFilterArgument;
 
 before(async () => {
   const {readStructureLayout} = await import('./java_class_structure_test.mjs');
@@ -89,6 +92,16 @@ before(async () => {
       const old = beforeLayout.methods.entries.find(other => other.descriptor === member.descriptor &&
         (other.name === member.name || className === 'java/time/Duration' &&
           member.name === 'toBigDecimalSeconds' && other.name === 'toSeconds'));
+      if (className === 'java/lang/invoke/MethodHandles' && member.name === 'filterArguments' &&
+        member.descriptor === filterArgumentsDescriptor) {
+        assert.ok(!filterArgumentsOverlay, 'exactly one public filterArguments overload');
+        filterArgumentsOverlay = {original, overlaid, old, member, pool: afterLayout.pool};
+      }
+      if (className === 'java/lang/invoke/MethodHandles' && member.name === 'filterArgument' &&
+        member.descriptor === '(Ljava/lang/invoke/MethodHandle;ILjava/lang/invoke/MethodHandle;)Ljava/lang/invoke/MethodHandle;') {
+        assert.ok(!stockFilterArgument, 'exactly one stock filterArgument helper');
+        stockFilterArgument = {original, overlaid, old, member};
+      }
       const method = cls.getMethods().find(candidate => candidate.name === member.name &&
         candidate.rawDescriptor === member.descriptor);
       assert.ok(method && method.declaredCode, 'verify the retained pre-trap Code attribute');
@@ -112,28 +125,74 @@ before(async () => {
   inventory = {selected, generated, all, unchanged};
 });
 
-test('overlay inventory preserves all 113 generated instruction bodies and 1272 stock Code attributes', () => {
+test('overlay inventory preserves 113 prior bodies and adds one filter delegate while retaining 1271 stock Code attributes', () => {
   assert.equal(inventory.selected.length, 36);
-  assert.equal(inventory.generated.length, 113);
-  assert.equal(inventory.unchanged, 1272);
+  assert.equal(inventory.generated.length, 114);
+  assert.equal(inventory.unchanged, 1271);
   const identity = inventory.generated.map(({className, member, bytes}) =>
     [className, member.name, member.descriptor, member.flags, member.code.maxStack, member.code.maxLocals,
       bytes.toString('hex')]);
+  const priorIdentity = identity.filter(([className, name, descriptor]) =>
+    className !== 'java/lang/invoke/MethodHandles' || name !== 'filterArguments' ||
+    descriptor !== filterArgumentsDescriptor);
+  assert.equal(priorIdentity.length, 113);
+  assert.equal(createHash('sha256').update(JSON.stringify(priorIdentity)).digest('hex'),
+    '6aa35a51cad536fa26de66219269564fbb4124f8fbea8a2058d34b2fd937d420');
   // The original 112 generated bodies retain their pre-StackMapTable identity;
-  // appending the wildcard bounds overlay must not rewrite any other body.
-  const previousIdentity = identity.filter(([className, name]) =>
+  // neither the wildcard overlay nor the filter delegate rewrites another body.
+  const previousIdentity = priorIdentity.filter(([className, name]) =>
     className !== 'sun/reflect/annotation/AnnotatedTypeFactory$AnnotatedWildcardTypeImpl' ||
     name !== 'getAnnotatedUpperBounds');
   assert.equal(previousIdentity.length, 112);
   assert.equal(createHash('sha256').update(JSON.stringify(previousIdentity)).digest('hex'),
     '74ad687fb07685b7c66dec51de7b8d7c6249e987ceb50b5f9f88014621b1ef30');
-  // This exact inventory additionally binds the new target Code body and limits.
-  assert.equal(createHash('sha256').update(JSON.stringify(identity)).digest('hex'),
-    '6aa35a51cad536fa26de66219269564fbb4124f8fbea8a2058d34b2fd937d420');
   for (const name of ['java/lang/Object', 'java/lang/reflect/AnnotatedElement', 'java/lang/reflect/Type']) {
     const original = execFileSync('unzip', ['-p', rtJar, name + '.class'], {timeout: 10000});
     assert.deepEqual(applyModernBootstrapOverlays('L' + name + ';', original), original);
   }
+});
+
+test('filterArguments retains public static varargs metadata and delegates its exact parsed Code body', () => {
+  assert.ok(filterArgumentsOverlay && filterArgumentsOverlay.old?.code, 'stock public filterArguments method exists');
+  const {original, overlaid, old, member, pool} = filterArgumentsOverlay;
+  assert.equal(member.flags, old.flags, 'preserve all original access flags');
+  assert.equal(member.flags, 0x0089, 'public static varargs, non-native and non-abstract');
+  const attributes = (bytes, method) => method.attributes.entries.filter(attribute => attribute.name !== 'Code')
+    .map(attribute => ({name: attribute.name, bytes: bytes.subarray(attribute.start, attribute.end)}));
+  assert.deepEqual(attributes(overlaid, member), attributes(original, old), 'preserve original non-Code attributes');
+  assert.equal(member.code.maxStack, 3);
+  assert.equal(member.code.maxLocals, 3);
+  assert.equal(member.code.handlerCount, 0);
+  assert.deepEqual(member.code.attributes.entries, [], 'straight-line delegate needs no nested Code attributes');
+  const entry = inventory.generated.find(candidate => candidate.className === 'java/lang/invoke/MethodHandles' &&
+    candidate.member.name === 'filterArguments' && candidate.member.descriptor === filterArgumentsDescriptor);
+  assert.ok(entry, 'replacement is a parsed generated Code body, not a native trap');
+  const decoded = decodeMethodCode(entry.input);
+  assert.deepEqual(decoded.instructions.map(instruction => instruction.opcode), [0x2a, 0x1b, 0x2c, 0xb8, 0xb0],
+    'aload_0, iload_1, aload_2, invokestatic, areturn');
+  assert.equal(entry.bytes.length, 7, 'exact delegate instruction count and operand size');
+  const target = pool[decoded.instructions[3].cpIndex];
+  assert.equal(target?.tag, 10, 'invokestatic uses an actual Methodref');
+  assert.equal(pool[target.first]?.tag, 7, 'exact helper Class operand');
+  assert.equal(pool[pool[target.first].first]?.tag, 1);
+  assert.equal(pool[pool[target.first].first].value, 'java/lang/invoke/DoppioMethodHandles');
+  const nameAndType = pool[target.second];
+  assert.equal(nameAndType?.tag, 12, 'exact helper NameAndType operand');
+  assert.equal(pool[nameAndType.first]?.tag, 1);
+  assert.equal(pool[nameAndType.first].value, 'filterArguments');
+  assert.equal(pool[nameAndType.second]?.tag, 1);
+  assert.equal(pool[nameAndType.second].value, filterArgumentsDescriptor);
+});
+
+test('the package-private stock filterArgument helper and all its metadata remain unchanged', () => {
+  assert.ok(stockFilterArgument && stockFilterArgument.old?.code, 'stock filterArgument helper exists');
+  const {original, overlaid, old, member} = stockFilterArgument;
+  assert.equal(old.flags & 0x0007, 0, 'stock helper is package-private');
+  assert.equal(member.flags, old.flags);
+  assert.deepEqual(overlaid.subarray(member.start, member.end), original.subarray(old.start, old.end),
+    'preserve the whole stock method, including Code and non-Code attributes');
+  assert.ok(!inventory.generated.some(entry => entry.className === 'java/lang/invoke/MethodHandles' &&
+    entry.member.name === 'filterArgument'), 'stock helper is not redirected or regenerated');
 });
 
 test('eleven branchful overlays declare all 43 full frames at exact instruction boundaries', () => {
@@ -191,7 +250,7 @@ test('every generated overlay body passes pure decoding and type checking withou
   const {failures, obligations} = verifyAll(inventory.generated);
   assert.deepEqual(failures, []);
   assert.ok(obligations > 0, 'symbolic obligations are retained, not bypassed or claimed discharged');
-  t.diagnostic('113 generated methods checked; ' + obligations + ' metadata obligations remain for linking');
+  t.diagnostic('114 generated methods checked; ' + obligations + ' metadata obligations remain for linking');
 });
 
 test('all original and generated Code methods in transformed bootstrap classes pass pure verification', t => {

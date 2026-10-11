@@ -29,12 +29,12 @@ function probe(method, symbolicOperands, extra = {}) {
 }
 
 function referenceCase(id, entryMethod, trace, probes, kind, extra = {}) {
-  return {id, entryMethod, entryDescriptor: '()V', trace: [trace],
+  return {id, entryMethod, entryDescriptor: '()V', trace: Array.isArray(trace) ? trace : [trace],
     anchors: {JLS: ['15.12.3', '15.12.4.2'], JVMS: ['5.4.3.5', '6.5.invokevirtual'], ...(extra.anchors || {})},
     probes, oracleKind: 'specification',
     limitations: ['Selected unchanged javac 21/25 unnamed-module case, not full API conformance.',
       ...(kind === 'lookup' ? ['No named-module teleportation, SecurityManager, hidden classes, or VarHandle execution.'] :
-        ['Exact fixed-arity reference compositions only; no adaptation, collectors, spreaders, arbitrary loops, or VarHandles.'])],
+        ['Fixed-arity compositions and selected unary filter parameter replacement only; no asType/explicitCast adaptation, collectors, spreaders, arbitrary loops, or VarHandles.'])],
     primarySources: [...api(kind === 'lookup' ? 'MethodHandles.Lookup' : 'MethodHandles'), ...api('MethodHandle')]};
 }
 
@@ -129,7 +129,8 @@ const permute = factory('permuteArguments', '(' + mh + mt + '[I)' + mh);
 function composition(id, method, trace, combinator, descriptor = unary, extra = {}) {
   const symbols = Array.isArray(combinator) ? combinator : [combinator];
   return referenceCase(id, method, trace,
-    [probe(method, descriptor === null ? symbols : [...symbols, invokeExact(descriptor)]),
+    [probe(method, [...(descriptor === null ? symbols : [...symbols, invokeExact(descriptor)]),
+      ...(extra.symbolicOperands || [])], extra.probe || {}),
       probe('handle', [lookup('findStatic')], {descriptor: '(' + text + mt + ')' + mh})], 'combinator', extra);
 }
 
@@ -139,9 +140,22 @@ const combinatorCases = [
   composition('combinator-guard-predicate-failure', 'caseGuardPredicateFailure',
     'order=P;throwable=original;branches=absent', guard),
   composition('combinator-filter-argument-order', 'caseFilterArgumentOrder',
-    'order=LRT;argument-identities=same;return=first', filterArguments, '(' + object + object + ')' + object),
+    ['order=LRT;argument-identities=same;return=first',
+      'zero/all-null=original-handle;callbacks=absent',
+      'position=1;null-gap=unchanged;order=LRT;reference=same',
+      'position=1;three-filters=LMRT;caller-array-mutation=isolated;reference=same',
+      'unary-types=String-to-long/int-to-double;long=9007199254740993;double=-0.0;order=LRT;reference=same'],
+    filterArguments, '(' + object + object + ')' + object,
+    {symbolicOperands: [invokeExact('(' + object + object + object + object + ')' + object),
+      invokeExact('(' + text + object + 'I)' + object)],
+    probe: {requiredOpcodes: ['invokestatic', 'invokevirtual', 'aastore']},
+    anchors: {JLS: ['15.12.3', '15.12.4.2'], JVMS: ['5.4.3.5', '2.6.1', '2.6.2', '6.5.invokevirtual']}}),
   composition('combinator-filter-argument-failure', 'caseFilterArgumentFailure',
-    'order=F;throwable=original;later-filter/target=absent', filterArguments, '(' + object + object + ')' + object),
+    ['order=F;throwable=original;later-filter/target=absent',
+      'three-filters=F;leftmost-throwable=original;later-throwable/remaining-filter/target=absent',
+      'three-filters=LE;later-throwable=original-later-instance;remaining-filter/target=absent'],
+    filterArguments, '(' + object + object + ')' + object,
+    {symbolicOperands: [invokeExact('(' + object + object + object + object + ')' + object)]}),
   composition('combinator-filter-return-order', 'caseFilterReturnOrder',
     'order=TR;target-result/filtered-return=same', filterReturnValue),
   composition('combinator-fold-value-wide', 'caseFoldValueWide',

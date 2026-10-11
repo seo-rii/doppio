@@ -9,6 +9,28 @@ import java.util.Objects;
 public final class DoppioMethodHandles {
   private DoppioMethodHandles() {}
 
+  private static native MethodHandle filterArgumentBase(
+      MethodHandle target, int pos, MethodHandle filter);
+
+  public static MethodHandle filterArguments(
+      MethodHandle target, int pos, MethodHandle... filters) {
+    MethodType targetType = target.type();
+    if (pos + filters.length > targetType.parameterCount()) {
+      throw new IllegalArgumentException("too many filters");
+    }
+    // Each wrapper invokes its filter before the enclosed target. Building
+    // right-to-left therefore executes filters left-to-right, including the
+    // first exceptional filter, without capturing the caller's mutable array.
+    MethodHandle adapter = target;
+    for (int index = filters.length - 1; index >= 0; index--) {
+      MethodHandle filter = filters[index];
+      if (filter != null) {
+        adapter = filterArgumentBase(adapter, pos + index, filter);
+      }
+    }
+    return adapter;
+  }
+
   static native Class<?> defineClass(MethodHandles.Lookup lookup, byte[] bytes)
       throws IllegalAccessException;
 

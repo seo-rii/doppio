@@ -4,7 +4,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 
-/** Exact-reference C1 compositions; conversion/varargs matrices live elsewhere. */
+/** Fixed-arity C1 compositions; general conversion/varargs matrices live elsewhere. */
 public final class MethodHandleCombinatorsFinal {
   private static final Object FIRST = new Object();
   private static final Object SECOND = new Object();
@@ -12,6 +12,7 @@ public final class MethodHandleCombinatorsFinal {
   private static final StringBuilder ORDER = new StringBuilder();
   private static final ProbeFailure ORIGINAL = new ProbeFailure();
   private static final ProbeFailure CLEANUP = new ProbeFailure();
+  private static final ProbeFailure LATER = new ProbeFailure();
   private static final MethodType UNARY = MethodType.methodType(Object.class, Object.class);
   private static final MethodType BINARY = MethodType.methodType(Object.class, Object.class, Object.class);
 
@@ -41,8 +42,35 @@ public final class MethodHandleCombinatorsFinal {
   public static Object branchA(Object value) { check(value == FIRST); ORDER.append('A'); return SECOND; }
   public static Object branchB(Object value) { check(value == SECOND); ORDER.append('B'); return FIRST; }
   public static Object left(Object value) { ORDER.append('L'); return value; }
+  public static Object middle(Object value) { ORDER.append('M'); return value; }
   public static Object right(Object value) { ORDER.append('R'); return value; }
   public static Object argumentFailure(Object value) throws ProbeFailure { ORDER.append('F'); throw ORIGINAL; }
+  public static Object laterArgumentFailure(Object value) throws ProbeFailure { ORDER.append('E'); throw LATER; }
+
+  public static Object fourArguments(Object first, Object second, Object third, Object fourth) {
+    check(first == FIRST && second == SECOND && third == FIRST && fourth == SECOND);
+    ORDER.append('T');
+    return first;
+  }
+
+  public static long stringToWide(String value) {
+    check(value.equals("wide"));
+    ORDER.append('L');
+    return WIDE;
+  }
+
+  public static double intToNegativeZero(int value) {
+    check(value == 3);
+    ORDER.append('R');
+    return -0.0d;
+  }
+
+  public static Object filteredWideTarget(long wide, Object reference, double decimal) {
+    check(wide == WIDE && reference == FIRST &&
+        Double.doubleToRawLongBits(decimal) == Double.doubleToRawLongBits(-0.0d));
+    ORDER.append('T');
+    return reference;
+  }
 
   public static Object binary(Object first, Object second) {
     check(first == FIRST && second == SECOND);
@@ -135,12 +163,54 @@ public final class MethodHandleCombinatorsFinal {
 
   public static void caseFilterArgumentOrder() throws Throwable {
     reset();
-    MethodHandle filtered = MethodHandles.filterArguments(handle("binary", BINARY), 0,
+    MethodHandle binaryTarget = handle("binary", BINARY);
+    MethodHandle filtered = MethodHandles.filterArguments(binaryTarget, 0,
         new MethodHandle[] {handle("left", UNARY), handle("right", UNARY)});
     Object result = (Object) filtered.invokeExact(FIRST, SECOND);
     check(result == FIRST);
     order("LRT");
     emit("combinator-filter-argument-order", "order=LRT;argument-identities=same;return=first");
+
+    reset();
+    MethodHandle noFilters = MethodHandles.filterArguments(binaryTarget, 2, new MethodHandle[0]);
+    MethodHandle allNull = MethodHandles.filterArguments(binaryTarget, 0, new MethodHandle[] {null, null});
+    check(noFilters == binaryTarget && allNull == binaryTarget);
+    order("");
+    emit("combinator-filter-argument-order", "zero/all-null=original-handle;callbacks=absent");
+
+    reset();
+    MethodHandle fourTarget = handle("fourArguments",
+        MethodType.methodType(Object.class, Object.class, Object.class, Object.class, Object.class));
+    MethodHandle gap = MethodHandles.filterArguments(fourTarget, 1,
+        new MethodHandle[] {handle("left", UNARY), null, handle("right", UNARY)});
+    Object gapResult = (Object) gap.invokeExact(FIRST, SECOND, FIRST, SECOND);
+    check(gapResult == FIRST);
+    order("LRT");
+    emit("combinator-filter-argument-order", "position=1;null-gap=unchanged;order=LRT;reference=same");
+
+    reset();
+    MethodHandle[] callerFilters = new MethodHandle[] {
+        handle("left", UNARY), handle("middle", UNARY), handle("right", UNARY)};
+    MethodHandle three = MethodHandles.filterArguments(fourTarget, 1, callerFilters);
+    callerFilters[0] = handle("argumentFailure", UNARY);
+    callerFilters[1] = null;
+    callerFilters[2] = handle("laterArgumentFailure", UNARY);
+    Object threeResult = (Object) three.invokeExact(FIRST, SECOND, FIRST, SECOND);
+    check(threeResult == FIRST);
+    order("LMRT");
+    emit("combinator-filter-argument-order", "position=1;three-filters=LMRT;caller-array-mutation=isolated;reference=same");
+
+    reset();
+    MethodHandle wideTarget = handle("filteredWideTarget",
+        MethodType.methodType(Object.class, long.class, Object.class, double.class));
+    MethodHandle wideFiltered = MethodHandles.filterArguments(wideTarget, 0, new MethodHandle[] {
+        handle("stringToWide", MethodType.methodType(long.class, String.class)), null,
+        handle("intToNegativeZero", MethodType.methodType(double.class, int.class))});
+    check(wideFiltered.type().equals(MethodType.methodType(Object.class, String.class, Object.class, int.class)));
+    Object wideResult = (Object) wideFiltered.invokeExact("wide", FIRST, 3);
+    check(wideResult == FIRST);
+    order("LRT");
+    emit("combinator-filter-argument-order", "unary-types=String-to-long/int-to-double;long=9007199254740993;double=-0.0;order=LRT;reference=same");
   }
 
   public static void caseFilterArgumentFailure() throws Throwable {
@@ -155,6 +225,32 @@ public final class MethodHandleCombinatorsFinal {
     check(caught == ORIGINAL);
     order("F");
     emit("combinator-filter-argument-failure", "order=F;throwable=original;later-filter/target=absent");
+
+    reset();
+    MethodHandle fourTarget = handle("fourArguments",
+        MethodType.methodType(Object.class, Object.class, Object.class, Object.class, Object.class));
+    MethodHandle leftmostFails = MethodHandles.filterArguments(fourTarget, 1, new MethodHandle[] {
+        handle("argumentFailure", UNARY), handle("laterArgumentFailure", UNARY), handle("right", UNARY)});
+    caught = null;
+    try {
+      Object unused = (Object) leftmostFails.invokeExact(FIRST, SECOND, FIRST, SECOND);
+      check(unused == FIRST);
+    } catch (ProbeFailure failure) { caught = failure; }
+    check(caught == ORIGINAL);
+    order("F");
+    emit("combinator-filter-argument-failure", "three-filters=F;leftmost-throwable=original;later-throwable/remaining-filter/target=absent");
+
+    reset();
+    MethodHandle laterFails = MethodHandles.filterArguments(fourTarget, 1, new MethodHandle[] {
+        handle("left", UNARY), handle("laterArgumentFailure", UNARY), handle("right", UNARY)});
+    caught = null;
+    try {
+      Object unused = (Object) laterFails.invokeExact(FIRST, SECOND, FIRST, SECOND);
+      check(unused == FIRST);
+    } catch (ProbeFailure failure) { caught = failure; }
+    check(caught == LATER && caught != ORIGINAL);
+    order("LE");
+    emit("combinator-filter-argument-failure", "three-filters=LE;later-throwable=original-later-instance;remaining-filter/target=absent");
   }
 
   public static void caseFilterReturnOrder() throws Throwable {
