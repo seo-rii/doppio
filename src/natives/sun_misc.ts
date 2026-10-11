@@ -13,6 +13,7 @@ import ClassLoader = Doppio.VM.ClassFile.ClassLoader;
 import CustomClassLoader = Doppio.VM.ClassFile.CustomClassLoader;
 import assert = Doppio.Debug.Assert;
 import {ClassFileVersionError} from '../ClassData';
+import {prepareLambdaAnonymousClass, installLambdaAdapters} from '../LambdaAdapters';
 
 export default function (): any {
   function getFieldInfo(thread: JVMThread, unsafe: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long): [any, string] {
@@ -950,8 +951,11 @@ export default function (): any {
       }
       var anonymousClass: ReferenceClassData<JVMTypes.java_lang_Object>;
       try {
-        anonymousClass = new ReferenceClassData(new Buffer(data.array),
+        var originalBytes = Buffer.from(data.array),
+          generated = prepareLambdaAnonymousClass(thread, hostClass, originalBytes, cpPatches);
+        anonymousClass = new ReferenceClassData(generated === null ? originalBytes : generated.bytes,
           hostClass.$cls.getProtectionDomain(), hostClass.$cls.getLoader(), cpPatches);
+        if (generated !== null) installLambdaAdapters(generated, anonymousClass);
       } catch (failure) {
         thread.throwNewException(failure instanceof ClassFileVersionError ?
           'Ljava/lang/UnsupportedClassVersionError;' : 'Ljava/lang/ClassFormatError;',

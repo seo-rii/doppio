@@ -1000,6 +1000,16 @@ if(!u.isNull(t,f,obj${suffix})){obj${suffix}['${methodReference.signature}'](t,a
     return this.code;
   }
 
+  /** Install a VM-owned body on this exact native declaration. Name-keyed
+   * native registries cannot distinguish generated classes from other loaders.
+   * Never discard an original Code attribute or turn bytecode into a native.
+   */
+  public installNativeBody(body: Function): void {
+    if (!this.isNative || (this.declaredAccessFlags & 0x0100) === 0 || this.declaredCode !== null ||
+        typeof body !== 'function') throw new Error('Native body requires an original native declaration');
+    this.code = body;
+  }
+
   /**
    * Resolves all of the classes referenced through this method. Required in
    * order to create its reflection object.
