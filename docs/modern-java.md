@@ -2657,11 +2657,19 @@ expanded.
   implementation. The permitted-subclass method exposes its native-compatible
   `Class<?>[]` generic return and `CallerSensitive` metadata. Coverage includes
   sealed interfaces, final permitted classes, ordinary classes, selected JDK
-  classes, primitives, void, arrays, permit order, fresh arrays, and mutation
-  isolation.
-- Direct superclass and direct interface `PermittedSubclasses` checks are
-  enforced during class resolution.
-- The current illegal-subtype fixture verifies rejection through `LinkageError`
-  compatibility. Doppio's Java 8-era class-loader surface can still map the
-  internal `IncompatibleClassChangeError` to a broader linkage failure on some
-  reflective loading paths.
+  classes, primitives, void, arrays, fresh arrays and mutation isolation.
+  Array order is not a general specification guarantee.
+- The [B7 selected corpus](phase-b-loading.md#b7-selected-sealed-types) adds
+  62 genuine/mutated cases on pinned 21/25 native, Node and Chromium. Direct
+  superclass/interface checks bind actual defining-loader and runtime-package
+  identities and reject prohibited derivation with exact
+  `IncompatibleClassChangeError`. Public cross-package children in the same
+  unnamed module are accepted; named-module runtime checks remain unclaimed.
+- Permitted metadata uses the declaring owner's original constant-pool
+  references without preparation or initialization. It filters by actual direct
+  parent identity, omits ordinary loading failures, propagates the original
+  bootstrap VirtualMachineError, and retains constant-pool success/failure
+  caching. A native return cannot consume a pending internal exception boundary.
+  The selected malformed-attribute, old-major, duplicate/array and passive
+  verification cases do not establish every class-file or reflection contract;
+  all JVM-007 source units remain unassessed.

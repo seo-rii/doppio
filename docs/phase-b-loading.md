@@ -613,6 +613,54 @@ fixed, not waived or repaired by changing expectations. This is the selected
 B6 exit, not complete JVM-006, general ObjectMethods/bootstrap support or
 Phase B conformance.
 
+## B7 selected sealed types
+
+`ci/java_sealed_semantics_test.mjs` registers 62 fixed cases and all 18 Java
+21/25 native, Node and Chromium cells before compilation. Twenty cases cover
+passive reflection and fresh arrays; twenty cover actual defining-loader,
+runtime-package and direct-parent identities; twenty-two cover bounded metadata
+mutations, ordinary loader failures, original VirtualMachineError propagation
+and passive verification boundaries. All twenty genuine compiler operations
+must succeed without compiler diagnostics. Independent readers bind original
+constant-pool references, class headers, executable operands and bounded
+mutation replay; generated or mutated payloads are explicitly distinguished
+from untouched compiler output.
+
+Derivation rejects unlisted children, different actual defining loaders and
+non-public children in a different runtime package with exact
+`IncompatibleClassChangeError`. Public cross-package children in the same
+unnamed module remain accepted. Reflection resolves metadata through the
+declaring owner's original constant-pool entries without preparing or
+initializing children, retains only actual direct superclass/interface matches,
+skips ordinary loading failures and propagates the original bootstrap
+VirtualMachineError. Duplicate entries, array entries and old-major opaque
+attributes have explicit pinned-native classifications; array order is not a
+general specification promise. Named-module carriers are compilation-only,
+not evidence for runtime module access.
+
+```sh
+yarn ci:sealed-semantics:test
+yarn ci:sealed-semantics
+```
+
+The clean official command checkpoints failures in
+`build/java-sealed-semantics-results.json`; diagnostics use separate ledgers.
+The first full run exposed a compiler module-name warning, and the next exposed
+a cached metadata failure that left an internal exception boundary above a
+native frame. Neither result was waived. The exact-frame native return guard
+now preserves that boundary, with actual JVMThread/NativeStackFrame/cache
+regressions covering synchronous, exceptional and waiting returns.
+
+At clean `fb2fa583e`, strict CLI/browser builds, all 62 cases in 18 mandatory
+cells and all twenty compiler operations pass. B1–B7 compiled units/contracts
+pass 808 of 809 tests, with no failures and one optional native-taxonomy
+diagnostic skip. All eight B1–B4 host gates and B5/B6 remain green. Fresh
+retained execution passes the original 77 default and 246 modern fixtures
+without changing sources, class files, goldens, HEAD or input/runtime snapshots.
+All eight JVM-007 source units remain unassessed with false full-unit flags.
+This records the selected B7 exit, not complete sealed-type, class-file,
+initialization, module or Phase B conformance.
+
 ## Remaining boundaries
 
 These batches do not finish B1, JVM-002 or Phase B. B2's structural corpus does
@@ -622,5 +670,5 @@ verification rule, historical class shape or adversarial resource limit.
 Remaining initialization cases include exceptional allocation during error
 wrapping and broader concurrency/memory-model interactions. General linkage,
 module access, hidden classes and arbitrary bootstrap behavior remain separate.
-The record package remains partial beyond the selected B6 evidence; sealed
-and final-language work follows in B7 and B8.
+The record and sealed packages remain partial beyond the selected B6/B7
+evidence; final-language work follows in B8.
