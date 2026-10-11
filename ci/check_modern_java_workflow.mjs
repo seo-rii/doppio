@@ -670,7 +670,7 @@ for (const [name, fields] of [
   ]],
   ['Check phase B bytecode verification contracts', [
     'timeout-minutes: 3',
-    'run: node --test ci/bytecode_structure_test.cjs ci/bytecode_type_test.cjs ci/verification_relations_test.cjs ci/verification_exception_boundary_test.cjs ci/class_verification_test.cjs ci/verification_loader_failure_test.cjs ci/class_verification_integration_test.cjs ci/modern_overlay_verification_test.cjs ci/java_bytecode_verification_contract_test.mjs',
+    'run: node --test ci/bytecode_structure_test.cjs ci/bytecode_type_test.cjs ci/verification_relations_test.cjs ci/verification_exception_boundary_test.cjs ci/class_verification_test.cjs ci/verification_loader_failure_test.cjs ci/class_verification_integration_test.cjs ci/modern_overlay_verification_test.cjs ci/unsafe_allocation_verification_test.cjs ci/reflection_invocation_verification_test.cjs ci/lambda_verification_test.cjs ci/reflection_adapters_test.cjs ci/java_bytecode_verification_contract_test.mjs',
   ]],
   ['Run Java bytecode verification compatibility', [
     'id: java_bytecode_verification',

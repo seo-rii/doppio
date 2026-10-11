@@ -27,6 +27,10 @@ const verificationUnits = [
   'ci/verification_loader_failure_test.cjs',
   'ci/class_verification_integration_test.cjs',
   'ci/modern_overlay_verification_test.cjs',
+  'ci/unsafe_allocation_verification_test.cjs',
+  'ci/reflection_invocation_verification_test.cjs',
+  'ci/lambda_verification_test.cjs',
+  'ci/reflection_adapters_test.cjs',
   'ci/java_bytecode_verification_contract_test.mjs',
 ];
 const verificationUnitCommand = `node --test ${verificationUnits.join(' ')}`;
