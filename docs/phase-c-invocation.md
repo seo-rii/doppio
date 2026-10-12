@@ -1172,3 +1172,70 @@ argument constant-instruction types/factories. Unselected attributes/debug
 relocation/mapper reentrancy remain open. Full C7/Phase C/LIB-007/API/source-unit,
 modules, memory-order/concurrency and GC conformance remain unclaimed; all 15
 broader C7c completion flags stay false.
+
+## C7 remaining execution order
+
+The request to finish C7 is tracked across the remaining profiles below. The
+first C7d hierarchy/constant ABI gate is an initial subgate, not the end of C7.
+Full Java SE/JVM/source-unit conformance is separate from closing this worklist.
+
+| Order | Remaining profile | Current status |
+| --- | --- | --- |
+| C7d1 | Explicit hierarchy resolvers, reference/array joins and native constant-instruction factories/covariance | Verified below |
+| C7d2 | Modern instruction models/aliases, stack/array/type/monitor flow, long jumps and dead-code/frame policies | In progress; 209 modern opcode entries in 24 families, four discontinued entries tracked separately |
+| C7d3 | Debug/label attributes and actual relocation, mapper reader lifecycle/reentrancy | Pending |
+| C7d4 | Signature trees, annotation/record/module attributes and remaining public builder/transform/ABI topology | Pending; inventory must remain explicit |
+| C7d5 | Structural verifier/legacy applicability and final aggregate regression/ABI reconciliation | Pending; no broad completion flag is inferred from a finite subgate |
+
+## C7d1 verified hierarchy and constant ABI profile
+
+At implementation `c422b6cd4b16924d09b72248b0ffc85d08bfdb91`, with the
+test-only configured-verifier descriptor correction at
+`ad05805c5fe4bac2112d54a50ba0ae515818c818`:
+
+- Real ClassHierarchyResolver factories, nullable roots, resource-header
+  parsing, non-initializing reflection, chaining and caching feed configured
+  frame generation and byte/model verification. JVM verification interface
+  rules are intentionally distinct from Java runtime cast/source assignability.
+  Missing/cyclic metadata has explicit errors; current owner metadata does not
+  require defining the class under construction.
+- Intrinsic/Argument/LoadConstantInstruction factories and nested types now
+  have their native descriptors. Argument values return Integer and have
+  genuine javac-generated ConstantDesc bridges. Exactly two source files use
+  system javac's source/target9 boxed covariance first; all remaining normal
+  classlib sources keep --release9. Headers are naturally53, not rewritten;
+  no fake Integer stub or modified SDK/runtime image is used.
+- Two untouched original Java25 recipes pass 16 cases/six mandatory
+  native25/Node/Chromium cells/48 outcomes. Four original artifact rows bind
+  37 named methods (35 bootstrap-bound), 13 static returned-array routes and
+  complete independently checked output vectors. Each host produces 13 arrays:
+  12 valid defined/invoked there and one invalid never defined (39 outputs).
+- Dedicated C7 units total221, all pass with no failure/skip. Fresh compiled
+  source execution checks the actual successful-definition package provider,
+  not Class.getResource's separate lookup order. Native diagnostics have39
+  hierarchy and55 constant checks; guest has41 hierarchy checks including two
+  explicit cycle guards, plus the same55 constant checks.
+- Strict CLI/browser builds, ES5 checking, workflow checker and complete
+  mutation suite pass. The compiler bootstrap JAR retains its44-entry hash.
+  The initial unit run's old internal verifier-descriptor expectation failed;
+  its record is preserved and the corrected exact resolver-context test passes
+  at unchanged product sources/runtime/limits. C1–C6/B host gates, retained323
+  and compiler consumers were not rerun in this profile.
+
+Reproduce with `yarn ci:classfile-hierarchy:test` and
+`yarn ci:classfile-hierarchy`; the mandatory runner is
+`node ci/java_classfile_hierarchy_test.mjs --browser` and ledger
+`build/java-classfile-hierarchy-results.json`. Java21 is non-applicable, not a
+passing or skipped final-API cell. Original recipes are not adapters/carriers,
+and neither native outputs nor prior C7a–C7c gates substitute for this gate.
+
+Final initial-profile consumer: exit0,
+`/home/seorii/logs/doppio-c7d-step1-close-7BTZls/verification-summary.json`,
+SHA-256 `83b75fa610f92d4cc62b3f042765c930d7598005605721101fedca4d52e6c8ed`.
+Official ledger SHA-256:
+`1e568d8481d93cc5a54346e54b6641997a4eb97393a1bd6ffc10cb08ca2477d1`;
+runtime SHA-256:
+`952043df1ad787ecfb4ffabfd645f825ade2a7930cad4174ca5c09eaf25ed000`.
+This receipt explicitly binds the test-only HEAD delta rather than pretending
+all producers used one HEAD. C7d2–C7d5 remain open; all17 initial-gate broader
+flags, including c7Complete/c7dComplete, are false.
