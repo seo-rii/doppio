@@ -31,6 +31,15 @@ import java.util.function.Function;
 /** Internal pure Java reader and immutable selected public models, independent of VM/test decoders. */
 public final class DoppioClassReader {
   private DoppioClassReader() {}
+  private static final Opcode[] OPCODES = new Opcode[256];
+  private static final Opcode[] WIDE_OPCODES = new Opcode[256];
+  static {
+    for (Opcode opcode : Opcode.values()) {
+      int bytecode = opcode.bytecode();
+      if (bytecode < 256) OPCODES[bytecode] = opcode;
+      else WIDE_OPCODES[bytecode & 255] = opcode;
+    }
+  }
 
   public static ClassModel parse(byte[] bytes) {
     return parse(bytes, entry -> null);
@@ -405,7 +414,9 @@ public final class DoppioClassReader {
   }
 
   public static Opcode opcode(int bytecode) {
-    for (Opcode opcode : Opcode.values()) if (opcode.bytecode() == bytecode) return opcode;
+    Opcode opcode = bytecode >= 0 && bytecode < 256 ? OPCODES[bytecode] :
+        bytecode >>> 8 == 196 ? WIDE_OPCODES[bytecode & 255] : null;
+    if (opcode != null) return opcode;
     throw new IllegalArgumentException("Invalid opcode " + bytecode);
   }
   public static ConstantInstruction.IntrinsicConstantInstruction intrinsic(Opcode opcode) {
@@ -580,6 +591,18 @@ public final class DoppioClassReader {
         case NOP: instruction = nop(); break;
         case THROW_EXCEPTION: instruction = throwInstruction(); break;
         case NEW_OBJECT: instruction = newObject(code.pool.entryByIndex(u2(bytes, cursor), ClassEntry.class)); break;
+        case ARRAY_LOAD: instruction = ArrayLoadInstruction.of(opcode); break;
+        case ARRAY_STORE: instruction = ArrayStoreInstruction.of(opcode); break;
+        case NEW_PRIMITIVE_ARRAY:
+          instruction = NewPrimitiveArrayInstruction.of(TypeKind.fromNewarrayCode(bytes[cursor] & 255)); break;
+        case NEW_REF_ARRAY:
+          instruction = NewReferenceArrayInstruction.of(code.pool.entryByIndex(u2(bytes, cursor), ClassEntry.class)); break;
+        case NEW_MULTI_ARRAY:
+          instruction = NewMultiArrayInstruction.of(code.pool.entryByIndex(u2(bytes, cursor), ClassEntry.class),
+              bytes[cursor + 2] & 255); break;
+        case TYPE_CHECK:
+          instruction = TypeCheckInstruction.of(opcode, code.pool.entryByIndex(u2(bytes, cursor), ClassEntry.class)); break;
+        case MONITOR: instruction = MonitorInstruction.of(opcode); break;
         case INCREMENT:
           instruction = new IncrementValue(opcode, opcode.isWide() ? u2(bytes, cursor) : bytes[cursor] & 255,
             opcode.isWide() ? (short) u2(bytes, cursor + 2) : bytes[cursor + 1]); break;

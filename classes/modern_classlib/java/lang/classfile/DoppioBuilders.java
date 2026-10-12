@@ -79,16 +79,20 @@ final class DoppioBuilders {
 
   static byte[] build(ClassEntry name, DoppioConstantPool pool, Consumer<? super ClassBuilder> handler,
       ClassFile.StackMapsOption stackMaps, ClassFile.AttributesProcessingOption attributesProcessing,
-      ClassHierarchyResolver hierarchyResolver) {
-    ClassSink builder = new ClassSink(name, pool, stackMaps, attributesProcessing, false, hierarchyResolver);
+      ClassHierarchyResolver hierarchyResolver, ClassFile.DeadCodeOption deadCode,
+      ClassFile.DeadLabelsOption deadLabels, ClassFile.ShortJumpsOption shortJumps) {
+    ClassSink builder = new ClassSink(name, pool, stackMaps, attributesProcessing, false, hierarchyResolver,
+        deadCode, deadLabels, shortJumps);
     handler.accept(builder);
     return builder.bytes();
   }
 
   static byte[] transform(ClassModel model, ClassEntry name, DoppioConstantPool pool, ClassTransform transform,
       ClassFile.StackMapsOption stackMaps, ClassFile.AttributesProcessingOption attributesProcessing, boolean remapBound,
-      ClassHierarchyResolver hierarchyResolver) {
-    ClassSink builder = new ClassSink(name, pool, stackMaps, attributesProcessing, remapBound, hierarchyResolver);
+      ClassHierarchyResolver hierarchyResolver, ClassFile.DeadCodeOption deadCode,
+      ClassFile.DeadLabelsOption deadLabels, ClassFile.ShortJumpsOption shortJumps) {
+    ClassSink builder = new ClassSink(name, pool, stackMaps, attributesProcessing, remapBound, hierarchyResolver,
+        deadCode, deadLabels, shortJumps);
     builder.transform(model, transform);
     return builder.bytes();
   }
@@ -110,6 +114,9 @@ final class DoppioBuilders {
     int majorVersion();
     int classFlags();
     ClassHierarchyResolver hierarchyResolver();
+    ClassFile.DeadCodeOption deadCode();
+    ClassFile.DeadLabelsOption deadLabels();
+    ClassFile.ShortJumpsOption shortJumps();
     ClassFile.AttributesProcessingOption attributesProcessing();
     boolean remapBound();
   }
@@ -159,6 +166,9 @@ final class DoppioBuilders {
     public int majorVersion() { return context.majorVersion(); }
     public int classFlags() { return context.classFlags(); }
     public ClassHierarchyResolver hierarchyResolver() { return context.hierarchyResolver(); }
+    public ClassFile.DeadCodeOption deadCode() { return context.deadCode(); }
+    public ClassFile.DeadLabelsOption deadLabels() { return context.deadLabels(); }
+    public ClassFile.ShortJumpsOption shortJumps() { return context.shortJumps(); }
     public ClassFile.AttributesProcessingOption attributesProcessing() { return context.attributesProcessing(); }
     public boolean remapBound() { return context.remapBound(); }
     public ConstantPoolBuilder constantPool() { return pool(); }
@@ -248,6 +258,9 @@ final class DoppioBuilders {
     final ClassFile.AttributesProcessingOption attributesProcessing;
     final boolean remapBound;
     final ClassHierarchyResolver hierarchyResolver;
+    final ClassFile.DeadCodeOption deadCode;
+    final ClassFile.DeadLabelsOption deadLabels;
+    final ClassFile.ShortJumpsOption shortJumps;
     int flags = ClassFile.ACC_SUPER;
     int major = 69, minor = 0;
     ClassEntry superclass;
@@ -256,10 +269,14 @@ final class DoppioBuilders {
     final List<MethodModel> methods = new ArrayList<MethodModel>();
     final List<Attribute<?>> attributes = new ArrayList<Attribute<?>>();
     ClassSink(ClassEntry name, DoppioConstantPool pool, ClassFile.StackMapsOption stackMaps,
-        ClassFile.AttributesProcessingOption attributesProcessing, boolean remapBound, ClassHierarchyResolver hierarchyResolver) {
+        ClassFile.AttributesProcessingOption attributesProcessing, boolean remapBound, ClassHierarchyResolver hierarchyResolver,
+        ClassFile.DeadCodeOption deadCode, ClassFile.DeadLabelsOption deadLabels, ClassFile.ShortJumpsOption shortJumps) {
       this.pool = Objects.requireNonNull(pool); this.stackMaps = Objects.requireNonNull(stackMaps);
       this.attributesProcessing = Objects.requireNonNull(attributesProcessing); this.remapBound = remapBound;
       this.hierarchyResolver = Objects.requireNonNull(hierarchyResolver);
+      this.deadCode = Objects.requireNonNull(deadCode);
+      this.deadLabels = Objects.requireNonNull(deadLabels);
+      this.shortJumps = Objects.requireNonNull(shortJumps);
       this.name = pool.classEntry(pool.utf8Entry(Objects.requireNonNull(name).name().stringValue()));
       this.superclass = pool.classEntry(ClassDesc.of("java.lang.Object"));
     }
@@ -271,6 +288,9 @@ final class DoppioBuilders {
     public int majorVersion() { return major; }
     public int classFlags() { return flags; }
     public ClassHierarchyResolver hierarchyResolver() { return hierarchyResolver; }
+    public ClassFile.DeadCodeOption deadCode() { return deadCode; }
+    public ClassFile.DeadLabelsOption deadLabels() { return deadLabels; }
+    public ClassFile.ShortJumpsOption shortJumps() { return shortJumps; }
     public ClassFile.AttributesProcessingOption attributesProcessing() { return attributesProcessing; }
     public boolean remapBound() { return remapBound; }
     public ConstantPoolBuilder constantPool() { return pool; }
@@ -479,6 +499,9 @@ final class DoppioBuilders {
     public ConstantPoolBuilder constantPool() { return pool; }
     public CodeBuilder with(CodeElement element) {
       Objects.requireNonNull(element);
+      if (element instanceof java.lang.classfile.instruction.NopInstruction) {
+        elements.add(element); return this;
+      }
       if (element instanceof StackMapTableAttribute) {
         if (source == null) throw new UnsupportedOperationException("Manual stack-map attributes are outside the selected builder");
         return this; // Rewriting regenerates frames rather than retaining stale offsets.
@@ -777,27 +800,27 @@ final class DoppioBuilders {
     final List<int[]> handlers;
     final IdentityHashMap<Label, Integer> labels;
     final byte[] stackMap;
-    EncodedCode(DoppioCodeAssembler.Result result, int maxStack, byte[] stackMap) {
-      this.bytes = result.bytes; this.maxStack = maxStack; this.maxLocals = result.maxLocals;
-      this.handlers = result.handlers; this.labels = result.labels; this.stackMap = stackMap;
+    EncodedCode(DoppioCodeAssembler.Result result, byte[] bytes, int maxStack, List<int[]> handlers, byte[] stackMap) {
+      this.bytes = bytes; this.maxStack = maxStack; this.maxLocals = result.maxLocals;
+      this.handlers = handlers; this.labels = result.labels; this.stackMap = stackMap;
     }
   }
 
   private static EncodedCode encodeCode(CodeValue code) {
     DoppioCodeAssembler.Result result = DoppioCodeAssembler.assemble(code.pool, code.elements,
-      code.allocatedLocals, code.start, code.end);
+      code.allocatedLocals, code.start, code.end, code.owner.deadLabels(), code.owner.shortJumps());
     ClassFile.StackMapsOption option = code.owner.stackMaps();
     boolean generate = option == ClassFile.StackMapsOption.GENERATE_STACK_MAPS ||
       option == ClassFile.StackMapsOption.STACK_MAPS_WHEN_REQUIRED && code.owner.majorVersion() >= 50 && result.controlFlow;
-    if (!generate) return new EncodedCode(result, result.maxStack, null);
+    if (!generate) return new EncodedCode(result, result.bytes, result.maxStack, result.handlers, null);
     List<ClassDesc> interfaces = new ArrayList<ClassDesc>();
     for (ClassEntry entry : code.owner.interfaces()) interfaces.add(entry.asSymbol());
     DoppioCodeFlow.Result analyzed = DoppioCodeFlow.analyze(code.owner.className().asSymbol(),
       code.owner.superclass() == null ? null : code.owner.superclass().asSymbol(), interfaces,
       code.pool, code.name.stringValue(), MethodTypeDesc.ofDescriptor(code.type.stringValue()),
       code.flags, result.bytes, 65535, result.maxLocals, result.handlers, null, false,
-      code.owner.hierarchyResolver(), code.owner.classFlags());
-    return new EncodedCode(result, analyzed.maxStack,
+      code.owner.hierarchyResolver(), code.owner.classFlags(), code.owner.deadCode());
+    return new EncodedCode(result, analyzed.code, analyzed.maxStack, analyzed.handlers,
       analyzed.frames.isEmpty() ? null : stackMap(code.pool, analyzed.frames));
   }
 

@@ -16,6 +16,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 /** Selected CFG analysis shared by generation and verification; never defines or initializes classes. */
@@ -51,17 +52,28 @@ final class DoppioCodeFlow {
     final int bci;
     // Locals are JVM slots (including category-2 tails); stack is verification entries.
     final List<Value> locals, stack;
+    final boolean thisInitialized;
     Frame(int bci, List<Value> locals, List<Value> stack) {
       this.bci = bci;
       this.locals = Collections.unmodifiableList(new ArrayList<>(locals));
       this.stack = Collections.unmodifiableList(new ArrayList<>(stack));
+      boolean initialized = true;
+      for (Value item : locals) if (item.kind == 'U' && item.newBci == -1) initialized = false;
+      for (Value item : stack) if (item.kind == 'U' && item.newBci == -1) initialized = false;
+      this.thisInitialized = initialized;
     }
   }
   static final class Result {
     final int maxStack;
     final List<Frame> frames;
-    Result(int maxStack, List<Frame> frames) {
-      this.maxStack = maxStack; this.frames = Collections.unmodifiableList(frames);
+    final byte[] code;
+    final List<int[]> handlers;
+    Result(int maxStack, List<Frame> frames, byte[] code, List<int[]> handlers) {
+      this.maxStack = maxStack; this.frames = Collections.unmodifiableList(new ArrayList<>(frames));
+      this.code = code.clone();
+      List<int[]> copied = new ArrayList<>();
+      for (int[] handler : handlers) copied.add(handler.clone());
+      this.handlers = Collections.unmodifiableList(copied);
     }
   }
 
@@ -69,7 +81,8 @@ final class DoppioCodeFlow {
       ConstantPool pool, String methodName, MethodTypeDesc type, int flags,
       byte[] code, int maxStack, int maxLocals, List<int[]> handlers) {
     return analyze(owner, superclass, interfaces, pool, methodName, type, flags, code,
-        maxStack, maxLocals, handlers, null, false, ClassHierarchyResolver.defaultResolver(), 0);
+        maxStack, maxLocals, handlers, null, false, ClassHierarchyResolver.defaultResolver(), 0,
+        ClassFile.DeadCodeOption.PATCH_DEAD_CODE);
   }
 
   static Result analyze(ClassDesc owner, ClassDesc superclass, List<ClassDesc> interfaces,
@@ -86,9 +99,18 @@ final class DoppioCodeFlow {
       byte[] code, int maxStack, int maxLocals, List<int[]> handlers,
       Map<Integer, Frame> declaredFrames, boolean requireStackMaps,
       ClassHierarchyResolver resolver, int ownerClassFlags) {
+    return analyze(owner, superclass, interfaces, pool, methodName, type, flags, code,
+        maxStack, maxLocals, handlers, declaredFrames, requireStackMaps, resolver, ownerClassFlags, null);
+  }
+
+  static Result analyze(ClassDesc owner, ClassDesc superclass, List<ClassDesc> interfaces,
+      ConstantPool pool, String methodName, MethodTypeDesc type, int flags,
+      byte[] code, int maxStack, int maxLocals, List<int[]> handlers,
+      Map<Integer, Frame> declaredFrames, boolean requireStackMaps,
+      ClassHierarchyResolver resolver, int ownerClassFlags, ClassFile.DeadCodeOption deadCode) {
     Analysis analysis = new Analysis(owner, superclass, interfaces, pool, methodName, type,
         flags, code, maxStack, maxLocals, handlers, declaredFrames, requireStackMaps,
-        resolver, ownerClassFlags);
+        resolver, ownerClassFlags, deadCode);
     return analysis.run();
   }
 
@@ -103,6 +125,7 @@ final class DoppioCodeFlow {
   }
 
   private static final int[] FIXED = new int[256];
+  private static final int[] NO_TARGETS = new int[0];
   static {
     Arrays.fill(FIXED, -1);
     for (Opcode opcode : Opcode.values())
@@ -137,8 +160,12 @@ final class DoppioCodeFlow {
     final int maxStack, maxLocals;
     final List<int[]> handlers;
     final Map<Integer, Frame> declared;
+    final boolean requireStackMaps;
+    final ClassFile.DeadCodeOption deadCode;
     final Map<Integer, Instruction> instructions = new LinkedHashMap<>();
     final TreeSet<Integer> frameTargets = new TreeSet<>();
+    final TreeSet<Integer> blockStarts = new TreeSet<>();
+    // Published states are never mutated: execution and changed joins copy first.
     final Map<Integer, State> entries = new LinkedHashMap<>();
     final ArrayDeque<Integer> pending = new ArrayDeque<>();
     final State initial;
@@ -147,12 +174,14 @@ final class DoppioCodeFlow {
     Analysis(ClassDesc owner, ClassDesc superclass, List<ClassDesc> interfaces,
         ConstantPool pool, String name, MethodTypeDesc type, int flags, byte[] code,
         int maxStack, int maxLocals, List<int[]> handlers, Map<Integer, Frame> declared,
-        boolean requireStackMaps, ClassHierarchyResolver resolver, int ownerClassFlags) {
+        boolean requireStackMaps, ClassHierarchyResolver resolver, int ownerClassFlags,
+        ClassFile.DeadCodeOption deadCode) {
       this.owner = owner; this.superclass = superclass; this.interfaces = interfaces;
       this.pool = pool; this.type = type; this.code = code;
       this.hierarchy = new DoppioClassHierarchy(resolver, owner, superclass, ownerClassFlags);
       this.maxStack = maxStack; this.maxLocals = maxLocals; this.handlers = handlers;
       this.declared = declared;
+      this.requireStackMaps = requireStackMaps; this.deadCode = deadCode;
       if (code.length == 0 || code.length > 65535 || maxStack < 0 || maxStack > 65535 ||
           maxLocals < 0 || maxLocals > 65535) throw new VerifyError("Invalid Code limits");
       decode();
@@ -161,6 +190,8 @@ final class DoppioCodeFlow {
           if (!instructions.containsKey(destination)) throw new VerifyError("Branch target is not an instruction start");
           frameTargets.add(destination);
         }
+        if ((instruction.targets.length != 0 || instruction.terminal()) && instruction.next < code.length)
+          blockStarts.add(instruction.next);
       }
       for (int[] handler : handlers) {
         if (handler.length != 4 || handler[0] >= handler[1] || !instructions.containsKey(handler[0]) ||
@@ -173,6 +204,7 @@ final class DoppioCodeFlow {
         }
         frameTargets.add(handler[2]);
       }
+      blockStarts.addAll(frameTargets);
       if (declared != null) for (Frame frame : declared.values()) {
         if (!instructions.containsKey(frame.bci) || frame.locals.size() > maxLocals)
           throw new VerifyError("Invalid stack-map target or locals");
@@ -207,7 +239,7 @@ final class DoppioCodeFlow {
       int cursor = 0;
       while (cursor < code.length) {
         int bci = cursor, opcode = code[cursor] & 255, size = FIXED[opcode];
-        int[] targets = new int[0];
+        int[] targets = NO_TARGETS;
         if (opcode == 170 || opcode == 171) {
           cursor++;
           while ((cursor & 3) != 0) {
@@ -253,14 +285,27 @@ final class DoppioCodeFlow {
 
     Result run() {
       offer(0, initial);
+      for (;;) {
       while (!pending.isEmpty()) {
         int bci = pending.removeFirst();
         Instruction instruction = instructions.get(bci);
-        State state = entries.get(bci).copy();
+        // Entry states are immutable snapshots. A NOP has no normal-state effect,
+        // so long basic blocks may safely share a snapshot rather than copying it.
+        State entry = entries.get(bci);
+        State state = instruction.opcode == 0 ? entry : entry.copy();
         for (int[] handler : handlers) if (bci >= handler[0] && bci < handler[1]) {
-          if (instruction.opcode == 183 && "<init>".equals(pool.entryByIndex(u2(code, bci + 1), MemberRefEntry.class).nameAndType().name().stringValue()))
-            unsupported("constructor invocation protected by a handler");
           State caught = state.copy(); caught.stack.clear(); caught.stackSlots = 0;
+          if (instruction.opcode == 183) {
+            MemberRefEntry method = pool.entryByIndex(u2(code, bci + 1), MemberRefEntry.class);
+            if ("<init>".equals(method.nameAndType().name().stringValue())) {
+              MethodTypeDesc signature = MethodTypeDesc.ofDescriptor(method.nameAndType().type().stringValue());
+              int receiverIndex = state.stack.size() - signature.parameterCount() - 1;
+              if (receiverIndex < 0) throw new VerifyError("Invalid constructor operand stack");
+              Value receiver = state.stack.get(receiverIndex);
+              for (int slot = 0; slot < caught.locals.length; slot++)
+                if (caught.locals[slot].same(receiver)) caught.locals[slot] = TOP;
+            }
+          }
           caught.push(value(handler[3] == 0 ? "Ljava/lang/Throwable;" : pool.entryByIndex(handler[3], ClassEntry.class).asSymbol().descriptorString()));
           offer(handler[2], caught);
         }
@@ -273,19 +318,77 @@ final class DoppioCodeFlow {
           offer(instruction.next, state);
         }
       }
-      if (entries.size() != instructions.size()) unsupported("unreachable Code");
-      List<Frame> frames = new ArrayList<>();
+      if (entries.size() == instructions.size() || deadCode != null) break;
+      Instruction disconnected = null;
+      for (Instruction instruction : instructions.values()) if (!entries.containsKey(instruction.bci)) {
+        disconnected = instruction; break;
+      }
+      Frame frame = declared == null ? null : declared.get(disconnected.bci);
+      if (frame == null) {
+        if (requireStackMaps) throw new VerifyError("Missing stack-map frame for unreachable block at " + disconnected.bci);
+        break; // Legacy inference ignores unreachable instructions, but structural decoding still covers them.
+      }
+      State state = new State(this); state.thisInitialized = frame.thisInitialized;
+      for (int slot = 0; slot < frame.locals.size(); slot++) state.locals[slot] = frame.locals.get(slot);
+      for (Value item : frame.stack) state.push(item);
+      offer(disconnected.bci, state);
+      }
+      Map<Integer, Frame> frames = new TreeMap<>();
       for (int bci : frameTargets) {
         State state = entries.get(bci);
-        frames.add(new Frame(bci, Arrays.asList(state.locals), state.stack));
+        if (state != null) frames.put(bci, new Frame(bci, Arrays.asList(state.locals), state.stack));
       }
-      return new Result(observedStack, frames);
+      byte[] output = code.clone(); List<int[]> outputHandlers = handlers;
+      if (entries.size() != instructions.size() && deadCode != null) {
+        if (deadCode == ClassFile.DeadCodeOption.KEEP_DEAD_CODE) {
+          for (Instruction instruction : instructions.values()) if (!entries.containsKey(instruction.bci))
+            throw new IllegalArgumentException("Unable to generate stack map frame for dead code at bytecode offset " + instruction.bci);
+        }
+        int start = -1, end = -1;
+        for (Instruction instruction : instructions.values()) {
+          if (entries.containsKey(instruction.bci) || start >= 0 && blockStarts.contains(instruction.bci)) {
+            if (start >= 0) { patch(output, frames, start, end); start = -1; }
+          }
+          if (!entries.containsKey(instruction.bci)) {
+            if (start < 0) start = instruction.bci;
+            end = instruction.next;
+          }
+        }
+        if (start >= 0) patch(output, frames, start, end);
+        outputHandlers = new ArrayList<>();
+        for (int[] handler : handlers) {
+          int rangeStart = -1, rangeEnd = -1;
+          for (Instruction instruction : instructions.values()) {
+            if (instruction.bci < handler[0]) continue;
+            if (instruction.bci >= handler[1]) break;
+            if (entries.containsKey(instruction.bci)) {
+              if (rangeStart < 0) rangeStart = instruction.bci;
+              rangeEnd = instruction.next;
+            } else if (rangeStart >= 0) {
+              outputHandlers.add(new int[] { rangeStart, rangeEnd, handler[2], handler[3] }); rangeStart = -1;
+            }
+          }
+          if (rangeStart >= 0) outputHandlers.add(new int[] { rangeStart, rangeEnd, handler[2], handler[3] });
+        }
+      }
+      return new Result(observedStack, new ArrayList<>(frames.values()), output, outputHandlers);
+    }
+
+    void patch(byte[] output, Map<Integer, Frame> frames, int start, int end) {
+      Arrays.fill(output, start, end, (byte) 0); output[end - 1] = (byte) 191;
+      List<Value> locals = new ArrayList<>();
+      for (int slot = 0; slot < maxLocals; slot++) locals.add(TOP);
+      frames.put(start, new Frame(start, locals, Collections.singletonList(value("Ljava/lang/Throwable;"))));
+      observedStack = Math.max(observedStack, 1);
     }
 
     void offer(int bci, State incoming) {
-      State candidate = incoming.copy();
+      State candidate = incoming;
       Frame frame = declared == null ? null : declared.get(bci);
       if (frame != null) {
+        candidate = incoming.copy();
+        if (!candidate.thisInitialized && frame.thisInitialized)
+          throw new VerifyError("Stack-map frame loses uninitializedThis constructor state");
         if (candidate.stack.size() != frame.stack.size()) throw new VerifyError("Stack-map stack height mismatch");
         for (int i = 0; i < frame.stack.size(); i++) compatible(candidate.stack.get(i), frame.stack.get(i), false);
         for (int i = 0; i < maxLocals; i++) compatible(candidate.locals[i], i < frame.locals.size() ? frame.locals.get(i) : TOP, true);
@@ -297,17 +400,26 @@ final class DoppioCodeFlow {
       State current = entries.get(bci);
       if (current == null) { entries.put(bci, candidate); pending.add(bci); return; }
       if (current.stack.size() != candidate.stack.size()) throw new VerifyError("Incompatible stack heights at join");
-      boolean changed = false;
+      State joinedState = null;
       for (int i = 0; i < maxLocals; i++) {
         Value joined = merge(current.locals[i], candidate.locals[i], true);
-        if (!joined.same(current.locals[i])) { current.locals[i] = joined; changed = true; }
+        if (!joined.same(current.locals[i])) {
+          if (joinedState == null) joinedState = current.copy();
+          joinedState.locals[i] = joined;
+        }
       }
       for (int i = 0; i < current.stack.size(); i++) {
         Value joined = merge(current.stack.get(i), candidate.stack.get(i), false);
-        if (!joined.same(current.stack.get(i))) { current.stack.set(i, joined); changed = true; }
+        if (!joined.same(current.stack.get(i))) {
+          if (joinedState == null) joinedState = current.copy();
+          joinedState.stack.set(i, joined);
+        }
       }
-      if (current.thisInitialized && !candidate.thisInitialized) { current.thisInitialized = false; changed = true; }
-      if (changed) pending.add(bci);
+      if (current.thisInitialized && !candidate.thisInitialized) {
+        if (joinedState == null) joinedState = current.copy();
+        joinedState.thisInitialized = false;
+      }
+      if (joinedState != null) { entries.put(bci, joinedState); pending.add(bci); }
     }
 
     void compatible(Value actual, Value expected, boolean local) {
@@ -359,7 +471,9 @@ final class DoppioCodeFlow {
         char kind = opcode == 148 ? 'J' : opcode <= 150 ? 'F' : 'D'; state.pop(kind); state.pop(kind); state.push(value("I"));
       } else if (opcode >= 153 && opcode <= 158) state.pop('I');
       else if (opcode >= 159 && opcode <= 164) { state.pop('I'); state.pop('I'); }
-      else if (opcode == 165 || opcode == 166) { initializedReference(state.pop('A')); initializedReference(state.pop('A')); }
+      else if (opcode == 165 || opcode == 166) { state.pop('A'); state.pop('A'); }
+      else if (opcode >= 46 && opcode <= 53) array(state, opcode, false);
+      else if (opcode >= 79 && opcode <= 86) array(state, opcode, true);
       else switch (opcode) {
         case 0: case 167: case 200: break;
         case 1: state.push(NULL); break;
@@ -368,11 +482,8 @@ final class DoppioCodeFlow {
         case 19: case 20: constant(state, u2(code, bci + 1), opcode == 20); break;
         case 21: case 22: case 23: case 24: case 25: state.load(code[bci + 1] & 255, "IJFDA".charAt(opcode - 21)); break;
         case 54: case 55: case 56: case 57: case 58: state.local(code[bci + 1] & 255, state.pop("IJFDA".charAt(opcode - 54))); break;
-        case 87: if (state.pop().slots() != 1) throw new VerifyError("pop requires category-1 value"); break;
-        case 88: if (state.pop().slots() == 1 && state.pop().slots() != 1) throw new VerifyError("Invalid pop2 shape"); break;
-        case 89: {
-          Value top = state.pop(); if (top.slots() != 1) throw new VerifyError("dup requires category-1 value"); state.push(top); state.push(top); break;
-        }
+        case 87: case 88: case 89: case 90: case 91: case 92: case 93: case 94: case 95:
+          stack(state, opcode); break;
         case 132: state.checkLocal(code[bci + 1] & 255, 'I'); break;
         case 170: case 171: state.pop('I'); break;
         case 172: case 173: case 174: case 175: case 176: case 177: {
@@ -402,7 +513,25 @@ final class DoppioCodeFlow {
         case 187: {
           ClassDesc allocated = pool.entryByIndex(u2(code, bci + 1), ClassEntry.class).asSymbol();
           if (!allocated.isClassOrInterface()) throw new VerifyError("new requires a class type");
+          for (Value item : state.stack)
+            if (item.kind == 'U' && item.newBci == bci) throw new VerifyError("new repeats a live allocation token");
+          for (int slot = 0; slot < state.locals.length; slot++)
+            if (state.locals[slot].kind == 'U' && state.locals[slot].newBci == bci) state.locals[slot] = TOP;
           state.push(new Value('U', allocated.descriptorString(), bci)); break;
+        }
+        case 188: {
+          int atype = code[bci + 1] & 255;
+          if (atype < 4 || atype > 11) throw new VerifyError("Invalid newarray type code");
+          state.pop('I'); state.push(value("[" + "ZCFDBSIJ".charAt(atype - 4))); break;
+        }
+        case 189: {
+          ClassDesc component = pool.entryByIndex(u2(code, bci + 1), ClassEntry.class).asSymbol();
+          String descriptor = component.descriptorString();
+          if (!component.isClassOrInterface() && !component.isArray()) throw new VerifyError("Invalid anewarray component type");
+          state.pop('I'); state.push(value("[" + descriptor)); break;
+        }
+        case 190: {
+          Value operand = state.pop('A'); requireArray(operand, null, false); state.push(value("I")); break;
         }
         case 191: {
           Value thrown = state.pop('A'); initializedReference(thrown);
@@ -414,6 +543,7 @@ final class DoppioCodeFlow {
         }
         case 193:
           pool.entryByIndex(u2(code, bci + 1), ClassEntry.class); initializedReference(state.pop('A')); state.push(value("I")); break;
+        case 194: case 195: state.pop('A'); break;
         case 196: {
           int operation = code[bci + 1] & 255, slot = u2(code, bci + 2);
           if (operation >= 21 && operation <= 25) state.load(slot, "IJFDA".charAt(operation - 21));
@@ -421,9 +551,81 @@ final class DoppioCodeFlow {
           else if (operation == 132) state.checkLocal(slot, 'I');
           else unsupported("wide ret"); break;
         }
-        case 198: case 199: initializedReference(state.pop('A')); break;
+        case 197: {
+          String descriptor = pool.entryByIndex(u2(code, bci + 1), ClassEntry.class).asSymbol().descriptorString();
+          int dimensions = code[bci + 3] & 255, rank = 0;
+          while (rank < descriptor.length() && descriptor.charAt(rank) == '[') rank++;
+          if (dimensions == 0 || dimensions > rank) throw new VerifyError("Invalid multianewarray type or dimensions");
+          for (int dimension = 0; dimension < dimensions; dimension++) state.pop('I');
+          state.push(value(descriptor)); break;
+        }
+        case 198: case 199: state.pop('A'); break;
         default: unsupported("opcode " + opcode);
       }
+    }
+
+    void array(State state, int opcode, boolean store) {
+      int kind = opcode - (store ? 79 : 46);
+      Value element = null;
+      if (store) {
+        element = state.pop(kind == 4 ? 'A' : "IJFDAIII".charAt(kind));
+        if (kind == 4) initializedReference(element);
+      }
+      state.pop('I'); Value operand = state.pop('A');
+      String component = requireArray(operand, kind == 4 ? null : "IJFD?BCS".substring(kind, kind + 1), kind == 4);
+      if (!store) state.push(kind == 4 ? operand.kind == 'N' ? NULL : value(component) :
+          value(String.valueOf("IJFDAIII".charAt(kind))));
+    }
+
+    String requireArray(Value operand, String primitive, boolean reference) {
+      if (operand.kind == 'N') return null;
+      if (operand.kind != 'A' || operand.descriptor.charAt(0) != '[')
+        throw new VerifyError("Array instruction requires an array reference");
+      String component = operand.descriptor.substring(1);
+      if (reference && component.length() == 1 || primitive != null &&
+          !(component.equals(primitive) || "B".equals(primitive) && "Z".equals(component)))
+        throw new VerifyError("Array instruction component type mismatch");
+      return component;
+    }
+
+    void stack(State state, int opcode) {
+      Value first = state.pop();
+      if (opcode == 87) { categoryOne(first); return; }
+      if (opcode == 88) { if (first.slots() == 1) categoryOne(state.pop()); return; }
+      if (opcode == 89) { categoryOne(first); state.push(first); state.push(first); return; }
+      if (opcode == 90 || opcode == 91) {
+        categoryOne(first); Value second = state.pop();
+        if (opcode == 90) {
+          categoryOne(second); state.push(first); state.push(second); state.push(first);
+        } else if (second.slots() == 2) {
+          state.push(first); state.push(second); state.push(first);
+        } else {
+          Value third = state.pop(); categoryOne(third);
+          state.push(first); state.push(third); state.push(second); state.push(first);
+        }
+        return;
+      }
+      if (opcode == 95) {
+        categoryOne(first); Value second = state.pop(); categoryOne(second);
+        state.push(first); state.push(second); return;
+      }
+      Value second = first.slots() == 1 ? state.pop() : null;
+      if (second != null) categoryOne(second);
+      if (opcode == 92) {
+        if (second != null) state.push(second); state.push(first);
+        if (second != null) state.push(second); state.push(first); return;
+      }
+      Value below = state.pop();
+      if (opcode == 93) categoryOne(below);
+      Value deeper = opcode == 94 && below.slots() == 1 ? state.pop() : null;
+      if (deeper != null) categoryOne(deeper);
+      if (second != null) state.push(second); state.push(first);
+      if (deeper != null) state.push(deeper); state.push(below);
+      if (second != null) state.push(second); state.push(first);
+    }
+
+    void categoryOne(Value item) {
+      if (item.slots() != 1) throw new VerifyError("Stack instruction requires category-1 values");
     }
 
     void constant(State state, int index, boolean wide) {
@@ -512,7 +714,8 @@ final class DoppioCodeFlow {
     State(Analysis analysis) { this.analysis = analysis; locals = new Value[analysis.maxLocals]; Arrays.fill(locals, TOP); }
     State copy() {
       State result = new State(analysis);
-      System.arraycopy(locals, 0, result.locals, 0, locals.length); result.stack.addAll(stack);
+      System.arraycopy(locals, 0, result.locals, 0, locals.length);
+      if (!stack.isEmpty()) result.stack.addAll(stack);
       result.stackSlots = stackSlots; result.thisInitialized = thisInitialized; return result;
     }
     void push(Value item) {
@@ -558,6 +761,6 @@ final class DoppioCodeFlow {
     if (value.kind == 'U') throw new VerifyError("Uninitialized reference operand");
   }
   private static void unsupported(String contract) {
-    throw new UnsupportedOperationException("Class-File flow outside selected C7b: " + contract);
+    throw new UnsupportedOperationException("Class-File flow outside implemented instruction profile: " + contract);
   }
 }

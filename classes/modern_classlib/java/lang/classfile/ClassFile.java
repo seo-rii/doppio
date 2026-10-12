@@ -34,6 +34,9 @@ public interface ClassFile {
     STACK_MAPS_WHEN_REQUIRED, GENERATE_STACK_MAPS, DROP_STACK_MAPS
   }
   enum ConstantPoolSharingOption implements Option { SHARED_POOL, NEW_POOL }
+  enum DeadCodeOption implements Option { PATCH_DEAD_CODE, KEEP_DEAD_CODE }
+  enum DeadLabelsOption implements Option { FAIL_ON_DEAD_LABELS, DROP_DEAD_LABELS }
+  enum ShortJumpsOption implements Option { FIX_SHORT_JUMPS, FAIL_ON_SHORT_JUMPS }
   enum AttributesProcessingOption implements Option {
     PASS_ALL_ATTRIBUTES, DROP_UNKNOWN_ATTRIBUTES, DROP_UNSTABLE_ATTRIBUTES
   }

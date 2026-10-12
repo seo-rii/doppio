@@ -16,21 +16,29 @@ final class DoppioClassFile implements ClassFile {
   private final AttributesProcessingOption attributesProcessing;
   private final Function<Utf8Entry, AttributeMapper<?>> customAttributes;
   private final ClassHierarchyResolver hierarchyResolver;
+  private final DeadCodeOption deadCode;
+  private final DeadLabelsOption deadLabels;
+  private final ShortJumpsOption shortJumps;
 
   DoppioClassFile(Option[] options) {
     this(StackMapsOption.STACK_MAPS_WHEN_REQUIRED, ConstantPoolSharingOption.SHARED_POOL,
-        AttributesProcessingOption.PASS_ALL_ATTRIBUTES, entry -> null, ClassHierarchyResolver.defaultResolver(), options);
+        AttributesProcessingOption.PASS_ALL_ATTRIBUTES, entry -> null, ClassHierarchyResolver.defaultResolver(),
+        DeadCodeOption.PATCH_DEAD_CODE, DeadLabelsOption.FAIL_ON_DEAD_LABELS, ShortJumpsOption.FIX_SHORT_JUMPS, options);
   }
 
   private DoppioClassFile(StackMapsOption initialStackMaps, ConstantPoolSharingOption initialPoolSharing,
       AttributesProcessingOption initialAttributesProcessing, Function<Utf8Entry, AttributeMapper<?>> initialCustomAttributes,
-      ClassHierarchyResolver initialHierarchyResolver, Option[] options) {
+      ClassHierarchyResolver initialHierarchyResolver, DeadCodeOption initialDeadCode,
+      DeadLabelsOption initialDeadLabels, ShortJumpsOption initialShortJumps, Option[] options) {
     Objects.requireNonNull(options);
     StackMapsOption selectedStackMaps = initialStackMaps;
     ConstantPoolSharingOption selectedPoolSharing = initialPoolSharing;
     AttributesProcessingOption selectedAttributesProcessing = initialAttributesProcessing;
     Function<Utf8Entry, AttributeMapper<?>> selectedCustomAttributes = initialCustomAttributes;
     ClassHierarchyResolver selectedHierarchyResolver = initialHierarchyResolver;
+    DeadCodeOption selectedDeadCode = initialDeadCode;
+    DeadLabelsOption selectedDeadLabels = initialDeadLabels;
+    ShortJumpsOption selectedShortJumps = initialShortJumps;
     for (Option option : options) {
       Objects.requireNonNull(option);
       if (option instanceof StackMapsOption) selectedStackMaps = (StackMapsOption) option;
@@ -40,6 +48,9 @@ final class DoppioClassFile implements ClassFile {
         selectedCustomAttributes = Objects.requireNonNull(((AttributeMapperOption) option).attributeMapper());
       else if (option instanceof ClassHierarchyResolverOption)
         selectedHierarchyResolver = Objects.requireNonNull(((ClassHierarchyResolverOption) option).classHierarchyResolver());
+      else if (option instanceof DeadCodeOption) selectedDeadCode = (DeadCodeOption) option;
+      else if (option instanceof DeadLabelsOption) selectedDeadLabels = (DeadLabelsOption) option;
+      else if (option instanceof ShortJumpsOption) selectedShortJumps = (ShortJumpsOption) option;
       else throw new IllegalArgumentException("Unsupported Class-File option");
     }
     this.stackMaps = selectedStackMaps;
@@ -47,10 +58,14 @@ final class DoppioClassFile implements ClassFile {
     this.attributesProcessing = selectedAttributesProcessing;
     this.customAttributes = selectedCustomAttributes;
     this.hierarchyResolver = selectedHierarchyResolver;
+    this.deadCode = selectedDeadCode;
+    this.deadLabels = selectedDeadLabels;
+    this.shortJumps = selectedShortJumps;
   }
 
   public ClassFile withOptions(Option... options) {
-    return new DoppioClassFile(stackMaps, poolSharing, attributesProcessing, customAttributes, hierarchyResolver, options);
+    return new DoppioClassFile(stackMaps, poolSharing, attributesProcessing, customAttributes, hierarchyResolver,
+        deadCode, deadLabels, shortJumps, options);
   }
 
   public ClassModel parse(byte[] bytes) {
@@ -62,7 +77,8 @@ final class DoppioClassFile implements ClassFile {
     Objects.requireNonNull(pool);
     Objects.requireNonNull(handler);
     if (!(pool instanceof DoppioConstantPool)) throw new IllegalArgumentException("Unsupported constant pool builder");
-    return DoppioBuilders.build(name, (DoppioConstantPool) pool, handler, stackMaps, attributesProcessing, hierarchyResolver);
+    return DoppioBuilders.build(name, (DoppioConstantPool) pool, handler, stackMaps, attributesProcessing,
+        hierarchyResolver, deadCode, deadLabels, shortJumps);
   }
 
   public byte[] transformClass(ClassModel model, ClassEntry name, ClassTransform transform) {
@@ -71,7 +87,8 @@ final class DoppioClassFile implements ClassFile {
     Objects.requireNonNull(transform);
     boolean remapBound = poolSharing == ConstantPoolSharingOption.NEW_POOL;
     DoppioConstantPool pool = remapBound ? new DoppioConstantPool() : DoppioConstantPool.copyOf(model.constantPool());
-    return DoppioBuilders.transform(model, name, pool, transform, stackMaps, attributesProcessing, remapBound, hierarchyResolver);
+    return DoppioBuilders.transform(model, name, pool, transform, stackMaps, attributesProcessing, remapBound,
+        hierarchyResolver, deadCode, deadLabels, shortJumps);
   }
 
   public List<VerifyError> verify(byte[] bytes) {
