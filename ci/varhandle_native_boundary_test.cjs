@@ -75,7 +75,10 @@ const signatures = {
   array: 'captureArray(Ljava/lang/invoke/VarHandle;Ljava/lang/Class;)V',
   copy: 'copyStorage(Ljava/lang/invoke/VarHandle;Ljava/lang/invoke/VarHandle;)V',
   operate: 'operate(Ljava/lang/invoke/VarHandle;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/Object;',
-  find: 'findVirtualBase(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/Class;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;'
+  find: 'findVirtualBase(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/Class;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;',
+  nominalKind: 'nominalKind(Ljava/lang/invoke/VarHandle;)I',
+  nominalOwner: 'nominalOwner(Ljava/lang/invoke/VarHandle;)Ljava/lang/Class;',
+  nominalName: 'nominalName(Ljava/lang/invoke/VarHandle;)Ljava/lang/String;'
 };
 const alias = 'java/lang/invoke/MethodHandles$Lookup/doppioFindVirtualBase(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;';
 const mirror = cls => ({$cls: cls});
@@ -202,9 +205,13 @@ function helperWorld() {
   return {...w, bootstrap, lookupClass, helperClass, helperMirror, trusted, typeRequests, findRequests, interned};
 }
 
-test('registration contains eight bridge signatures and exactly the 31 canonical shim declarations', () => {
+test('registration retains eight bridges, exactly three C6 readonly projections and 31 canonical shim declarations', () => {
   assert.deepEqual(Object.keys(natives).sort(), ['java/lang/invoke/DoppioVarHandles', 'java/lang/invoke/VarHandle']);
   assert.deepEqual(Object.keys(helper).sort(), Object.values(signatures).sort());
+  assert.equal(Object.keys(helper).length, 11);
+  for (const name of ['nominalKind', 'nominalOwner', 'nominalName']) {
+    assert.equal(helper[signatures[name]].length, 2, 'Only the implicit thread and held VarHandle: ' + name);
+  }
   const source = fs.readFileSync(path.resolve(__dirname, '../classes/modern_classlib/java/lang/invoke/VarHandle.java'), 'utf8');
   const canonical = [...source.matchAll(/public final native (Object|void|boolean) (\w+)\(Object\.\.\. arguments\);/g)]
     .map(([, result, name]) => name + '([Ljava/lang/Object;)' + ({Object: 'Ljava/lang/Object;', void: 'V', boolean: 'Z'})[result]);
@@ -248,7 +255,7 @@ test('actual source native registrar accepts every bridge and canonical method m
       count++;
     }
   }
-  assert.equal(count, 39);
+  assert.equal(count, 42, 'Exactly eleven fixed helper hooks plus31 canonical access placeholders');
 });
 
 test('zero-argument helper natives resolve only the two canonical private bootstrap members', () => {

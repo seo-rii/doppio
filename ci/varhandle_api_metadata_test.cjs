@@ -24,7 +24,8 @@ const erased = '([Ljava/lang/Object;)';
 // Independent public declaration inventory, not imported runtime mode tables.
 // These units inspect compiled shared-library bytes, not genuine javac 21/25
 // driver execution. Fences, nominal descriptors and complete API conformance
-// remain outside the selected C3 surface.
+// remain outside the selected C3 surface. The three C6 readonly description
+// hooks are an explicit private metadata addition, not a larger C3 claim.
 const accessModes = [
   ['GET', 'get', 'Ljava/lang/Object;'],
   ['SET', 'set', 'V'],
@@ -243,7 +244,7 @@ test('compiled AccessMode enum independently declares all31 canonical constants 
     instruction.cp?.tag === 8 && instruction.cp.value === name), 'Actual enum initialization contains canonical method name ' + name);
 });
 
-test('compiled C3 helper exposes exactly the intended factory signatures and no public native bypass', () => {
+test('compiled helper retains the C3 public factories and exactly three private C6 readonly projections', () => {
   const unit = compiled.get('DoppioVarHandles');
   assert.deepEqual(publicMethods(unit), expectedPublicMethods(facadeFactories.map(([name, descriptor]) => [name, descriptor, 0x0009])));
   for (const [name, descriptor] of facadeFactories) assert.ok(method(unit, name, descriptor).code,
@@ -255,6 +256,13 @@ test('compiled C3 helper exposes exactly the intended factory signatures and no 
     ['operate', '(' + variable + text + '[Ljava/lang/Object;)Ljava/lang/Object;'],
     ['operationHandle', '()' + handle], ['selectorHandle', '()' + handle]])
     assert.equal(method(unit, name, descriptor).flags, 0x010a, 'Storage bridge is private static native: ' + name);
+  for (const [name, descriptor] of [['nominalKind', '(' + variable + ')I'],
+    ['nominalOwner', '(' + variable + ')' + cls], ['nominalName', '(' + variable + ')' + text]]) {
+    const projection = method(unit, name, descriptor);
+    assert.equal(projection.flags, 0x010a, 'Readonly description hook is private static native: ' + name);
+    assert.equal(projection.code, undefined, 'Private description hook has no fabricated Java Code');
+    assert.deepEqual(exceptions(unit, projection), []);
+  }
   assert.deepEqual(unit.layout.methods.entries.filter(member => (member.flags & 0x0100) !== 0)
     .map(member => [member.name, member.descriptor, member.flags]).sort((first, second) =>
       (first[0] + first[1]).localeCompare(second[0] + second[1])), expectedPublicMethods([
@@ -264,8 +272,10 @@ test('compiled C3 helper exposes exactly the intended factory signatures and no 
         ['captureArray', '(' + variable + cls + ')V', 0x010a],
         ['copyStorage', '(' + variable + variable + ')V', 0x0108],
         ['operate', '(' + variable + text + '[Ljava/lang/Object;)Ljava/lang/Object;', 0x010a],
-        ['operationHandle', '()' + handle, 0x010a], ['selectorHandle', '()' + handle, 0x010a]
-      ]), 'Exactly eight fixed native declarations, with no trusted Lookup getter');
+        ['operationHandle', '()' + handle, 0x010a], ['selectorHandle', '()' + handle, 0x010a],
+        ['nominalKind', '(' + variable + ')I', 0x010a], ['nominalOwner', '(' + variable + ')' + cls, 0x010a],
+        ['nominalName', '(' + variable + ')' + text, 0x010a]
+      ]), 'Exactly eight retained storage bridges plus three readonly C6 hooks, with no trusted Lookup getter');
 });
 
 test('compiled private helper selection uses only the two fixed zero-argument MethodHandle bridges', () => {
