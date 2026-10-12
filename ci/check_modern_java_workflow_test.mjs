@@ -97,7 +97,8 @@ const methodHandleCoreRunnerCommand = 'node ci/java_methodhandle_core_test.mjs -
 const methodHandleCollectionUnits = ['ci/java_methodhandle_collection_contract_test.mjs'];
 const methodHandleCollectionUnitCommand = `node --test ${methodHandleCollectionUnits.join(' ')}`;
 const methodHandleCollectionRunnerCommand = 'node ci/java_methodhandle_collection_test.mjs --browser';
-const varHandleUnits = ['ci/java_methodhandle_varhandle_contract_test.mjs'];
+const varHandleUnits = ['ci/java_methodhandle_varhandle_contract_test.mjs', 'ci/varhandle_storage_test.cjs',
+  'ci/varhandle_linkage_test.cjs', 'ci/varhandle_native_boundary_test.cjs', 'ci/varhandle_api_metadata_test.cjs'];
 const varHandleUnitCommand = `node --test ${varHandleUnits.join(' ')}`;
 const varHandleRunnerCommand = 'node ci/java_methodhandle_varhandle_test.mjs --browser';
 const memberGates = [

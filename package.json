@@ -142,7 +142,7 @@
     "ci:methodhandle-core": "node ci/java_methodhandle_core_test.mjs --browser",
     "ci:methodhandle-collection:test": "node --test ci/java_methodhandle_collection_contract_test.mjs",
     "ci:methodhandle-collection": "node ci/java_methodhandle_collection_test.mjs --browser",
-    "ci:varhandle-execution:test": "node --test ci/java_methodhandle_varhandle_contract_test.mjs",
+    "ci:varhandle-execution:test": "node --test ci/java_methodhandle_varhandle_contract_test.mjs ci/varhandle_storage_test.cjs ci/varhandle_linkage_test.cjs ci/varhandle_native_boundary_test.cjs ci/varhandle_api_metadata_test.cjs",
     "ci:varhandle-execution": "node ci/java_methodhandle_varhandle_test.mjs --browser",
     "ci:java25-main": "node ci/java25_main_test.mjs --browser",
     "ci:java-uncaught-exit": "node ci/java_uncaught_exit_test.mjs --browser",
