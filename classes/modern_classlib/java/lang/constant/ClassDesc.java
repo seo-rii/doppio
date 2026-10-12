@@ -13,6 +13,14 @@ public interface ClassDesc extends ConstantDesc, TypeDescriptor.OfField<ClassDes
     return ofDescriptor("L" + name.replace('.', '/') + ";");
   }
 
+  static ClassDesc ofInternalName(String name) {
+    Objects.requireNonNull(name);
+    if (!isValidInternalName(name)) {
+      throw new IllegalArgumentException();
+    }
+    return ofDescriptor("L" + name + ";");
+  }
+
   static ClassDesc of(String packageName, String className) {
     Objects.requireNonNull(packageName);
     Objects.requireNonNull(className);
@@ -34,25 +42,32 @@ public interface ClassDesc extends ConstantDesc, TypeDescriptor.OfField<ClassDes
   }
 
   default ClassDesc arrayType() {
-    return ofDescriptor("[" + descriptorString());
+    if (arrayDepth(descriptorString()) == 255) {
+      throw new IllegalStateException();
+    }
+    return arrayType(1);
   }
 
   default ClassDesc arrayType(int rank) {
-    if (rank <= 0) {
+    String descriptor = descriptorString();
+    if (rank <= 0 || rank > 255 - arrayDepth(descriptor)) {
       throw new IllegalArgumentException();
     }
-    StringBuilder builder = new StringBuilder(descriptorString().length() + rank);
+    StringBuilder builder = new StringBuilder(descriptor.length() + rank);
     for (int i = 0; i < rank; i++) {
       builder.append('[');
     }
-    builder.append(descriptorString());
+    builder.append(descriptor);
     return ofDescriptor(builder.toString());
   }
 
   default ClassDesc nested(String nestedName) {
     Objects.requireNonNull(nestedName);
     String descriptor = descriptorString();
-    if (!isClassOrInterface() || !isValidMemberName(nestedName)) {
+    if (!isClassOrInterface()) {
+      throw new IllegalStateException();
+    }
+    if (!isValidMemberName(nestedName)) {
       throw new IllegalArgumentException();
     }
     return ofDescriptor(descriptor.substring(0, descriptor.length() - 1) + "$" + nestedName + ";");
@@ -90,13 +105,10 @@ public interface ClassDesc extends ConstantDesc, TypeDescriptor.OfField<ClassDes
   }
 
   default String packageName() {
-    String descriptor = descriptorString();
-    while (descriptor.charAt(0) == '[') {
-      descriptor = descriptor.substring(1);
-    }
-    if (descriptor.length() < 3 || descriptor.charAt(0) != 'L') {
+    if (!isClassOrInterface()) {
       return "";
     }
+    String descriptor = descriptorString();
     int slash = descriptor.lastIndexOf('/');
     if (slash < 2) {
       return "";
@@ -113,7 +125,7 @@ public interface ClassDesc extends ConstantDesc, TypeDescriptor.OfField<ClassDes
     String baseName = primitiveName(descriptor.charAt(arrayDepth));
     if (baseName == null) {
       int slash = descriptor.lastIndexOf('/');
-      baseName = descriptor.substring(slash + 1, descriptor.length() - 1);
+      baseName = descriptor.substring(Math.max(arrayDepth + 1, slash + 1), descriptor.length() - 1);
     }
     if (arrayDepth == 0) {
       return baseName;
@@ -124,6 +136,16 @@ public interface ClassDesc extends ConstantDesc, TypeDescriptor.OfField<ClassDes
       builder.append("[]");
     }
     return builder.toString();
+  }
+
+  Class<?> resolveConstantDesc(MethodHandles.Lookup lookup) throws ReflectiveOperationException;
+
+  private static int arrayDepth(String descriptor) {
+    int depth = 0;
+    while (descriptor.charAt(depth) == '[') {
+      depth++;
+    }
+    return depth;
   }
 
   private static boolean isValidDescriptor(String descriptor) {
@@ -242,7 +264,7 @@ final class ClassDescImpl implements ClassDesc {
     return descriptor;
   }
 
-  public Object resolveConstantDesc(MethodHandles.Lookup lookup) throws ReflectiveOperationException {
+  public Class<?> resolveConstantDesc(MethodHandles.Lookup lookup) throws ReflectiveOperationException {
     Objects.requireNonNull(lookup);
     if (descriptor.length() == 1) {
       switch (descriptor.charAt(0)) {
@@ -268,11 +290,12 @@ final class ClassDescImpl implements ClassDesc {
           throw new ClassNotFoundException(descriptor);
       }
     }
-    ClassLoader loader = lookup.lookupClass().getClassLoader();
     if (descriptor.charAt(0) == '[') {
-      return Class.forName(descriptor.replace('/', '.'), false, loader);
+      // Lookup checks the array's ultimate component without initialization.
+      // Keep the shim source compilable against the retained Java9 API surface.
+      return lookup.findClass(descriptor.replace('/', '.'));
     }
-    return Class.forName(descriptor.substring(1, descriptor.length() - 1).replace('/', '.'), false, loader);
+    return lookup.findClass(descriptor.substring(1, descriptor.length() - 1).replace('/', '.'));
   }
 
   public boolean equals(Object obj) {

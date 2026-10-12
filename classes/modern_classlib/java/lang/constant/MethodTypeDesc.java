@@ -14,6 +14,16 @@ public interface MethodTypeDesc extends ConstantDesc, TypeDescriptor.OfMethod<Cl
     return MethodTypeDescImpl.ofDescriptor(descriptor);
   }
 
+  static MethodTypeDesc of(ClassDesc returnDesc) {
+    return of(returnDesc, new ClassDesc[0]);
+  }
+
+  static MethodTypeDesc of(ClassDesc returnDesc, List<ClassDesc> paramDescs) {
+    Objects.requireNonNull(returnDesc);
+    Objects.requireNonNull(paramDescs);
+    return of(returnDesc, paramDescs.toArray(new ClassDesc[0]));
+  }
+
   static MethodTypeDesc of(ClassDesc returnDesc, ClassDesc... paramDescs) {
     Objects.requireNonNull(returnDesc);
     Objects.requireNonNull(paramDescs);
@@ -41,6 +51,8 @@ public interface MethodTypeDesc extends ConstantDesc, TypeDescriptor.OfMethod<Cl
   MethodTypeDesc dropParameterTypes(int start, int end);
 
   MethodTypeDesc insertParameterTypes(int pos, ClassDesc... paramTypes);
+
+  MethodType resolveConstantDesc(MethodHandles.Lookup lookup) throws ReflectiveOperationException;
 
   default String descriptorString() {
     StringBuilder builder = new StringBuilder();
@@ -142,7 +154,7 @@ final class MethodTypeDescImpl implements MethodTypeDesc {
   }
 
   public MethodTypeDesc dropParameterTypes(int start, int end) {
-    if (start < 0 || start > end || end > parameters.length) {
+    if (start < 0 || start >= parameters.length || start > end || end > parameters.length) {
       throw new IndexOutOfBoundsException();
     }
     ClassDesc[] params = new ClassDesc[parameters.length - (end - start)];
@@ -165,9 +177,16 @@ final class MethodTypeDescImpl implements MethodTypeDesc {
     return new MethodTypeDescImpl(returnType, params);
   }
 
-  public Object resolveConstantDesc(MethodHandles.Lookup lookup) {
+  public MethodType resolveConstantDesc(MethodHandles.Lookup lookup) throws ReflectiveOperationException {
     Objects.requireNonNull(lookup);
-    return MethodType.fromMethodDescriptorString(descriptorString(), lookup.lookupClass().getClassLoader());
+    MethodType type = MethodType.fromMethodDescriptorString(
+        descriptorString(), lookup.lookupClass().getClassLoader());
+    lookup.accessClass(type.returnType());
+    Class<?>[] params = type.parameterArray();
+    for (int i = 0; i < params.length; i++) {
+      lookup.accessClass(params[i]);
+    }
+    return type;
   }
 
   public boolean equals(Object obj) {
