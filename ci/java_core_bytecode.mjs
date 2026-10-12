@@ -38,6 +38,13 @@ export function decodeCoreCode(code, pool = [], classBytes = null) {
     if ([9, 10, 11].includes(entry.tag)) {
       const nt = pool[entry.second]; assert.equal(nt?.tag, 12, 'CP NameAndType operand');
       Object.assign(result, {owner: cls(entry.first), name: utf(nt.first), descriptor: utf(nt.second)});
+    } else if ([17, 18].includes(entry.tag)) {
+      const nt = pool[entry.second]; assert.equal(nt?.tag, 12, 'CP dynamic NameAndType operand');
+      Object.assign(result, {bootstrapIndex: entry.first, name: utf(nt.first), descriptor: utf(nt.second)});
+    } else if (entry.tag === 16) result.descriptor = utf(entry.first);
+    else if (entry.tag === 15 && classBytes) {
+      const referenceKind = classBytes[entry.start + 1], referenceIndex = classBytes.readUInt16BE(entry.start + 2);
+      Object.assign(result, {referenceKind, reference: cpOperand(referenceIndex)});
     } else if (entry.tag === 8) result.value = utf(entry.first);
     else if (entry.tag === 7) result.value = cls(index);
     else if (classBytes && [3, 4, 5, 6].includes(entry.tag)) {
