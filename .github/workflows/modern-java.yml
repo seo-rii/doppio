@@ -599,6 +599,26 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Check phase C class-file extended contracts
+        timeout-minutes: 3
+        run: node --test ci/java_classfile_extended_contract_test.mjs ci/classfile_extended_metadata_test.cjs
+
+      # C7c original Java25 attribute/bootstrap/fresh-pool recipes and per-host
+      # produced bytes are independent of C7a/C7b, not replacement carriers.
+      - name: Run Java class-file extended compatibility
+        id: java_classfile_extended
+        timeout-minutes: 40
+        run: node ci/java_classfile_extended_test.mjs --browser
+
+      - name: Upload Java class-file extended ledger
+        if: always() && steps.java_classfile_extended.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-classfile-extended-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Check evolved switch ledger contract
         timeout-minutes: 1
         run: node --test ci/java_pattern_evolution_contract_test.mjs

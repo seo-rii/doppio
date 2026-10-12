@@ -118,6 +118,9 @@ const classFileApiRunnerCommand = 'node ci/java_classfile_api_test.mjs --browser
 const classFileControlFlowUnits = ['ci/java_classfile_controlflow_contract_test.mjs'];
 const classFileControlFlowUnitCommand = `node --test ${classFileControlFlowUnits.join(' ')}`;
 const classFileControlFlowRunnerCommand = 'node ci/java_classfile_controlflow_test.mjs --browser';
+const classFileExtendedUnits = ['ci/java_classfile_extended_contract_test.mjs','ci/classfile_extended_metadata_test.cjs'];
+const classFileExtendedUnitCommand = `node --test ${classFileExtendedUnits.join(' ')}`;
+const classFileExtendedRunnerCommand = 'node ci/java_classfile_extended_test.mjs --browser';
 const memberGates = [
   {name: 'member resolution', units: memberResolutionUnits, unitCommand: memberResolutionUnitCommand,
     runnerCommand: memberResolutionRunnerCommand, stepId: 'java_member_resolution',
@@ -166,6 +169,9 @@ const memberGates = [
   {name: 'class-file control-flow', units: classFileControlFlowUnits, unitCommand: classFileControlFlowUnitCommand,
     runnerCommand: classFileControlFlowRunnerCommand, stepId: 'java_classfile_controlflow',
     ledger: 'build/java-classfile-controlflow-results.json', timeout: 40},
+  {name: 'class-file extended', units: classFileExtendedUnits, unitCommand: classFileExtendedUnitCommand,
+    runnerCommand: classFileExtendedRunnerCommand, stepId: 'java_classfile_extended',
+    ledger: 'build/java-classfile-extended-results.json', timeout: 40},
 ];
 const packageScripts = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).scripts;
 for (const [name, command] of [['ci:classfile-api:test', classFileApiUnitCommand], ['ci:classfile-api', classFileApiRunnerCommand]]) {
@@ -173,6 +179,9 @@ for (const [name, command] of [['ci:classfile-api:test', classFileApiUnitCommand
 }
 for (const [name, command] of [['ci:classfile-controlflow:test', classFileControlFlowUnitCommand], ['ci:classfile-controlflow', classFileControlFlowRunnerCommand]]) {
   if (packageScripts[name] !== command) throw new Error(`Package script ${name} must retain the exact C7b gate command.`);
+}
+for (const [name, command] of [['ci:classfile-extended:test', classFileExtendedUnitCommand], ['ci:classfile-extended', classFileExtendedRunnerCommand]]) {
+  if (packageScripts[name] !== command) throw new Error(`Package script ${name} must retain the exact C7c gate command.`);
 }
 for (const [name, command] of [
   ['ci:java-initialization:test', initializationUnitCommand],
@@ -924,6 +933,9 @@ for (const gate of [
   {name: 'class-file control-flow', contractName: 'Check phase C class-file control-flow contracts', runName: 'Run Java class-file control-flow compatibility',
     uploadName: 'Upload Java class-file control-flow ledger', unitCommand: classFileControlFlowUnitCommand, runnerCommand: classFileControlFlowRunnerCommand,
     stepId: 'java_classfile_controlflow', ledgerBase: 'java-classfile-controlflow'},
+  {name: 'class-file extended', contractName: 'Check phase C class-file extended contracts', runName: 'Run Java class-file extended compatibility',
+    uploadName: 'Upload Java class-file extended ledger', unitCommand: classFileExtendedUnitCommand, runnerCommand: classFileExtendedRunnerCommand,
+    stepId: 'java_classfile_extended', ledgerBase: 'java-classfile-extended'},
 ]) {
   for (const replacement of ['echo selected contracts checked', gate.runnerCommand.replace(' --browser', ' --diagnostic'),
     ...['--case selected', '--group selected', '--fixture selected', '--host node', '--guest node', '--skip-native',
@@ -966,7 +978,7 @@ for (const gate of [
   }
   const condition = `if: always() && steps.${gate.stepId}.outcome != 'skipped'`, ledger = `path: build/${gate.ledgerBase}-results.json`;
   for (const other of ['java-methodhandle-core', 'java-methodhandle-collection', 'java-methodhandle-varhandle',
-    'java-methodhandle-bootstrap', 'java-methodhandle-hidden-class', 'java-methodhandle-nominal-constant', 'java-classfile-api', 'java-classfile-controlflow']) if (other !== gate.ledgerBase) {
+    'java-methodhandle-bootstrap', 'java-methodhandle-hidden-class', 'java-methodhandle-nominal-constant', 'java-classfile-api', 'java-classfile-controlflow', 'java-classfile-extended']) if (other !== gate.ledgerBase) {
     expectCheckerFailure(`cross-wired ${gate.name} ledger to ${other}`,
       {workflow: replaceRequired(realWorkflow, ledger, `path: build/${other}-results.json`)},
       'exact bounded, fail-closed baseline command or artifact contract');

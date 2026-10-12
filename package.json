@@ -154,6 +154,8 @@
     "ci:classfile-api": "node ci/java_classfile_api_test.mjs --browser",
     "ci:classfile-controlflow:test": "node --test ci/java_classfile_controlflow_contract_test.mjs",
     "ci:classfile-controlflow": "node ci/java_classfile_controlflow_test.mjs --browser",
+    "ci:classfile-extended:test": "node --test ci/java_classfile_extended_contract_test.mjs ci/classfile_extended_metadata_test.cjs",
+    "ci:classfile-extended": "node ci/java_classfile_extended_test.mjs --browser",
     "ci:java25-main": "node ci/java25_main_test.mjs --browser",
     "ci:java-uncaught-exit": "node ci/java_uncaught_exit_test.mjs --browser",
     "ci:java-uncaught-exit:test": "node ci/jvm_exit_status_test.cjs && node --test ci/java_uncaught_exit_contract_test.mjs",
