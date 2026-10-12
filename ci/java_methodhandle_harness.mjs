@@ -20,15 +20,17 @@ const freeze = value => {
   return value;
 };
 
-// The C1 and C2 callers provide independent literal inventories. Only the
+// The C1, C2 and C3 callers provide independent literal inventories. Only the
 // unchanged compiler/host evidence protocol is shared; no filtered case mode.
 export function createMethodHandleHarness({scope, groups, requiredInventory, harnessUrl, contractFilename, ledgerBase, phaseId}) {
   const harnessPath = fileURLToPath(harnessUrl), contractPath = path.join(repoRoot, 'ci', contractFilename);
-  assert.ok(['C1', 'C2'].includes(phaseId));
+  const phaseLedgers = {C1: 'java-methodhandle-core', C2: 'java-methodhandle-collection',
+    C3: 'java-methodhandle-varhandle'};
+  assert.ok(Object.hasOwn(phaseLedgers, phaseId));
   assert.ok(harnessPath.startsWith(path.join(repoRoot, 'ci') + path.sep));
   assert.match(contractFilename, /^java_methodhandle_[a-z_]+_contract_test\.mjs$/);
-  assert.match(ledgerBase, /^java-methodhandle-(?:core|collection)$/);
-  assert.equal(ledgerBase, phaseId === 'C1' ? 'java-methodhandle-core' : 'java-methodhandle-collection',
+  assert.match(ledgerBase, /^java-methodhandle-(?:core|collection|varhandle)$/);
+  assert.equal(ledgerBase, phaseLedgers[phaseId],
     'Each phase retains its own official and diagnostic ledger namespace');
   const methodHandleScope = scope;
   const methodHandleGroups = freeze(groups);
@@ -38,7 +40,8 @@ export function createMethodHandleHarness({scope, groups, requiredInventory, har
   const modes = Object.freeze(['browser', 'native-only', 'diagnostic']);
   const flags = Object.freeze(['phaseCComplete', 'jvm003Complete', 'fullSourceUnitConformanceProven',
     'fullApiConformanceProven', 'generalBootstrapConformanceProven', 'varHandleExecutionConformanceProven',
-    'namedModuleRuntimeConformanceProven']);
+    'namedModuleRuntimeConformanceProven', ...(phaseId === 'C3' ?
+      ['varHandleMemoryOrderingConformanceProven', 'varHandleConcurrentVisibilityConformanceProven'] : [])]);
   const inventory = freeze(requiredInventory);
   const selectedHosts = mode => mode === 'native-only' ? ['native'] : mode === 'diagnostic' ? ['native', 'node'] : methodHandleHosts;
   const records = () => methodHandleReleases.flatMap(release => methodHandleGroups.map(group => ({release, group})));
@@ -58,9 +61,11 @@ export function createMethodHandleHarness({scope, groups, requiredInventory, har
     for (const [n, group] of groups.entries()) {
       assert.deepEqual(group.cases.map(entry => entry.id), inventory[n].ids, 'Independent mandatory ' + phaseId + ' case IDs');
       assert.deepEqual(group.releases, methodHandleReleases, 'Both final-profile releases');
-      assert.match(group.source, /^classes\/modern_fixture\/MethodHandle[A-Za-z]+Final\.java$/);
-      assert.match(group.mainClass, /^classes\.modern_test\.MethodHandle[A-Za-z]+Final$/);
-      assert.match(group.completionMarker, /^METHODHANDLE_[A-Z_]+_OK$/);
+      assert.match(group.source, phaseId === 'C3' ? /^classes\/modern_fixture\/VarHandle[A-Za-z]+Final\.java$/ :
+        /^classes\/modern_fixture\/MethodHandle[A-Za-z]+Final\.java$/);
+      assert.match(group.mainClass, phaseId === 'C3' ? /^classes\.modern_test\.VarHandle[A-Za-z]+Final$/ :
+        /^classes\.modern_test\.MethodHandle[A-Za-z]+Final$/);
+      assert.match(group.completionMarker, phaseId === 'C3' ? /^VARHANDLE_[A-Z_]+_OK$/ : /^METHODHANDLE_[A-Z_]+_OK$/);
       assert.ok(group.cases.length > 0, 'Nonempty ' + phaseId + ' corpus');
       assert.ok(Array.isArray(group.driverClassNames) && group.driverClassNames.includes(group.mainClass) &&
         group.driverClassNames.every(binaryName) && new Set(group.driverClassNames).size === group.driverClassNames.length,
@@ -68,6 +73,7 @@ export function createMethodHandleHarness({scope, groups, requiredInventory, har
       assert.ok(!group.generatedSources && !group.mutatePayload && !group.carrierSources && !group.compilationUnits,
         'No generated carrier, class transformations or fallback');
       const extra = group.additionalSources || [];
+      if (phaseId === 'C3') assert.equal(extra.length, 0, 'C3 uses original explicit driver units only');
       assert.ok(Array.isArray(extra) && extra.every(source => /^classes\/modern_fixture\/methodhandle_lookup\/[A-Za-z0-9_]+\.java$/.test(source)),
         'Explicit bounded Lookup companion sources');
       assert.equal(new Set([group.source, ...extra]).size, 1 + extra.length, 'Unique compiler sources');

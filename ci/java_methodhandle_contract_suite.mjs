@@ -17,7 +17,7 @@ const raw = group => ({status: 'passed', exitCode: 0, signal: null, timedOut: fa
     .concat([group.completionMarker, '']).join('\n'), stderr: ''});
 const sourceIndex = JSON.parse(fs.readFileSync(path.join(root, 'ci/plan_spec_source_index.json')));
 
-// Identical adversarial evidence checks run against both concrete harnesses.
+// Identical adversarial evidence checks run against all three concrete harnesses.
 export function registerMethodHandleContractTests(harness, {phaseId, caseCount, groupCount, harnessFilename, contractFilename, ledgerBase}) {
   const {methodHandleGroups, methodHandleHosts, methodHandleReleases, methodHandleTimeouts,
   validateMethodHandleGroups, methodHandleSourceUnits, createMethodHandleLedger, assertMethodHandleLedger,
@@ -117,8 +117,8 @@ export function registerMethodHandleContractTests(harness, {phaseId, caseCount, 
     const empty = path.resolve(output, '..', '..', '..', 'empty-sourcepath');
     const arguments_ = ['--release', '21', '-encoding', 'UTF-8', '-proc:none', '-g', '-sourcepath', empty, '-classpath', empty,
       '-d', output, path.join(root, group.source)];
-    const classFiles = group.driverClassNames.map(name => ({path: name.replaceAll('.', '/') + '.class', size: 100,
-      sha256: 'a'.repeat(64), major: 65, minor: 0}));
+    const classFiles = group.driverClassNames.map(name => name.replaceAll('.', '/') + '.class').sort()
+      .map(path => ({path, size: 100, sha256: 'a'.repeat(64), major: 65, minor: 0}));
     const operation = {kind: 'genuine-driver', command: '/locked/jdk21/bin/javac', arguments: arguments_,
       sourceDigests: [{path: path.join(root, group.source), sha256: sha(fs.readFileSync(path.join(root, group.source)))}],
       result: {command: ['/locked/jdk21/bin/javac', ...arguments_], cwd: path.dirname(output), timeoutMs: methodHandleTimeouts.compileMs,
