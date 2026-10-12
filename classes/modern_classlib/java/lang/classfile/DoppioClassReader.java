@@ -5,6 +5,12 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.lang.classfile.attribute.CodeAttribute;
 import java.lang.classfile.attribute.SourceFileAttribute;
+import java.lang.classfile.attribute.StackMapTableAttribute;
+import java.lang.classfile.attribute.StackMapFrameInfo;
+import java.lang.classfile.attribute.StackMapFrameInfo.VerificationTypeInfo;
+import java.lang.classfile.attribute.StackMapFrameInfo.SimpleVerificationTypeInfo;
+import java.lang.classfile.attribute.StackMapFrameInfo.ObjectVerificationTypeInfo;
+import java.lang.classfile.attribute.StackMapFrameInfo.UninitializedVerificationTypeInfo;
 import java.lang.classfile.attribute.UnknownAttribute;
 import java.lang.classfile.constantpool.*;
 import java.lang.classfile.instruction.*;
@@ -90,6 +96,7 @@ public final class DoppioClassReader {
   private static List<Attribute<?>> readAttributes(AttributedElement owner, Cursor data, boolean method) {
     int count = data.u2();
     List<Attribute<?>> attributes = new ArrayList<Attribute<?>>();
+    boolean stackMapSeen = false;
     for (int index = 0; index < count; index++) {
       Utf8Entry name = data.input.pool.entryByIndex(data.u2(), Utf8Entry.class);
       int length = data.length();
@@ -97,6 +104,10 @@ public final class DoppioClassReader {
       byte[] payload = data.bytes(length);
       if (method && "Code".equals(name.stringValue())) {
         attributes.add(readCode((MethodModel) owner, data.input, name, start, payload));
+      } else if (owner instanceof CodeValue && "StackMapTable".equals(name.stringValue())) {
+        if (stackMapSeen) throw new IllegalArgumentException("Duplicate StackMapTable attribute");
+        stackMapSeen = true;
+        attributes.add(readStackMap((CodeValue) owner, name, payload));
       } else if ("SourceFile".equals(name.stringValue())) {
         if (length != 2) throw new IllegalArgumentException("Invalid SourceFile length");
         attributes.add(new SourceFileValue(name, data.input.pool.entryByIndex(u2(payload, 0), Utf8Entry.class), data.input.pool, payload));
@@ -108,8 +119,8 @@ public final class DoppioClassReader {
   }
 
   private static CodeValue readCode(MethodModel method, Input input, Utf8Entry name, int payloadStart, byte[] payload) {
-    Cursor data = new Cursor(input, payloadStart);
     int end = payloadStart + payload.length;
+    Cursor data = new Cursor(input, payloadStart, end);
     int maxStack = data.u2(), maxLocals = data.u2(), length = data.length();
     if (length == 0 || length > 65535) throw new IllegalArgumentException("Invalid Code length");
     byte[] code = data.bytes(length);
@@ -120,12 +131,97 @@ public final class DoppioClassReader {
       int start = data.u2(), stop = data.u2(), handler = data.u2(), catchIndex = data.u2();
       if (start >= stop || stop > length || handler >= length) throw new IllegalArgumentException("Invalid exception-handler range");
       ClassEntry catchType = catchIndex == 0 ? null : input.pool.entryByIndex(catchIndex, ClassEntry.class);
-      handlers.add(exceptionCatch(result.label(handler), result.label(start), result.label(stop), Optional.ofNullable(catchType)));
+      handlers.add(exceptionCatch(result.checkedLabel(handler, false), result.checkedLabel(start, false),
+        result.checkedLabel(stop, true), Optional.ofNullable(catchType)));
     }
     result.handlers = immutable(handlers);
     result.attributes = readAttributes(result, data, false);
     if (data.at != end) throw new IllegalArgumentException("Invalid Code attribute boundary");
     return result;
+  }
+
+  private static StackMapTableAttribute readStackMap(CodeValue code, Utf8Entry name, byte[] payload) {
+    PayloadCursor data = new PayloadCursor(payload);
+    int count = data.u2();
+    List<StackMapFrameInfo> entries = new ArrayList<StackMapFrameInfo>();
+    List<VerificationTypeInfo> locals = initialFrameLocals(code.parent);
+    int previous = -1;
+    for (int index = 0; index < count; index++) {
+      int type = data.u1(), delta;
+      List<VerificationTypeInfo> stack = new ArrayList<VerificationTypeInfo>();
+      if (type <= 63) {
+        delta = type;
+      } else if (type <= 127) {
+        delta = type - 64;
+        stack.add(readVerificationType(code, data));
+      } else if (type == 247) {
+        delta = data.u2();
+        stack.add(readVerificationType(code, data));
+      } else if (type >= 248 && type <= 250) {
+        delta = data.u2();
+        int removed = 251 - type;
+        if (removed > locals.size()) throw new IllegalArgumentException("Stack map chop exceeds prior local entries");
+        locals = new ArrayList<VerificationTypeInfo>(locals.subList(0, locals.size() - removed));
+      } else if (type == 251) {
+        delta = data.u2();
+      } else if (type >= 252 && type <= 254) {
+        delta = data.u2();
+        locals = new ArrayList<VerificationTypeInfo>(locals);
+        for (int added = 0; added < type - 251; added++) locals.add(readVerificationType(code, data));
+      } else if (type == 255) {
+        delta = data.u2();
+        int localCount = data.u2();
+        locals = new ArrayList<VerificationTypeInfo>();
+        for (int local = 0; local < localCount; local++) locals.add(readVerificationType(code, data));
+        int stackCount = data.u2();
+        for (int item = 0; item < stackCount; item++) stack.add(readVerificationType(code, data));
+      } else {
+        throw new IllegalArgumentException("Reserved stack map frame type");
+      }
+      int target = previous + delta + 1;
+      entries.add(new FrameValue(type, code.checkedLabel(target, false), locals, stack));
+      previous = target;
+    }
+    if (data.at != payload.length) throw new IllegalArgumentException("Trailing StackMapTable data");
+    return new StackMapValue(name, code.pool, entries, payload);
+  }
+
+  private static List<VerificationTypeInfo> initialFrameLocals(MethodModel method) {
+    List<VerificationTypeInfo> locals = new ArrayList<VerificationTypeInfo>();
+    ClassEntry owner = method.parent().orElseThrow(() -> new IllegalArgumentException("Missing method owner")).thisClass();
+    if (!method.flags().has(AccessFlag.STATIC)) {
+      if ("<init>".equals(method.methodName().stringValue()) && !owner.matches(ConstantDescs.CD_Object))
+        locals.add(SimpleVerificationTypeInfo.UNINITIALIZED_THIS);
+      else locals.add(objectVerificationType(owner));
+    }
+    DoppioConstantPool initialPool = new DoppioConstantPool();
+    for (ClassDesc parameter : method.methodTypeSymbol().parameterList()) {
+      TypeKind kind = TypeKind.fromDescriptor(parameter.descriptorString()).asLoadable();
+      switch (kind) {
+        case INT: locals.add(SimpleVerificationTypeInfo.INTEGER); break;
+        case FLOAT: locals.add(SimpleVerificationTypeInfo.FLOAT); break;
+        case LONG: locals.add(SimpleVerificationTypeInfo.LONG); break;
+        case DOUBLE: locals.add(SimpleVerificationTypeInfo.DOUBLE); break;
+        case REFERENCE: locals.add(objectVerificationType(initialPool.classEntry(parameter))); break;
+        default: throw new IllegalArgumentException("Invalid initial stack map parameter");
+      }
+    }
+    return locals;
+  }
+
+  private static VerificationTypeInfo readVerificationType(CodeValue code, PayloadCursor data) {
+    int tag = data.u1();
+    if (tag <= VerificationTypeInfo.ITEM_UNINITIALIZED_THIS) return SimpleVerificationTypeInfo.values()[tag];
+    if (tag == VerificationTypeInfo.ITEM_OBJECT)
+      return objectVerificationType(code.pool.entryByIndex(data.u2(), ClassEntry.class));
+    if (tag == VerificationTypeInfo.ITEM_UNINITIALIZED) {
+      int target = data.u2();
+      Label label = code.checkedLabel(target, false);
+      if ((code.code[target] & 255) != Opcode.NEW.bytecode())
+        throw new IllegalArgumentException("Uninitialized stack map value must target new");
+      return uninitializedVerificationType(label);
+    }
+    throw new IllegalArgumentException("Invalid stack map verification tag");
   }
 
   public static byte[] originalBytes(ClassModel model) {
@@ -174,6 +270,8 @@ public final class DoppioClassReader {
       if (payload != null) return payload.clone();
     }
     if (attribute instanceof CodeValue) return ((CodeValue) attribute).payload.clone();
+    if (attribute instanceof StackMapValue && ((StackMapValue) attribute).payload != null)
+      return ((StackMapValue) attribute).payload.clone();
     throw new IllegalArgumentException("No retained original attribute payload");
   }
   public static ConstantPool sourcePool(Attribute<?> attribute) {
@@ -181,6 +279,7 @@ public final class DoppioClassReader {
     if (attribute instanceof RawAttribute) return ((RawAttribute) attribute).pool;
     if (attribute instanceof SourceFileValue) return ((SourceFileValue) attribute).pool;
     if (attribute instanceof CodeValue) return ((CodeValue) attribute).pool;
+    if (attribute instanceof StackMapValue) return ((StackMapValue) attribute).pool;
     throw new IllegalArgumentException("No retained source pool");
   }
 
@@ -230,6 +329,41 @@ public final class DoppioClassReader {
   };
   public static AttributeMapper<SourceFileAttribute> sourceFileMapper() { return SOURCE_FILE_MAPPER; }
   public static AttributeMapper<CodeAttribute> codeMapper() { return CODE_MAPPER; }
+
+  private static final AttributeMapper<StackMapTableAttribute> STACK_MAP_MAPPER = new AttributeMapper<StackMapTableAttribute>() {
+    public String name() { return "StackMapTable"; }
+    public AttributeStability stability() { return AttributeStability.LABELS; }
+    public StackMapTableAttribute readAttribute(AttributedElement owner, ClassReader reader, int at) {
+      if (!(owner instanceof CodeValue)) throw new IllegalArgumentException("Missing original stack map Code context");
+      return readStackMap((CodeValue) owner, reader.readEntry(at - 6, Utf8Entry.class),
+        reader.readBytes(at, reader.readInt(at - 4)));
+    }
+    public void writeAttribute(BufWriter writer, StackMapTableAttribute attribute) {
+      if (!(attribute instanceof StackMapValue) || ((StackMapValue) attribute).payload == null)
+        throw new UnsupportedOperationException("Explicit stack map serialization requires a Code label context");
+      if (!writer.canWriteDirect(sourcePool(attribute))) throw new IllegalArgumentException("Stack map copy requires original pool");
+      byte[] payload = attributePayload(attribute);
+      writer.writeIndex(attribute.attributeName()); writer.writeInt(payload.length); writer.writeBytes(payload);
+    }
+  };
+  public static AttributeMapper<StackMapTableAttribute> stackMapTableMapper() { return STACK_MAP_MAPPER; }
+
+  public static StackMapTableAttribute stackMapTable(List<StackMapFrameInfo> entries) {
+    DoppioConstantPool pool = new DoppioConstantPool();
+    return new StackMapValue(pool.utf8Entry("StackMapTable"), pool, entries, null);
+  }
+  public static StackMapFrameInfo stackMapFrame(Label target, List<VerificationTypeInfo> locals, List<VerificationTypeInfo> stack) {
+    return new FrameValue(255, Objects.requireNonNull(target), locals, stack);
+  }
+  public static ObjectVerificationTypeInfo objectVerificationType(ClassEntry className) {
+    return new ObjectTypeValue(Objects.requireNonNull(className));
+  }
+  public static ObjectVerificationTypeInfo objectVerificationType(ClassDesc classDesc) {
+    return objectVerificationType(new DoppioConstantPool().classEntry(Objects.requireNonNull(classDesc)));
+  }
+  public static UninitializedVerificationTypeInfo uninitializedVerificationType(Label newTarget) {
+    return new UninitializedTypeValue(Objects.requireNonNull(newTarget));
+  }
 
   public static Opcode opcode(int bytecode) {
     for (Opcode opcode : Opcode.values()) if (opcode.bytecode() == bytecode) return opcode;
@@ -316,6 +450,44 @@ public final class DoppioClassReader {
     return new StackValue(opcode);
   }
   public static NopInstruction nop() { return new NopValue(); }
+  public static ThrowInstruction throwInstruction() { return new ThrowValue(); }
+  public static NewObjectInstruction newObject(ClassEntry className) {
+    return new NewObjectValue(Objects.requireNonNull(className));
+  }
+  public static IncrementInstruction increment(int slot, int constant) {
+    if (slot < 0 || slot > 65535 || constant < -32768 || constant > 32767)
+      throw new IllegalArgumentException("Increment operand overflow");
+    return new IncrementValue(slot <= 255 && constant >= -128 && constant <= 127 ? Opcode.IINC : Opcode.IINC_W,
+      slot, constant);
+  }
+  public static ConvertInstruction convert(Opcode opcode) {
+    Objects.requireNonNull(opcode);
+    if (opcode.kind() != Opcode.Kind.CONVERT) throw new IllegalArgumentException("Not a conversion opcode");
+    return new ConvertValue(opcode, conversionKind(opcode.name().charAt(0)), conversionKind(opcode.name().charAt(2)));
+  }
+  public static ConvertInstruction convert(TypeKind from, TypeKind to) {
+    Objects.requireNonNull(from); Objects.requireNonNull(to);
+    for (Opcode opcode : Opcode.values()) if (opcode.kind() == Opcode.Kind.CONVERT &&
+        conversionKind(opcode.name().charAt(0)) == from && conversionKind(opcode.name().charAt(2)) == to)
+      return convert(opcode);
+    throw new IllegalArgumentException("Invalid primitive conversion");
+  }
+  private static TypeKind conversionKind(char descriptor) {
+    return descriptor == 'L' ? TypeKind.LONG : TypeKind.fromDescriptor(String.valueOf(descriptor));
+  }
+  public static BranchInstruction branch(Opcode opcode, Label target) {
+    Objects.requireNonNull(opcode); Objects.requireNonNull(target);
+    if (opcode.kind() != Opcode.Kind.BRANCH) throw new IllegalArgumentException("Not a branch opcode");
+    return new BranchValue(opcode, target);
+  }
+  public static LabelTarget labelTarget(Label label) { return new LabelTargetValue(Objects.requireNonNull(label)); }
+  public static SwitchCase switchCase(int value, Label target) { return new SwitchCaseValue(value, Objects.requireNonNull(target)); }
+  public static TableSwitchInstruction tableSwitch(int low, int high, Label defaultTarget, List<SwitchCase> cases) {
+    return new TableSwitchValue(low, high, Objects.requireNonNull(defaultTarget), cases, -1);
+  }
+  public static LookupSwitchInstruction lookupSwitch(Label defaultTarget, List<SwitchCase> cases) {
+    return new LookupSwitchValue(Objects.requireNonNull(defaultTarget), cases, -1);
+  }
   public static FieldInstruction field(Opcode opcode, FieldRefEntry field) {
     Objects.requireNonNull(opcode); Objects.requireNonNull(field);
     if (opcode.kind() != Opcode.Kind.FIELD_ACCESS) throw new IllegalArgumentException("Not a field opcode");
@@ -345,13 +517,14 @@ public final class DoppioClassReader {
     byte[] bytes = code.code;
     List<CodeElement> elements = new ArrayList<CodeElement>();
     for (ExceptionCatch handler : code.handlers) elements.add(handler);
-    for (Attribute<?> attribute : code.attributes) if (attribute instanceof UnknownAttribute &&
+    for (Attribute<?> attribute : code.attributes) if (attribute instanceof CodeElement &&
         !"LineNumberTable".equals(attribute.attributeName().stringValue()) &&
         !"LocalVariableTable".equals(attribute.attributeName().stringValue()) &&
         !"LocalVariableTypeTable".equals(attribute.attributeName().stringValue()) &&
-        !"StackMapTable".equals(attribute.attributeName().stringValue())) elements.add((UnknownAttribute) attribute);
+        !"StackMapTable".equals(attribute.attributeName().stringValue())) elements.add((CodeElement) attribute);
     int cursor = 0;
     while (cursor < bytes.length) {
+      if (code.labels[cursor] != null) elements.add(labelTarget(code.labels[cursor]));
       for (Attribute<?> attribute : code.attributes) if ("LineNumberTable".equals(attribute.attributeName().stringValue())) {
         byte[] lines = attributePayload(attribute);
         int count = u2(lines, 0);
@@ -366,9 +539,7 @@ public final class DoppioClassReader {
         bytecode = 196 << 8 | bytes[cursor++] & 255;
       }
       opcode = opcode(bytecode);
-      int size = opcode.sizeIfFixed();
-      if (size < 0) throw new IllegalArgumentException("Control-flow modeling is outside the selected pipeline");
-      require(bytes, start, size);
+      int size = code.sizes[start];
       Instruction instruction;
       switch (opcode.kind()) {
         case CONSTANT:
@@ -386,6 +557,33 @@ public final class DoppioClassReader {
         case OPERATOR: instruction = operator(opcode); break;
         case STACK: instruction = stack(opcode); break;
         case NOP: instruction = nop(); break;
+        case THROW_EXCEPTION: instruction = throwInstruction(); break;
+        case NEW_OBJECT: instruction = newObject(code.pool.entryByIndex(u2(bytes, cursor), ClassEntry.class)); break;
+        case INCREMENT:
+          instruction = new IncrementValue(opcode, opcode.isWide() ? u2(bytes, cursor) : bytes[cursor] & 255,
+            opcode.isWide() ? (short) u2(bytes, cursor + 2) : bytes[cursor + 1]); break;
+        case CONVERT: instruction = convert(opcode); break;
+        case BRANCH:
+          instruction = branch(opcode, code.checkedLabel(branchTarget(bytes, start, opcode), false)); break;
+        case TABLE_SWITCH: {
+          int operands = switchOperands(bytes, start), low = i4(bytes, operands + 4), high = i4(bytes, operands + 8);
+          Label defaultTarget = code.checkedLabel(relativeTarget(start, i4(bytes, operands)), false);
+          List<SwitchCase> cases = new ArrayList<SwitchCase>();
+          int count = high - low + 1;
+          for (int index = 0; index < count; index++) {
+            Label target = code.checkedLabel(relativeTarget(start, i4(bytes, operands + 12 + index * 4)), false);
+            if (target != defaultTarget) cases.add(switchCase(low + index, target));
+          }
+          instruction = new TableSwitchValue(low, high, defaultTarget, cases, size); break;
+        }
+        case LOOKUP_SWITCH: {
+          int operands = switchOperands(bytes, start), count = i4(bytes, operands + 4);
+          Label defaultTarget = code.checkedLabel(relativeTarget(start, i4(bytes, operands)), false);
+          List<SwitchCase> cases = new ArrayList<SwitchCase>();
+          for (int index = 0; index < count; index++) cases.add(switchCase(i4(bytes, operands + 8 + index * 8),
+            code.checkedLabel(relativeTarget(start, i4(bytes, operands + 12 + index * 8)), false)));
+          instruction = new LookupSwitchValue(defaultTarget, cases, size); break;
+        }
         case FIELD_ACCESS: instruction = field(opcode, code.pool.entryByIndex(u2(bytes, cursor), FieldRefEntry.class)); break;
         case INVOKE: {
           instruction = invoke(opcode, code.pool.entryByIndex(u2(bytes, cursor), MemberRefEntry.class));
@@ -398,10 +596,67 @@ public final class DoppioClassReader {
       elements.add(instruction);
       cursor = start + size;
     }
+    if (code.labels[bytes.length] != null) elements.add(labelTarget(code.labels[bytes.length]));
     return immutable(elements);
   }
 
+  private static int[] instructionSizes(byte[] bytes) {
+    int[] sizes = new int[bytes.length];
+    for (int start = 0; start < bytes.length;) {
+      int bytecode = bytes[start] & 255;
+      if (bytecode == 196) {
+        require(bytes, start, 2);
+        bytecode = 196 << 8 | bytes[start + 1] & 255;
+      }
+      Opcode opcode = opcode(bytecode);
+      int size = opcode.sizeIfFixed();
+      if (opcode == Opcode.TABLESWITCH) {
+        int operands = switchOperands(bytes, start);
+        require(bytes, operands, 12);
+        int low = i4(bytes, operands + 4), high = i4(bytes, operands + 8);
+        long count = (long) high - low + 1;
+        if (count <= 0 || count > (bytes.length - operands - 12) / 4)
+          throw new IllegalArgumentException("Invalid tableswitch range");
+        size = operands - start + 12 + (int) count * 4;
+      } else if (opcode == Opcode.LOOKUPSWITCH) {
+        int operands = switchOperands(bytes, start);
+        require(bytes, operands, 8);
+        int count = i4(bytes, operands + 4);
+        if (count < 0 || count > (bytes.length - operands - 8) / 8)
+          throw new IllegalArgumentException("Invalid lookupswitch pair count");
+        for (int index = 1; index < count; index++) if (i4(bytes, operands + 8 + (index - 1) * 8) >=
+            i4(bytes, operands + 8 + index * 8)) throw new IllegalArgumentException("Unsorted lookupswitch keys");
+        size = operands - start + 8 + count * 8;
+      }
+      if (size <= 0) throw new IllegalArgumentException("Unsupported instruction framing");
+      require(bytes, start, size);
+      sizes[start] = size;
+      start += size;
+    }
+    return sizes;
+  }
+  private static int switchOperands(byte[] bytes, int start) {
+    int operands = (start + 4) & ~3;
+    require(bytes, start + 1, operands - start - 1);
+    for (int at = start + 1; at < operands; at++) if (bytes[at] != 0)
+      throw new IllegalArgumentException("Nonzero switch padding");
+    return operands;
+  }
+  private static int branchTarget(byte[] bytes, int start, Opcode opcode) {
+    return relativeTarget(start, opcode == Opcode.GOTO_W ? i4(bytes, start + 1) : (short) u2(bytes, start + 1));
+  }
+  private static int relativeTarget(int start, int offset) {
+    long target = (long) start + offset;
+    if (target < 0 || target > Integer.MAX_VALUE) throw new IllegalArgumentException("Invalid relative branch offset");
+    return (int) target;
+  }
+
   private static <T> List<T> immutable(List<T> values) { return Collections.unmodifiableList(new ArrayList<T>(values)); }
+  private static <T> List<T> nonNullImmutable(List<T> values) {
+    List<T> retained = new ArrayList<T>(Objects.requireNonNull(values));
+    for (T value : retained) Objects.requireNonNull(value);
+    return Collections.unmodifiableList(retained);
+  }
   private static void require(byte[] bytes, int cursor, int length) {
     if (cursor < 0 || length < 0 || cursor > bytes.length || length > bytes.length - cursor)
       throw new IllegalArgumentException("Truncated class-file data");
@@ -409,18 +664,40 @@ public final class DoppioClassReader {
   private static int u2(byte[] bytes, int cursor) {
     require(bytes, cursor, 2); return (bytes[cursor] & 255) << 8 | bytes[cursor + 1] & 255;
   }
+  private static int i4(byte[] bytes, int cursor) {
+    require(bytes, cursor, 4);
+    return (bytes[cursor] & 255) << 24 | (bytes[cursor + 1] & 255) << 16 |
+      (bytes[cursor + 2] & 255) << 8 | bytes[cursor + 3] & 255;
+  }
 
   private static final class Cursor {
     final Input input;
+    final int end;
     int at;
-    Cursor(Input input, int at) { this.input = input; this.at = at; }
-    int u2() { int value = input.readU2(at); at += 2; return value; }
+    Cursor(Input input, int at) { this(input, at, input.bytes.length); }
+    Cursor(Input input, int at, int end) {
+      this.input = input; this.at = at; this.end = end;
+      require(input.bytes, at, end - at);
+    }
+    void check(int length) {
+      if (length < 0 || at < 0 || at > end || length > end - at)
+        throw new IllegalArgumentException("Truncated attribute data");
+    }
+    int u2() { check(2); int value = input.readU2(at); at += 2; return value; }
     int length() {
+      check(4);
       int value = input.readInt(at); at += 4;
       if (value < 0) throw new IllegalArgumentException("Attribute/Code length exceeds Java array bounds");
       return value;
     }
-    byte[] bytes(int length) { byte[] value = input.readBytes(at, length); at += length; return value; }
+    byte[] bytes(int length) { check(length); byte[] value = input.readBytes(at, length); at += length; return value; }
+  }
+  private static final class PayloadCursor {
+    final byte[] bytes;
+    int at;
+    PayloadCursor(byte[] bytes) { this.bytes = bytes; }
+    int u1() { require(bytes, at, 1); return bytes[at++] & 255; }
+    int u2() { int value = DoppioClassReader.u2(bytes, at); at += 2; return value; }
   }
   private static final class Input implements ClassReader {
     final byte[] bytes;
@@ -589,23 +866,100 @@ public final class DoppioClassReader {
     public AttributeMapper<UnknownAttribute> attributeMapper() { return mapper; }
     public byte[] contents() { return payload.clone(); }
   }
+  private static final class StackMapValue implements StackMapTableAttribute {
+    final Utf8Entry name;
+    final ConstantPool pool;
+    final List<StackMapFrameInfo> entries;
+    final byte[] payload;
+    StackMapValue(Utf8Entry name, ConstantPool pool, List<StackMapFrameInfo> entries, byte[] payload) {
+      this.name = name; this.pool = pool; this.entries = nonNullImmutable(entries);
+      this.payload = payload == null ? null : payload.clone();
+    }
+    public Utf8Entry attributeName() { return name; }
+    public AttributeMapper<StackMapTableAttribute> attributeMapper() { return STACK_MAP_MAPPER; }
+    public List<StackMapFrameInfo> entries() { return entries; }
+  }
+  private static final class FrameValue implements StackMapFrameInfo {
+    final int type;
+    final Label target;
+    final List<VerificationTypeInfo> locals, stack;
+    FrameValue(int type, Label target, List<VerificationTypeInfo> locals, List<VerificationTypeInfo> stack) {
+      this.type = type; this.target = Objects.requireNonNull(target);
+      this.locals = nonNullImmutable(locals); this.stack = nonNullImmutable(stack);
+    }
+    public int frameType() { return type; }
+    public Label target() { return target; }
+    public List<VerificationTypeInfo> locals() { return locals; }
+    public List<VerificationTypeInfo> stack() { return stack; }
+  }
+  private static final class ObjectTypeValue implements ObjectVerificationTypeInfo {
+    final ClassEntry className;
+    ObjectTypeValue(ClassEntry className) { this.className = className; }
+    public int tag() { return ITEM_OBJECT; }
+    public ClassEntry className() { return className; }
+    public boolean equals(Object value) {
+      return value instanceof ObjectTypeValue && className.equals(((ObjectTypeValue) value).className);
+    }
+    public int hashCode() { return className.hashCode(); }
+  }
+  private static final class UninitializedTypeValue implements UninitializedVerificationTypeInfo {
+    final Label target;
+    UninitializedTypeValue(Label target) { this.target = target; }
+    public int tag() { return ITEM_UNINITIALIZED; }
+    public Label newTarget() { return target; }
+    public boolean equals(Object value) {
+      return value instanceof UninitializedTypeValue && target.equals(((UninitializedTypeValue) value).target);
+    }
+    public int hashCode() { return target.hashCode(); }
+  }
   private static final class CodeValue implements CodeAttribute {
     final MethodModel parent;
     final DoppioConstantPool pool;
     final Utf8Entry name;
     final int stack, locals;
     final byte[] code, payload;
-    final List<BoundLabel> labels = new ArrayList<BoundLabel>();
+    final BoundLabel[] labels;
+    final int[] sizes;
     List<ExceptionCatch> handlers = Collections.emptyList();
     List<Attribute<?>> attributes = Collections.emptyList();
     List<CodeElement> elements;
     CodeValue(MethodModel parent, DoppioConstantPool pool, Utf8Entry name, int stack, int locals, byte[] code, byte[] payload) {
       this.parent = parent; this.pool = pool; this.name = name; this.stack = stack; this.locals = locals;
       this.code = code.clone(); this.payload = payload.clone();
+      this.labels = new BoundLabel[code.length + 1];
+      this.sizes = instructionSizes(this.code);
+      discoverLabels();
     }
     BoundLabel label(int offset) {
-      for (BoundLabel label : labels) if (label.offset == offset) return label;
-      BoundLabel label = new BoundLabel(this, offset); labels.add(label); return label;
+      if (labels[offset] == null) labels[offset] = new BoundLabel(this, offset);
+      return labels[offset];
+    }
+    BoundLabel checkedLabel(int offset, boolean allowEnd) {
+      if (offset < 0 || offset > code.length || offset == code.length && !allowEnd ||
+          offset < code.length && sizes[offset] == 0)
+        throw new IllegalArgumentException("Label is not at a valid instruction boundary");
+      return label(offset);
+    }
+    void discoverLabels() {
+      for (int start = 0; start < code.length; start += sizes[start]) {
+        int bytecode = code[start] & 255;
+        if (bytecode == 196) bytecode = 196 << 8 | code[start + 1] & 255;
+        Opcode opcode = DoppioClassReader.opcode(bytecode);
+        if (opcode.kind() == Opcode.Kind.BRANCH) checkedLabel(branchTarget(code, start, opcode), false);
+        else if (opcode == Opcode.TABLESWITCH || opcode == Opcode.LOOKUPSWITCH) {
+          int operands = switchOperands(code, start);
+          checkedLabel(relativeTarget(start, i4(code, operands)), false);
+          if (opcode == Opcode.TABLESWITCH) {
+            int count = i4(code, operands + 8) - i4(code, operands + 4) + 1;
+            for (int index = 0; index < count; index++)
+              checkedLabel(relativeTarget(start, i4(code, operands + 12 + index * 4)), false);
+          } else {
+            int count = i4(code, operands + 4);
+            for (int index = 0; index < count; index++)
+              checkedLabel(relativeTarget(start, i4(code, operands + 12 + index * 8)), false);
+          }
+        }
+      }
     }
     public Optional<MethodModel> parent() { return Optional.of(parent); }
     public List<ExceptionCatch> exceptionHandlers() { return handlers; }
@@ -696,6 +1050,68 @@ public final class DoppioClassReader {
   }
   private static final class NopValue extends InstructionValue implements NopInstruction {
     NopValue() { super(Opcode.NOP); }
+  }
+  private static final class ThrowValue extends InstructionValue implements ThrowInstruction {
+    ThrowValue() { super(Opcode.ATHROW); }
+  }
+  private static final class NewObjectValue extends InstructionValue implements NewObjectInstruction {
+    final ClassEntry className;
+    NewObjectValue(ClassEntry className) { super(Opcode.NEW); this.className = className; }
+    public ClassEntry className() { return className; }
+  }
+  private static final class IncrementValue extends InstructionValue implements IncrementInstruction {
+    final int slot, constant;
+    IncrementValue(Opcode opcode, int slot, int constant) { super(opcode); this.slot = slot; this.constant = constant; }
+    public int slot() { return slot; }
+    public int constant() { return constant; }
+  }
+  private static final class ConvertValue extends InstructionValue implements ConvertInstruction {
+    final TypeKind from, to;
+    ConvertValue(Opcode opcode, TypeKind from, TypeKind to) { super(opcode); this.from = from; this.to = to; }
+    public TypeKind fromType() { return from; }
+    public TypeKind toType() { return to; }
+  }
+  private static final class BranchValue extends InstructionValue implements BranchInstruction {
+    final Label target;
+    BranchValue(Opcode opcode, Label target) { super(opcode); this.target = target; }
+    public Label target() { return target; }
+  }
+  private static final class LabelTargetValue implements LabelTarget {
+    final Label label;
+    LabelTargetValue(Label label) { this.label = label; }
+    public Label label() { return label; }
+  }
+  private static final class SwitchCaseValue implements SwitchCase {
+    final int value;
+    final Label target;
+    SwitchCaseValue(int value, Label target) { this.value = value; this.target = target; }
+    public int caseValue() { return value; }
+    public Label target() { return target; }
+  }
+  private static final class TableSwitchValue extends InstructionValue implements TableSwitchInstruction {
+    final int low, high, size;
+    final Label defaultTarget;
+    final List<SwitchCase> cases;
+    TableSwitchValue(int low, int high, Label defaultTarget, List<SwitchCase> cases, int size) {
+      super(Opcode.TABLESWITCH); this.low = low; this.high = high; this.defaultTarget = defaultTarget;
+      this.cases = nonNullImmutable(cases); this.size = size;
+    }
+    public int lowValue() { return low; }
+    public int highValue() { return high; }
+    public Label defaultTarget() { return defaultTarget; }
+    public List<SwitchCase> cases() { return cases; }
+    public int sizeInBytes() { return size; }
+  }
+  private static final class LookupSwitchValue extends InstructionValue implements LookupSwitchInstruction {
+    final int size;
+    final Label defaultTarget;
+    final List<SwitchCase> cases;
+    LookupSwitchValue(Label defaultTarget, List<SwitchCase> cases, int size) {
+      super(Opcode.LOOKUPSWITCH); this.defaultTarget = defaultTarget; this.cases = nonNullImmutable(cases); this.size = size;
+    }
+    public Label defaultTarget() { return defaultTarget; }
+    public List<SwitchCase> cases() { return cases; }
+    public int sizeInBytes() { return size; }
   }
   private static final class FieldInstructionValue extends InstructionValue implements FieldInstruction {
     final FieldRefEntry field;
