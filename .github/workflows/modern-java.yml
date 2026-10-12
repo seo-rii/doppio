@@ -619,6 +619,25 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Check phase C class-file hierarchy contracts
+        timeout-minutes: 3
+        run: node --test ci/java_classfile_hierarchy_contract_test.mjs ci/classfile_hierarchy_metadata_test.cjs ci/classfile_constant_instruction_test.cjs
+
+      # Initial C7d hierarchy/constant ABI gate; broader C7d remains separate.
+      - name: Run Java class-file hierarchy compatibility
+        id: java_classfile_hierarchy
+        timeout-minutes: 40
+        run: node ci/java_classfile_hierarchy_test.mjs --browser
+
+      - name: Upload Java class-file hierarchy ledger
+        if: always() && steps.java_classfile_hierarchy.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-classfile-hierarchy-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Check evolved switch ledger contract
         timeout-minutes: 1
         run: node --test ci/java_pattern_evolution_contract_test.mjs
