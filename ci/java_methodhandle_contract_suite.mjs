@@ -8,6 +8,7 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {assertCoreResult, checkCoreExecution, checkCoreCompilation, CoreIntegrityError} from './java_core_semantics_test.mjs';
 import {proveCoreGroup} from './java_core_bytecode.mjs';
+import {generateUserBootstrapFixtures} from './generate_user_bootstrap_fixtures.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sha = value => crypto.createHash('sha256').update(value).digest('hex');
@@ -17,8 +18,9 @@ const raw = group => ({status: 'passed', exitCode: 0, signal: null, timedOut: fa
     .concat([group.completionMarker, '']).join('\n'), stderr: ''});
 const sourceIndex = JSON.parse(fs.readFileSync(path.join(root, 'ci/plan_spec_source_index.json')));
 
-// Identical adversarial evidence checks run against all three concrete harnesses.
+// Identical adversarial evidence checks run against every concrete harness.
 export function registerMethodHandleContractTests(harness, {phaseId, caseCount, groupCount, harnessFilename, contractFilename, ledgerBase}) {
+  const apiOwner = phaseId === 'C4' ? 'JVM-004' : phaseId === 'C5' ? 'JVM-005' : 'JVM-003';
   const {methodHandleGroups, methodHandleHosts, methodHandleReleases, methodHandleTimeouts,
   validateMethodHandleGroups, methodHandleSourceUnits, createMethodHandleLedger, assertMethodHandleLedger,
   assertMethodHandleCompilation, assertMethodHandleExecution, assertMethodHandleProvenance, captureMethodHandleOutput,
@@ -83,10 +85,10 @@ export function registerMethodHandleContractTests(harness, {phaseId, caseCount, 
   });
 
   test(`${phaseId} binds API contracts without reassigning indexed dependent JVMS/JLS owners or full units`, () => {
-    assert.equal(sourceIndex.units.filter(unit => unit.ownerPackageId === 'JVM-003').length, 0);
+    assert.equal(sourceIndex.units.filter(unit => unit.ownerPackageId === apiOwner).length, 0);
     const originals = new Map(sourceIndex.units.map(unit => [unit.id, unit]));
     for (const group of methodHandleGroups) for (const entry of methodHandleSourceUnits(group, sourceIndex)) {
-      assert.equal(entry.apiOwnerPackageId, 'JVM-003'); assert.equal(entry.fullApiConformanceProven, false);
+      assert.equal(entry.apiOwnerPackageId, apiOwner); assert.equal(entry.fullApiConformanceProven, false);
       assert.ok(entry.sourceUnits.length >= 2);
       for (const unit of entry.sourceUnits) {
         assert.equal(unit.ownerPackageId, originals.get(unit.id).ownerPackageId);
@@ -115,32 +117,68 @@ export function registerMethodHandleContractTests(harness, {phaseId, caseCount, 
     const group = methodHandleGroups[0], prepared = {feature: 21, home: '/locked/jdk21'};
     const output = path.join(os.tmpdir(), `${phaseId}-receipt-placeholder/release21/${group.id}/classes`);
     const empty = path.resolve(output, '..', '..', '..', 'empty-sourcepath');
-    const arguments_ = ['--release', '21', '-encoding', 'UTF-8', '-proc:none', '-g', '-sourcepath', empty, '-classpath', empty,
-      '-d', output, path.join(root, group.source)];
+    const sources = [group.source, ...(group.additionalSources || [])].map(source => path.join(root, source));
+    const arguments_ = ['--release', '21', '-encoding', 'UTF-8', '-proc:none', '-g', '-sourcepath', empty,
+      '-classpath', phaseId === 'C4' ? output : empty, '-d', output, ...sources];
     const classFiles = group.driverClassNames.map(name => name.replaceAll('.', '/') + '.class').sort()
       .map(path => ({path, size: 100, sha256: 'a'.repeat(64), major: 65, minor: 0}));
+    const operations = [];
+    if (phaseId === 'C4') {
+      const generated = generateUserBootstrapFixtures(group.generatedClassFixture.group, 21).map(file =>
+        ({path: file.className.replaceAll('.', '/') + '.class', size: file.bytes.length, sha256: sha(file.bytes), major: 65, minor: 0}));
+      for (const file of generated) Object.assign(classFiles.find(actual => actual.path === file.path), file);
+      const generatorPath = path.join(root, group.generatedClassFixture.generator);
+      const arguments_ = [generatorPath, '--group', group.generatedClassFixture.group, '--release', '21', '--output', output];
+      operations.push({kind: 'original-classfile-generator', command: process.execPath, arguments: arguments_,
+        sourceDigests: [{path: generatorPath, sha256: sha(fs.readFileSync(generatorPath))}],
+        generatedOutputEvidence: {directory: output, files: generated.map(({path, size, sha256}) => ({path, size, sha256}))},
+        result: {command: [process.execPath, ...arguments_], cwd: path.dirname(output), timeoutMs: methodHandleTimeouts.compileMs,
+          status: 'passed', exitCode: 0, signal: null, timedOut: false, outputLimitExceeded: false, error: null, stdout: '', stderr: ''}});
+    }
     const operation = {kind: 'genuine-driver', command: '/locked/jdk21/bin/javac', arguments: arguments_,
-      sourceDigests: [{path: path.join(root, group.source), sha256: sha(fs.readFileSync(path.join(root, group.source)))}],
+      sourceDigests: sources.map(path => ({path, sha256: sha(fs.readFileSync(path))})),
       result: {command: ['/locked/jdk21/bin/javac', ...arguments_], cwd: path.dirname(output), timeoutMs: methodHandleTimeouts.compileMs,
         status: 'passed', exitCode: 0, signal: null, timedOut: false, outputLimitExceeded: false, error: null, stdout: '', stderr: ''},
       outputEvidence: {directory: output, treeSha256: 'b'.repeat(64), files: classFiles.map(({path, size, sha256}) => ({path, size, sha256}))}};
-    return {group, prepared, record: {release: 21, classFiles, operations: [operation], classpath: {directory: output,
-      treeSha256: 'b'.repeat(64), genuineCompilerBytes: true, byteTransformations: false, fallbackClassFiles: false}}};
+    operations.push(operation);
+    return {group, prepared, record: {release: 21, classFiles, operations, classpath: {directory: output,
+      treeSha256: 'b'.repeat(64), genuineCompilerBytes: phaseId !== 'C4', byteTransformations: false, fallbackClassFiles: false,
+      ...(phaseId === 'C4' ? {originalGeneratedClassFiles: true, generatedClassNames: [...group.generatedClassFixture.classNames]} : {})}}};
   }
 
   test('compiler receipts bind release, source hash, flags, raw argv/cwd/timeouts and exact output inventory', () => {
     const valid = compilerReceipt(); assertMethodHandleCompilation(valid.record, valid.group, valid.prepared);
-    for (const mutate of [record => record.operations[0].arguments[1] = '8',
-      record => record.operations[0].arguments.push('--enable-preview'), record => record.operations[0].command = '/other/javac',
-      record => record.operations[0].result.command[0] = '/other/javac', record => record.operations[0].result.command[2] = '25',
-      record => record.operations[0].result.cwd = '/other', record => record.operations[0].result.timeoutMs++,
-      record => record.operations[0].sourceDigests[0].sha256 = 'c'.repeat(64), record => record.classFiles[0].major = 52,
+    for (const mutate of [record => record.operations.at(-1).arguments[1] = '8',
+      record => record.operations.at(-1).arguments.push('--enable-preview'), record => record.operations.at(-1).command = '/other/javac',
+      record => record.operations.at(-1).result.command[0] = '/other/javac', record => record.operations.at(-1).result.command[2] = '25',
+      record => record.operations.at(-1).result.cwd = '/other', record => record.operations.at(-1).result.timeoutMs++,
+      record => record.operations.at(-1).sourceDigests[0].sha256 = 'c'.repeat(64), record => record.classFiles[0].major = 52,
       record => record.classFiles[0].minor = 65535, record => record.classFiles.push(clone(record.classFiles[0])),
       record => record.classpath.byteTransformations = true, record => record.classpath.fallbackClassFiles = true,
-      record => record.operations[0].outputEvidence.files.pop(), record => record.operations[0].outputEvidence.treeSha256 = 'c'.repeat(64),
-      record => record.operations[0].result.stdout = 'warning', record => record.operations[0].result.stderr = 'warning',
+      record => record.operations.at(-1).outputEvidence.files.pop(), record => record.operations.at(-1).outputEvidence.treeSha256 = 'c'.repeat(64),
+      record => record.operations.at(-1).result.stdout = 'warning', record => record.operations.at(-1).result.stderr = 'warning',
+      record => record.operations.at(-1).result.exitCode = 1, record => record.operations.at(-1).result.timedOut = true,
+      record => record.operations.push(clone(record.operations.at(-1)))]) {
+      const record = clone(valid.record); mutate(record); assert.throws(() => assertMethodHandleCompilation(record, valid.group, valid.prepared));
+    }
+  });
+
+  if (phaseId === 'C4') test('C4 original-generator receipts cannot become a rewritten javac carrier or unrecorded fallback', () => {
+    const valid = compilerReceipt(); assertMethodHandleCompilation(valid.record, valid.group, valid.prepared);
+    for (const mutate of [record => record.operations.shift(), record => record.operations.reverse(),
+      record => record.operations[0].kind = 'genuine-driver', record => record.operations[0].command = '/other/node',
+      record => record.operations[0].arguments[2] = 'indy', record => record.operations[0].arguments[4] = '25',
+      record => record.operations[0].arguments[6] = '/other/output',
+      record => record.operations[0].result.command[0] = '/other/node', record => record.operations[0].result.cwd = '/other',
+      record => record.operations[0].result.timeoutMs++, record => record.operations[0].sourceDigests[0].sha256 = 'c'.repeat(64),
+      record => record.operations[0].result.stdout = 'waiver', record => record.operations[0].result.stderr = 'warning',
       record => record.operations[0].result.exitCode = 1, record => record.operations[0].result.timedOut = true,
-      record => record.operations.push(clone(record.operations[0]))]) {
+      record => record.operations[0].result.outputLimitExceeded = true, record => record.operations[0].result.signal = 'SIGKILL',
+      record => record.operations[0].generatedOutputEvidence.files.pop(),
+      record => record.operations[0].generatedOutputEvidence.files[0].sha256 = 'd'.repeat(64),
+      record => record.classFiles.find(file => file.path.endsWith('Calls.class')).sha256 = 'e'.repeat(64),
+      record => record.classpath.genuineCompilerBytes = true, record => record.classpath.originalGeneratedClassFiles = false,
+      record => record.classpath.generatedClassNames = [], record => record.operations.at(-1).arguments[10] = '/carrier/classpath']) {
       const record = clone(valid.record); mutate(record); assert.throws(() => assertMethodHandleCompilation(record, valid.group, valid.prepared));
     }
   });
@@ -270,7 +308,11 @@ export function registerMethodHandleContractTests(harness, {phaseId, caseCount, 
     for (const relative of [`ci/${harnessFilename}`, `ci/${contractFilename}`,
       'ci/java_methodhandle_harness.mjs', 'ci/java_methodhandle_contract_suite.mjs',
       'ci/java_core_bytecode.mjs', 'ci/java_compatibility_browser.mjs', 'ci/plan_spec_source_index.json',
-      'ci/java_compatibility_toolchains.lock.json', '.github/workflows/modern-java.yml', 'package.json'])
+      'ci/java_compatibility_toolchains.lock.json', '.github/workflows/modern-java.yml', 'package.json',
+      ...(phaseId === 'C4' ? ['ci/generate_user_bootstrap_fixtures.mjs', 'ci/java_user_bootstrap_bytecode.mjs',
+        'ci/bootstrap_case_helpers.mjs', 'ci/bootstrap_condy_cases.mjs', 'ci/bootstrap_indy_cases.mjs', 'ci/bootstrap_error_cases.mjs'] : []),
+      ...(phaseId === 'C5' ? ['ci/hidden_class_cases.mjs', 'ci/java_hidden_class_bytecode.mjs',
+        'classes/modern_fixture/hiddenclass/HiddenClassSupport.java', 'classes/modern_fixture/hiddenclass/foreign/ForeignPayload.java'] : [])])
       assert.ok(inputs.includes(path.join(root, relative)), 'Mandatory actual input ' + relative);
     for (const group of methodHandleGroups) for (const source of [group.source, ...(group.additionalSources || [])])
       assert.ok(inputs.includes(path.join(root, source)), 'Original compiler source ' + source);

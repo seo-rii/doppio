@@ -5,6 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {coreOpcodeNames, inspectCoreClasses, proveCoreGroup} from './java_core_bytecode.mjs';
+import {inspectUserBootstrapClasses, proveUserBootstrapGroup, assertUserBootstrapProofs} from './java_user_bootstrap_bytecode.mjs';
+import {generateUserBootstrapFixtures} from './generate_user_bootstrap_fixtures.mjs';
+import {hiddenPayloadContracts, proveHiddenClassGroup, assertHiddenClassProofs} from './java_hidden_class_bytecode.mjs';
 import {assertCoreCompilerSources, assertCoreResult, checkCoreCompilation, checkCoreExecution,
   CoreIntegrityError} from './java_core_semantics_test.mjs';
 import {inspectClassFiles, runCommand, runtimeSnapshot, validateToolchains} from './run_java_compatibility.mjs';
@@ -20,16 +23,17 @@ const freeze = value => {
   return value;
 };
 
-// The C1, C2 and C3 callers provide independent literal inventories. Only the
+// Each phase provides an independent literal inventory. Only the
 // unchanged compiler/host evidence protocol is shared; no filtered case mode.
 export function createMethodHandleHarness({scope, groups, requiredInventory, harnessUrl, contractFilename, ledgerBase, phaseId}) {
   const harnessPath = fileURLToPath(harnessUrl), contractPath = path.join(repoRoot, 'ci', contractFilename);
   const phaseLedgers = {C1: 'java-methodhandle-core', C2: 'java-methodhandle-collection',
-    C3: 'java-methodhandle-varhandle'};
+    C3: 'java-methodhandle-varhandle', C4: 'java-methodhandle-bootstrap', C5: 'java-methodhandle-hidden-class'};
+  const apiOwner = phaseId === 'C4' ? 'JVM-004' : phaseId === 'C5' ? 'JVM-005' : 'JVM-003';
   assert.ok(Object.hasOwn(phaseLedgers, phaseId));
   assert.ok(harnessPath.startsWith(path.join(repoRoot, 'ci') + path.sep));
   assert.match(contractFilename, /^java_methodhandle_[a-z_]+_contract_test\.mjs$/);
-  assert.match(ledgerBase, /^java-methodhandle-(?:core|collection|varhandle)$/);
+  assert.match(ledgerBase, /^java-methodhandle-(?:core|collection|varhandle|bootstrap|hidden-class)$/);
   assert.equal(ledgerBase, phaseLedgers[phaseId],
     'Each phase retains its own official and diagnostic ledger namespace');
   const methodHandleScope = scope;
@@ -41,13 +45,42 @@ export function createMethodHandleHarness({scope, groups, requiredInventory, har
   const flags = Object.freeze(['phaseCComplete', 'jvm003Complete', 'fullSourceUnitConformanceProven',
     'fullApiConformanceProven', 'generalBootstrapConformanceProven', 'varHandleExecutionConformanceProven',
     'namedModuleRuntimeConformanceProven', ...(phaseId === 'C3' ?
-      ['varHandleMemoryOrderingConformanceProven', 'varHandleConcurrentVisibilityConformanceProven'] : [])]);
+      ['varHandleMemoryOrderingConformanceProven', 'varHandleConcurrentVisibilityConformanceProven'] : []),
+    ...(phaseId === 'C4' ? ['bootstrapConcurrentLinkageConformanceProven', 'bootstrapMaximalArityConformanceProven'] : []),
+    ...(phaseId === 'C5' ? ['hiddenClassGarbageCollectionConformanceProven', 'hiddenClassNamedModuleConformanceProven'] : [])]);
   const inventory = freeze(requiredInventory);
   const selectedHosts = mode => mode === 'native-only' ? ['native'] : mode === 'diagnostic' ? ['native', 'node'] : methodHandleHosts;
   const records = () => methodHandleReleases.flatMap(release => methodHandleGroups.map(group => ({release, group})));
   const sources = group => [group.source, ...(group.additionalSources || [])].map(relative => path.join(repoRoot, relative));
+  const originalGeneratedFiles = (group, release) => generateUserBootstrapFixtures(group.generatedClassFixture.group, release)
+    .map(file => ({path: file.className.replaceAll('.', '/') + '.class', size: file.bytes.length, sha256: sha(file.bytes),
+      major: release + 44, minor: 0}));
+  const bytecodeProofs = (group, directory, files) => (phaseId === 'C4' ?
+    proveUserBootstrapGroup(group, inspectUserBootstrapClasses(directory, files)) :
+    proveCoreGroup(group, inspectCoreClasses(directory, files)))
+    .map(proof => ({...proof, fullSourceUnitConformanceProven: false}));
   const integrity = check => { try { check(); } catch (error) { throw new CoreIntegrityError(error.message, {cause: error}); } };
   const binaryName = value => typeof value === 'string' && /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(value);
+  const validateBootstrapOperand = value => {
+    assert.ok(value && typeof value === 'object' && !Array.isArray(value));
+    const fields = [17, 18].includes(value.tag) ? ['tag', 'name', 'descriptor', 'bootstrap'] : value.tag === 15 ?
+      ['tag', 'referenceKind', 'reference'] : value.tag === 16 ? ['tag', 'descriptor'] : [9, 10, 11].includes(value.tag) ?
+        ['tag', 'owner', 'name', 'descriptor'] : ['tag', 'value'];
+    assert.deepEqual(Object.keys(value).sort(), fields.sort(), 'No ignored bootstrap CP obligation fields');
+    assert.ok([3, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16, 17, 18].includes(value.tag));
+    for (const key of ['owner', 'name', 'descriptor']) if (fields.includes(key)) assert.ok(typeof value[key] === 'string' && value[key].length > 0);
+    if ([17, 18].includes(value.tag)) {
+      assert.deepEqual(Object.keys(value.bootstrap).sort(), ['arguments', 'method']);
+      validateBootstrapOperand(value.bootstrap.method); assert.equal(value.bootstrap.method.tag, 15);
+      assert.ok([6, 8].includes(value.bootstrap.method.referenceKind));
+      assert.ok(Array.isArray(value.bootstrap.arguments));
+      value.bootstrap.arguments.forEach(validateBootstrapOperand);
+    } else if (value.tag === 15) {
+      assert.ok(Number.isInteger(value.referenceKind) && value.referenceKind >= 1 && value.referenceKind <= 9);
+      validateBootstrapOperand(value.reference); assert.ok([9, 10, 11].includes(value.reference.tag));
+    } else if ([7, 8, 5].includes(value.tag)) assert.ok(typeof value.value === 'string' && value.value.length > 0);
+    else if ([3, 4, 6].includes(value.tag)) assert.equal(typeof value.value, 'number');
+  };
 
   function parseMethodHandleMode(options) {
     assert.ok(Array.isArray(options) && options.length === 1 && ['--browser', '--native-only', '--diagnostic'].includes(options[0]),
@@ -61,21 +94,43 @@ export function createMethodHandleHarness({scope, groups, requiredInventory, har
     for (const [n, group] of groups.entries()) {
       assert.deepEqual(group.cases.map(entry => entry.id), inventory[n].ids, 'Independent mandatory ' + phaseId + ' case IDs');
       assert.deepEqual(group.releases, methodHandleReleases, 'Both final-profile releases');
-      assert.match(group.source, phaseId === 'C3' ? /^classes\/modern_fixture\/VarHandle[A-Za-z]+Final\.java$/ :
-        /^classes\/modern_fixture\/MethodHandle[A-Za-z]+Final\.java$/);
-      assert.match(group.mainClass, phaseId === 'C3' ? /^classes\.modern_test\.VarHandle[A-Za-z]+Final$/ :
-        /^classes\.modern_test\.MethodHandle[A-Za-z]+Final$/);
-      assert.match(group.completionMarker, phaseId === 'C3' ? /^VARHANDLE_[A-Z_]+_OK$/ : /^METHODHANDLE_[A-Z_]+_OK$/);
+      const prefix = phaseId === 'C3' ? 'VarHandle' : phaseId === 'C4' ? 'Bootstrap' : phaseId === 'C5' ? 'HiddenClass' : 'MethodHandle';
+      assert.match(group.source, new RegExp('^classes/modern_fixture/' + prefix + '[A-Za-z]+Final\\.java$'));
+      assert.match(group.mainClass, new RegExp('^classes\\.modern_test\\.' + prefix + '[A-Za-z]+Final$'));
+      assert.match(group.completionMarker, phaseId === 'C3' ? /^VARHANDLE_[A-Z_]+_OK$/ : phaseId === 'C4' ? /^BOOTSTRAP_[A-Z_]+_OK$/ :
+        phaseId === 'C5' ? /^HIDDEN_CLASS_[A-Z_]+_OK$/ : /^METHODHANDLE_[A-Z_]+_OK$/);
       assert.ok(group.cases.length > 0, 'Nonempty ' + phaseId + ' corpus');
       assert.ok(Array.isArray(group.driverClassNames) && group.driverClassNames.includes(group.mainClass) &&
         group.driverClassNames.every(binaryName) && new Set(group.driverClassNames).size === group.driverClassNames.length,
       'Exact genuine compiler class inventory');
       assert.ok(!group.generatedSources && !group.mutatePayload && !group.carrierSources && !group.compilationUnits,
         'No generated carrier, class transformations or fallback');
+      if (phaseId === 'C4') {
+        assert.deepEqual(group.generatedClassFixture, {generator: 'ci/generate_user_bootstrap_fixtures.mjs',
+          group: group.id.replace('bootstrap-', ''), classNames: [group.mainClass.replace(/Final$/, 'Calls')]},
+        'Exact original C4 class-file generation recipe, never a javac carrier rewrite');
+        assert.ok(group.driverClassNames.includes(group.generatedClassFixture.classNames[0]));
+      } else assert.ok(!Object.hasOwn(group, 'generatedClassFixture'), 'Only C4 has original generated inputs');
+      if (phaseId === 'C5') {
+        const expected = hiddenPayloadContracts[group.id]; assert.ok(expected, 'Independent literal hidden-class payload group');
+        assert.equal(group.mainClass, expected.mainClass, 'Independent hidden-class driver identity');
+        assert.deepEqual(group.hiddenPayloads, expected.payloads.map(payload => payload.name),
+          'Independent complete original hidden-class payload inventory');
+        assert.deepEqual([...group.driverClassNames].sort(),
+          [expected.mainClass, 'classes.modern_test.HiddenClassSupport', ...expected.payloads.map(payload => payload.name)].sort(),
+        'Exact original C5 main/support/payload compiler inventory');
+      } else assert.ok(!Object.hasOwn(group, 'hiddenPayloads'), 'Only C5 owns hidden-class payload proof inputs');
       const extra = group.additionalSources || [];
       if (phaseId === 'C3') assert.equal(extra.length, 0, 'C3 uses original explicit driver units only');
-      assert.ok(Array.isArray(extra) && extra.every(source => /^classes\/modern_fixture\/methodhandle_lookup\/[A-Za-z0-9_]+\.java$/.test(source)),
+      assert.ok(Array.isArray(extra) && extra.every(source => phaseId === 'C4' ? source === 'classes/modern_fixture/BootstrapTestSupport.java' :
+        phaseId === 'C5' ? ['classes/modern_fixture/hiddenclass/HiddenClassSupport.java',
+          'classes/modern_fixture/hiddenclass/foreign/ForeignPayload.java'].includes(source) :
+          /^classes\/modern_fixture\/methodhandle_lookup\/[A-Za-z0-9_]+\.java$/.test(source)),
         'Explicit bounded Lookup companion sources');
+      if (phaseId === 'C4') assert.deepEqual(extra, ['classes/modern_fixture/BootstrapTestSupport.java']);
+      if (phaseId === 'C5') assert.deepEqual(extra, ['classes/modern_fixture/hiddenclass/HiddenClassSupport.java',
+        ...(group.id === 'hidden-class-definition' ? ['classes/modern_fixture/hiddenclass/foreign/ForeignPayload.java'] : [])],
+      'Exact C5 genuine javac support/package-rejection sources');
       assert.equal(new Set([group.source, ...extra]).size, 1 + extra.length, 'Unique compiler sources');
       for (const entry of group.cases) {
         assert.match(entry.id, /^[a-z][a-z0-9-]*$/); assert.ok(!allIds.has(entry.id), 'Unique ' + phaseId + ' case ID'); allIds.add(entry.id);
@@ -86,14 +141,16 @@ export function createMethodHandleHarness({scope, groups, requiredInventory, har
         assert.ok(Array.isArray(entry.limitations) && entry.limitations.length > 0 && entry.limitations.every(value => typeof value === 'string' && value.length > 0),
           'Explicit selected-case limitations');
         assert.ok(Array.isArray(entry.primarySources) && entry.primarySources.length > 0 && entry.primarySources.every(url =>
-          /^https:\/\/docs\.oracle\.com\/(?:en\/java\/javase\/(?:21|25)\/docs\/api\/java\.base\/java\/lang\/invoke\/|javase\/specs\/)/.test(url)),
+          /^https:\/\/docs\.oracle\.com\/(?:en\/java\/javase\/(?:21|25)\/docs\/api\/java\.base\/java\/lang\/invoke\/|javase\/specs\/)/.test(url) ||
+          phaseId === 'C5' && /^https:\/\/docs\.oracle\.com\/en\/java\/javase\/(?:21|25)\/docs\/api\/java\.base\/java\/lang\/(?:Class|reflect\/Field)\.html$/.test(url)),
         'Primary API/specification contract sources');
         assert.ok(entry.anchors && Object.keys(entry.anchors).length > 0 && Object.entries(entry.anchors).every(([spec, anchors]) =>
           ['JLS', 'JVMS'].includes(spec) && Array.isArray(anchors) && anchors.length > 0 && anchors.every(anchor => typeof anchor === 'string' && anchor.length > 0)),
         'Indexed dependent specification obligations');
         assert.ok(Array.isArray(entry.probes) && entry.probes.length > 0, 'Actual executable Code probes');
         for (const probe of entry.probes) {
-          assert.ok(Object.keys(probe).every(key => ['className', 'method', 'descriptor', 'requiredOpcodes', 'symbolicOperands'].includes(key)),
+          assert.ok(Object.keys(probe).every(key => ['className', 'method', 'descriptor', 'requiredOpcodes', 'symbolicOperands',
+            ...(phaseId === 'C4' ? ['dynamicOperands', 'sameConstantPoolAs', 'sameConstantPoolWithinMethod'] : [])].includes(key)),
             'No ignored method handle probe fields');
           assert.ok(typeof probe.method === 'string' && typeof probe.descriptor === 'string', 'Exact member signature');
           assert.ok(!probe.className || group.driverClassNames.includes(probe.className), 'Actual probe owner');
@@ -108,6 +165,19 @@ export function createMethodHandleHarness({scope, groups, requiredInventory, har
                 keys.every(key => typeof operand[key] === 'string' && operand[key].length > 0), 'Exact actual member/type operand');
             }
           }
+          if (phaseId === 'C4' && probe.dynamicOperands !== undefined) {
+            assert.ok(Array.isArray(probe.dynamicOperands) && probe.dynamicOperands.length > 0);
+            for (const operand of probe.dynamicOperands) {
+              assert.ok(Object.keys(operand).every(key => ['opcode', 'cp', 'count'].includes(key)));
+              assert.ok(['ldc', 'ldc_w', 'ldc2_w', 'invokedynamic'].includes(operand.opcode));
+              assert.ok([17, 18].includes(operand.cp?.tag) && typeof operand.cp.name === 'string' &&
+                typeof operand.cp.descriptor === 'string' && operand.cp.bootstrap?.method?.tag === 15);
+              validateBootstrapOperand(operand.cp);
+              assert.ok(operand.count === undefined || Number.isInteger(operand.count) && operand.count > 0);
+            }
+          }
+          if (probe.sameConstantPoolAs) assert.deepEqual(Object.keys(probe.sameConstantPoolAs).sort(), ['descriptor', 'method', 'tag']);
+          if (probe.sameConstantPoolWithinMethod) assert.deepEqual(Object.keys(probe.sameConstantPoolWithinMethod).sort(), ['count', 'tag']);
         }
       }
       if (groups !== methodHandleGroups) assert.deepEqual(group, methodHandleGroups[n], 'No changed compiler/case contracts');
@@ -117,7 +187,7 @@ export function createMethodHandleHarness({scope, groups, requiredInventory, har
 
   function methodHandleSourceUnits(group, index) {
     const units = new Map(index.units.map(unit => [unit.id, unit]));
-    return group.cases.map(entry => ({id: entry.id, apiOwnerPackageId: 'JVM-003', primarySources: entry.primarySources,
+    return group.cases.map(entry => ({id: entry.id, apiOwnerPackageId: apiOwner, primarySources: entry.primarySources,
       fullApiConformanceProven: false, sourceUnits: methodHandleReleases.flatMap(release => Object.entries(entry.anchors)
         .flatMap(([spec, anchors]) => anchors.map(anchor => {
           const id = `${spec}-${release}:${spec.toLowerCase()}-${anchor}`, unit = units.get(id);
@@ -140,14 +210,15 @@ export function createMethodHandleHarness({scope, groups, requiredInventory, har
 
   function assertMethodHandleCompilation(record, group, prepared) {
     assert.equal(prepared.feature, record.release, 'Matching locked compiler edition');
-    assert.equal(record.operations.length, 1, 'Exactly one original javac attempt');
-    const operation = record.operations[0], output = record.classpath?.directory;
+    assert.equal(record.operations.length, phaseId === 'C4' ? 2 : 1, 'Exactly one original javac attempt' +
+      (phaseId === 'C4' ? ' and one original C4 generator' : ''));
+    const operation = record.operations.at(-1), output = record.classpath?.directory;
     assert.equal(operation.kind, 'genuine-driver');
     assert.ok(typeof output === 'string' && path.isAbsolute(output), 'Private original compiler destination');
     const empty = path.resolve(output, '..', '..', '..', 'empty-sourcepath');
     assert.equal(operation.command, path.join(prepared.home, 'bin/javac'), 'Original locked compiler command');
     assert.deepEqual(operation.arguments, ['--release', String(record.release), '-encoding', 'UTF-8', '-proc:none', '-g',
-      '-sourcepath', empty, '-classpath', empty, '-d', output, ...sources(group)], 'Exact genuine no-fallback compiler recipe');
+      '-sourcepath', empty, '-classpath', phaseId === 'C4' ? output : empty, '-d', output, ...sources(group)], 'Exact genuine no-fallback compiler recipe');
     assert.deepEqual(operation.sourceDigests, sources(group).map(filename => ({path: filename, sha256: sha(fs.readFileSync(filename))})),
       'Actual pre-javac compiler source hashes');
     const result = operation.result;
@@ -156,11 +227,28 @@ export function createMethodHandleHarness({scope, groups, requiredInventory, har
     assert.ok(result.status === 'passed' && result.exitCode === 0 && !result.error && !result.signal && !result.timedOut &&
       !result.outputLimitExceeded && result.stdout === '' && result.stderr === '', 'Raw clean compiler outcome');
     assert.deepEqual(record.classFiles?.map(file => file.path), group.driverClassNames.map(name => name.replaceAll('.', '/') + '.class').sort(),
-      'Exact untouched javac class inventory');
+      'Exact untouched original class inventory');
     for (const file of record.classFiles) assert.ok(file.major === record.release + 44 && file.minor === 0 &&
       /^[a-f0-9]{64}$/.test(file.sha256) && Number.isInteger(file.size) && file.size > 8, 'Genuine version/hash evidence');
-    assert.ok(record.classpath.genuineCompilerBytes === true && record.classpath.byteTransformations === false &&
+    assert.ok(record.classpath.genuineCompilerBytes === (phaseId !== 'C4') && record.classpath.byteTransformations === false &&
       record.classpath.fallbackClassFiles === false, 'No transformed or fallback compiler bytes');
+    if (phaseId === 'C4') {
+      const generator = record.operations[0], generated = originalGeneratedFiles(group, record.release);
+      const generatorPath = path.join(repoRoot, group.generatedClassFixture.generator);
+      assert.equal(generator.kind, 'original-classfile-generator'); assert.equal(generator.command, process.execPath);
+      assert.deepEqual(generator.arguments, [generatorPath, '--group', group.generatedClassFixture.group,
+        '--release', String(record.release), '--output', output]);
+      assert.deepEqual(generator.sourceDigests, [{path: generatorPath, sha256: sha(fs.readFileSync(generatorPath))}]);
+      assert.deepEqual(generator.result?.command, [generator.command, ...generator.arguments]);
+      assert.equal(generator.result?.cwd, path.dirname(output)); assert.equal(generator.result?.timeoutMs, methodHandleTimeouts.compileMs);
+      assert.ok(generator.result?.status === 'passed' && generator.result.exitCode === 0 && !generator.result.error && !generator.result.signal &&
+        !generator.result.timedOut && !generator.result.outputLimitExceeded && generator.result.stdout === '' && generator.result.stderr === '');
+      assert.deepEqual(generator.generatedOutputEvidence, {directory: output, files: generated.map(({path, size, sha256}) => ({path, size, sha256}))});
+      for (const file of generated) assert.deepEqual(record.classFiles.find(actual => actual.path === file.path), file,
+        'Generated bytes preserved untouched across javac and every host');
+      assert.equal(record.classpath.originalGeneratedClassFiles, true);
+      assert.deepEqual(record.classpath.generatedClassNames, group.generatedClassFixture.classNames);
+    }
     assert.equal(operation.outputEvidence?.directory, output);
     assert.equal(operation.outputEvidence.treeSha256, record.classpath.treeSha256);
     assert.deepEqual(operation.outputEvidence.files, record.classFiles.map(({path, size, sha256}) => ({path, size, sha256})),
@@ -186,6 +274,8 @@ export function createMethodHandleHarness({scope, groups, requiredInventory, har
       for (const flag of ['dynamicBranchCoverageProven', 'jitExecutionProven', 'fullSourceUnitConformanceProven'])
         assert.equal(proof[flag], false, 'Selected static proof never promotes full or dynamic coverage');
     }
+    if (phaseId === 'C4') assertUserBootstrapProofs(record, group);
+    if (phaseId === 'C5') assertHiddenClassProofs(record, group);
   }
 
   function assertMethodHandleExecution(cell, record, group, prepared) {
@@ -359,7 +449,7 @@ export function createMethodHandleHarness({scope, groups, requiredInventory, har
     validateToolchains(marker, lock, sha(lockBytes), methodHandleReleases);
     const index = JSON.parse(fs.readFileSync(path.join(repoRoot, 'ci/plan_spec_source_index.json')));
     ledger.sourceUnits = methodHandleGroups.map(group => ({group: group.id, cases: methodHandleSourceUnits(group, index)}));
-    ledger.directlyOwnedSpecUnitCount = index.units.filter(unit => unit.ownerPackageId === 'JVM-003').length;
+    ledger.directlyOwnedSpecUnitCount = index.units.filter(unit => unit.ownerPackageId === apiOwner).length;
     const inputPaths = methodHandleInputPaths(), inputs = () => inputPaths.map(filename => ({path: filename,
       size: fs.statSync(filename).size, sha256: sha(fs.readFileSync(filename))}));
     ledger.inputDigests = inputs(); ledger.node = {version: process.version, executable: process.execPath};
@@ -392,22 +482,37 @@ export function createMethodHandleHarness({scope, groups, requiredInventory, har
         try {
           checkGlobal(); const sourceDigests = sources(group).map(filename => ({path: filename, sha256: sha(fs.readFileSync(filename))}));
           assertCoreCompilerSources(sourceDigests);
+          if (phaseId === 'C4') {
+            const generatorPath = path.join(repoRoot, group.generatedClassFixture.generator);
+            const generator = {kind: 'original-classfile-generator', command: process.execPath,
+              arguments: [generatorPath, '--group', group.generatedClassFixture.group, '--release', String(record.release), '--output', output],
+              sourceDigests: [{path: generatorPath, sha256: sha(fs.readFileSync(generatorPath))}]};
+            record.operations.push(generator); checkpoint();
+            await checkCoreCompilation(generator, () => runCommand(generator.command, generator.arguments,
+              {cwd: directory, timeoutMs: methodHandleTimeouts.compileMs}), () => {checkGlobal(); assertCoreCompilerSources(generator.sourceDigests);}, checkpoint);
+            generator.generatedOutputEvidence = {directory: output, files: captureMethodHandleOutput(output).files}; checkpoint();
+            assert.deepEqual(generator.generatedOutputEvidence.files, originalGeneratedFiles(group, record.release)
+              .map(({path, size, sha256}) => ({path, size, sha256})));
+          }
           const operation = {kind: 'genuine-driver', command: path.join(prepared.home, 'bin/javac'), arguments: ['--release', String(record.release),
-            '-encoding', 'UTF-8', '-proc:none', '-g', '-sourcepath', empty, '-classpath', empty, '-d', output, ...sources(group)], sourceDigests};
+            '-encoding', 'UTF-8', '-proc:none', '-g', '-sourcepath', empty, '-classpath', phaseId === 'C4' ? output : empty,
+            '-d', output, ...sources(group)], sourceDigests};
           record.operations.push(operation); checkpoint();
           try { await checkCoreCompilation(operation, () => runCommand(operation.command, operation.arguments,
             {cwd: directory, timeoutMs: methodHandleTimeouts.compileMs}), () => {checkGlobal(); assertCoreCompilerSources(sourceDigests);}, checkpoint); }
           finally { operation.outputEvidence = captureMethodHandleOutput(output); checkpoint(); }
           record.classFiles = inspectClassFiles(output, record.release, group.mainClass);
-          record.classpath = {directory: output, treeSha256: treeDigest(output), genuineCompilerBytes: true, byteTransformations: false, fallbackClassFiles: false};
+          record.classpath = {directory: output, treeSha256: treeDigest(output), genuineCompilerBytes: phaseId !== 'C4', byteTransformations: false,
+            fallbackClassFiles: false, ...(phaseId === 'C4' ? {originalGeneratedClassFiles: true, generatedClassNames: [...group.generatedClassFixture.classNames]} : {})};
           assertMethodHandleCompilation(record, group, prepared);
-          record.bytecodeProofs = proveCoreGroup(group, inspectCoreClasses(output, record.classFiles))
-            .map(proof => ({...proof, fullSourceUnitConformanceProven: false}));
+          record.bytecodeProofs = bytecodeProofs(group, output, record.classFiles);
+          if (phaseId === 'C5') record.hiddenPayloadProofs = proveHiddenClassGroup(group, output, record.classFiles);
           assertMethodHandleProofs(record, group); checkpoint();
           const checkLocal = () => integrity(() => {
             assert.deepEqual(inspectClassFiles(output, record.release, group.mainClass), record.classFiles, 'Original classes unchanged');
-            assert.deepEqual(proveCoreGroup(group, inspectCoreClasses(output, record.classFiles))
-              .map(proof => ({...proof, fullSourceUnitConformanceProven: false})), record.bytecodeProofs, 'Actual Code proof replay');
+            assert.deepEqual(bytecodeProofs(group, output, record.classFiles), record.bytecodeProofs, 'Actual Code proof replay');
+            if (phaseId === 'C5') assert.deepEqual(proveHiddenClassGroup(group, output, record.classFiles), record.hiddenPayloadProofs,
+              'Original hidden-class payload proof replay');
           });
           for (const cell of record.executions) {
             if (!selectedHosts(ledger.requestedMode).includes(cell.host)) {cell.reason = 'Explicit diagnostic mode excludes this mandatory host'; checkpoint(); continue;}
@@ -432,8 +537,10 @@ export function createMethodHandleHarness({scope, groups, requiredInventory, har
       checkGlobal(); integrity(checkJdks);
       for (const record of ledger.results) if (record.bytecodeProofs) {
         const group = methodHandleGroups.find(group => group.id === record.group);
-        integrity(() => assert.deepEqual(proveCoreGroup(group, inspectCoreClasses(record.classpath.directory, record.classFiles))
-          .map(proof => ({...proof, fullSourceUnitConformanceProven: false})), record.bytecodeProofs));
+        integrity(() => {
+          assert.deepEqual(bytecodeProofs(group, record.classpath.directory, record.classFiles), record.bytecodeProofs);
+          if (phaseId === 'C5') assert.deepEqual(proveHiddenClassGroup(group, record.classpath.directory, record.classFiles), record.hiddenPayloadProofs);
+        });
       }
       ledger.gitEnd = await provenance(); assert.deepEqual(ledger.gitEnd, ledger.gitStart);
       if (ledger.officialGate) assertDerivationProvenance(ledger.gitStart, ledger.gitEnd);
