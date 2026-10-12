@@ -183,7 +183,10 @@ test('fresh Java pool decode and encode use true modified-UTF and byte writers',
 });
 
 test('fresh class reader is independent Java Code with the actual pool decoder call', () => {
-  const invoke = calls('DoppioClassReader', 'parse', '([B)Ljava/lang/classfile/ClassModel;');
+  const entry = calls('DoppioClassReader', 'parse', '([B)Ljava/lang/classfile/ClassModel;');
+  assert.ok(entry.some(value => value.cp.owner === 'java.lang.classfile.DoppioClassReader' && value.cp.name === 'parse' &&
+    value.cp.descriptor === '([BLjava/util/function/Function;)Ljava/lang/classfile/ClassModel;'));
+  const invoke = calls('DoppioClassReader', 'parse', '([BLjava/util/function/Function;)Ljava/lang/classfile/ClassModel;');
   assert.ok(invoke.some(value => value.cp.owner === 'java.lang.classfile.constantpool.DoppioConstantPool' && value.cp.name === 'decode'));
   assert.ok(!invoke.some(value => /DoppioClassFileVerifier|ClassLoader|Doppio\.VM/.test(value.cp.owner)));
 });
