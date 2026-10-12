@@ -2320,17 +2320,29 @@ expanded.
   define/initialize classes to produce its verdict; typed-invalid output is
   retained but never defined. Shared-pool raw copies require exact source
   identity, and regenerated Code drops stale offset/frame/debug attributes.
-- C7b retains branches/switches, handlers and stack maps; C7c retains extended/
+- [C7b's selected expansion](phase-c-invocation.md#c7b-verified-batch-exit)
+  verifies another 16 original-javac25 cases/six cells/48 outcomes: labels,
+  integer/reference predicates, loops, switch padding/defaults, ordered handlers,
+  typed StackMapTable parsing and default/forced frame regeneration. LONG stack
+  and wide DOUBLE local joins plus branchful insertion/identity transforms are
+  covered. Declared frames govern downstream checks, not just inferred states.
+  DROP outputs lacking required frames remain invalid and are never defined.
+- Short branch overflow, duplicate table keys and empty/reversed handler ranges
+  reject explicitly rather than implementing native widening/default repair.
+  Arbitrary hierarchy, protected constructor invokes, dead-code rewriting and
+  general frame/allocation lattices remain unsupported. C7c retains extended/
   custom attributes, bootstrap/indy/condy models and fresh-pool remapping; C7d
   retains hierarchy/resolvers, general verification and remaining ABI/reflective
-  topology. Unsupported verifier families reject explicitly. Forced
-  `GENERATE_STACK_MAPS` build/transform throws `UnsupportedOperationException`
-  before callbacks; `NEW_POOL` transformation throws `IllegalArgumentException`.
+  topology. `NEW_POOL` transformation still throws `IllegalArgumentException`.
+  Forced generation is now supported for the selected C7b pipeline, superseding
+  C7a's historical pre-callback unsupported boundary.
 - `ConstantInstruction.ofIntrinsic`/`ofArgument` and their nested public types,
   full sealed/non-sealed reflection, all attributes/opcodes/versions and complete
   API/source-unit conformance remain open. Legal selected instruction encodings
   are compared, not byte-for-byte native pool/class parity or general callback
-  data flow. See the [C7a boundaries](phase-c-invocation.md#c7a-selected-public-class-file-pipeline).
+  data flow. C7a/C7b together pass 48 cases/18 cells/144 outcomes on the C7b
+  implementation; this does not complete the public API. See the
+  [C7b boundaries](phase-c-invocation.md#c7b-selected-control-flow-and-stack-maps).
 
 ## Known Collection Factory Gaps
 
@@ -2874,6 +2886,9 @@ The final fail-closed local receipt has exit code 0 and SHA-256
 `b0cab6dc56016eb08c435f2b4202829abdf23b90451126aa946575323080ff59`;
 the batch exit records its path, runtime and individual ledger/input hashes.
 No C7a Pro review was produced: consultation failed before
-chat creation. C7b–C7d and full Phase C/LIB-007/JVM/API/source-unit, module,
-memory-order/concurrency and GC contracts remain open; all broader flags stay
-false.
+chat creation. At that historical C7a exit, C7b–C7d were the follow-ups.
+The [C7b selected exit](phase-c-invocation.md#c7b-verified-batch-exit) now adds
+16 cases/six cells/48 outcomes and rechecks the unchanged 32 C7a cases on
+`2e7cbf57b`. C7c–C7d, wider CFG/frame families and full
+Phase C/LIB-007/JVM/API/source-unit, module, memory-order/concurrency and GC
+contracts remain open; all broader flags stay false.

@@ -5,9 +5,10 @@ Phase C owns `JVM-003`, `JVM-004`, `JVM-005` and `LIB-007` from the
 B1–B8 loading, verification, linking and language foundation; that foundation
 does not establish general method-handle, bootstrap or module conformance.
 This is an ordered batch plan, not a single feature, effort estimate or new
-support level. The selected C1–C6 batches and C7a's public class-file pipeline
-are verified. C7b–C7d retain control-flow/stack-map, extended-attribute/pool
-and hierarchy/general-verifier/API work. Selected exits do not complete
+support level. The selected C1–C6 batches, C7a's public class-file pipeline
+and C7b's selected control-flow/stack-map expansion are verified. C7c–C7d
+retain extended-attribute/pool and hierarchy/general-verifier/API work;
+unselected CFG/frame families remain open. Selected exits do not complete
 Phase C or any full owner/API contract.
 
 ## Batches and dependencies
@@ -20,7 +21,7 @@ Phase C or any full owner/API contract.
 | C4: user bootstrap linkage | `JVM-004`: general `invokedynamic` and `CONSTANT_Dynamic` paths | Genuine native-checked inputs with user bootstrap handles, nested arguments, adaptation/access, success/failure caching and specified error/cause identities. Independently prove bootstrap metadata and lexical call-site identity. Retain lambda, concat, record and compiler bootstrap consumers. Depends on B4 and C1/C2; VarHandle bootstrap forms also depend on C3. |
 | C5: hidden classes | `JVM-005`: definition, class data, lookup privileges and reflective restrictions | Select definition/initialization, malformed bytes, privilege failures, nestmate options, runtime names/descriptors, class-data access and discovery/non-discovery cases. Preserve class/loader identity rather than comparing implementation-generated name suffixes. Depends on B2–B4 and C1; named-module cases require G. |
 | C6: nominal constants | `LIB-007`: class/method/handle/dynamic/VarHandle descriptors and resolution | Verified finite 64-case original-javac 21/25 matrix: descriptors, caller-Lookup resolution, executable round trips, ordered user bootstraps and selected exact failures. Metadata-only VarHandle descriptors do not discharge C3; C6's API reinvocation is not C4 CP-entry caching. Hidden-class restrictions depend on C5. Full nominal/API/access/loader conformance remains unclaimed. |
-| C7: public class-file library | `LIB-007`: Java 25 `java.lang.classfile` and its public subpackages | C7a verifies a finite 32-case public parse/model, branch-free build, transform and typed-verify pipeline on native Java 25, Node and Chromium. C7b–C7d retain control flow/stack maps, extended/custom attributes and bootstrap/fresh-pool remapping, hierarchy/resolvers and general verifier/API breadth. VM-internal parsing and the test decoder are not this public API. Depends on B2/B3, C4 and C6. |
+| C7: public class-file library | `LIB-007`: Java 25 `java.lang.classfile` and its public subpackages | C7a's 32-case public pipeline and C7b's 16-case selected labels/control-flow/handler/stack-map pipeline pass on native Java 25, Node and Chromium. C7c–C7d retain extended/custom attributes, bootstrap/fresh-pool remapping, hierarchy/resolvers and general verifier/API breadth; unselected CFG families also remain open. VM-internal parsing and the test decoder are not this public API. Depends on B2/B3, C4 and C6. |
 
 This ordering keeps invocation/adaptation foundations before their bootstrap
 and descriptor consumers. C3's executable access and D's memory-model work have
@@ -816,17 +817,20 @@ and divergent sibling builders cannot acquire raw-copy authority. Regenerated
 Code drops stale offset/frame/debug attributes. Transform composition forwards
 produced compound elements through downstream callbacks.
 
-The pure-Java verifier checks selected straight-line stack/local types,
-category-2 overlap, return/bounds/fall-through and constructor initialization
-identity. It never uses class definition or initialization as its verdict.
-Unsupported control-flow, handler/frame and hierarchy families fail explicitly;
-an empty error list is not a silent unsupported result. Forced
-`GENERATE_STACK_MAPS` build/transform rejects with `UnsupportedOperationException`
-before callbacks; `NEW_POOL` transformation rejects with `IllegalArgumentException`.
+At the historical C7a implementation `bed25a30e`, the pure-Java verifier checked
+selected straight-line stack/local types, category-2 overlap,
+return/bounds/fall-through and constructor initialization identity. It never
+used class definition or initialization as its verdict. Unsupported
+control-flow, handler/frame and hierarchy families failed explicitly; an empty
+error list was not a silent unsupported result. Forced `GENERATE_STACK_MAPS`
+build/transform rejected with `UnsupportedOperationException` before callbacks;
+`NEW_POOL` transformation rejected with `IllegalArgumentException`.
+The selected C7b exit below supersedes the control-flow/forced-generation
+boundary, not this historical C7a evidence or the fresh-pool restriction.
 
 | Follow-up | Remaining selected work |
 | --- | --- |
-| C7b | Labels, branches/switches, exception handlers and stack-map generation/validation |
+| C7b | [Selected labels/control-flow/handlers/stack-map exit verified below](#c7b-verified-batch-exit); broader CFG/frame families remain unclaimed |
 | C7c | Extended/custom attributes, bootstrap/indy/condy models and fresh-pool remapping |
 | C7d | Hierarchy/resolvers, general verifier breadth and remaining public ABI/reflective topology |
 
@@ -912,6 +916,129 @@ any documentation-only commit. Runtime snapshot SHA-256:
 The C7a Pro consultation failed at the model-picker UI before chat creation;
 no Pro review exists and shared login/broker state was not changed.
 
-C7a is a selected exit, not full C7, Phase C or LIB-007 completion. C7b–C7d,
+C7a is a selected exit, not full C7, Phase C or LIB-007 completion. C7b–C7d
+were the follow-ups at that historical exit. C7b's selected expansion follows;
 broader JVM/API/source-unit contracts, named modules, concurrency/memory ordering
-and hidden-class GC remain open; all broader flags stay false.
+and hidden-class GC remain open, and all broader flags stay false.
+
+## C7b selected control flow and stack maps
+
+C7b expands the same real Java class library under `LIB-007`. Its separate
+original Java 25 corpus has two eight-case groups; C7a's 32-case inventory is
+unchanged. Native Java 25, Node and Chromium each consume the original javac25
+driver/resource bytes and independently produce their own returned arrays.
+Java 21 remains explicitly non-applicable to the final public API.
+
+- Control flow: all six zero and integer comparison predicates, null/reference
+  identity predicates, explicit `goto_w`, a backward loop, dense `tableswitch`,
+  sorted sparse `lookupswitch` with padding, ordered typed/catch-all dispatch
+  and exact unbound/duplicate/foreign-builder label failures.
+- Stack maps: typed parsing of an unchanged branchful javac25 resource,
+  default and forced generation, LONG stack and wide-slot DOUBLE local joins,
+  explicit DROP rejection, branchful identity transform, inserted-instruction
+  offset/frame regeneration and retained invalid primitive/reference output.
+
+Checked parsing validates instruction starts, switch counts/keys/padding,
+relative targets, exception ranges and compressed StackMapTable frames.
+Canonical labels belong to their Code model, including frame/allocation
+targets. Expanded public locals/stack use one entry per LONG/DOUBLE value;
+internal local analysis expands those entries to two JVM slots.
+StackMapTable remains in `attributes()`/`findAttribute()` and is not emitted
+as a traversed Code element, matching the native API.
+
+The two-pass assembler rebinds source labels by identity, lays out real switch
+padding and ordered exception tables, and regenerates offsets and full frames.
+Exact source-pool raw copies still require held provenance. Regeneration drops
+stale frame/debug metadata; a forced straight-line body with no frame targets
+does not emit an empty StackMapTable. DROP calculates CFG slot heights without
+silently performing typed verification, so the deliberate invalid outputs can
+be built, retained and separately rejected without class definition.
+
+The pure-Java CFG verifier uses a worklist across both branch edges, loop
+backedges and before-instruction exception states. Declared frames are checked
+against incoming states **and applied before downstream instruction checks**:
+an inferred String cannot authorize String operations after a frame declares
+Object. Wide-slot overlap, stack heights/types, frame targets, constructor
+initialization and allocation tokens are checked without loading/defining a
+class. An independent review found and corrected the special initialized
+receiver of `Object.<init>`; the native-aligned diagnostic includes that case.
+
+These remain selected policies, not full native behavior:
+
+- Short branch overflow rejects with IAE; native automatic widening is not
+  implemented. Explicit `goto_w` is supported.
+- Duplicate table keys reject with IAE rather than native first-entry handling.
+  Empty/reversed protected ranges reject rather than native default dropping;
+  the checked reader's nonempty-range test is separate from native-comparable
+  verifier diagnostics.
+- Arbitrary hierarchy/resolver contracts, array/monitor/dynamic instruction
+  families, jsr/ret, unreachable-code rewriting, protected constructor invokes
+  and general allocation/frame lattices remain unsupported, not successful.
+  Source-owned handler/frame metadata is not a full dynamic branch-coverage
+  or byte-for-byte native class/pool parity claim.
+
+### Reproduce C7b
+
+After the locked toolchain/Chromium preparation and release CLI/browser build:
+
+```sh
+yarn ci:classfile-api:test
+yarn ci:classfile-controlflow:test
+yarn ci:classfile-api
+yarn ci:classfile-controlflow
+```
+
+The independent official ledger is
+`build/java-classfile-controlflow-results.json`; native-only/diagnostic outputs
+cannot replace it or C7a's ledger. CI requires exact bounded, unique ordered
+commands and retains the ledger after success or failure. Mutation tests reject
+filters, host waivers, swallowed failures, duplicate/renamed steps, scheduling
+changes and cross-wired or discarded artifacts.
+
+## C7b verified batch exit
+
+At clean implementation `2e7cbf57bab18f730cb7aa389b5ca82ee12db4cc`:
+
+- C7b: 16 cases, six mandatory native25/Node/Chromium cells and 48 outcomes all
+  pass; failed/not-run cells are zero. Five original class-artifact rows have
+  four distinct names. Original Code proves 45 functions (44 actual named
+  bootstrap callbacks plus one shared predicate helper) and 14 returned-array
+  routes, without rewritten headers, generated compiler carriers or adapters.
+- Each host retains 14 outputs: 12 valid arrays defined/invoked on that same
+  host and two invalid arrays never defined. All 42 outputs have independent
+  complete Code/CFG/handler/expanded-frame proofs. Native bytes never substitute
+  for Node/Chromium products.
+- C7a's unchanged 32 cases/12 cells/96 outcomes also pass on this implementation.
+  Together the two public-library gates have 48 cases/18 cells/144 outcomes.
+- Full selected B/C unit inventory: 1,312 pass, zero failures and one existing
+  optional native-JDK diagnostic skip (1,313 total). Dedicated public-library
+  tests total 112. Guest diagnostics retain 15 straight-line, 10 pool, 24 typed
+  CFG, 40 reader, 25 stricter reader-bound and 10 writer cases; diagnostic
+  inventories are separate from the 16 original C7b cases.
+- Strict CLI/browser builds, ES5 typecheck, workflow checker and its complete
+  mutation suite pass. Compiler bootstrap smoke retains the deterministic
+  44-entry class-only JAR SHA-256
+  `caa9598e266120414c393b6b03a1158988fe42d12a626a1482685f3d33434daa`.
+- The first clean C7b gate recorded four passed/two failed cells because forced
+  regeneration emitted an extra empty StackMapTable. Its failed ledger is
+  preserved (SHA-256
+  `c58b709c71c25933e339adf03d390f79a26db591b15bcefcb3abe53e2f337412`);
+  the same full six-cell gate passes after the output fix. Initial compile,
+  exact diagnostic-error expectation, dirty-input rejection and CI-uniqueness
+  failures remain recorded rather than rewritten as passes.
+- C1–C6 host gates, the full retained 323-case process gate and Kotlin/Scala
+  compiler consumers were not rerun in this C7b turn. Their historical C7a
+  receipts above remain historical evidence, not new uniform-current runs.
+
+The private final consumer verifies fully exited producers and preserved
+attempts, with exit code 0. Receipt:
+`/home/seorii/logs/doppio-c7b-final-proof-mx1Ys3/verification-summary.json`,
+SHA-256 `7cb3e97bb0906cef323f1e050566737aa919eac7baec6585dcdd7abf764ef273`.
+Runtime snapshot SHA-256:
+`96b4122cefc43b3eb2aa8d0c62593569d7db60ef90d47640df7f2ade1f3e13b4`.
+No Pro review is claimed; the independent review here was a peer code review.
+
+Next are C7c (extended/custom attributes, bootstrap/indy/condy models and real
+fresh-pool remapping) and C7d (hierarchy/resolvers, general verification and
+remaining public ABI). Full C7/Phase C/LIB-007/source-unit/API conformance,
+modules, concurrency and GC remain unclaimed; all broader flags stay false.

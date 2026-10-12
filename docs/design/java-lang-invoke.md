@@ -764,10 +764,11 @@ Shared-pool raw copies require exact held source identity; independent
 byte-equal pools and divergent sibling builders cannot reuse indices by
 authority alone. Rebuilt Code drops stale offset/frame/debug attributes.
 Verification never defines or initializes the class as its verdict, and
-unsupported control-flow/handler/frame/hierarchy families reject explicitly.
-Forced stack-map generation rejects before callbacks, and fresh-pool transform
-remapping is not implemented. C7b–C7d retain these families, extended attributes/
-bootstrap models, general verification and remaining public ABI, including
+unsupported families reject explicitly. At the historical C7a exit, forced
+stack-map generation rejected before callbacks; C7b below supersedes that
+selected boundary. Fresh-pool transform remapping is not implemented.
+C7c–C7d retain extended attributes/bootstrap models, hierarchy/general
+verification and remaining public ABI, including
 intrinsic/argument constant-instruction factories and full reflective topology.
 
 C1–C6's nominal/bootstrap/hidden-class evidence and deterministic 44-entry
@@ -775,6 +776,30 @@ compiler overlay remain separate and retained. Independently generated
 per-host outputs and legal selected encoding checks do not establish native
 byte/CP parity, opaque callback reachability or full Phase C/LIB-007/API,
 module, concurrency or GC conformance.
+
+## C7b selected class-file CFG and frames
+
+The [selected C7b exit](../phase-c-invocation.md#c7b-verified-batch-exit) adds
+16 original Java25 cases/six native25/Node/Chromium cells/48 outcomes. Public
+labels, predicates, loops, switch models, ordered exception handlers and typed
+StackMapTable entries now feed a real two-pass Java assembler and CFG worklist.
+Original compressed frames expand to public verification entries; internal
+wide locals use JVM slots. Transforms rebind canonical labels and regenerate
+offsets/frames rather than keeping stale metadata.
+
+Incoming states must satisfy declared frames, and downstream instructions run
+with those declared types. Constructor/allocation identity and wide overlap
+diagnostics never use class definition as the verification verdict. The
+`Object.<init>` special initialized receiver is covered by a native-aligned
+regression. Forced generation omits empty frame attributes; DROP retains
+deliberately invalid branchful outputs for separate rejection, never definition.
+
+Short branch widening, duplicate-table/native dead-label repair, arbitrary
+hierarchy/resolvers, protected constructor invokes, unreachable rewriting and
+general frame/allocation lattices remain unclaimed. Independent host outputs
+have complete selected Code/CFG/frame proofs, not general native-byte parity
+or dynamic callback coverage. C7a's unchanged 32 cases also pass; full Phase C,
+LIB-007, source-unit/API, modules, concurrency and GC flags remain false.
 
 ## Open Design Questions
 
