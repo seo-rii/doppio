@@ -20,8 +20,8 @@ import java.util.function.Consumer;
 
 /**
  * Public writer diagnostics, not additions to the native16 C7b inventory.
- * Run with "native" on stock Java25 to record the documented overflow
- * divergence; default execution checks Doppio's explicit bounded rejection.
+ * Native and guest execution both exercise default short-jump widening and
+ * explicit FAIL_ON_SHORT_JUMPS rejection, without changing the C7b inventory.
  */
 public final class ClassFileControlFlowWriterRegression {
   private static final MethodTypeDesc INT_INT = MethodTypeDesc.of(ConstantDescs.CD_int, ConstantDescs.CD_int);
@@ -130,15 +130,16 @@ public final class ClassFileControlFlowWriterRegression {
   }
 
   private static void wide(boolean nativeOracle) {
-    if (nativeOracle) {
-      byte[] bytes = build("WriterShortOverflowNative", ClassFileControlFlowWriterRegression::shortOverflow);
-      valid(bytes, "native short overflow widening");
-      boolean wide = false;
-      for (CodeElement element : code(bytes))
-        if (element instanceof BranchInstruction && ((BranchInstruction) element).opcode() == Opcode.GOTO_W) wide = true;
-      check(wide, "Native automatic overflow widening"); completed++;
-    } else reject(IllegalArgumentException.class,
-      () -> build("WriterShortOverflow", ClassFileControlFlowWriterRegression::shortOverflow), "short branch overflow");
+    byte[] widened = build("WriterShortOverflow", ClassFileControlFlowWriterRegression::shortOverflow);
+    valid(widened, "default short overflow widening");
+    boolean automatic = false;
+    for (CodeElement element : code(widened))
+      if (element instanceof BranchInstruction && ((BranchInstruction) element).opcode() == Opcode.GOTO_W) automatic = true;
+    check(automatic, "Automatic overflow widening");
+    reject(IllegalArgumentException.class, () -> ClassFile.of(ClassFile.ShortJumpsOption.FAIL_ON_SHORT_JUMPS)
+      .build(ClassDesc.of("classes.modern_test.WriterShortOverflowRejected"), builder ->
+        builder.withMethodBody("choose", INT_INT, ClassFile.ACC_PUBLIC | ClassFile.ACC_STATIC,
+          ClassFileControlFlowWriterRegression::shortOverflow)), "explicit short branch overflow");
     byte[] bytes = build("WriterWideJump", ClassFileControlFlowWriterRegression::wideJump);
     CodeAttribute code = code(bytes); valid(bytes, "explicit goto_w");
     boolean found = false;
