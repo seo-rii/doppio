@@ -38,7 +38,7 @@ matrix continues to describe the current implementation.
 | 22 | 66 | class-file API ecosystem expectations, unnamed variables and patterns | Partial: simple class-file container, runnable print fixture and selected final unnamed-variable/pattern forms compiled by genuine javac 25 (see note below) | Medium |
 | 23 | 67 | primitive patterns preview, module/JDK library drift | Partial: simple class-file container plus runnable print fixture | High |
 | 24 | 68 | stream gatherers, compact object headers ecosystem assumptions | Partial: simple class-file container plus runnable print fixture | High |
-| 25 | 69 | current LTS class-file and library surface | Partial: simple class-file container, runnable print fixture, selected final pattern/record, module-import, flexible-constructor and compact-source lowering compiled by genuine javac 25, non-private static/instance main startup, and five `java.lang.IO` methods (see notes below) | Very high |
+| 25 | 69 | current LTS class-file and library surface | Partial: simple class-file container, runnable print fixture, selected final pattern/record, module-import, flexible-constructor and compact-source lowering compiled by genuine javac 25, non-private static/instance main startup, five `java.lang.IO` methods, and the selected C7a public `java.lang.classfile` parse/model, branch-free build, transform and typed-verify pipeline (see notes below) | Very high |
 | 26 | 70 | current feature-release class-file and library surface | Partial: simple class-file container plus runnable print fixture | Very high |
 
 Java 21/25 final pattern note: the native-oracle
@@ -2306,6 +2306,32 @@ expanded.
   [invoke design](design/java-lang-invoke.md#c6-nominal-descriptor-resolution)
   and [Phase C boundaries](phase-c-invocation.md#c6-selected-nominal-constants).
 
+## Known Class-File API Gaps
+
+- [C7a's selected public pipeline](phase-c-invocation.md#c7a-verified-batch-exit)
+  verifies 32 original-javac 25 cases in 12 native Java 25/Node/Chromium cells
+  and 96 mandatory outcomes. This is an actual Java class library, not the
+  VM-internal parser or a test decoder. The final API exists since Java 24;
+  Java 21 is non-applicable, not skipped or counted as passing. Java 24 native
+  execution is not claimed.
+- Immutable parse/model and pool metadata, selected executable build and
+  transform outputs, callback forwarding/exception barriers and selected
+  byte/model verification errors are covered. The pure-Java verifier does not
+  define/initialize classes to produce its verdict; typed-invalid output is
+  retained but never defined. Shared-pool raw copies require exact source
+  identity, and regenerated Code drops stale offset/frame/debug attributes.
+- C7b retains branches/switches, handlers and stack maps; C7c retains extended/
+  custom attributes, bootstrap/indy/condy models and fresh-pool remapping; C7d
+  retains hierarchy/resolvers, general verification and remaining ABI/reflective
+  topology. Unsupported verifier families reject explicitly. Forced
+  `GENERATE_STACK_MAPS` build/transform throws `UnsupportedOperationException`
+  before callbacks; `NEW_POOL` transformation throws `IllegalArgumentException`.
+- `ConstantInstruction.ofIntrinsic`/`ofArgument` and their nested public types,
+  full sealed/non-sealed reflection, all attributes/opcodes/versions and complete
+  API/source-unit conformance remain open. Legal selected instruction encodings
+  are compared, not byte-for-byte native pool/class parity or general callback
+  data flow. See the [C7a boundaries](phase-c-invocation.md#c7a-selected-public-class-file-pipeline).
+
 ## Known Collection Factory Gaps
 
 - `java.util.List`, `java.util.Set`, and `java.util.Map` now expose tested
@@ -2786,8 +2812,8 @@ uncached and separate from C4 CP linkage. Hidden MethodType descriptor syntax
 is retained without inventing nominal hidden types; native category exclusions
 and canonical-initialization preconditions are explicit in the batch exit.
 
-The current compiler JAR has 44 exact class-only entries (43 changed stock
-classes plus the genuinely compiled ClassOption enum), with deterministic
+At that C6 exit, the compiler JAR had 44 exact class-only entries (43 changed
+stock classes plus the genuinely compiled ClassOption enum), with deterministic
 SHA-256 `caa9598e266120414c393b6b03a1158988fe42d12a626a1482685f3d33434daa`.
 The independent verifier inventories 39 stock classes and 1,601 Code bodies:
 141 generated/rewritten and 1,460 retained, with C5/MethodType original-Code
@@ -2811,7 +2837,43 @@ the batch exit records its path and independent ledger,
 runtime and unchanged-input hashes. No C6 Pro review was produced: consultation
 failed at the model-picker UI before chat creation.
 
-The next batch is C7's public class-file library. Full Phase C/LIB-007/
-JVM-003/004/005/source-unit/API conformance, maximal arity, memory ordering,
+At that historical C6 exit, C7's public class-file library was next. Full
+Phase C/LIB-007/JVM-003/004/005/source-unit/API conformance, maximal arity, memory ordering,
 concurrency, named modules and hidden-class GC remain open; all broader flags
 stay false.
+
+## Selected C7a public class-file pipeline and refreshed boundaries
+
+[C7a's independent exit](phase-c-invocation.md#c7a-verified-batch-exit) verifies
+32 selected public parse/model, branch-free build, transform and typed-verify
+cases at clean implementation `bed25a30e`. All 12 native Java 25/Node/Chromium
+cells and 96 outcomes pass. Four original compilations retain 11 artifacts,
+28 named callback Code proofs and 16 returned-array routes; all three hosts
+independently produce 16 output artifacts each. Invalid verification output is
+never defined. Java 21 is non-applicable; full public API/ABI is not established.
+
+Fresh C1–C7a gates pass 348 selected cases, 132 cells and 1,992 outcomes at the
+same frozen runtime. Strict builds/checks, 1,262 passing units plus one existing
+optional diagnostic skip (1,263 total) and all 15 B-boundary commands pass.
+The original 323-fixture producer retains 307 passes and 16 timeouts; exact
+16-case replay passes with byte-identical full323 input snapshots and unchanged
+workers/limits. This combines old and new evidence, not a full323 rerun or a
+successful relabeling of the initial producer. All 969 original fixture files
+remain byte-identical to C6. Initial native compiler SIGKILL, C6/Scala timeouts
+and the incomplete first compiler-consumer attempt remain recorded without a
+proven particular cause.
+
+Lock-verified Kotlin 2.4.0 and Scala 2.13.18 MethodHandle compiler smokes pass in
+Doppio and match native Java 17 on Node (321/327 seconds). The deterministic
+44-class-only compiler JAR and independent 39-class/1,601-Code stock verifier
+retain the C6 hashes, aliases and branch
+frames. Native Java 17/Node compiler smokes are not Chromium or full-language
+conformance evidence.
+
+The final fail-closed local receipt has exit code 0 and SHA-256
+`b0cab6dc56016eb08c435f2b4202829abdf23b90451126aa946575323080ff59`;
+the batch exit records its path, runtime and individual ledger/input hashes.
+No C7a Pro review was produced: consultation failed before
+chat creation. C7b–C7d and full Phase C/LIB-007/JVM/API/source-unit, module,
+memory-order/concurrency and GC contracts remain open; all broader flags stay
+false.

@@ -684,8 +684,8 @@ are unchanged. These metadata counts are not semantic outcome counts.
 
 GC/unloading, named modules, SecurityManager, arbitrary raw InnerClasses
 reflection fidelity and mixed-invalid-input error priority remain unclaimed.
-C7 and complete Phase C/JVM-003/004/005/API conformance remain pending; selected
-C6 evidence follows.
+At that historical C5 exit, C7 and complete Phase C/JVM-003/004/005/API
+conformance remained pending; selected C6 and C7a evidence follows.
 
 ## C6 nominal descriptor resolution
 
@@ -748,6 +748,33 @@ Code; historical body hashes and branch frames are unchanged. The selected C6
 exit leaves all broader Phase C/LIB-007/source-unit/API,
 loader/access/conversion/maximal-arity,
 module, GC and concurrent conformance flags false.
+
+## C7a public class-file pipeline
+
+The [selected C7a exit](../phase-c-invocation.md#c7a-verified-batch-exit) remains
+owned by LIB-007. Original Java 25 callers execute a separate Java
+`java.lang.classfile` library: immutable parse/model/pool metadata, actual
+branch-free class/Code construction, public transform forwarding and pure-Java
+typed byte/model verification. The VM parser and test-side evidence decoder
+are not substitutes for that public API. Native Java 25, Node and Chromium
+pass all 32 cases/12 cells/96 outcomes; Java 21 is non-applicable to the final
+API, not skipped or credited as passing.
+
+Shared-pool raw copies require exact held source identity; independent
+byte-equal pools and divergent sibling builders cannot reuse indices by
+authority alone. Rebuilt Code drops stale offset/frame/debug attributes.
+Verification never defines or initializes the class as its verdict, and
+unsupported control-flow/handler/frame/hierarchy families reject explicitly.
+Forced stack-map generation rejects before callbacks, and fresh-pool transform
+remapping is not implemented. C7b–C7d retain these families, extended attributes/
+bootstrap models, general verification and remaining public ABI, including
+intrinsic/argument constant-instruction factories and full reflective topology.
+
+C1–C6's nominal/bootstrap/hidden-class evidence and deterministic 44-entry
+compiler overlay remain separate and retained. Independently generated
+per-host outputs and legal selected encoding checks do not establish native
+byte/CP parity, opaque callback reachability or full Phase C/LIB-007/API,
+module, concurrency or GC conformance.
 
 ## Open Design Questions
 
