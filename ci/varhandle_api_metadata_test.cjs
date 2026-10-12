@@ -252,8 +252,70 @@ test('compiled C3 helper exposes exactly the intended factory signatures and no 
     'Capability copying is package-private static native');
   for (const [name, descriptor] of [['fieldIsFinal', '(' + cls + text + cls + 'Z)Z'],
     ['captureField', '(' + variable + cls + text + cls + 'Z)V'], ['captureArray', '(' + variable + cls + ')V'],
-    ['operate', '(' + variable + text + '[Ljava/lang/Object;)Ljava/lang/Object;']])
+    ['operate', '(' + variable + text + '[Ljava/lang/Object;)Ljava/lang/Object;'],
+    ['operationHandle', '()' + handle], ['selectorHandle', '()' + handle]])
     assert.equal(method(unit, name, descriptor).flags, 0x010a, 'Storage bridge is private static native: ' + name);
+  assert.deepEqual(unit.layout.methods.entries.filter(member => (member.flags & 0x0100) !== 0)
+    .map(member => [member.name, member.descriptor, member.flags]).sort((first, second) =>
+      (first[0] + first[1]).localeCompare(second[0] + second[1])), expectedPublicMethods([
+        ['findVirtualBase', '(' + lookup + cls + text + type + ')' + handle, 0x010a],
+        ['fieldIsFinal', '(' + cls + text + cls + 'Z)Z', 0x010a],
+        ['captureField', '(' + variable + cls + text + cls + 'Z)V', 0x010a],
+        ['captureArray', '(' + variable + cls + ')V', 0x010a],
+        ['copyStorage', '(' + variable + variable + ')V', 0x0108],
+        ['operate', '(' + variable + text + '[Ljava/lang/Object;)Ljava/lang/Object;', 0x010a],
+        ['operationHandle', '()' + handle, 0x010a], ['selectorHandle', '()' + handle, 0x010a]
+      ]), 'Exactly eight fixed native declarations, with no trusted Lookup getter');
+});
+
+test('compiled private helper selection uses only the two fixed zero-argument MethodHandle bridges', () => {
+  const unit = compiled.get('DoppioVarHandles');
+  for (const [caller, descriptor, bridge] of [
+    ['accessHandle', '(' + variable + mode + ')' + handle, 'operationHandle'],
+    ['invoker', '(' + mode + type + 'Z)' + handle, 'selectorHandle']
+  ]) {
+    const body = code(unit, method(unit, caller, descriptor));
+    const selected = body.filter(instruction => instruction.name === 'invokestatic' && instruction.cp?.tag === 10 &&
+      instruction.cp.owner === 'java.lang.invoke.DoppioVarHandles' && instruction.cp.name === bridge);
+    assert.equal(selected.length, 1, 'Exactly one fixed private helper selection in ' + caller);
+    assert.equal(selected[0].cp.descriptor, '()' + handle, 'No caller, owner, name or type can redirect trusted resolution');
+    assert.ok(!body.some(instruction => instruction.cp?.owner === 'java.lang.invoke.DoppioVarHandles' &&
+      instruction.cp.name === (bridge === 'operationHandle' ? 'selectorHandle' : 'operationHandle')));
+    const native = method(unit, bridge, '()' + handle);
+    assert.equal(native.flags, 0x010a);
+    assert.equal(native.code, undefined);
+    assert.deepEqual(exceptions(unit, native), ['java/lang/NoSuchMethodException', 'java/lang/IllegalAccessException']);
+  }
+  assert.equal(method(unit, 'operate', '(' + variable + text + '[Ljava/lang/Object;)Ljava/lang/Object;').flags, 0x010a);
+  assert.equal(method(unit, 'select', '(' + variable + mode + type + 'Z)' + handle).flags, 0x000a,
+    'The selected Java operation selector remains private static');
+  for (const member of unit.layout.methods.entries) {
+    assert.ok(!member.descriptor.endsWith(')' + lookup), 'No helper exposes a trusted Lookup return type');
+    if (!member.code) continue;
+    const body = code(unit, member);
+    assert.ok(!body.some(instruction => instruction.cp?.owner === 'java.lang.invoke.MethodHandles' &&
+      instruction.cp.name === 'lookup'), 'Illegal package caller lookup cannot recur in compiled helper Code');
+    assert.ok(!body.some(instruction => instruction.name === 'getstatic' && instruction.cp?.name === 'IMPL_LOOKUP'),
+      'Release9 Java Code does not depend on the private SDK symbol or expose trusted authority');
+  }
+});
+
+test('compiled user-field factories keep authorization on their supplied caller Lookup', () => {
+  const unit = compiled.get('DoppioVarHandles');
+  for (const [factory, getter] of [['findVarHandle', 'findGetter'], ['findStaticVarHandle', 'findStaticGetter']]) {
+    const body = code(unit, method(unit, factory, '(' + lookup + fieldFactoryType.slice(1)));
+    const calls = body.filter(instruction => instruction.cp?.owner === 'java.lang.invoke.MethodHandles$Lookup');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].name, 'invokevirtual');
+    assert.equal(calls[0].cp.tag, 10);
+    assert.equal(calls[0].cp.name, getter);
+    assert.equal(calls[0].cp.descriptor, '(' + cls + text + cls + ')' + handle);
+    const index = body.indexOf(calls[0]);
+    assert.deepEqual(body.slice(index - 4, index).map(instruction => instruction.name),
+      ['aload_0', 'aload_1', 'aload_2', 'aload_3'], 'Caller Lookup and exact original field identity reach access checking');
+    assert.ok(!body.some(instruction => instruction.cp?.owner === 'java.lang.invoke.DoppioVarHandles' &&
+      ['operationHandle', 'selectorHandle'].includes(instruction.cp.name)), 'Trusted internal selection cannot authorize user fields');
+  }
 });
 
 test('actual compiler bootstrap artifact has exactly the C3 public factories and typed helper delegates', () => {

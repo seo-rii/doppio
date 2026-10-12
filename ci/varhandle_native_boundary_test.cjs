@@ -29,6 +29,9 @@ const mockUtil = {
   is_primitive_type: descriptor => descriptor.length === 1,
   boxClassName: descriptor => 'Ljava/lang/' + types[descriptor] + ';',
   descriptor2typestr: descriptor => descriptor.slice(1, -1),
+  createMethodType(thread, bootstrap, descriptor, callback) {
+    thread.createMethodType(bootstrap, descriptor, callback);
+  },
   unboxArguments(thread, descriptors, values) {
     thread.events.push(['unbox', [...descriptors]]);
     const result = [];
@@ -65,6 +68,8 @@ const Long = load('gLong').default;
 const natives = load('natives/java_lang_invoke').default();
 const helper = natives['java/lang/invoke/DoppioVarHandles'];
 const signatures = {
+  operation: 'operationHandle()Ljava/lang/invoke/MethodHandle;',
+  selector: 'selectorHandle()Ljava/lang/invoke/MethodHandle;',
   final: 'fieldIsFinal(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/Class;Z)Z',
   field: 'captureField(Ljava/lang/invoke/VarHandle;Ljava/lang/Class;Ljava/lang/String;Ljava/lang/Class;Z)V',
   array: 'captureArray(Ljava/lang/invoke/VarHandle;Ljava/lang/Class;)V',
@@ -167,7 +172,37 @@ function value(result, descriptor, expected) {
 }
 function error(w, type) { assert.equal(w.errors.at(-1).type, type); assert.deepEqual(w.returns, []); }
 
-test('registration contains six bridge signatures and exactly the 31 canonical shim declarations', () => {
+const lookupName = 'Ljava/lang/invoke/MethodHandles$Lookup;';
+const helperName = 'Ljava/lang/invoke/DoppioVarHandles;';
+const trustedField = 'java/lang/invoke/MethodHandles$Lookup/IMPL_LOOKUP';
+const findStaticAlias = 'java/lang/invoke/MethodHandles$Lookup/findStatic(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;';
+const privateMembers = [
+  ['operation', 'operate', '(Ljava/lang/invoke/VarHandle;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/Object;'],
+  ['selector', 'select', '(Ljava/lang/invoke/VarHandle;Ljava/lang/invoke/VarHandle$AccessMode;Ljava/lang/invoke/MethodType;Z)Ljava/lang/invoke/MethodHandle;']
+];
+function helperWorld() {
+  const w = world(), bootstrap = w.thread.getBsCl();
+  const lookupClass = w.register(new ReferenceClass(lookupName, w.objectClass));
+  const helperClass = w.register(new ReferenceClass(helperName, w.objectClass));
+  const helperMirror = mirror(helperClass), trusted = reference(lookupClass), typeRequests = [], findRequests = [], interned = [];
+  lookupClass.initialized = helperClass.initialized = false;
+  w.constructors.get(lookupName)[trustedField] = trusted;
+  helperClass.getClassObject = thread => { assert.equal(thread, w.thread); return helperMirror; };
+  w.thread.getJVM = () => ({internString(name) {
+    interned.push(name); w.events.push(['intern', name]); return text(name);
+  }});
+  w.thread.createMethodType = (loader, descriptor, callback) => {
+    assert.equal(loader, bootstrap); w.events.push(['method-type', descriptor]);
+    typeRequests.push({descriptor, callback});
+  };
+  trusted[findStaticAlias] = function(thread, args, callback) {
+    assert.equal(this, trusted); assert.equal(thread, w.thread);
+    w.events.push(['find-static', args[1].toString()]); findRequests.push({args, callback});
+  };
+  return {...w, bootstrap, lookupClass, helperClass, helperMirror, trusted, typeRequests, findRequests, interned};
+}
+
+test('registration contains eight bridge signatures and exactly the 31 canonical shim declarations', () => {
   assert.deepEqual(Object.keys(natives).sort(), ['java/lang/invoke/DoppioVarHandles', 'java/lang/invoke/VarHandle']);
   assert.deepEqual(Object.keys(helper).sort(), Object.values(signatures).sort());
   const source = fs.readFileSync(path.resolve(__dirname, '../classes/modern_classlib/java/lang/invoke/VarHandle.java'), 'utf8');
@@ -213,7 +248,141 @@ test('actual source native registrar accepts every bridge and canonical method m
       count++;
     }
   }
-  assert.equal(count, 37);
+  assert.equal(count, 39);
+});
+
+test('zero-argument helper natives resolve only the two canonical private bootstrap members', () => {
+  for (const [entry, name, descriptor] of privateMembers) {
+    const w = helperWorld(), callerOwner = {}, callerName = text('caller-controlled'), callerType = {};
+    const native = helper[signatures[entry]];
+    assert.equal(native.length, 1, 'Only the implicit thread parameter');
+    assert.equal(native(w.thread, callerOwner, callerName, callerType), undefined);
+    assert.deepEqual(w.returns, []);
+    assert.equal(w.pending.has(lookupName), true); assert.equal(w.pending.has(helperName), false);
+    w.succeed(lookupName);
+    assert.equal(w.pending.has(helperName), true); assert.deepEqual(w.typeRequests, []);
+    w.succeed(helperName);
+    assert.equal(w.typeRequests.length, 1); assert.equal(w.typeRequests[0].descriptor, descriptor);
+    const canonicalType = {descriptor}; w.typeRequests[0].callback(null, canonicalType);
+    assert.equal(w.findRequests.length, 1);
+    const request = w.findRequests[0];
+    assert.equal(request.args[0], w.helperMirror);
+    assert.equal(request.args[0].$cls, w.helperClass);
+    assert.equal(request.args[1].toString(), name);
+    assert.equal(request.args[2], canonicalType);
+    assert.deepEqual(w.interned, [name]);
+    assert.equal(request.args.includes(callerOwner) || request.args.includes(callerName) || request.args.includes(callerType), false);
+    const methodHandle = {name: 'private method handle'}; request.callback(null, methodHandle);
+    assert.deepEqual(w.returns, [methodHandle]); assert.notEqual(w.returns[0], w.trusted);
+    assert.deepEqual(w.errors, []);
+  }
+});
+
+test('private helper Lookup/owner initialization failures preserve identity and prevent later stages', () => {
+  for (const failedClass of [lookupName, helperName]) {
+    const w = helperWorld(), original = {name: 'original private helper initializer failure'};
+    helper[signatures.operation](w.thread);
+    if (failedClass === helperName) w.succeed(lookupName);
+    const callback = w.fail(failedClass, original);
+    assert.deepEqual(w.errors, [original]); assert.deepEqual(w.returns, []);
+    assert.deepEqual(w.typeRequests, []); assert.deepEqual(w.findRequests, []);
+    w.classes.get(failedClass).initialized = true; callback(w.classes.get(failedClass));
+    assert.deepEqual(w.errors, [original]); assert.deepEqual(w.returns, []);
+    assert.deepEqual(w.typeRequests, []); assert.deepEqual(w.findRequests, []);
+    if (failedClass === lookupName) assert.equal(w.pending.has(helperName), false);
+  }
+});
+
+test('private helper canonical MethodType failure propagates its original Throwable without lookup/return', () => {
+  const w = helperWorld(), original = {name: 'original canonical MethodType failure'};
+  helper[signatures.selector](w.thread); w.succeed(lookupName); w.succeed(helperName);
+  const callback = w.typeRequests[0].callback;
+  callback(original, null);
+  assert.deepEqual(w.errors, [original]); assert.deepEqual(w.returns, []); assert.deepEqual(w.findRequests, []);
+  callback(null, {});
+  assert.deepEqual(w.errors, [original]); assert.deepEqual(w.returns, []); assert.deepEqual(w.findRequests, []);
+});
+
+test('private helper fixed findStatic failures preserve the original Throwable rather than returning Lookup', () => {
+  for (const [entry] of privateMembers) {
+    const w = helperWorld(), original = {name: 'original private findStatic failure'};
+    helper[signatures[entry]](w.thread); w.succeed(lookupName); w.succeed(helperName);
+    w.typeRequests[0].callback(null, {});
+    const callback = w.findRequests[0].callback;
+    callback(original);
+    assert.deepEqual(w.errors, [original]); assert.deepEqual(w.returns, []);
+    callback(null, w.trusted);
+    assert.deepEqual(w.errors, [original]); assert.deepEqual(w.returns, []);
+  }
+});
+
+test('every private helper continuation is latched against duplicate asynchronous callbacks', () => {
+  const w = helperWorld(); helper[signatures.operation](w.thread);
+  const lookupCallback = w.succeed(lookupName); lookupCallback(w.lookupClass);
+  const ownerCallback = w.succeed(helperName); ownerCallback(w.helperClass);
+  assert.equal(w.typeRequests.length, 1);
+  const typeCallback = w.typeRequests[0].callback; typeCallback(null, {}); typeCallback(null, {});
+  assert.equal(w.findRequests.length, 1);
+  const findCallback = w.findRequests[0].callback, methodHandle = {};
+  findCallback(null, methodHandle); findCallback(null, {});
+  assert.deepEqual(w.returns, [methodHandle]); assert.deepEqual(w.errors, []);
+  assert.deepEqual(w.interned, ['operate']);
+});
+
+test('private helper synchronous cached continuations still complete exactly once', () => {
+  const w = helperWorld(), methodHandle = {};
+  w.bootstrap.initializeClass = (thread, name, callback) => {
+    assert.equal(thread, w.thread); const cls = w.classes.get(name); cls.initialized = true;
+    callback(cls); callback(cls);
+  };
+  w.thread.createMethodType = (loader, descriptor, callback) => {
+    assert.equal(loader, w.bootstrap); assert.equal(descriptor, privateMembers[0][2]); callback(null, {}); callback(null, {});
+  };
+  w.trusted[findStaticAlias] = function(thread, args, callback) {
+    assert.equal(this, w.trusted); assert.equal(args[0], w.helperMirror); assert.equal(args[1].toString(), 'operate');
+    callback(null, methodHandle); callback(null, {});
+  };
+  assert.equal(helper[signatures.operation](w.thread), undefined);
+  assert.deepEqual(w.returns, [methodHandle]); assert.deepEqual(w.errors, []);
+});
+
+test('same-named foreign helper metadata never grants the fixed bootstrap lookup capability', () => {
+  for (const stage of ['lookup', 'owner']) {
+    const w = helperWorld(); helper[signatures.operation](w.thread);
+    if (stage === 'owner') w.succeed(lookupName);
+    const name = stage === 'lookup' ? lookupName : helperName;
+    const foreign = new ReferenceClass(name, w.objectClass);
+    foreign.initialized = true; foreign.getLoader = () => ({});
+    w.pending.get(name)(foreign);
+    error(w, 'Ljava/lang/InternalError;'); assert.deepEqual(w.typeRequests, []); assert.deepEqual(w.findRequests, []);
+  }
+});
+
+test('missing trusted lookup, MethodType or fixed findStatic implementation rejects without exposing authority', () => {
+  for (const stage of ['lookup', 'type', 'find']) {
+    const w = helperWorld();
+    if (stage === 'lookup') delete w.constructors.get(lookupName)[trustedField];
+    if (stage === 'find') delete w.trusted[findStaticAlias];
+    helper[signatures.operation](w.thread); w.succeed(lookupName);
+    if (stage !== 'lookup') {
+      w.succeed(helperName); w.typeRequests[0].callback(null, stage === 'type' ? null : {});
+    }
+    error(w, 'Ljava/lang/InternalError;'); assert.deepEqual(w.findRequests, []);
+    assert.equal(w.returns.includes(w.trusted), false);
+  }
+});
+
+test('private helper findStatic cannot publish a missing MethodHandle or the trusted Lookup itself', () => {
+  for (const missing of ['null', 'undefined', 'trusted-lookup']) {
+    const w = helperWorld();
+    helper[signatures.operation](w.thread); w.succeed(lookupName); w.succeed(helperName);
+    w.typeRequests[0].callback(null, {});
+    const callback = w.findRequests[0].callback;
+    callback(null, missing === 'null' ? null : missing === 'undefined' ? undefined : w.trusted);
+    error(w, 'Ljava/lang/InternalError;');
+    callback(null, {});
+    assert.deepEqual(w.returns, []); assert.equal(w.errors.length, 1);
+  }
 });
 
 test('field capture is passive, exact, inherited-declaration-aware and readonly for finals', () => {

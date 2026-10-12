@@ -65,8 +65,7 @@ public final class DoppioVarHandles {
       return MethodHandles.dropArguments(failure, 0, type.parameterList());
     }
     try {
-      MethodHandle operation = MethodHandles.lookup().findStatic(DoppioVarHandles.class, "operate",
-          MethodType.methodType(Object.class, VarHandle.class, String.class, Object[].class));
+      MethodHandle operation = operationHandle();
       operation = MethodHandles.insertArguments(operation, 0, handle, mode.methodName());
       return operation.asCollector(Object[].class, type.parameterCount()).asType(type);
     } catch (ReflectiveOperationException impossible) {
@@ -86,9 +85,7 @@ public final class DoppioVarHandles {
     Objects.requireNonNull(mode);
     Objects.requireNonNull(type);
     try {
-      MethodHandle selector = MethodHandles.lookup().findStatic(DoppioVarHandles.class, "select",
-          MethodType.methodType(MethodHandle.class, VarHandle.class, VarHandle.AccessMode.class,
-              MethodType.class, boolean.class));
+      MethodHandle selector = selectorHandle();
       selector = MethodHandles.insertArguments(selector, 1, mode, type, Boolean.valueOf(exact));
       return MethodHandles.filterArguments(MethodHandles.exactInvoker(type), 0, selector);
     } catch (ReflectiveOperationException impossible) {
@@ -131,6 +128,11 @@ public final class DoppioVarHandles {
 
   private static native MethodHandle findVirtualBase(MethodHandles.Lookup lookup, Class<?> owner,
       String name, MethodType type) throws NoSuchMethodException, IllegalAccessException;
+  // The stock Java 8 lookup factory forbids untrusted java.lang.invoke callers.
+  // Resolve only these two fixed bootstrap members; never expose a trusted
+  // Lookup or use its authority for caller-requested fields.
+  private static native MethodHandle operationHandle() throws NoSuchMethodException, IllegalAccessException;
+  private static native MethodHandle selectorHandle() throws NoSuchMethodException, IllegalAccessException;
   private static native boolean fieldIsFinal(Class<?> owner, String name, Class<?> type, boolean isStatic);
   private static native void captureField(VarHandle handle, Class<?> owner, String name,
       Class<?> type, boolean isStatic);

@@ -14,6 +14,73 @@ interface StoredVarHandle extends JVMTypes.java_lang_Object {
 }
 
 export default function (): any {
+  function internalHandle(thread: JVMThread, member: 'operate' | 'select'): void {
+    // These two zero-argument native entry points are the only callers. No
+    // caller-selected class, name or type reaches this trusted Lookup path.
+    var descriptor = member === 'operate' ?
+        '(Ljava/lang/invoke/VarHandle;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/Object;' :
+        '(Ljava/lang/invoke/VarHandle;Ljava/lang/invoke/VarHandle$AccessMode;Ljava/lang/invoke/MethodType;Z)Ljava/lang/invoke/MethodHandle;',
+      bootstrap = thread.getBsCl(), lookupName = 'Ljava/lang/invoke/MethodHandles$Lookup;',
+      helperName = 'Ljava/lang/invoke/DoppioVarHandles;', stage = 0;
+    thread.setStatus(ThreadStatus.ASYNC_WAITING);
+    bootstrap.initializeClass(thread, lookupName, lookupClass => {
+      if (stage !== 0) return;
+      stage = 1;
+      if (lookupClass === null) { stage = 4; return; }
+      if (lookupClass !== bootstrap.getLoadedClass(lookupName) || lookupClass.getLoader() !== bootstrap) {
+        stage = 4;
+        thread.throwNewException('Ljava/lang/InternalError;', 'Unexpected VarHandle helper Lookup class');
+        return;
+      }
+      var trusted: JVMTypes.java_lang_invoke_MethodHandles$Lookup =
+        (<any> (<ReferenceClassData<JVMTypes.java_lang_Object>> lookupClass).getConstructor(thread))[
+          'java/lang/invoke/MethodHandles$Lookup/IMPL_LOOKUP'];
+      if (trusted === null || trusted === undefined || trusted.getClass() !== lookupClass) {
+        stage = 4;
+        thread.throwNewException('Ljava/lang/InternalError;', 'Bootstrap helper Lookup is unavailable');
+        return;
+      }
+      bootstrap.initializeClass(thread, helperName, helperClass => {
+        if (stage !== 1) return;
+        stage = 2;
+        if (helperClass === null) { stage = 4; return; }
+        if (helperClass !== bootstrap.getLoadedClass(helperName) || helperClass.getLoader() !== bootstrap) {
+          stage = 4;
+          thread.throwNewException('Ljava/lang/InternalError;', 'Unexpected VarHandle helper class');
+          return;
+        }
+        util.createMethodType(thread, bootstrap, descriptor, (failure, type) => {
+          if (stage !== 2) return;
+          stage = 3;
+          if (failure) { stage = 4; thread.throwException(failure); return; }
+          if (type === null || type === undefined) {
+            stage = 4;
+            thread.throwNewException('Ljava/lang/InternalError;', 'VarHandle helper MethodType is unavailable');
+            return;
+          }
+          var findStatic = (<any> trusted)[
+            'java/lang/invoke/MethodHandles$Lookup/findStatic(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;'];
+          if (typeof findStatic !== 'function') {
+            stage = 4;
+            thread.throwNewException('Ljava/lang/InternalError;', 'Bootstrap helper findStatic is unavailable');
+            return;
+          }
+          findStatic.call(trusted, thread, [helperClass.getClassObject(thread),
+            thread.getJVM().internString(member), type], (error?: JVMTypes.java_lang_Throwable,
+              handle?: JVMTypes.java_lang_invoke_MethodHandle) => {
+            if (stage !== 3) return;
+            stage = 4;
+            if (error) thread.throwException(error);
+            else if (handle === null || handle === undefined || <any> handle === trusted) {
+              thread.throwNewException('Ljava/lang/InternalError;', 'VarHandle helper MethodHandle is unavailable');
+            }
+            else thread.asyncReturn(handle);
+          });
+        });
+      });
+    });
+  }
+
   function capture(thread: JVMThread, owner: JVMTypes.java_lang_Class,
       name: JVMTypes.java_lang_String, valueType: JVMTypes.java_lang_Class, isStatic: number) {
     if (owner === null || name === null || valueType === null) {
@@ -44,6 +111,14 @@ export default function (): any {
   }
 
   class DoppioVarHandles {
+    public static 'operationHandle()Ljava/lang/invoke/MethodHandle;'(thread: JVMThread): void {
+      internalHandle(thread, 'operate');
+    }
+
+    public static 'selectorHandle()Ljava/lang/invoke/MethodHandle;'(thread: JVMThread): void {
+      internalHandle(thread, 'select');
+    }
+
     public static 'fieldIsFinal(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/Class;Z)Z'(
         thread: JVMThread, owner: JVMTypes.java_lang_Class, name: JVMTypes.java_lang_String,
         valueType: JVMTypes.java_lang_Class, isStatic: number): boolean {
