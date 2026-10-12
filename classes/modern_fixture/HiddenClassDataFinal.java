@@ -137,7 +137,7 @@ public final class HiddenClassDataFinal {
     MethodHandles.Lookup lookup = define(list);
     rejectDataAt(lookup, "_", Object.class, -1, IndexOutOfBoundsException.class);
     rejectDataAt(lookup, "_", Object.class, 1, IndexOutOfBoundsException.class);
-    emit("hc-data-list-bounds", "ArrayList-negative/size-index=IndexOutOfBoundsException;rejections=2");
+    emit("hc-data-list-bounds", "ArrayList-negative/size-index=IndexOutOfBoundsException-family;rejections=2");
   }
 
   private static void caseListConversionAndNull() throws Throwable {

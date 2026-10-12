@@ -68,6 +68,18 @@ test('C5 scope records unknown suffixes, original self descriptors, single-failu
     .trace[0].includes('VerifyError'));
 });
 
+test('only the specified classDataAt bounds family allows implementation subclasses, without an exception allowlist', () => {
+  const entry = harness.methodHandleGroups[2].cases.find(item => item.id === 'hc-data-list-bounds');
+  assert.ok(entry.trace[0].includes('IndexOutOfBoundsException-family'));
+  assert.ok(entry.limitations.some(value => value.includes('may throw a subclass') && value.includes('no exception is rewritten')));
+  const source = fs.readFileSync(path.resolve('classes/modern_fixture/hiddenclass/HiddenClassSupport.java'), 'utf8');
+  assert.ok(source.includes('expected == IndexOutOfBoundsException.class ? expected.isInstance(error) : error.getClass() == expected'));
+  const definition = source.slice(source.indexOf('Throwable rejectDefinition'), source.indexOf('Throwable rejectData('));
+  assert.ok(definition.includes('check(error.getClass() == expected)'));
+  assert.ok(!definition.includes('expected.isInstance'));
+  for (const item of harness.methodHandleGroups.flatMap(group => group.cases)) assert.equal(item.exceptionAllowlist, undefined);
+});
+
 // Synthetic reader/mutation inputs ONLY. These unit bytes are never substituted
 // into a compatibility run, are not javac output, and prove no guest/native
 // execution. Full gates separately compile and execute the actual source corpus.

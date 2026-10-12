@@ -51,7 +51,9 @@ public final class HiddenClassSupport {
     try {
       MethodHandles.classDataAt(caller, name, type, index);
     } catch (Throwable error) {
-      check(error.getClass() == expected);
+      // The API names the bounds exception family, not ArrayList's concrete
+      // implementation subclass. Other selected failures remain exact.
+      check(expected == IndexOutOfBoundsException.class ? expected.isInstance(error) : error.getClass() == expected);
       return error;
     }
     throw new AssertionError("indexed class data unexpectedly succeeded");
