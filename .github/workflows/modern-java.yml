@@ -579,6 +579,26 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Check phase C class-file control-flow contracts
+        timeout-minutes: 3
+        run: node --test ci/java_classfile_controlflow_contract_test.mjs
+
+      # C7b is a separate finite original Java 25 CFG/StackMapTable corpus.
+      # Per-host generated outputs never substitute for unchanged driver inputs.
+      - name: Run Java class-file control-flow compatibility
+        id: java_classfile_controlflow
+        timeout-minutes: 40
+        run: node ci/java_classfile_controlflow_test.mjs --browser
+
+      - name: Upload Java class-file control-flow ledger
+        if: always() && steps.java_classfile_controlflow.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-classfile-controlflow-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Check evolved switch ledger contract
         timeout-minutes: 1
         run: node --test ci/java_pattern_evolution_contract_test.mjs

@@ -36,6 +36,8 @@ const nominalConstantUnitCommand = 'node --test ci/java_methodhandle_nominal_con
 const nominalConstantRunnerCommand = 'node ci/java_methodhandle_nominal_constant_test.mjs --browser';
 const classFileApiUnitCommand = 'node --test ci/java_classfile_api_contract_test.mjs ci/classfile_api_metadata_test.cjs';
 const classFileApiRunnerCommand = 'node ci/java_classfile_api_test.mjs --browser';
+const classFileControlFlowUnitCommand = 'node --test ci/java_classfile_controlflow_contract_test.mjs';
+const classFileControlFlowRunnerCommand = 'node ci/java_classfile_controlflow_test.mjs --browser';
 
 function stripUnquotedComments(text) {
   return text.split('\n').map((line) => {
@@ -1005,6 +1007,24 @@ for (const [name, fields] of [
     'uses: actions/upload-artifact@v7',
     'with:',
     '  path: build/java-classfile-api-results.json',
+    '  archive: false',
+    '  if-no-files-found: error',
+    '  retention-days: 7',
+  ]],
+  ['Check phase C class-file control-flow contracts', [
+    'timeout-minutes: 3',
+    `run: ${classFileControlFlowUnitCommand}`,
+  ]],
+  ['Run Java class-file control-flow compatibility', [
+    'id: java_classfile_controlflow',
+    'timeout-minutes: 40',
+    `run: ${classFileControlFlowRunnerCommand}`,
+  ]],
+  ['Upload Java class-file control-flow ledger', [
+    "if: always() && steps.java_classfile_controlflow.outcome != 'skipped'",
+    'uses: actions/upload-artifact@v7',
+    'with:',
+    '  path: build/java-classfile-controlflow-results.json',
     '  archive: false',
     '  if-no-files-found: error',
     '  retention-days: 7',
