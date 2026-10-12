@@ -182,6 +182,40 @@ test('registration contains six bridge signatures and exactly the 31 canonical s
   }
 });
 
+test('actual source native registrar accepts every bridge and canonical method map', () => {
+  // Execute the real registrar body in isolation, without constructing a JVM,
+  // touching its global registry or depending on a newly built artifact.
+  const filename = path.resolve(__dirname, '../src/jvm.ts');
+  const source = fs.readFileSync(filename, 'utf8');
+  const parsed = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true);
+  const declarations = parsed.statements.filter(node => ts.isClassDeclaration(node) && node.name?.text === 'JVM');
+  assert.equal(declarations.length, 1);
+  const methods = declarations[0].members.filter(node => ts.isMethodDeclaration(node) &&
+    ts.isIdentifier(node.name) && node.name.text === 'registerNatives');
+  assert.equal(methods.length, 1);
+  const originalMethod = methods[0].getText(parsed);
+  const compiled = ts.transpileModule('export default class Registrar {\n' + originalMethod + '\n}', {
+    compilerOptions: {target: ts.ScriptTarget.ES5, module: ts.ModuleKind.CommonJS, ignoreDeprecations: '6.0'},
+    reportDiagnostics: true
+  });
+  assert.deepEqual(compiled.diagnostics, []);
+  const isolated = new Module(filename, module);
+  isolated.require = id => assert.fail('Pure native registrar unexpectedly imported ' + id);
+  isolated._compile(compiled.outputText, filename);
+  const registry = {natives: {}};
+  assert.doesNotThrow(() => isolated.exports.default.prototype.registerNatives.call(registry, natives));
+  assert.deepEqual(Object.keys(registry.natives).sort(), Object.keys(natives).sort());
+  let count = 0;
+  for (const [owner, methods] of Object.entries(natives)) {
+    assert.deepEqual(Object.keys(registry.natives[owner]).sort(), Object.keys(methods).sort());
+    for (const [signature, method] of Object.entries(methods)) {
+      assert.equal(registry.natives[owner][signature], method);
+      count++;
+    }
+  }
+  assert.equal(count, 37);
+});
+
 test('field capture is passive, exact, inherited-declaration-aware and readonly for finals', () => {
   const w = world(), owner = w.register(new ReferenceClass('Lbase/Owner;', w.objectClass));
   const child = w.register(new ReferenceClass('Lchild/Owner;', owner));

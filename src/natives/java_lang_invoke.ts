@@ -215,7 +215,8 @@ export default function (): any {
     }
   }
 
-  var placeholders: {[signature: string]: Function} = Object.create(null);
+  // JVM.registerNatives expects ordinary method maps with hasOwnProperty.
+  var placeholders: {[signature: string]: Function} = {};
   ['get', 'set', 'getVolatile', 'setVolatile', 'getAcquire', 'setRelease', 'getOpaque', 'setOpaque',
     'compareAndSet', 'compareAndExchange', 'compareAndExchangeAcquire', 'compareAndExchangeRelease',
     'weakCompareAndSetPlain', 'weakCompareAndSet', 'weakCompareAndSetAcquire', 'weakCompareAndSetRelease',
