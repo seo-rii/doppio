@@ -1,9 +1,20 @@
 package java.lang.classfile;
 
 import java.lang.classfile.constantpool.FieldRefEntry;
+import java.lang.classfile.constantpool.ClassEntry;
 import java.lang.classfile.constantpool.LoadableConstantEntry;
 import java.lang.classfile.constantpool.MemberRefEntry;
 import java.lang.classfile.instruction.ConstantInstruction;
+import java.lang.classfile.instruction.BranchInstruction;
+import java.lang.classfile.instruction.ConvertInstruction;
+import java.lang.classfile.instruction.ExceptionCatch;
+import java.lang.classfile.instruction.IncrementInstruction;
+import java.lang.classfile.instruction.LookupSwitchInstruction;
+import java.lang.classfile.instruction.NewObjectInstruction;
+import java.lang.classfile.instruction.NopInstruction;
+import java.lang.classfile.instruction.SwitchCase;
+import java.lang.classfile.instruction.TableSwitchInstruction;
+import java.lang.classfile.instruction.ThrowInstruction;
 import java.lang.classfile.instruction.FieldInstruction;
 import java.lang.classfile.instruction.InvokeInstruction;
 import java.lang.classfile.instruction.LoadInstruction;
@@ -15,8 +26,10 @@ import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDesc;
 import java.lang.constant.MethodTypeDesc;
 import java.util.Objects;
+import java.util.List;
+import java.util.Optional;
 
-/** Basic straight-line builders; unselected control-flow families are separate. */
+/** Selected instruction and label-based control-flow builders. */
 public interface CodeBuilder extends ClassFileBuilder<CodeElement, CodeBuilder> {
   Label newLabel();
   Label startLabel();
@@ -24,6 +37,81 @@ public interface CodeBuilder extends ClassFileBuilder<CodeElement, CodeBuilder> 
   int receiverSlot();
   int parameterSlot(int parameter);
   int allocateLocal(TypeKind kind);
+  default CodeBuilder nop() { return with(NopInstruction.of()); }
+  default Label newBoundLabel() { Label label = newLabel(); labelBinding(label); return label; }
+  default CodeBuilder labelBinding(Label label) { return with(DoppioClassReader.labelTarget(label)); }
+  default CodeBuilder branch(Opcode opcode, Label label) { return with(BranchInstruction.of(opcode, label)); }
+  default CodeBuilder goto_(Label label) { return branch(Opcode.GOTO, label); }
+  default CodeBuilder goto_w(Label label) { return branch(Opcode.GOTO_W, label); }
+  default CodeBuilder ifeq(Label label) { return branch(Opcode.IFEQ, label); }
+  default CodeBuilder ifne(Label label) { return branch(Opcode.IFNE, label); }
+  default CodeBuilder iflt(Label label) { return branch(Opcode.IFLT, label); }
+  default CodeBuilder ifge(Label label) { return branch(Opcode.IFGE, label); }
+  default CodeBuilder ifgt(Label label) { return branch(Opcode.IFGT, label); }
+  default CodeBuilder ifle(Label label) { return branch(Opcode.IFLE, label); }
+  default CodeBuilder if_icmpeq(Label label) { return branch(Opcode.IF_ICMPEQ, label); }
+  default CodeBuilder if_icmpne(Label label) { return branch(Opcode.IF_ICMPNE, label); }
+  default CodeBuilder if_icmplt(Label label) { return branch(Opcode.IF_ICMPLT, label); }
+  default CodeBuilder if_icmpge(Label label) { return branch(Opcode.IF_ICMPGE, label); }
+  default CodeBuilder if_icmpgt(Label label) { return branch(Opcode.IF_ICMPGT, label); }
+  default CodeBuilder if_icmple(Label label) { return branch(Opcode.IF_ICMPLE, label); }
+  default CodeBuilder if_acmpeq(Label label) { return branch(Opcode.IF_ACMPEQ, label); }
+  default CodeBuilder if_acmpne(Label label) { return branch(Opcode.IF_ACMPNE, label); }
+  default CodeBuilder ifnull(Label label) { return branch(Opcode.IFNULL, label); }
+  default CodeBuilder ifnonnull(Label label) { return branch(Opcode.IFNONNULL, label); }
+  default CodeBuilder tableswitch(int low, int high, Label defaultTarget, List<SwitchCase> cases) {
+    return with(TableSwitchInstruction.of(low, high, defaultTarget, cases));
+  }
+  default CodeBuilder tableswitch(Label defaultTarget, List<SwitchCase> cases) {
+    Objects.requireNonNull(cases);
+    if (cases.isEmpty()) throw new IllegalArgumentException("A table switch requires a case range");
+    int low = Integer.MAX_VALUE, high = Integer.MIN_VALUE;
+    for (SwitchCase entry : cases) {
+      low = Math.min(low, Objects.requireNonNull(entry).caseValue());
+      high = Math.max(high, entry.caseValue());
+    }
+    return tableswitch(low, high, defaultTarget, cases);
+  }
+  default CodeBuilder lookupswitch(Label defaultTarget, List<SwitchCase> cases) {
+    return with(LookupSwitchInstruction.of(defaultTarget, cases));
+  }
+  default CodeBuilder exceptionCatch(Label start, Label end, Label handler, ClassEntry catchType) {
+    return exceptionCatch(start, end, handler, Optional.ofNullable(catchType));
+  }
+  default CodeBuilder exceptionCatch(Label start, Label end, Label handler, Optional<ClassEntry> catchType) {
+    return with(ExceptionCatch.of(handler, start, end, catchType));
+  }
+  default CodeBuilder exceptionCatch(Label start, Label end, Label handler, ClassDesc catchType) {
+    return exceptionCatch(start, end, handler, constantPool().classEntry(Objects.requireNonNull(catchType)));
+  }
+  default CodeBuilder exceptionCatchAll(Label start, Label end, Label handler) {
+    return exceptionCatch(start, end, handler, Optional.empty());
+  }
+  default CodeBuilder athrow() { return with(ThrowInstruction.of()); }
+  default CodeBuilder iinc(int slot, int increment) { return with(IncrementInstruction.of(slot, increment)); }
+  default CodeBuilder conversion(TypeKind from, TypeKind to) { return with(ConvertInstruction.of(from, to)); }
+  default CodeBuilder i2l() { return with(ConvertInstruction.of(Opcode.I2L)); }
+  default CodeBuilder i2f() { return with(ConvertInstruction.of(Opcode.I2F)); }
+  default CodeBuilder i2d() { return with(ConvertInstruction.of(Opcode.I2D)); }
+  default CodeBuilder l2i() { return with(ConvertInstruction.of(Opcode.L2I)); }
+  default CodeBuilder l2f() { return with(ConvertInstruction.of(Opcode.L2F)); }
+  default CodeBuilder l2d() { return with(ConvertInstruction.of(Opcode.L2D)); }
+  default CodeBuilder f2i() { return with(ConvertInstruction.of(Opcode.F2I)); }
+  default CodeBuilder f2l() { return with(ConvertInstruction.of(Opcode.F2L)); }
+  default CodeBuilder f2d() { return with(ConvertInstruction.of(Opcode.F2D)); }
+  default CodeBuilder d2i() { return with(ConvertInstruction.of(Opcode.D2I)); }
+  default CodeBuilder d2l() { return with(ConvertInstruction.of(Opcode.D2L)); }
+  default CodeBuilder d2f() { return with(ConvertInstruction.of(Opcode.D2F)); }
+  default CodeBuilder i2b() { return with(ConvertInstruction.of(Opcode.I2B)); }
+  default CodeBuilder i2c() { return with(ConvertInstruction.of(Opcode.I2C)); }
+  default CodeBuilder i2s() { return with(ConvertInstruction.of(Opcode.I2S)); }
+  default CodeBuilder lcmp() { return with(OperatorInstruction.of(Opcode.LCMP)); }
+  default CodeBuilder fcmpl() { return with(OperatorInstruction.of(Opcode.FCMPL)); }
+  default CodeBuilder fcmpg() { return with(OperatorInstruction.of(Opcode.FCMPG)); }
+  default CodeBuilder dcmpl() { return with(OperatorInstruction.of(Opcode.DCMPL)); }
+  default CodeBuilder dcmpg() { return with(OperatorInstruction.of(Opcode.DCMPG)); }
+  default CodeBuilder new_(ClassEntry className) { return with(NewObjectInstruction.of(className)); }
+  default CodeBuilder new_(ClassDesc className) { return new_(constantPool().classEntry(Objects.requireNonNull(className))); }
   default CodeBuilder loadLocal(TypeKind kind, int slot) { return with(LoadInstruction.of(kind, slot)); }
   default CodeBuilder storeLocal(TypeKind kind, int slot) { return with(StoreInstruction.of(kind, slot)); }
   default CodeBuilder iload(int slot) { return loadLocal(TypeKind.INT, slot); }

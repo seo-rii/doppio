@@ -43,8 +43,6 @@ final class DoppioClassFile implements ClassFile {
     Objects.requireNonNull(name);
     Objects.requireNonNull(pool);
     Objects.requireNonNull(handler);
-    if (stackMaps == StackMapsOption.GENERATE_STACK_MAPS)
-      throw new UnsupportedOperationException("Forced stack-map generation is outside the selected pipeline");
     if (!(pool instanceof DoppioConstantPool)) throw new IllegalArgumentException("Unsupported constant pool builder");
     return DoppioBuilders.build(name, (DoppioConstantPool) pool, handler, stackMaps);
   }
@@ -53,8 +51,6 @@ final class DoppioClassFile implements ClassFile {
     Objects.requireNonNull(model);
     Objects.requireNonNull(name);
     Objects.requireNonNull(transform);
-    if (stackMaps == StackMapsOption.GENERATE_STACK_MAPS)
-      throw new UnsupportedOperationException("Forced stack-map generation is outside the selected pipeline");
     if (poolSharing != ConstantPoolSharingOption.SHARED_POOL)
       throw new IllegalArgumentException("Fresh-pool transformation is outside the selected pipeline");
     DoppioConstantPool pool = DoppioConstantPool.copyOf(model.constantPool());

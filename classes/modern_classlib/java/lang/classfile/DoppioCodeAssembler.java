@@ -1,0 +1,380 @@
+package java.lang.classfile;
+
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.lang.classfile.constantpool.DoppioConstantPool;
+import java.lang.classfile.constantpool.LoadableConstantEntry;
+import java.lang.classfile.instruction.BranchInstruction;
+import java.lang.classfile.instruction.ConstantInstruction;
+import java.lang.classfile.instruction.ConvertInstruction;
+import java.lang.classfile.instruction.ExceptionCatch;
+import java.lang.classfile.instruction.FieldInstruction;
+import java.lang.classfile.instruction.IncrementInstruction;
+import java.lang.classfile.instruction.InvokeInstruction;
+import java.lang.classfile.instruction.LabelTarget;
+import java.lang.classfile.instruction.LoadInstruction;
+import java.lang.classfile.instruction.LookupSwitchInstruction;
+import java.lang.classfile.instruction.NewObjectInstruction;
+import java.lang.classfile.instruction.NopInstruction;
+import java.lang.classfile.instruction.OperatorInstruction;
+import java.lang.classfile.instruction.ReturnInstruction;
+import java.lang.classfile.instruction.StackInstruction;
+import java.lang.classfile.instruction.StoreInstruction;
+import java.lang.classfile.instruction.SwitchCase;
+import java.lang.classfile.instruction.TableSwitchInstruction;
+import java.lang.classfile.instruction.ThrowInstruction;
+import java.lang.constant.MethodTypeDesc;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
+import java.util.List;
+
+/** Two-pass Code layout; offsets are identities, never guessed source BCIs. */
+final class DoppioCodeAssembler {
+  private DoppioCodeAssembler() {}
+
+  static final class Result {
+    final byte[] bytes;
+    final int maxStack, maxLocals;
+    final boolean controlFlow;
+    final List<int[]> handlers;
+    final IdentityHashMap<Label, Integer> labels;
+    Result(byte[] bytes, int stack, int locals, boolean controlFlow, List<int[]> handlers,
+        IdentityHashMap<Label, Integer> labels) {
+      this.bytes = bytes; this.maxStack = stack; this.maxLocals = locals;
+      this.controlFlow = controlFlow; this.handlers = handlers; this.labels = labels;
+    }
+  }
+
+  private static final class Entry {
+    final Instruction instruction;
+    final int bci;
+    final byte[] bytes;
+    Entry(Instruction instruction, int bci, byte[] bytes) {
+      this.instruction = instruction; this.bci = bci; this.bytes = bytes;
+    }
+  }
+
+  static Result assemble(DoppioConstantPool pool, List<CodeElement> elements,
+      int allocatedLocals, Label start, Label end) {
+    try {
+      IdentityHashMap<Label, Integer> labels = new IdentityHashMap<Label, Integer>();
+      labels.put(start, Integer.valueOf(0));
+      List<Entry> entries = new ArrayList<Entry>();
+      List<ExceptionCatch> catches = new ArrayList<ExceptionCatch>();
+      int bci = 0, locals = allocatedLocals, stack = 0, maximum = 0;
+      boolean controlFlow = false;
+      for (CodeElement element : elements) {
+        if (element instanceof LabelTarget) {
+          Label label = ((LabelTarget) element).label();
+          if (label == end || labels.containsKey(label)) throw new IllegalArgumentException("Duplicate label binding");
+          labels.put(label, Integer.valueOf(bci));
+        } else if (element instanceof ExceptionCatch) {
+          catches.add((ExceptionCatch) element); controlFlow = true;
+        } else if (element instanceof Instruction) {
+          Instruction instruction = (Instruction) element;
+          byte[] bytes = null;
+          int size;
+          if (instruction instanceof BranchInstruction) {
+            int opcode = instruction.opcode().bytecode();
+            if (!(opcode >= 153 && opcode <= 167 || opcode == 198 || opcode == 199 || opcode == 200))
+              throw new UnsupportedOperationException("Unselected branch opcode");
+            size = opcode == 200 ? 5 : 3; controlFlow = true;
+          } else if (instruction instanceof TableSwitchInstruction) {
+            TableSwitchInstruction table = (TableSwitchInstruction) instruction;
+            long count = (long) table.highValue() - (long) table.lowValue() + 1;
+            long length = 1L + padding(bci) + 12L + 4L * count;
+            if (count <= 0 || length > 65535) throw new IllegalArgumentException("Table switch range exceeds Code limit");
+            size = (int) length; controlFlow = true;
+          } else if (instruction instanceof LookupSwitchInstruction) {
+            long length = 1L + padding(bci) + 8L + 8L * ((LookupSwitchInstruction) instruction).cases().size();
+            if (length > 65535) throw new IllegalArgumentException("Lookup switch exceeds Code limit");
+            size = (int) length; controlFlow = true;
+          } else {
+            bytes = encode(pool, instruction); size = bytes.length;
+            if (instruction instanceof LoadInstruction) {
+              LoadInstruction load = (LoadInstruction) instruction;
+              locals = Math.max(locals, localLimit(load.slot(), load.typeKind().slotSize()));
+            } else if (instruction instanceof StoreInstruction) {
+              StoreInstruction store = (StoreInstruction) instruction;
+              locals = Math.max(locals, localLimit(store.slot(), store.typeKind().slotSize()));
+            } else if (instruction instanceof IncrementInstruction) {
+              locals = Math.max(locals, localLimit(((IncrementInstruction) instruction).slot(), 1));
+            }
+          }
+          entries.add(new Entry(instruction, bci, bytes));
+          bci += size;
+          if (bci > 65535) throw new IllegalArgumentException("Code length exceeds class-file limit");
+          stack += delta(instruction);
+          maximum = Math.max(maximum, stack);
+        } else throw new UnsupportedOperationException("Unselected Code element");
+      }
+      if (bci == 0) throw new IllegalArgumentException("Empty Code body");
+      labels.put(end, Integer.valueOf(bci));
+      if (locals > 65535 || maximum > 65535) throw new IllegalArgumentException("Code resource limit exceeded");
+      if (!controlFlow) {
+        boolean terminated = false;
+        for (Entry entry : entries) {
+          if (terminated) throw new UnsupportedOperationException("Dead-code rewriting is outside the selected pipeline");
+          terminated = entry.instruction instanceof ReturnInstruction || entry.instruction instanceof ThrowInstruction;
+        }
+      }
+      ByteArrayOutputStream bytes = new ByteArrayOutputStream(bci);
+      DataOutputStream output = new DataOutputStream(bytes);
+      for (Entry entry : entries) {
+        Instruction instruction = entry.instruction;
+        if (instruction instanceof BranchInstruction) {
+          int opcode = instruction.opcode().bytecode();
+          int distance = target(labels, ((BranchInstruction) instruction).target(), bci, false) - entry.bci;
+          output.writeByte(opcode);
+          if (opcode == 200) output.writeInt(distance);
+          else {
+            if (distance < Short.MIN_VALUE || distance > Short.MAX_VALUE)
+              throw new IllegalArgumentException("Short branch overflow; use goto_w for an explicit wide jump");
+            output.writeShort(distance);
+          }
+        } else if (instruction instanceof TableSwitchInstruction) {
+          TableSwitchInstruction table = (TableSwitchInstruction) instruction;
+          output.writeByte(170); pad(output, entry.bci);
+          int defaultBci = target(labels, table.defaultTarget(), bci, false);
+          output.writeInt(defaultBci - entry.bci); output.writeInt(table.lowValue()); output.writeInt(table.highValue());
+          List<SwitchCase> cases = ordered(table.cases());
+          int index = 0;
+          for (long value = table.lowValue(); value <= table.highValue(); value++) {
+            if (index < cases.size() && cases.get(index).caseValue() < value)
+              throw new IllegalArgumentException("Table case outside declared range");
+            int offset = defaultBci;
+            if (index < cases.size() && cases.get(index).caseValue() == value)
+              offset = target(labels, cases.get(index++).target(), bci, false);
+            output.writeInt(offset - entry.bci);
+          }
+          if (index != cases.size()) throw new IllegalArgumentException("Table case outside declared range");
+        } else if (instruction instanceof LookupSwitchInstruction) {
+          LookupSwitchInstruction lookup = (LookupSwitchInstruction) instruction;
+          output.writeByte(171); pad(output, entry.bci);
+          output.writeInt(target(labels, lookup.defaultTarget(), bci, false) - entry.bci);
+          List<SwitchCase> cases = ordered(lookup.cases()); output.writeInt(cases.size());
+          for (SwitchCase value : cases) {
+            output.writeInt(value.caseValue());
+            output.writeInt(target(labels, value.target(), bci, false) - entry.bci);
+          }
+        } else output.write(entry.bytes);
+      }
+      List<int[]> handlers = new ArrayList<int[]>();
+      for (ExceptionCatch handler : catches) {
+        int from = target(labels, handler.tryStart(), bci, false);
+        int to = target(labels, handler.tryEnd(), bci, true);
+        int destination = target(labels, handler.handler(), bci, false);
+        if (from >= to) throw new IllegalArgumentException("Exception range must be nonempty and ordered");
+        int catchIndex = 0;
+        if (handler.catchType().isPresent()) {
+          DoppioBuilders.requireSharedPool(pool, handler.catchType().get().constantPool());
+          String descriptor = handler.catchType().get().asSymbol().descriptorString();
+          if (descriptor.charAt(0) != 'L') throw new IllegalArgumentException("Catch type must be a class type");
+          catchIndex = handler.catchType().get().index();
+        }
+        handlers.add(new int[] {from, to, destination, catchIndex});
+      }
+      if (handlers.size() > 65535) throw new IllegalArgumentException("Exception table limit exceeded");
+      output.flush();
+      byte[] result = bytes.toByteArray();
+      if (result.length != bci) throw new IllegalArgumentException("Inconsistent Code layout");
+      if (controlFlow) maximum = flowMaximum(entries, labels, handlers, bci);
+      return new Result(result, maximum, locals, controlFlow, Collections.unmodifiableList(handlers), labels);
+    } catch (IOException error) { throw new IllegalArgumentException("Code serialization failed", error); }
+  }
+
+  private static int padding(int bci) { return (4 - ((bci + 1) & 3)) & 3; }
+
+  /** Slot heights only: DROP_STACK_MAPS must not become implicit typed verification. */
+  private static int flowMaximum(List<Entry> entries, IdentityHashMap<Label, Integer> labels,
+      List<int[]> handlers, int length) {
+    HashMap<Integer, Entry> instructions = new HashMap<Integer, Entry>();
+    HashMap<Integer, Integer> heights = new HashMap<Integer, Integer>();
+    List<Integer> queue = new ArrayList<Integer>();
+    for (Entry entry : entries) instructions.put(Integer.valueOf(entry.bci), entry);
+    enqueue(0, 0, instructions, heights, queue);
+    int maximum = 0;
+    for (int cursor = 0; cursor < queue.size(); cursor++) {
+      Integer offset = queue.get(cursor); Entry entry = instructions.get(offset);
+      int before = heights.get(offset).intValue(), after = before + delta(entry.instruction);
+      if (after < 0 || after > 65535) throw new IllegalArgumentException("Invalid operand-stack slot height");
+      maximum = Math.max(maximum, Math.max(before, after));
+      for (int[] handler : handlers) if (entry.bci >= handler[0] && entry.bci < handler[1])
+        enqueue(handler[2], 1, instructions, heights, queue);
+      Instruction instruction = entry.instruction;
+      int opcode = instruction.opcode().bytecode();
+      if (instruction instanceof BranchInstruction) {
+        enqueue(target(labels, ((BranchInstruction) instruction).target(), length, false), after,
+          instructions, heights, queue);
+        if (opcode != 167 && opcode != 200)
+          enqueue(entry.bci + 3, after, instructions, heights, queue);
+      } else if (instruction instanceof TableSwitchInstruction) {
+        TableSwitchInstruction table = (TableSwitchInstruction) instruction;
+        enqueue(target(labels, table.defaultTarget(), length, false), after, instructions, heights, queue);
+        for (SwitchCase value : table.cases())
+          enqueue(target(labels, value.target(), length, false), after, instructions, heights, queue);
+      } else if (instruction instanceof LookupSwitchInstruction) {
+        LookupSwitchInstruction lookup = (LookupSwitchInstruction) instruction;
+        enqueue(target(labels, lookup.defaultTarget(), length, false), after, instructions, heights, queue);
+        for (SwitchCase value : lookup.cases())
+          enqueue(target(labels, value.target(), length, false), after, instructions, heights, queue);
+      } else if (!(instruction instanceof ReturnInstruction || instruction instanceof ThrowInstruction)) {
+        enqueue(entry.bci + entry.bytes.length, after, instructions, heights, queue);
+      }
+    }
+    if (heights.size() != entries.size())
+      throw new UnsupportedOperationException("Dead-code rewriting is outside the selected pipeline");
+    return maximum;
+  }
+
+  private static void enqueue(int bci, int height, HashMap<Integer, Entry> instructions,
+      HashMap<Integer, Integer> heights, List<Integer> queue) {
+    Integer key = Integer.valueOf(bci);
+    if (!instructions.containsKey(key)) throw new IllegalArgumentException("Control flow falls outside an instruction boundary");
+    Integer existing = heights.get(key);
+    if (existing == null) { heights.put(key, Integer.valueOf(height)); queue.add(key); }
+    else if (existing.intValue() != height) throw new IllegalArgumentException("Incompatible operand-stack heights at merge");
+  }
+
+  private static void pad(DataOutputStream output, int bci) throws IOException {
+    for (int count = padding(bci); count > 0; count--) output.writeByte(0);
+  }
+  private static int target(IdentityHashMap<Label, Integer> labels, Label label, int length, boolean endAllowed) {
+    Integer offset = labels.get(label);
+    if (offset == null) throw new IllegalArgumentException("Unbound or foreign branch/handler label");
+    if (offset.intValue() < 0 || offset.intValue() > length || !endAllowed && offset.intValue() == length)
+      throw new IllegalArgumentException("Label is not an instruction boundary");
+    return offset.intValue();
+  }
+  private static List<SwitchCase> ordered(List<SwitchCase> values) {
+    List<SwitchCase> sorted = new ArrayList<SwitchCase>(values);
+    Collections.sort(sorted, new Comparator<SwitchCase>() {
+      public int compare(SwitchCase left, SwitchCase right) { return Integer.compare(left.caseValue(), right.caseValue()); }
+    });
+    for (int index = 1; index < sorted.size(); index++)
+      if (sorted.get(index - 1).caseValue() == sorted.get(index).caseValue())
+        throw new IllegalArgumentException("Duplicate switch case value");
+    return sorted;
+  }
+  private static int localLimit(int slot, int size) {
+    if (slot < 0 || slot > 65535 - size) throw new IllegalArgumentException("Local-variable limit exceeded");
+    return slot + size;
+  }
+  private static void u2(DataOutputStream output, int value) throws IOException {
+    if (value < 0 || value > 65535) throw new IllegalArgumentException("Unsigned-short class-file limit exceeded");
+    output.writeShort(value);
+  }
+  private static void local(DataOutputStream output, TypeKind kind, int slot, boolean load) throws IOException {
+    localLimit(slot, kind.slotSize());
+    TypeKind type = kind.asLoadable();
+    int family = type == TypeKind.INT ? 0 : type == TypeKind.LONG ? 1 : type == TypeKind.FLOAT ? 2 :
+      type == TypeKind.DOUBLE ? 3 : type == TypeKind.REFERENCE ? 4 : -1;
+    if (family < 0) throw new IllegalArgumentException("Unsupported local-variable type");
+    int opcode = (load ? 0x15 : 0x36) + family;
+    if (slot <= 3) output.writeByte((load ? 0x1a : 0x3b) + family * 4 + slot);
+    else if (slot <= 255) { output.writeByte(opcode); output.writeByte(slot); }
+    else { output.writeByte(0xc4); output.writeByte(opcode); u2(output, slot); }
+  }
+
+  private static byte[] encode(DoppioConstantPool pool, Instruction instruction) throws IOException {
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream(); DataOutputStream output = new DataOutputStream(bytes);
+    int opcode = instruction.opcode().bytecode();
+    if (instruction instanceof ConstantInstruction) {
+      ConstantInstruction constant = (ConstantInstruction) instruction; output.writeByte(opcode);
+      if (opcode == 0x10 || opcode == 0x11) {
+        int value = ((Number) (Object) constant.constantValue()).intValue();
+        if (opcode == 0x10) output.writeByte(value); else output.writeShort(value);
+      } else if (constant instanceof ConstantInstruction.LoadConstantInstruction) {
+        LoadableConstantEntry entry = ((ConstantInstruction.LoadConstantInstruction) constant).constantEntry();
+        DoppioBuilders.requireSharedPool(pool, entry.constantPool());
+        if (opcode == 0x12) {
+          if (entry.index() > 255) throw new IllegalArgumentException("ldc operand requires wide encoding");
+          output.writeByte(entry.index());
+        } else if (opcode == 0x13 || opcode == 0x14) u2(output, entry.index());
+        else throw new IllegalArgumentException("Unsupported constant-pool load opcode");
+      } else if (opcode < 1 || opcode > 15) throw new IllegalArgumentException("Unsupported constant instruction");
+    } else if (instruction instanceof LoadInstruction) {
+      LoadInstruction load = (LoadInstruction) instruction; local(output, load.typeKind(), load.slot(), true);
+    } else if (instruction instanceof StoreInstruction) {
+      StoreInstruction store = (StoreInstruction) instruction; local(output, store.typeKind(), store.slot(), false);
+    } else if (instruction instanceof IncrementInstruction) {
+      IncrementInstruction increment = (IncrementInstruction) instruction;
+      localLimit(increment.slot(), 1);
+      int amount = increment.constant();
+      if (amount < Short.MIN_VALUE || amount > Short.MAX_VALUE) throw new IllegalArgumentException("iinc constant exceeds signed short");
+      if (increment.slot() <= 255 && amount >= -128 && amount <= 127) {
+        output.writeByte(132); output.writeByte(increment.slot()); output.writeByte(amount);
+      } else { output.writeByte(196); output.writeByte(132); u2(output, increment.slot()); output.writeShort(amount); }
+    } else if (instruction instanceof FieldInstruction) {
+      FieldInstruction field = (FieldInstruction) instruction;
+      DoppioBuilders.requireSharedPool(pool, field.field().constantPool());
+      if (opcode < 178 || opcode > 181) throw new IllegalArgumentException("Unsupported field opcode");
+      output.writeByte(opcode); u2(output, field.field().index());
+    } else if (instruction instanceof InvokeInstruction) {
+      InvokeInstruction invoke = (InvokeInstruction) instruction;
+      DoppioBuilders.requireSharedPool(pool, invoke.method().constantPool());
+      if (opcode < 182 || opcode > 185) throw new IllegalArgumentException("Unsupported invocation opcode");
+      output.writeByte(opcode); u2(output, invoke.method().index());
+      if (opcode == 185) {
+        int parameters = DoppioBuilders.argumentSlots(invoke.type().stringValue()) + 1;
+        if (parameters > 255) throw new IllegalArgumentException("invokeinterface slot limit exceeded");
+        output.writeByte(parameters); output.writeByte(0);
+      }
+    } else if (instruction instanceof OperatorInstruction) {
+      if (!(opcode >= 96 && opcode <= 103 || opcode >= 148 && opcode <= 152))
+        throw new UnsupportedOperationException("Unselected arithmetic opcode");
+      output.writeByte(opcode);
+    } else if (instruction instanceof ConvertInstruction) {
+      if (opcode < 133 || opcode > 147) throw new IllegalArgumentException("Unsupported conversion opcode");
+      output.writeByte(opcode);
+    } else if (instruction instanceof StackInstruction) {
+      if (opcode != 87 && opcode != 88 && opcode != 89) throw new UnsupportedOperationException("Unselected stack opcode");
+      output.writeByte(opcode);
+    } else if (instruction instanceof ReturnInstruction) {
+      if (opcode < 172 || opcode > 177) throw new IllegalArgumentException("Unsupported return opcode");
+      output.writeByte(opcode);
+    } else if (instruction instanceof NopInstruction) output.writeByte(0);
+    else if (instruction instanceof ThrowInstruction) output.writeByte(191);
+    else if (instruction instanceof NewObjectInstruction) {
+      NewObjectInstruction allocation = (NewObjectInstruction) instruction;
+      DoppioBuilders.requireSharedPool(pool, allocation.className().constantPool());
+      output.writeByte(187); u2(output, allocation.className().index());
+    } else throw new UnsupportedOperationException("Unselected instruction generation");
+    output.flush(); return bytes.toByteArray();
+  }
+
+  private static int delta(Instruction instruction) {
+    int opcode = instruction.opcode().bytecode();
+    if (instruction instanceof ConstantInstruction) return ((ConstantInstruction) instruction).typeKind().slotSize();
+    if (instruction instanceof LoadInstruction) return ((LoadInstruction) instruction).typeKind().slotSize();
+    if (instruction instanceof StoreInstruction) return -((StoreInstruction) instruction).typeKind().slotSize();
+    if (instruction instanceof FieldInstruction) {
+      int size = DoppioBuilders.fieldSlots(((FieldInstruction) instruction).typeSymbol().descriptorString());
+      return opcode == 178 ? size : opcode == 179 ? -size : opcode == 180 ? size - 1 : -size - 1;
+    }
+    if (instruction instanceof InvokeInstruction) {
+      String descriptor = ((InvokeInstruction) instruction).type().stringValue();
+      return DoppioBuilders.fieldSlots(MethodTypeDesc.ofDescriptor(descriptor).returnType().descriptorString()) -
+        DoppioBuilders.argumentSlots(descriptor) - (opcode == 184 ? 0 : 1);
+    }
+    if (instruction instanceof OperatorInstruction) {
+      if (opcode >= 148 && opcode <= 152) return opcode == 148 || opcode >= 151 ? -3 : -1;
+      return opcode % 4 == 1 || opcode % 4 == 3 ? -2 : -1;
+    }
+    if (instruction instanceof ConvertInstruction) {
+      int[] difference = {1, 0, 1, -1, -1, 0, 0, 1, 1, -1, 0, -1, 0, 0, 0};
+      return difference[opcode - 133];
+    }
+    if (instruction instanceof StackInstruction) return opcode == 87 ? -1 : opcode == 88 ? -2 : 1;
+    if (instruction instanceof ReturnInstruction) return opcode == 177 ? 0 : opcode == 173 || opcode == 175 ? -2 : -1;
+    if (instruction instanceof ThrowInstruction) return -1;
+    if (instruction instanceof NewObjectInstruction) return 1;
+    if (instruction instanceof BranchInstruction) return opcode >= 159 && opcode <= 166 ? -2 : opcode == 167 || opcode == 200 ? 0 : -1;
+    if (instruction instanceof TableSwitchInstruction || instruction instanceof LookupSwitchInstruction) return -1;
+    return 0;
+  }
+}
