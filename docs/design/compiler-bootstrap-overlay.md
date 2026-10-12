@@ -2,9 +2,9 @@
 
 ## Status
 
-Implemented for 42 transformed Java 8 bootstrap classes and one genuinely
-compiled hidden-class ClassOption enum: 43 exact class-only entries at the
-selected C5 exit. Difficulty: medium-high.
+Implemented for 43 transformed Java 8 bootstrap classes and one genuinely
+compiled hidden-class ClassOption enum: 44 exact class-only entries at the
+selected C6 exit. Difficulty: medium-high.
 
 ## Problem
 
@@ -72,7 +72,7 @@ generator imports the compiled function and calls it for every `.class` entry
 extracted from Java 8 `rt.jar`.
 
 The exported function is the only class-to-transform dispatch. The build task
-does not use its expected 43-entry postcondition as a selection list and does
+does not use its expected 44-entry postcondition as a selection list and does
 not call individual overlay helpers. This keeps runtime metadata and
 compiler-visible metadata synchronized when a parsed overlay is added,
 removed, or reordered.
@@ -99,7 +99,7 @@ The generator visits every regular `.class` entry extracted from the pinned
 `rt.jar`, but eligibility remains inside the shared dispatch. For each entry
 `p.class`, it derives `L${p};` after normalizing platform separators to `/`.
 After transformation, an independent expected-set assertion requires the exact
-43 packaged class paths listed by the pinned baseline contract: 42 changed
+44 packaged class paths listed by the pinned baseline contract: 43 changed
 stock paths and the separately compiled ClassOption enum.
 
 The current pinned Java 8 baseline has these descriptor gates:
@@ -130,6 +130,7 @@ The current pinned Java 8 baseline has these descriptor gates:
 | `java/time/Duration.class` | `Ljava/time/Duration;` |
 | `java/lang/invoke/MethodHandles.class` | `Ljava/lang/invoke/MethodHandles;` |
 | `java/lang/invoke/MethodHandle.class` | `Ljava/lang/invoke/MethodHandle;` |
+| `java/lang/invoke/MethodType.class` | `Ljava/lang/invoke/MethodType;` |
 | `java/lang/invoke/MethodHandleImpl.class` | `Ljava/lang/invoke/MethodHandleImpl;` |
 | `java/lang/invoke/MethodHandles$Lookup.class` | `Ljava/lang/invoke/MethodHandles$Lookup;` |
 | `java/nio/MappedByteBuffer.class` | `Ljava/nio/MappedByteBuffer;` |
@@ -173,8 +174,10 @@ instead of assuming the tool invocation is reproducible.
 At least `java/lang/Runtime.class`, the selected transformed
 `java/lang/invoke/MethodHandle*` consumer classes, `java/time/Duration.class`,
 and `java/util/concurrent/TimeUnit.class` are required outputs because the broad
-and focused compiler smokes depend on their direct modern methods. More
-generally, a test records the complete 43-class expected packaged-entry set for
+and focused compiler smokes depend on their direct modern methods.
+`java/lang/invoke/MethodType.class` is also required to bind C6's parsed
+Constable/descriptor projection. More generally, a test records the complete
+44-class expected packaged-entry set for
 the pinned Java 8 baseline; changing that set requires an intentional
 parsed-overlay review.
 
@@ -191,11 +194,12 @@ again.
 
 `ci/modern_bootstrap_overlay_smoke.sh` performs two independent forced clean
 generations and compares the final JAR SHA-256 values. It then checks the stored
-artifact hash, exact 43-entry count, canonical class-only names, and required
-`Runtime`, `MethodHandle`, `MethodHandles`, `MethodHandles$Lookup`, `Duration`,
+artifact hash, exact 44-entry count, canonical class-only names, and required
+`Runtime`, `MethodHandle`, `MethodType`, `MethodHandles`,
+`MethodHandles$Lookup`, `Duration`,
 `TimeUnit`, `AbstractStringBuilder`, `StringBuilder`, `StringBuffer`, `String`,
 `Pattern`, `Field` and `MethodHandles$Lookup$ClassOption` entries.
-The generator itself compares the complete sorted 43-class set before
+The generator itself compares the complete sorted 44-class set before
 packaging, so an added, removed, or unexpectedly unchanged stock parsed overlay
 requires an intentional contract update. ClassOption is an explicit entry;
 independent metadata tests validate its nested-type/runtime projection.
@@ -210,6 +214,32 @@ Actual metadata tests independently compare Class/Field/Lookup/MethodHandles
 and the enum in this JAR with the runtime's transformed bytes. This exact
 43-entry compiler projection is separate from the scoped verifier's 38-stock-
 class/1,525-Code-method inventory and from semantic host outcome counts.
+
+At the frozen selected C6 implementation `0aa573593`, both fresh forced
+generations produce 44 exact class-only entries and SHA-256
+`caa9598e266120414c393b6b03a1158988fe42d12a626a1482685f3d33434daa`.
+The additional stock `MethodType` entry uses the same parsed transform as the
+runtime: its Constable/descriptor metadata and hidden-class-safe descriptor
+method are not compiler-only declarations. Actual metadata tests compare its
+projected bytes, as well as the retained Class/Field/Lookup/MethodHandles and
+ClassOption bytes, with runtime transformations. No host carrier is added.
+
+The current scoped stock-overlay verifier independently checks 39 selected
+stock classes and 1,601 Code bodies (141 generated/rewritten and 1,460
+byte-identical retained bodies). The complete original MethodType descriptor
+Code survives under a private synthetic alias; all eleven C5 aliases,
+historical body hashes and branch frames remain intact. These counts are
+distinct from the 44-entry compiler projection and the 42 original-javac C6
+class-file artifacts. See the
+[C6 batch exit](../phase-c-invocation.md#c6-verified-batch-exit).
+
+The fresh same-source selected Kotlin/Scala MethodHandle compiler smokes pass
+with this artifact and lock-verified inputs (544/387 seconds). An initial
+Kotlin compile timed out at the unchanged 900-second limit while retained
+controls also ran; that failed receipt is preserved. An isolated rerun passed
+without source, input, timeout or test changes. This does not establish a
+particular timeout cause, descriptor String cache/identity, or full language
+support.
 
 ## Compiler Smoke Classpaths
 
