@@ -480,6 +480,26 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Check phase C VarHandle execution contracts
+        timeout-minutes: 3
+        run: node --test ci/java_methodhandle_varhandle_contract_test.mjs
+
+      # C3 requires genuine field/array/interoperation values on every host.
+      # Single-thread results do not prove concurrent visibility or ordering.
+      - name: Run Java VarHandle execution compatibility
+        id: java_methodhandle_varhandle
+        timeout-minutes: 40
+        run: node ci/java_methodhandle_varhandle_test.mjs --browser
+
+      - name: Upload Java VarHandle execution ledger
+        if: always() && steps.java_methodhandle_varhandle.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-methodhandle-varhandle-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Check evolved switch ledger contract
         timeout-minutes: 1
         run: node --test ci/java_pattern_evolution_contract_test.mjs

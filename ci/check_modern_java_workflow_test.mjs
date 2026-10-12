@@ -97,6 +97,9 @@ const methodHandleCoreRunnerCommand = 'node ci/java_methodhandle_core_test.mjs -
 const methodHandleCollectionUnits = ['ci/java_methodhandle_collection_contract_test.mjs'];
 const methodHandleCollectionUnitCommand = `node --test ${methodHandleCollectionUnits.join(' ')}`;
 const methodHandleCollectionRunnerCommand = 'node ci/java_methodhandle_collection_test.mjs --browser';
+const varHandleUnits = ['ci/java_methodhandle_varhandle_contract_test.mjs'];
+const varHandleUnitCommand = `node --test ${varHandleUnits.join(' ')}`;
+const varHandleRunnerCommand = 'node ci/java_methodhandle_varhandle_test.mjs --browser';
 const memberGates = [
   {name: 'member resolution', units: memberResolutionUnits, unitCommand: memberResolutionUnitCommand,
     runnerCommand: memberResolutionRunnerCommand, stepId: 'java_member_resolution',
@@ -127,6 +130,9 @@ const memberGates = [
   {name: 'method handle collection', units: methodHandleCollectionUnits, unitCommand: methodHandleCollectionUnitCommand,
     runnerCommand: methodHandleCollectionRunnerCommand, stepId: 'java_methodhandle_collection',
     ledger: 'build/java-methodhandle-collection-results.json', timeout: 40},
+  {name: 'VarHandle execution', units: varHandleUnits, unitCommand: varHandleUnitCommand,
+    runnerCommand: varHandleRunnerCommand, stepId: 'java_methodhandle_varhandle',
+    ledger: 'build/java-methodhandle-varhandle-results.json', timeout: 40},
 ];
 const packageScripts = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).scripts;
 for (const [name, command] of [
@@ -156,6 +162,8 @@ for (const [name, command] of [
   ['ci:methodhandle-core', methodHandleCoreRunnerCommand],
   ['ci:methodhandle-collection:test', methodHandleCollectionUnitCommand],
   ['ci:methodhandle-collection', methodHandleCollectionRunnerCommand],
+  ['ci:varhandle-execution:test', varHandleUnitCommand],
+  ['ci:varhandle-execution', varHandleRunnerCommand],
 ]) {
   if (packageScripts[name] !== command) {
     throw new Error(`${name} must retain the complete compatibility command: ${command}`);
@@ -356,6 +364,9 @@ for (const name of [
   'Check phase C collection and control flow contracts',
   'Run Java method handle collection compatibility',
   'Upload Java method handle collection ledger',
+  'Check phase C VarHandle execution contracts',
+  'Run Java VarHandle execution compatibility',
+  'Upload Java VarHandle execution ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -741,6 +752,108 @@ for (const [original, replacement] of [
   );
 }
 
+for (const replacement of [
+  'echo VarHandle execution checked',
+  varHandleRunnerCommand.replace(' --browser', ' --diagnostic'),
+  varHandleRunnerCommand + ' --case selected',
+  varHandleRunnerCommand + ' --group fields',
+  varHandleRunnerCommand + ' --fixture selected',
+  varHandleRunnerCommand + ' --host node',
+  varHandleRunnerCommand + ' --guest node',
+  varHandleRunnerCommand + ' --skip-native',
+  varHandleRunnerCommand + ' --allow-oracle-waiver',
+  varHandleRunnerCommand + '; exit 0',
+  varHandleRunnerCommand + ' | tee varhandle-execution.log',
+  'DOPPIO_VERIFY_SOURCE=1 ' + varHandleRunnerCommand,
+]) {
+  expectCheckerFailure(
+    `filtered, diagnostic or swallowed VarHandle execution runner: ${replacement}`,
+    {workflow: replaceRequired(realWorkflow, `run: ${varHandleRunnerCommand}\n`, `run: ${replacement}\n`)},
+    'exact bounded, fail-closed baseline command or artifact contract'
+  );
+}
+
+for (const replacement of [
+  'node --test --test-name-pattern=selected ci/java_methodhandle_varhandle_contract_test.mjs',
+  varHandleUnitCommand + ' --test-name-pattern=selected',
+  'DOPPIO_VERIFY_SOURCE=1 ' + varHandleUnitCommand,
+  varHandleUnitCommand + '; exit 0',
+  'echo VarHandle contracts checked',
+]) {
+  expectCheckerFailure(
+    `filtered or replaced VarHandle execution contracts: ${replacement}`,
+    {workflow: replaceRequired(realWorkflow, `run: ${varHandleUnitCommand}\n`, `run: ${replacement}\n`)},
+    'exact bounded, fail-closed baseline command or artifact contract'
+  );
+}
+
+for (const name of ['Check phase C VarHandle execution contracts', 'Run Java VarHandle execution compatibility',
+  'Upload Java VarHandle execution ledger']) {
+  for (const field of ['if: false', '"if": false', 'continue-on-error: true', 'continue-on-error: false',
+    'shell: bash {0}', 'working-directory: ignored', 'env: {DOPPIO_VERIFY_SOURCE: 1}']) {
+    expectCheckerFailure(
+      `${name} gains noncanonical scheduling or context field ${field}`,
+      {workflow: replaceRequired(realWorkflow, `      - name: ${name}\n`, `      - name: ${name}\n        ${field}\n`)},
+      'exact bounded, fail-closed baseline command or artifact contract'
+    );
+  }
+  const start = realWorkflow.indexOf(`      - name: ${name}\n`);
+  const end = realWorkflow.indexOf('\n      - name:', start + 1) + 1;
+  if (start < 0 || end <= start) throw new Error('Missing bounded VarHandle execution step fixture: ' + name);
+  const block = realWorkflow.slice(start, end);
+  expectCheckerFailure(
+    `duplicate VarHandle execution step ${name}`,
+    {workflow: replaceRequired(realWorkflow, block, block + block)},
+    `contain the ${name} step exactly once`
+  );
+  if (name !== 'Upload Java VarHandle execution ledger') {
+    expectCheckerFailure(
+      `renamed duplicate VarHandle execution command ${name}`,
+      {workflow: replaceRequired(realWorkflow, block,
+        block + block.replace(`- name: ${name}\n`, '- name: Duplicate VarHandle execution command\n'))},
+      'execute VarHandle execution command exactly once'
+    );
+  }
+}
+
+for (const [name, minutes] of [['Check phase C VarHandle execution contracts', 3],
+  ['Run Java VarHandle execution compatibility', 40]]) {
+  const command = name === 'Check phase C VarHandle execution contracts' ? varHandleUnitCommand : varHandleRunnerCommand;
+  for (const replacement of ['timeout-minutes: 0', 'timeout-minutes: 1000', `timeout-minutes: "${minutes}"`,
+    `timeout-minutes: \${{ ${minutes} }}`, `timeout-minutes: ${minutes}\n        timeout-minutes: ${minutes}`,
+    `"timeout-minutes": ${minutes}`]) {
+    expectCheckerFailure(
+      `unbounded or ambiguous VarHandle execution timeout: ${name}: ${replacement}`,
+      {workflow: replaceRequired(realWorkflow, `timeout-minutes: ${minutes}\n        run: ${command}\n`,
+        `${replacement}\n        run: ${command}\n`)},
+      'exact bounded, fail-closed baseline command or artifact contract'
+    );
+  }
+}
+
+for (const [original, replacement] of [
+  ["if: always() && steps.java_methodhandle_varhandle.outcome != 'skipped'",
+    "if: always() && steps.java_methodhandle_collection.outcome != 'skipped'"],
+  ["if: always() && steps.java_methodhandle_varhandle.outcome != 'skipped'",
+    "if: always() && steps.java_methodhandle_core.outcome != 'skipped'"],
+  ['path: build/java-methodhandle-varhandle-results.json', 'path: build/java-methodhandle-collection-results.json'],
+  ['path: build/java-methodhandle-varhandle-results.json', 'path: build/java-methodhandle-core-results.json'],
+  ['path: build/java-methodhandle-varhandle-results.json', 'path: build/java-methodhandle-varhandle-native-only-results.json'],
+  ['path: build/java-methodhandle-varhandle-results.json', 'path: build/java-methodhandle-varhandle-diagnostic-results.json'],
+  ['path: build/java-methodhandle-collection-results.json', 'path: build/java-methodhandle-varhandle-results.json'],
+  ['path: build/java-methodhandle-core-results.json', 'path: build/java-methodhandle-varhandle-results.json'],
+  ['path: build/java-methodhandle-varhandle-results.json\n          archive: false\n          if-no-files-found: error\n          retention-days: 7',
+    'path: build/java-methodhandle-varhandle-results.json\n          archive: false\n          if-no-files-found: error\n          retention-days: 0'],
+  ["if: always() && steps.java_methodhandle_varhandle.outcome != 'skipped'\n        uses: actions/upload-artifact@v7",
+    "if: always() && steps.java_methodhandle_varhandle.outcome != 'skipped'\n        uses: actions/upload-artifact@v6"],
+]) {
+  expectCheckerFailure(
+    `cross-wired, diagnostic or discarded VarHandle execution ledger: ${original}`,
+    {workflow: replaceRequired(realWorkflow, original, replacement)},
+    'exact bounded, fail-closed baseline command or artifact contract'
+  );
+}
+
 // B4d must execute the whole genuine two-release/three-host runner, never a
 // filtered diagnostic or a replacement command that merely reports success.
 for (const command of [
@@ -932,7 +1045,10 @@ for (const [firstName, secondName] of [
   ['Upload Java method handle core ledger', 'Check phase C collection and control flow contracts'],
   ['Check phase C collection and control flow contracts', 'Run Java method handle collection compatibility'],
   ['Run Java method handle collection compatibility', 'Upload Java method handle collection ledger'],
-  ['Upload Java method handle collection ledger', 'Check evolved switch ledger contract'],
+  ['Upload Java method handle collection ledger', 'Check phase C VarHandle execution contracts'],
+  ['Check phase C VarHandle execution contracts', 'Run Java VarHandle execution compatibility'],
+  ['Run Java VarHandle execution compatibility', 'Upload Java VarHandle execution ledger'],
+  ['Upload Java VarHandle execution ledger', 'Check evolved switch ledger contract'],
 ]) {
   expectCheckerFailure(
     `member resolution/access dependency reversed: ${firstName} before ${secondName}`,
