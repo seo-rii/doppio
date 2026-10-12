@@ -15,20 +15,22 @@ final class DoppioClassFile implements ClassFile {
   private final ConstantPoolSharingOption poolSharing;
   private final AttributesProcessingOption attributesProcessing;
   private final Function<Utf8Entry, AttributeMapper<?>> customAttributes;
+  private final ClassHierarchyResolver hierarchyResolver;
 
   DoppioClassFile(Option[] options) {
     this(StackMapsOption.STACK_MAPS_WHEN_REQUIRED, ConstantPoolSharingOption.SHARED_POOL,
-        AttributesProcessingOption.PASS_ALL_ATTRIBUTES, entry -> null, options);
+        AttributesProcessingOption.PASS_ALL_ATTRIBUTES, entry -> null, ClassHierarchyResolver.defaultResolver(), options);
   }
 
   private DoppioClassFile(StackMapsOption initialStackMaps, ConstantPoolSharingOption initialPoolSharing,
       AttributesProcessingOption initialAttributesProcessing, Function<Utf8Entry, AttributeMapper<?>> initialCustomAttributes,
-      Option[] options) {
+      ClassHierarchyResolver initialHierarchyResolver, Option[] options) {
     Objects.requireNonNull(options);
     StackMapsOption selectedStackMaps = initialStackMaps;
     ConstantPoolSharingOption selectedPoolSharing = initialPoolSharing;
     AttributesProcessingOption selectedAttributesProcessing = initialAttributesProcessing;
     Function<Utf8Entry, AttributeMapper<?>> selectedCustomAttributes = initialCustomAttributes;
+    ClassHierarchyResolver selectedHierarchyResolver = initialHierarchyResolver;
     for (Option option : options) {
       Objects.requireNonNull(option);
       if (option instanceof StackMapsOption) selectedStackMaps = (StackMapsOption) option;
@@ -36,16 +38,19 @@ final class DoppioClassFile implements ClassFile {
       else if (option instanceof AttributesProcessingOption) selectedAttributesProcessing = (AttributesProcessingOption) option;
       else if (option instanceof AttributeMapperOption)
         selectedCustomAttributes = Objects.requireNonNull(((AttributeMapperOption) option).attributeMapper());
+      else if (option instanceof ClassHierarchyResolverOption)
+        selectedHierarchyResolver = Objects.requireNonNull(((ClassHierarchyResolverOption) option).classHierarchyResolver());
       else throw new IllegalArgumentException("Unsupported Class-File option");
     }
     this.stackMaps = selectedStackMaps;
     this.poolSharing = selectedPoolSharing;
     this.attributesProcessing = selectedAttributesProcessing;
     this.customAttributes = selectedCustomAttributes;
+    this.hierarchyResolver = selectedHierarchyResolver;
   }
 
   public ClassFile withOptions(Option... options) {
-    return new DoppioClassFile(stackMaps, poolSharing, attributesProcessing, customAttributes, options);
+    return new DoppioClassFile(stackMaps, poolSharing, attributesProcessing, customAttributes, hierarchyResolver, options);
   }
 
   public ClassModel parse(byte[] bytes) {
@@ -57,7 +62,7 @@ final class DoppioClassFile implements ClassFile {
     Objects.requireNonNull(pool);
     Objects.requireNonNull(handler);
     if (!(pool instanceof DoppioConstantPool)) throw new IllegalArgumentException("Unsupported constant pool builder");
-    return DoppioBuilders.build(name, (DoppioConstantPool) pool, handler, stackMaps, attributesProcessing);
+    return DoppioBuilders.build(name, (DoppioConstantPool) pool, handler, stackMaps, attributesProcessing, hierarchyResolver);
   }
 
   public byte[] transformClass(ClassModel model, ClassEntry name, ClassTransform transform) {
@@ -66,14 +71,14 @@ final class DoppioClassFile implements ClassFile {
     Objects.requireNonNull(transform);
     boolean remapBound = poolSharing == ConstantPoolSharingOption.NEW_POOL;
     DoppioConstantPool pool = remapBound ? new DoppioConstantPool() : DoppioConstantPool.copyOf(model.constantPool());
-    return DoppioBuilders.transform(model, name, pool, transform, stackMaps, attributesProcessing, remapBound);
+    return DoppioBuilders.transform(model, name, pool, transform, stackMaps, attributesProcessing, remapBound, hierarchyResolver);
   }
 
   public List<VerifyError> verify(byte[] bytes) {
-    return DoppioClassFileVerifier.verify(Objects.requireNonNull(bytes), customAttributes);
+    return DoppioClassFileVerifier.verify(Objects.requireNonNull(bytes), customAttributes, hierarchyResolver);
   }
 
   public List<VerifyError> verify(ClassModel model) {
-    return DoppioClassFileVerifier.verify(Objects.requireNonNull(model));
+    return DoppioClassFileVerifier.verify(Objects.requireNonNull(model), hierarchyResolver);
   }
 }

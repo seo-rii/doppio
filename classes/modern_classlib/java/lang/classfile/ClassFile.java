@@ -46,6 +46,15 @@ public interface ClassFile {
       };
     }
   }
+  interface ClassHierarchyResolverOption extends Option {
+    ClassHierarchyResolver classHierarchyResolver();
+    static ClassHierarchyResolverOption of(ClassHierarchyResolver resolver) {
+      Objects.requireNonNull(resolver);
+      return new ClassHierarchyResolverOption() {
+        public ClassHierarchyResolver classHierarchyResolver() { return resolver; }
+      };
+    }
+  }
 
   static ClassFile of() { return new DoppioClassFile(new Option[0]); }
   static ClassFile of(Option... options) { return new DoppioClassFile(options); }

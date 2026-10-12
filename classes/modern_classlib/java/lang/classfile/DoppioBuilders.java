@@ -78,15 +78,17 @@ final class DoppioBuilders {
   }
 
   static byte[] build(ClassEntry name, DoppioConstantPool pool, Consumer<? super ClassBuilder> handler,
-      ClassFile.StackMapsOption stackMaps, ClassFile.AttributesProcessingOption attributesProcessing) {
-    ClassSink builder = new ClassSink(name, pool, stackMaps, attributesProcessing, false);
+      ClassFile.StackMapsOption stackMaps, ClassFile.AttributesProcessingOption attributesProcessing,
+      ClassHierarchyResolver hierarchyResolver) {
+    ClassSink builder = new ClassSink(name, pool, stackMaps, attributesProcessing, false, hierarchyResolver);
     handler.accept(builder);
     return builder.bytes();
   }
 
   static byte[] transform(ClassModel model, ClassEntry name, DoppioConstantPool pool, ClassTransform transform,
-      ClassFile.StackMapsOption stackMaps, ClassFile.AttributesProcessingOption attributesProcessing, boolean remapBound) {
-    ClassSink builder = new ClassSink(name, pool, stackMaps, attributesProcessing, remapBound);
+      ClassFile.StackMapsOption stackMaps, ClassFile.AttributesProcessingOption attributesProcessing, boolean remapBound,
+      ClassHierarchyResolver hierarchyResolver) {
+    ClassSink builder = new ClassSink(name, pool, stackMaps, attributesProcessing, remapBound, hierarchyResolver);
     builder.transform(model, transform);
     return builder.bytes();
   }
@@ -106,6 +108,8 @@ final class DoppioBuilders {
     ClassEntry superclass();
     List<ClassEntry> interfaces();
     int majorVersion();
+    int classFlags();
+    ClassHierarchyResolver hierarchyResolver();
     ClassFile.AttributesProcessingOption attributesProcessing();
     boolean remapBound();
   }
@@ -153,6 +157,8 @@ final class DoppioBuilders {
     public ClassEntry superclass() { return context.superclass(); }
     public List<ClassEntry> interfaces() { return context.interfaces(); }
     public int majorVersion() { return context.majorVersion(); }
+    public int classFlags() { return context.classFlags(); }
+    public ClassHierarchyResolver hierarchyResolver() { return context.hierarchyResolver(); }
     public ClassFile.AttributesProcessingOption attributesProcessing() { return context.attributesProcessing(); }
     public boolean remapBound() { return context.remapBound(); }
     public ConstantPoolBuilder constantPool() { return pool(); }
@@ -241,6 +247,7 @@ final class DoppioBuilders {
     final ClassEntry name;
     final ClassFile.AttributesProcessingOption attributesProcessing;
     final boolean remapBound;
+    final ClassHierarchyResolver hierarchyResolver;
     int flags = ClassFile.ACC_SUPER;
     int major = 69, minor = 0;
     ClassEntry superclass;
@@ -249,9 +256,10 @@ final class DoppioBuilders {
     final List<MethodModel> methods = new ArrayList<MethodModel>();
     final List<Attribute<?>> attributes = new ArrayList<Attribute<?>>();
     ClassSink(ClassEntry name, DoppioConstantPool pool, ClassFile.StackMapsOption stackMaps,
-        ClassFile.AttributesProcessingOption attributesProcessing, boolean remapBound) {
+        ClassFile.AttributesProcessingOption attributesProcessing, boolean remapBound, ClassHierarchyResolver hierarchyResolver) {
       this.pool = Objects.requireNonNull(pool); this.stackMaps = Objects.requireNonNull(stackMaps);
       this.attributesProcessing = Objects.requireNonNull(attributesProcessing); this.remapBound = remapBound;
+      this.hierarchyResolver = Objects.requireNonNull(hierarchyResolver);
       this.name = pool.classEntry(pool.utf8Entry(Objects.requireNonNull(name).name().stringValue()));
       this.superclass = pool.classEntry(ClassDesc.of("java.lang.Object"));
     }
@@ -261,6 +269,8 @@ final class DoppioBuilders {
     public ClassEntry superclass() { return superclass; }
     public List<ClassEntry> interfaces() { return interfaces; }
     public int majorVersion() { return major; }
+    public int classFlags() { return flags; }
+    public ClassHierarchyResolver hierarchyResolver() { return hierarchyResolver; }
     public ClassFile.AttributesProcessingOption attributesProcessing() { return attributesProcessing; }
     public boolean remapBound() { return remapBound; }
     public ConstantPoolBuilder constantPool() { return pool; }
@@ -785,7 +795,8 @@ final class DoppioBuilders {
     DoppioCodeFlow.Result analyzed = DoppioCodeFlow.analyze(code.owner.className().asSymbol(),
       code.owner.superclass() == null ? null : code.owner.superclass().asSymbol(), interfaces,
       code.pool, code.name.stringValue(), MethodTypeDesc.ofDescriptor(code.type.stringValue()),
-      code.flags, result.bytes, 65535, result.maxLocals, result.handlers);
+      code.flags, result.bytes, 65535, result.maxLocals, result.handlers, null, false,
+      code.owner.hierarchyResolver(), code.owner.classFlags());
     return new EncodedCode(result, analyzed.maxStack,
       analyzed.frames.isEmpty() ? null : stackMap(code.pool, analyzed.frames));
   }

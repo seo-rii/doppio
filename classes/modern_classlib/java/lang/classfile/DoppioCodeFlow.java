@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 
-/** Selected CFG analysis shared by generation and verification; never loads classes. */
+/** Selected CFG analysis shared by generation and verification; never defines or initializes classes. */
 final class DoppioCodeFlow {
   private DoppioCodeFlow() {}
 
@@ -69,15 +69,26 @@ final class DoppioCodeFlow {
       ConstantPool pool, String methodName, MethodTypeDesc type, int flags,
       byte[] code, int maxStack, int maxLocals, List<int[]> handlers) {
     return analyze(owner, superclass, interfaces, pool, methodName, type, flags, code,
-        maxStack, maxLocals, handlers, null, false);
+        maxStack, maxLocals, handlers, null, false, ClassHierarchyResolver.defaultResolver(), 0);
   }
 
   static Result analyze(ClassDesc owner, ClassDesc superclass, List<ClassDesc> interfaces,
       ConstantPool pool, String methodName, MethodTypeDesc type, int flags,
       byte[] code, int maxStack, int maxLocals, List<int[]> handlers,
       Map<Integer, Frame> declaredFrames, boolean requireStackMaps) {
+    return analyze(owner, superclass, interfaces, pool, methodName, type, flags, code,
+        maxStack, maxLocals, handlers, declaredFrames, requireStackMaps,
+        ClassHierarchyResolver.defaultResolver(), 0);
+  }
+
+  static Result analyze(ClassDesc owner, ClassDesc superclass, List<ClassDesc> interfaces,
+      ConstantPool pool, String methodName, MethodTypeDesc type, int flags,
+      byte[] code, int maxStack, int maxLocals, List<int[]> handlers,
+      Map<Integer, Frame> declaredFrames, boolean requireStackMaps,
+      ClassHierarchyResolver resolver, int ownerClassFlags) {
     Analysis analysis = new Analysis(owner, superclass, interfaces, pool, methodName, type,
-        flags, code, maxStack, maxLocals, handlers, declaredFrames, requireStackMaps);
+        flags, code, maxStack, maxLocals, handlers, declaredFrames, requireStackMaps,
+        resolver, ownerClassFlags);
     return analysis.run();
   }
 
@@ -120,6 +131,7 @@ final class DoppioCodeFlow {
     final ClassDesc owner, superclass;
     final List<ClassDesc> interfaces;
     final ConstantPool pool;
+    final DoppioClassHierarchy hierarchy;
     final MethodTypeDesc type;
     final byte[] code;
     final int maxStack, maxLocals;
@@ -135,9 +147,10 @@ final class DoppioCodeFlow {
     Analysis(ClassDesc owner, ClassDesc superclass, List<ClassDesc> interfaces,
         ConstantPool pool, String name, MethodTypeDesc type, int flags, byte[] code,
         int maxStack, int maxLocals, List<int[]> handlers, Map<Integer, Frame> declared,
-        boolean requireStackMaps) {
+        boolean requireStackMaps, ClassHierarchyResolver resolver, int ownerClassFlags) {
       this.owner = owner; this.superclass = superclass; this.interfaces = interfaces;
       this.pool = pool; this.type = type; this.code = code;
+      this.hierarchy = new DoppioClassHierarchy(resolver, owner, superclass, ownerClassFlags);
       this.maxStack = maxStack; this.maxLocals = maxLocals; this.handlers = handlers;
       this.declared = declared;
       if (code.length == 0 || code.length > 65535 || maxStack < 0 || maxStack > 65535 ||
@@ -155,7 +168,8 @@ final class DoppioCodeFlow {
           throw new VerifyError("Invalid exception-handler range");
         if (handler[3] != 0) {
           String caught = pool.entryByIndex(handler[3], ClassEntry.class).asSymbol().descriptorString();
-          if (!throwable(caught)) unsupported("exception catch hierarchy");
+          if (!hierarchy.assignable(caught, "Ljava/lang/Throwable;"))
+            throw new VerifyError("Exception catch type is not assignable to Throwable");
         }
         frameTargets.add(handler[2]);
       }
@@ -306,7 +320,8 @@ final class DoppioCodeFlow {
       if (left.same(right)) return left;
       if (left.kind == 'N' && right.kind == 'A') return right;
       if (right.kind == 'N' && left.kind == 'A') return left;
-      if (left.kind == 'A' && right.kind == 'A') return value("Ljava/lang/Object;");
+      if (left.kind == 'A' && right.kind == 'A')
+        return value(hierarchy.commonAncestor(left.descriptor, right.descriptor));
       if (local) return TOP;
       throw new VerifyError("Incompatible operand types at join");
     }
@@ -318,21 +333,8 @@ final class DoppioCodeFlow {
       }
       if (actual.kind == 'N') return;
       if (actual.kind != 'A') throw new VerifyError("Incompatible reference value");
-      if (descriptor.equals(actual.descriptor) || "Ljava/lang/Object;".equals(descriptor)) return;
-      if (actual.descriptor.equals(owner.descriptorString())) {
-        if (superclass != null && descriptor.equals(superclass.descriptorString())) return;
-        for (ClassDesc implemented : interfaces) if (descriptor.equals(implemented.descriptorString())) return;
-      }
-      if (throwable(actual.descriptor) && throwable(descriptor)) {
-        String parent = throwableParent(actual.descriptor);
-        while (parent != null) {
-          if (parent.equals(descriptor)) return;
-          parent = throwableParent(parent);
-        }
-        throw new VerifyError("Incompatible selected exception type");
-      }
-      if ("Ljava/lang/Object;".equals(actual.descriptor)) throw new VerifyError("Object is not assignable to a narrower reference type");
-      unsupported("reference hierarchy assignability");
+      if (!hierarchy.assignable(actual.descriptor, descriptor))
+        throw new VerifyError("Reference " + actual.descriptor + " is not assignable to " + descriptor);
     }
 
     void execute(State state, Instruction instruction) {
@@ -554,21 +556,6 @@ final class DoppioCodeFlow {
 
   private static void initializedReference(Value value) {
     if (value.kind == 'U') throw new VerifyError("Uninitialized reference operand");
-  }
-  private static boolean throwable(String descriptor) {
-    return "Ljava/lang/Throwable;".equals(descriptor) || throwableParent(descriptor) != null;
-  }
-  private static String throwableParent(String descriptor) {
-    switch (descriptor) {
-      case "Ljava/lang/Exception;": case "Ljava/lang/Error;": return "Ljava/lang/Throwable;";
-      case "Ljava/lang/RuntimeException;": return "Ljava/lang/Exception;";
-      case "Ljava/lang/IllegalArgumentException;": case "Ljava/lang/IllegalStateException;":
-      case "Ljava/lang/NullPointerException;": case "Ljava/lang/ArithmeticException;":
-      case "Ljava/lang/ClassCastException;": case "Ljava/lang/IndexOutOfBoundsException;":
-        return "Ljava/lang/RuntimeException;";
-      case "Ljava/lang/ArrayIndexOutOfBoundsException;": return "Ljava/lang/IndexOutOfBoundsException;";
-      default: return null;
-    }
   }
   private static void unsupported(String contract) {
     throw new UnsupportedOperationException("Class-File flow outside selected C7b: " + contract);

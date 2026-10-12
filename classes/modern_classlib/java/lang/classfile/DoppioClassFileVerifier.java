@@ -18,7 +18,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 
-/** Pure library verification: no definition, loading, initialization or host verifier. */
+/** Library verification: no class definition, initialization or host verifier as a verdict. */
 final class DoppioClassFileVerifier {
   private DoppioClassFileVerifier() {}
 
@@ -27,14 +27,25 @@ final class DoppioClassFileVerifier {
   }
 
   static List<VerifyError> verify(byte[] bytes, Function<Utf8Entry, AttributeMapper<?>> customAttributes) {
+    return verify(bytes, customAttributes, ClassHierarchyResolver.defaultResolver());
+  }
+
+  static List<VerifyError> verify(byte[] bytes, Function<Utf8Entry, AttributeMapper<?>> customAttributes,
+      ClassHierarchyResolver resolver) {
     Objects.requireNonNull(bytes);
     Objects.requireNonNull(customAttributes);
-    try { return verify(DoppioClassReader.parse(bytes, customAttributes)); }
+    Objects.requireNonNull(resolver);
+    try { return verify(DoppioClassReader.parse(bytes, customAttributes), resolver); }
     catch (IllegalArgumentException malformed) { return error(malformed.getMessage()); }
   }
 
   static List<VerifyError> verify(ClassModel model) {
+    return verify(model, ClassHierarchyResolver.defaultResolver());
+  }
+
+  static List<VerifyError> verify(ClassModel model, ClassHierarchyResolver resolver) {
     Objects.requireNonNull(model);
+    Objects.requireNonNull(resolver);
     List<VerifyError> errors = new ArrayList<>();
     try {
       ClassDesc owner = model.thisClass().asSymbol();
@@ -43,7 +54,7 @@ final class DoppioClassFileVerifier {
         if ("V".equals(field.fieldTypeSymbol().descriptorString())) throw new VerifyError("Void field descriptor");
       }
       for (MethodModel method : model.methods()) {
-        try { verifyMethod(model, method); }
+        try { verifyMethod(model, method, resolver); }
         catch (VerifyError failed) { errors.add(failed); }
         catch (IllegalArgumentException malformed) { errors.add(new VerifyError(malformed.getMessage())); }
       }
@@ -54,7 +65,7 @@ final class DoppioClassFileVerifier {
 
   private static List<VerifyError> error(String message) { return Collections.singletonList(new VerifyError(message)); }
 
-  private static void verifyMethod(ClassModel model, MethodModel method) {
+  private static void verifyMethod(ClassModel model, MethodModel method, ClassHierarchyResolver resolver) {
     int flags = method.flags().flagsMask();
     MethodTypeDesc type = method.methodTypeSymbol();
     String name = method.methodName().stringValue();
@@ -90,7 +101,8 @@ final class DoppioClassFileVerifier {
     for (ClassEntry implemented : model.interfaces()) interfaces.add(implemented.asSymbol());
     DoppioCodeFlow.analyze(model.thisClass().asSymbol(), model.superclass().isPresent() ? model.superclass().get().asSymbol() : null,
         interfaces, model.constantPool(), name, type, flags, bytes,
-        DoppioClassReader.maxStack(code), DoppioClassReader.maxLocals(code), handlers, frames, model.majorVersion() >= 50);
+        DoppioClassReader.maxStack(code), DoppioClassReader.maxLocals(code), handlers, frames, model.majorVersion() >= 50,
+        resolver, model.flags().flagsMask());
   }
 
   private static List<DoppioCodeFlow.Value> verificationEntries(ClassModel model, MethodModel method,
