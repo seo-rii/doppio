@@ -158,6 +158,8 @@
     "ci:classfile-extended": "node ci/java_classfile_extended_test.mjs --browser",
     "ci:classfile-hierarchy:test": "node --test ci/java_classfile_hierarchy_contract_test.mjs ci/classfile_hierarchy_metadata_test.cjs ci/classfile_constant_instruction_test.cjs",
     "ci:classfile-hierarchy": "node ci/java_classfile_hierarchy_test.mjs --browser",
+    "ci:classfile-instructions:test": "node --test --test-concurrency=2 ci/java_classfile_instructions_contract_test.mjs ci/classfile_memory_instruction_test.cjs ci/classfile_instruction_writer_test.cjs ci/classfile_instruction_frame_policy_test.cjs",
+    "ci:classfile-instructions": "node ci/java_classfile_instructions_test.mjs --browser",
     "ci:java25-main": "node ci/java25_main_test.mjs --browser",
     "ci:java-uncaught-exit": "node ci/java_uncaught_exit_test.mjs --browser",
     "ci:java-uncaught-exit:test": "node ci/jvm_exit_status_test.cjs && node --test ci/java_uncaught_exit_contract_test.mjs",

@@ -42,6 +42,8 @@ const classFileExtendedUnitCommand = 'node --test ci/java_classfile_extended_con
 const classFileExtendedRunnerCommand = 'node ci/java_classfile_extended_test.mjs --browser';
 const classFileHierarchyUnitCommand = 'node --test ci/java_classfile_hierarchy_contract_test.mjs ci/classfile_hierarchy_metadata_test.cjs ci/classfile_constant_instruction_test.cjs';
 const classFileHierarchyRunnerCommand = 'node ci/java_classfile_hierarchy_test.mjs --browser';
+const classFileInstructionsUnitCommand = 'node --test --test-concurrency=2 ci/java_classfile_instructions_contract_test.mjs ci/classfile_memory_instruction_test.cjs ci/classfile_instruction_writer_test.cjs ci/classfile_instruction_frame_policy_test.cjs';
+const classFileInstructionsRunnerCommand = 'node ci/java_classfile_instructions_test.mjs --browser';
 
 function stripUnquotedComments(text) {
   return text.split('\n').map((line) => {
@@ -1069,6 +1071,24 @@ for (const [name, fields] of [
     '  if-no-files-found: error',
     '  retention-days: 7',
   ]],
+  ['Check phase C class-file instructions contracts', [
+    'timeout-minutes: 3',
+    `run: ${classFileInstructionsUnitCommand}`,
+  ]],
+  ['Run Java class-file instructions compatibility', [
+    'id: java_classfile_instructions',
+    'timeout-minutes: 40',
+    `run: ${classFileInstructionsRunnerCommand}`,
+  ]],
+  ['Upload Java class-file instructions ledger', [
+    "if: always() && steps.java_classfile_instructions.outcome != 'skipped'",
+    'uses: actions/upload-artifact@v7',
+    'with:',
+    '  path: build/java-classfile-instructions-results.json',
+    '  archive: false',
+    '  if-no-files-found: error',
+    '  retention-days: 7',
+  ]],
   ['Check evolved switch ledger contract', [
     'timeout-minutes: 1',
     'run: node --test ci/java_pattern_evolution_contract_test.mjs',
@@ -1264,6 +1284,9 @@ const runtimeOrder = [
   'Check phase C class-file hierarchy contracts',
   'Run Java class-file hierarchy compatibility',
   'Upload Java class-file hierarchy ledger',
+  'Check phase C class-file instructions contracts',
+  'Run Java class-file instructions compatibility',
+  'Upload Java class-file instructions ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -1307,7 +1330,8 @@ for (const [name, commands] of [['user bootstrap', [bootstrapUnitCommand, bootst
   ['public class-file API', [classFileApiUnitCommand, classFileApiRunnerCommand]],
   ['class-file control-flow', [classFileControlFlowUnitCommand, classFileControlFlowRunnerCommand]],
   ['class-file extended', [classFileExtendedUnitCommand, classFileExtendedRunnerCommand]],
-  ['class-file hierarchy', [classFileHierarchyUnitCommand, classFileHierarchyRunnerCommand]]]) {
+  ['class-file hierarchy', [classFileHierarchyUnitCommand, classFileHierarchyRunnerCommand]],
+  ['class-file instructions', [classFileInstructionsUnitCommand, classFileInstructionsRunnerCommand]]]) {
   for (const command of commands) if (countLiteral(runtimeJob, `        run: ${command}\n`) !== 1) {
     fail(`Modern Java workflow must execute ${name} command exactly once: ${command}`);
   }
