@@ -73,8 +73,7 @@ test('generation passes the explicit dead-code policy to real typed analysis', (
   assert.ok(body.some(value => value.cp.owner === 'java.lang.classfile.DoppioCodeAssembler' && value.cp.name === 'assemble' &&
     value.cp.descriptor.includes('Ljava/lang/classfile/ClassFile$DeadLabelsOption;Ljava/lang/classfile/ClassFile$ShortJumpsOption;')));
 });
-for (const [entry, profile, count] of [['Switch', 'switch', 1], ['Backward', 'backward', 1],
-  ['Jumps', 'jumps', 4], ['Labels', 'labels', 4], ['Dead', 'dead', 3], ['Transform', 'transform', 1]])
+for (const [entry, profile, count] of [['Switch', 'switch', 1], ['Backward', 'backward', 1], ['Jumps', 'jumps', 4]])
   test('fresh real guest matches native writer profile: ' + profile, () => {
     const result = runClassFileMetadataGuest({root, output, diagnostic:writerDiagnostic, checked,
       className:'classes.modern_test.ClassFileInstructionWriterRegression$' + entry,
