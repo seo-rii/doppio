@@ -2,8 +2,9 @@
 
 ## Status
 
-Implemented for all 36 bootstrap classes currently changed by Doppio's parsed
-overlay dispatch. Difficulty: medium-high.
+Implemented for 42 transformed Java 8 bootstrap classes and one genuinely
+compiled hidden-class ClassOption enum: 43 exact class-only entries at the
+selected C5 exit. Difficulty: medium-high.
 
 ## Problem
 
@@ -21,9 +22,10 @@ Scala. That proved the source was valid, but it also exposed host JDK metadata
 that Doppio did not own.
 
 The replacement is a generated, compiler-only JAR containing the Java 8
-bootstrap classes changed by Doppio's parsed-overlay transformer. It presents
-exactly the metadata Doppio will present at runtime without importing a host
-JDK's API surface.
+bootstrap classes changed by Doppio's parsed-overlay transformer plus the exact
+compiled/overlaid ClassOption enum required by Lookup's public signatures. It
+presents exactly the metadata Doppio will present at runtime without importing
+a host JDK's API surface.
 
 ## Goals
 
@@ -31,7 +33,8 @@ JDK's API surface.
   compiler metadata generation.
 - Generate the overlay from the repository's Java 8
   `vendor/java_home/lib/rt.jar`.
-- Package only class entries whose bytes actually change.
+- Package changed stock entries and the one explicit, hash-bound public
+  ClassOption shim; never copy arbitrary helper or host-JDK classes.
 - Make clean rebuilds byte-for-byte deterministic and gate stale artifacts by
   content hash rather than modification time.
 - Put the generated JAR before `doppio.jar` and `rt.jar` for Kotlin and Scala
@@ -54,7 +57,11 @@ The artifact is generated build output and is not added to `jdk.json`, release
 runtime listings, `JAVA_HOME`, or the normal Doppio bootstrap classpath. It
 contains no copied resources, unchanged classes, directory entries, manifest,
 host JDK classes, or Doppio helper classes. Helper and shim classes remain in
-`vendor/java_home/lib/doppio.jar`.
+`vendor/java_home/lib/doppio.jar`. The sole explicit API-type projection is
+`java/lang/invoke/MethodHandles$Lookup$ClassOption.class`: stock Java 8 lacks it,
+so the artifact includes the genuinely compiled enum after the same runtime
+InnerClasses metadata overlay. It is not a fabricated compiler declaration or
+a copy from a host JDK.
 
 ## Shared Overlay Dispatch
 
@@ -65,7 +72,7 @@ generator imports the compiled function and calls it for every `.class` entry
 extracted from Java 8 `rt.jar`.
 
 The exported function is the only class-to-transform dispatch. The build task
-does not use its expected 36-class postcondition as a selection list and does
+does not use its expected 43-entry postcondition as a selection list and does
 not call individual overlay helpers. This keeps runtime metadata and
 compiler-visible metadata synchronized when a parsed overlay is added,
 removed, or reordered.
@@ -74,7 +81,9 @@ The transform has this contract:
 
 - `typeStr` is a JVM reference descriptor such as
   `Ljava/time/Duration;`, not a binary name or path.
-- `data` is the untouched class entry from the configured Java 8 `rt.jar`.
+- for stock descriptors, `data` is the untouched class entry from the configured
+  Java 8 `rt.jar`; the sole ClassOption projection receives the untouched,
+  genuinely compiled shim bytes.
 - an ineligible descriptor returns the original bytes unchanged;
 - an eligible descriptor returns the fully transformed class bytes;
 - malformed or unexpected Java 8 class structure is a hard error, not a
@@ -90,9 +99,10 @@ The generator visits every regular `.class` entry extracted from the pinned
 `rt.jar`, but eligibility remains inside the shared dispatch. For each entry
 `p.class`, it derives `L${p};` after normalizing platform separators to `/`.
 After transformation, an independent expected-set assertion requires the exact
-36 changed class paths listed by the pinned baseline contract.
+43 packaged class paths listed by the pinned baseline contract: 42 changed
+stock paths and the separately compiled ClassOption enum.
 
-The initial Java 8 baseline has these descriptor gates:
+The current pinned Java 8 baseline has these descriptor gates:
 
 | Entry gate | Descriptor gate |
 | --- | --- |
@@ -101,6 +111,7 @@ The initial Java 8 baseline has these descriptor gates:
 | `java/lang/Class.class` | `Ljava/lang/Class;` |
 | `java/lang/reflect/Executable.class` | `Ljava/lang/reflect/Executable;` |
 | `java/lang/reflect/Constructor.class` | `Ljava/lang/reflect/Constructor;` |
+| `java/lang/reflect/Field.class` | `Ljava/lang/reflect/Field;` |
 | `java/lang/reflect/AccessibleObject.class` | `Ljava/lang/reflect/AccessibleObject;` |
 | `java/lang/reflect/Annotated*.class`, except `AnnotatedElement.class` | descriptors beginning `Ljava/lang/reflect/Annotated`, except `Ljava/lang/reflect/AnnotatedElement;` |
 | `sun/reflect/annotation/AnnotatedTypeFactory$Annotated*.class` | descriptors beginning `Lsun/reflect/annotation/AnnotatedTypeFactory$Annotated` |
@@ -111,6 +122,7 @@ The initial Java 8 baseline has these descriptor gates:
 | `java/lang/System.class` | `Ljava/lang/System;` |
 | `java/lang/Runtime.class` | `Ljava/lang/Runtime;` |
 | `java/lang/Character.class` | `Ljava/lang/Character;` |
+| `java/lang/Integer.class`, `java/lang/Long.class`, `java/lang/Float.class`, `java/lang/Double.class` | exact corresponding primitive-wrapper descriptors |
 | `java/lang/Math.class`, `java/lang/StrictMath.class` | `Ljava/lang/Math;`, `Ljava/lang/StrictMath;` |
 | `java/lang/AbstractStringBuilder.class`, `java/lang/StringBuilder.class`, `java/lang/StringBuffer.class` | `Ljava/lang/AbstractStringBuilder;`, `Ljava/lang/StringBuilder;`, `Ljava/lang/StringBuffer;` |
 | `java/lang/String.class`, `java/util/regex/Pattern.class` | `Ljava/lang/String;`, `Ljava/util/regex/Pattern;` |
@@ -118,6 +130,7 @@ The initial Java 8 baseline has these descriptor gates:
 | `java/time/Duration.class` | `Ljava/time/Duration;` |
 | `java/lang/invoke/MethodHandles.class` | `Ljava/lang/invoke/MethodHandles;` |
 | `java/lang/invoke/MethodHandle.class` | `Ljava/lang/invoke/MethodHandle;` |
+| `java/lang/invoke/MethodHandleImpl.class` | `Ljava/lang/invoke/MethodHandleImpl;` |
 | `java/lang/invoke/MethodHandles$Lookup.class` | `Ljava/lang/invoke/MethodHandles$Lookup;` |
 | `java/nio/MappedByteBuffer.class` | `Ljava/nio/MappedByteBuffer;` |
 
@@ -138,7 +151,8 @@ member must fail the task. Matching only a method name is not sufficient.
 
 The task performs these steps:
 
-1. Require the configured Java 8 `rt.jar` and the compiled shared transformer.
+1. Require the configured Java 8 `rt.jar`, compiled shared transformer and
+   genuinely compiled ClassOption shim.
 2. Extract `rt.jar` into a fresh private work directory. No host `jmod`,
    `jrt:/` image, or `JAVA_HOME` classes are consulted.
 3. Enumerate every extracted `.class` entry.
@@ -146,7 +160,9 @@ The task performs these steps:
    `applyModernBootstrapOverlays` once with the untouched bytes.
 5. Compare input and output by byte content, not JavaScript object identity.
    Write only non-identical outputs to the staging directory.
-6. Package the sorted changed-class paths directly, without recursively adding
+6. Apply the same dispatch to the exact compiled ClassOption input and add that
+   explicit API-type output. Its source and compiled bytes are hashed inputs.
+7. Package the sorted class paths directly, without recursively adding
    staging directories or an automatic manifest.
 
 The changed paths are sorted before the JDK 17 `jar` tool packages them without
@@ -154,11 +170,11 @@ a manifest or directory entries. `--date=2000-01-01T00:00:00Z` fixes every
 entry timestamp. The CI determinism smoke verifies the resulting archive bytes
 instead of assuming the tool invocation is reproducible.
 
-At least `java/lang/Runtime.class`, the three transformed
+At least `java/lang/Runtime.class`, the selected transformed
 `java/lang/invoke/MethodHandle*` consumer classes, `java/time/Duration.class`,
 and `java/util/concurrent/TimeUnit.class` are required outputs because the broad
 and focused compiler smokes depend on their direct modern methods. More
-generally, a test records the complete 36-class expected changed-entry set for
+generally, a test records the complete 43-class expected packaged-entry set for
 the pinned Java 8 baseline; changing that set requires an intentional
 parsed-overlay review.
 
@@ -166,24 +182,34 @@ parsed-overlay review.
 
 Modification times are not an acceptable freshness check. The task computes a
 versioned SHA-256 input fingerprint over the exact `rt.jar`, compiled overlay
-transformer, generator implementation, and deterministic archive settings. A
-cache hit is valid only when both the stored input fingerprint and the stored
+transformer, generator implementation, ClassOption source/compiled bytes, and
+deterministic archive settings. A cache hit is valid only when both the stored
+input fingerprint and the stored
 SHA-256 of `modern-bootstrap.jar` match the files on disk. Otherwise the task
 recreates its private build directory and writes the artifact and hash metadata
 again.
 
 `ci/modern_bootstrap_overlay_smoke.sh` performs two independent forced clean
 generations and compares the final JAR SHA-256 values. It then checks the stored
-artifact hash, exact 36-entry count, canonical class-only names, and required
+artifact hash, exact 43-entry count, canonical class-only names, and required
 `Runtime`, `MethodHandle`, `MethodHandles`, `MethodHandles$Lookup`, `Duration`,
 `TimeUnit`, `AbstractStringBuilder`, `StringBuilder`, `StringBuffer`, `String`,
-and `Pattern` entries.
-The generator itself compares the complete sorted 36-class set before
-packaging, so an added, removed, or unexpectedly unchanged
-parsed overlay requires an intentional contract update.
+`Pattern`, `Field` and `MethodHandles$Lookup$ClassOption` entries.
+The generator itself compares the complete sorted 43-class set before
+packaging, so an added, removed, or unexpectedly unchanged stock parsed overlay
+requires an intentional contract update. ClassOption is an explicit entry;
+independent metadata tests validate its nested-type/runtime projection.
 
 A same-input hash mismatch fails CI and reports both hashes. The task must not
 silently bless a newly nondeterministic output.
+
+At the frozen selected C5 implementation `8d38c63e2`, both forced generations
+produce SHA-256
+`0db0822f6f71bb10a9102c40ccf5c87fc785d1b2c7e24d4772f7afc6ffc28bd5`.
+Actual metadata tests independently compare Class/Field/Lookup/MethodHandles
+and the enum in this JAR with the runtime's transformed bytes. This exact
+43-entry compiler projection is separate from the scoped verifier's 38-stock-
+class/1,525-Code-method inventory and from semantic host outcome counts.
 
 ## Compiler Smoke Classpaths
 
@@ -258,7 +284,9 @@ new compatibility mechanism:
 - direct-call-only resolution in `ConstantPool.ts` is not materialized;
 - custom reflection-table entries that do not alter class bytes are not
   materialized;
-- new class-library classes are not copied from `doppio.jar` into the overlay;
+- arbitrary new class-library classes are not copied from `doppio.jar` into the
+  overlay; the one explicit ClassOption API-type projection uses its exact
+  compiled and hash-bound build input;
 - runtime behavior and native helpers continue to live in the existing runtime
   and modern class library.
 

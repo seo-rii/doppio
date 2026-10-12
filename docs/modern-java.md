@@ -207,9 +207,10 @@ all eight direct-call descriptors and compare host/Doppio output using only the
 generated Doppio compiler bootstrap overlay. Difficulty: medium.
 
 Compiler bootstrap note: `modern-ci-release-cli` generates a deterministic
-compiler-only JAR containing the 41 Java 8 bootstrap classes changed by the
-shared parsed-overlay dispatch. Kotlin and Scala put this artifact before
-`doppio.jar` and `rt.jar` for source analysis, eliminating host JDK metadata
+compiler-only JAR containing 42 changed Java 8 bootstrap classes and the exact
+genuinely compiled/overlaid ClassOption enum: 43 class-only entries. Kotlin and
+Scala put this artifact before `doppio.jar` and `rt.jar` for source analysis,
+eliminating host JDK metadata
 from the main compiler, broad modern interop, duration, diagnostic, Kotlin
 bytecode, basic/advanced/modern constructs, local and JVM interop,
 default/synthetic and JVM-default lowering, indy string concat, focused
