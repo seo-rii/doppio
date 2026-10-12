@@ -3101,6 +3101,108 @@ function addJavaLangInvokeFilterArgumentsModernOverlay(data: Buffer): Buffer {
     'filterArguments', descriptor, cp.count, 3, 3, code);
 }
 
+/** Append C3 delegates only after the older invoke overlays have allocated
+ * their constants. Keep their Code operands stable, and retain the complete
+ * stock findVirtual body under a private alias for non-VarHandle lookups. */
+function addJavaLangInvokeVarHandleModernOverlays(data: Buffer, lookup: boolean): Buffer {
+  var utf8: {[index: number]: string} = {},
+    cp = constantPoolEnd(data, utf8),
+    constants: Buffer[] = [],
+    nextIndex = cp.count;
+  function addConstant(value: Buffer): number {
+    var index = nextIndex++;
+    constants.push(value);
+    return index;
+  }
+  function addUtf8(value: string): number { return addConstant(utf8Constant(value)); }
+  function addClass(value: string): number {
+    return addConstant(Buffer.concat([Buffer.from([7]), u2(addUtf8(value))]));
+  }
+  function addMethodRef(owner: number, name: string, descriptor: string): number {
+    var nameIndex = addUtf8(name), descriptorIndex = addUtf8(descriptor),
+      nameAndType = addConstant(Buffer.concat([
+        Buffer.from([12]), u2(nameIndex), u2(descriptorIndex)
+      ]));
+    return addConstant(Buffer.concat([Buffer.from([10]), u2(owner), u2(nameAndType)]));
+  }
+  var codeName = addUtf8('Code'), signatureName = addUtf8('Signature'),
+    exceptionsName = addUtf8('Exceptions'),
+    helperClass = addClass('java/lang/invoke/DoppioVarHandles'),
+    lookupDescriptor = 'Ljava/lang/invoke/MethodHandles$Lookup;',
+    fieldDescriptor = '(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/invoke/VarHandle;',
+    virtualDescriptor = '(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;',
+    illegalAccess = lookup ? addClass('java/lang/IllegalAccessException') : 0,
+    noSuchField = lookup ? addClass('java/lang/NoSuchFieldException') : 0,
+    overlays: Array<{name: string; descriptor: string; arguments: number;
+      signature?: string; exceptions?: number[]}> = lookup ? [
+      {name: 'findVarHandle', descriptor: fieldDescriptor, arguments: 4,
+        signature: '(Ljava/lang/Class<*>;Ljava/lang/String;Ljava/lang/Class<*>;)Ljava/lang/invoke/VarHandle;',
+        exceptions: [noSuchField, illegalAccess]},
+      {name: 'findStaticVarHandle', descriptor: fieldDescriptor, arguments: 4,
+        signature: '(Ljava/lang/Class<*>;Ljava/lang/String;Ljava/lang/Class<*>;)Ljava/lang/invoke/VarHandle;',
+        exceptions: [noSuchField, illegalAccess]},
+      {name: 'unreflectVarHandle', descriptor: '(Ljava/lang/reflect/Field;)Ljava/lang/invoke/VarHandle;',
+        arguments: 2, exceptions: [illegalAccess]}
+    ] : [
+      {name: 'arrayElementVarHandle', descriptor: '(Ljava/lang/Class;)Ljava/lang/invoke/VarHandle;',
+        arguments: 1, signature: '(Ljava/lang/Class<*>;)Ljava/lang/invoke/VarHandle;'},
+      {name: 'varHandleInvoker', descriptor: '(Ljava/lang/invoke/VarHandle$AccessMode;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;',
+        arguments: 2},
+      {name: 'varHandleExactInvoker', descriptor: '(Ljava/lang/invoke/VarHandle$AccessMode;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;',
+        arguments: 2}
+    ],
+    methodData = overlays.map((overlay): Buffer => {
+      var nameIndex = addUtf8(overlay.name), descriptorIndex = addUtf8(overlay.descriptor),
+        helperDescriptor = lookup ? '(' + lookupDescriptor + overlay.descriptor.slice(1) : overlay.descriptor,
+        helperMethod = addMethodRef(helperClass, overlay.name, helperDescriptor),
+        loads: number[] = [];
+      for (var i = 0; i < overlay.arguments; i++) loads.push(0x2a + i);
+      var code = Buffer.concat([Buffer.from(loads.concat([0xb8])), u2(helperMethod), Buffer.from([0xb0])]),
+        attributes = [Buffer.concat([
+          u2(codeName), u4(12 + code.length), u2(overlay.arguments), u2(overlay.arguments),
+          u4(code.length), code, u2(0), u2(0)
+        ])];
+      if (overlay.signature !== undefined) {
+        attributes.push(Buffer.concat([u2(signatureName), u4(2), u2(addUtf8(overlay.signature))]));
+      }
+      if (overlay.exceptions !== undefined) {
+        attributes.push(Buffer.concat([u2(exceptionsName), u4(2 + 2 * overlay.exceptions.length),
+          u2(overlay.exceptions.length), Buffer.concat(overlay.exceptions.map(u2))]));
+      }
+      return Buffer.concat([u2(lookup ? 0x0001 : 0x0009), u2(nameIndex), u2(descriptorIndex),
+        u2(attributes.length), Buffer.concat(attributes)]);
+    }),
+    virtualCode: Buffer = null;
+  if (lookup) {
+    var methods = methodsInfo(data, cp.offset), offset = methods.countOffset + 2,
+      aliasName = addUtf8('doppioFindVirtualBase'), found = false;
+    for (var index = 0; index < methods.count; index++) {
+      var end = skipMember(data, offset);
+      if (utf8[data.readUInt16BE(offset + 2)] === 'findVirtual' &&
+          utf8[data.readUInt16BE(offset + 4)] === virtualDescriptor) {
+        methodData.push(Buffer.concat([u2(0x0002), u2(aliasName), data.slice(offset + 4, end)]));
+        found = true;
+        break;
+      }
+      offset = end;
+    }
+    if (!found) throw new Error('Stock Lookup.findVirtual is missing');
+    virtualCode = Buffer.concat([Buffer.from([0x2a, 0x2b, 0x2c, 0x2d, 0xb8]),
+      u2(addMethodRef(helperClass, 'findVirtual', '(' + lookupDescriptor + virtualDescriptor.slice(1))),
+      Buffer.from([0xb0])]);
+  }
+  var extraConstants = Buffer.concat(constants),
+    withConstants = Buffer.concat([data.slice(0, 8), u2(nextIndex), data.slice(10, cp.offset),
+      extraConstants, data.slice(cp.offset)]),
+    bodyOffset = cp.offset + extraConstants.length,
+    withVirtual = lookup ? replaceMethodCode(withConstants, bodyOffset, 'findVirtual',
+      virtualDescriptor, codeName, 4, 4, virtualCode) : withConstants,
+    table = methodsInfo(withVirtual, bodyOffset);
+  return Buffer.concat([withVirtual.slice(0, table.countOffset), u2(table.count + methodData.length),
+    withVirtual.slice(table.countOffset + 2, table.endOffset), Buffer.concat(methodData),
+    withVirtual.slice(table.endOffset)]);
+}
+
 function addJavaLangInvokeMethodHandleModernOverlays(data: Buffer): Buffer {
   var cp = constantPoolEnd(data),
     overlays = [
@@ -3769,6 +3871,7 @@ export function applyModernBootstrapOverlays(typeStr: string, data: Buffer): Buf
   if (typeStr === 'Ljava/lang/invoke/MethodHandles;') {
     data = addJavaLangInvokeMethodHandlesModernOverlays(data);
     data = addJavaLangInvokeFilterArgumentsModernOverlay(data);
+    data = addJavaLangInvokeVarHandleModernOverlays(data, false);
   }
   if (typeStr === 'Ljava/lang/invoke/MethodHandle;') {
     data = addJavaLangInvokeMethodHandleModernOverlays(data);
@@ -3778,6 +3881,7 @@ export function applyModernBootstrapOverlays(typeStr: string, data: Buffer): Buf
   }
   if (typeStr === 'Ljava/lang/invoke/MethodHandles$Lookup;') {
     data = addJavaLangInvokeMethodHandlesLookupModernOverlays(data);
+    data = addJavaLangInvokeVarHandleModernOverlays(data, true);
   }
   if (typeStr === 'Ljava/nio/MappedByteBuffer;') {
     data = addJavaNioMappedByteBufferModernOverlays(data);

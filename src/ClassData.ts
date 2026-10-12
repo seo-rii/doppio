@@ -1423,6 +1423,13 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
       if (m !== null && m.accessFlags.isNative() && m.accessFlags.isVarArgs() && m.cls === this) {
         return m;
       }
+    } else if (this.className === 'Ljava/lang/invoke/VarHandle;') {
+      // The unique canonical native declaration can return Object, void or
+      // boolean; its erased descriptor is not the caller's symbolic type.
+      var name = signature.slice(0, signature.indexOf('(')),
+        declarations = this.getMethods().filter(method => method.name === name);
+      if (declarations.length === 1 && declarations[0].cls === this &&
+          declarations[0].isSignaturePolymorphic()) return declarations[0];
     } else if (this.superClass !== null) {
       return this.superClass.signaturePolymorphicAwareMethodLookup(signature);
     }

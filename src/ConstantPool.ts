@@ -684,6 +684,9 @@ export class MethodReference implements IConstantPoolItem {
    * memberName.
    */
   public appendix: JVMTypes.java_lang_Object = null;
+  /** Real Java invoker for a VarHandle mode. Its type adds VarHandle to the
+   * original call-site parameters; the CP descriptor/word count stay original. */
+  public varHandleInvoker: JVMTypes.java_lang_invoke_MethodHandle = null;
   /**
    * The JavaScript constructor for the class that the method belongs to.
    */
@@ -760,6 +763,81 @@ export class MethodReference implements IConstantPoolItem {
           }
         });
       }
+    });
+  }
+
+  private resolveVarHandleMemberName(method: Method, thread: JVMThread, cl: ClassLoader,
+      caller: ReferenceClassData<JVMTypes.java_lang_Object>, cb: (status: boolean) => void): void {
+    var bootstrap = thread.getBsCl(), descriptor = this.nameAndTypeInfo.descriptor,
+      fail = (error: JVMTypes.java_lang_Throwable) => { thread.throwException(error); cb(false); };
+    // MethodType carries live classes from the caller's loader. In particular,
+    // arbitrary caller types must not acquire bootstrap member constraints.
+    util.createMethodType(thread, cl, descriptor, (error: JVMTypes.java_lang_Throwable,
+        originalType: JVMTypes.java_lang_invoke_MethodType) => {
+      if (error) { fail(error); return; }
+      bootstrap.initializeClass(thread, 'Ljava/lang/invoke/VarHandle$AccessMode;',
+          (modeClass: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+        if (modeClass === null) { cb(false); return; }
+        (<any> modeClass.getConstructor(thread))[
+          'java/lang/invoke/VarHandle$AccessMode/valueFromMethodName(Ljava/lang/String;)Ljava/lang/invoke/VarHandle$AccessMode;'
+        ](thread, [thread.getJVM().internString(this.nameAndTypeInfo.name)],
+            (error?: JVMTypes.java_lang_Throwable, mode?: JVMTypes.java_lang_Object) => {
+          if (error) { fail(error); return; }
+          bootstrap.initializeClass(thread, 'Ljava/lang/invoke/DoppioVarHandles;',
+              (helperClass: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+            if (helperClass === null) { cb(false); return; }
+            (<any> helperClass.getConstructor(thread))[
+              'java/lang/invoke/DoppioVarHandles/invoker(Ljava/lang/invoke/VarHandle$AccessMode;Ljava/lang/invoke/MethodType;Z)Ljava/lang/invoke/MethodHandle;'
+            ](thread, [mode, originalType, 0],
+                (error?: JVMTypes.java_lang_Throwable, invoker?: JVMTypes.java_lang_invoke_MethodHandle) => {
+              if (error) { fail(error); return; }
+              if (invoker === null || invoker === undefined) {
+                thread.throwNewException('Ljava/lang/InternalError;', 'VarHandle invoker factory returned no MethodHandle');
+                cb(false); return;
+              }
+              // Java 8's linker handles MethodHandles, not VarHandles. Link the
+              // actual Java bridge through invokeExact with a separate type.
+              var linkageDescriptor = '(Ljava/lang/invoke/VarHandle;' + descriptor.slice(1);
+              util.createMethodType(thread, cl, linkageDescriptor,
+                  (error: JVMTypes.java_lang_Throwable, linkageType: JVMTypes.java_lang_invoke_MethodType) => {
+                if (error) { fail(error); return; }
+                bootstrap.initializeClass(thread, 'Ljava/lang/invoke/MethodHandle;',
+                    (handleClass: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+                  if (handleClass === null) { cb(false); return; }
+                  var natives = <any> (<ReferenceClassData<JVMTypes.java_lang_Object>> bootstrap.getInitializedClass(
+                      thread, 'Ljava/lang/invoke/MethodHandleNatives;')).getConstructor(thread),
+                    appendix = new ((<ArrayClassData<JVMTypes.java_lang_Object>> bootstrap.getInitializedClass(
+                      thread, '[Ljava/lang/Object;')).getConstructor(thread))(thread, 1);
+                  natives[
+                    'java/lang/invoke/MethodHandleNatives/linkMethod(Ljava/lang/Class;ILjava/lang/Class;Ljava/lang/String;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/invoke/MemberName;'
+                  ](thread, [caller.getClassObject(thread), MethodHandleReferenceKind.INVOKEVIRTUAL,
+                    handleClass.getClassObject(thread), thread.getJVM().internString('invokeExact'), linkageType, appendix],
+                      (error?: JVMTypes.java_lang_Throwable, linked?: JVMTypes.java_lang_invoke_MemberName) => {
+                    if (error) { fail(error); return; }
+                    if (linked === null || linked === undefined) {
+                      thread.throwNewException('Ljava/lang/InternalError;', 'VarHandle invokeExact linkage returned no MemberName');
+                      cb(false); return;
+                    }
+                    // Finish all potentially failing construction before
+                    // publishing any cache. The declaration remains canonical;
+                    // its erased return type never controls the caller's slots.
+                    var constructor = method.cls.getConstructor(thread),
+                      words = util.getMethodDescriptorWordSize(descriptor);
+                    this.paramWordSize = words;
+                    this.fullSignature = method.fullSignature;
+                    this.jsConstructor = constructor;
+                    this.varHandleInvoker = invoker;
+                    this.appendix = appendix.array[0];
+                    this.memberName = linked;
+                    this.method = method;
+                    cb(true);
+                  });
+                });
+              });
+            });
+          });
+        });
+      });
     });
   }
 
@@ -3389,6 +3467,18 @@ export class MethodReference implements IConstantPoolItem {
       if (method === null && util.is_reference_type(cls.getInternalName())) {
         // Signature polymorphic lookup.
         method = (<ReferenceClassData<JVMTypes.java_lang_Object>> cls).signaturePolymorphicAwareMethodLookup(this.signature);
+      }
+      if (method !== null && method.isSignaturePolymorphic() &&
+          method.cls.getInternalName() === 'Ljava/lang/invoke/VarHandle;') {
+        return resolveExactMemberAccess(thread, caller, method, cls, allowed => {
+          if (allowed === null) { cb(false); return; }
+          if (!allowed) {
+            this.resolution.throwFailure(thread, 'Ljava/lang/IllegalAccessError;',
+              `${caller.getExternalName()} cannot access ${method.cls.getExternalName()}.${method.name}`);
+            cb(false); return;
+          }
+          this.resolveVarHandleMemberName(method, thread, loader, caller, cb);
+        });
       }
       if (method !== null && method.isSignaturePolymorphic() &&
           (method.name === 'invoke' || method.name === 'invokeExact')) {

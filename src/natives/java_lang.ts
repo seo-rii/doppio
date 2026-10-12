@@ -21,6 +21,7 @@ import * as JVMTypes from '../../includes/JVMTypes';
 import {setImmediate} from 'browserfs';
 import {refreshMemberNameMethodTarget} from '../method_handles';
 import {getKnownNestHost, resolveNestHost, isVirtualMachineError} from '../ClassAccess';
+import varHandleNatives from './java_lang_invoke';
 
 export default function (): any {
   var debug = logging.debug;
@@ -3346,6 +3347,10 @@ export default function (): any {
     var methods = natives[name] || (natives[name] = {});
     methods['resolveConstantDesc(Ljava/lang/invoke/MethodHandles$Lookup;)L' + name + ';'] = resolveNominalConstant;
     methods['resolveConstantDesc(Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/Object;'] = resolveNominalConstant;
+  });
+  var invokeNatives = varHandleNatives();
+  Object.keys(invokeNatives).forEach((name: string) => {
+    natives[name] = invokeNatives[name];
   });
   return natives;
 };

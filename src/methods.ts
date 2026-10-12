@@ -864,9 +864,11 @@ export class Method extends AbstractMethodField {
       this.numBBEntries = codeLength > 3 ? 200 : 1000 * codeLength;
     }
     this.isNative = this.accessFlags.isNative();
-    this.isSignaturePolymorphicMethod = this.cls.getInternalName() === 'Ljava/lang/invoke/MethodHandle;' &&
-      this.isNative && this.accessFlags.isVarArgs() &&
-      this.rawDescriptor === '([Ljava/lang/Object;)Ljava/lang/Object;';
+    this.isSignaturePolymorphicMethod =
+      (this.cls.getInternalName() === 'Ljava/lang/invoke/MethodHandle;' ||
+       this.cls.getInternalName() === 'Ljava/lang/invoke/VarHandle;') &&
+      (this.declaredAccessFlags & 0x0180) === 0x0180 &&
+      this.parameterTypes.length === 1 && this.parameterTypes[0] === '[Ljava/lang/Object;';
     if (this.isNative && !this.isSignaturePolymorphicMethod) {
       const parameterCount = this.parameterTypes.length;
       if (parameterCount === 0) {
@@ -1278,12 +1280,13 @@ if(invokeSpecialMethod(t,f.method.cls,methodReference${suffix}.classInfo.cls,met
 
   /**
    * Check if this is a signature polymorphic method.
-   * From S2.9:
+   * From JVMS 2.9.3:
    * A method is signature polymorphic if and only if all of the following conditions hold :
-   * * It is declared in the java.lang.invoke.MethodHandle class.
+   * * It is declared in MethodHandle or VarHandle.
    * * It has a single formal parameter of type Object[].
-   * * It has a return type of Object.
    * * It has the ACC_VARARGS and ACC_NATIVE flags set.
+   * The return type is unrestricted; VarHandle setters and comparisons use
+   * void and boolean declarations. Native traps do not change this metadata.
    */
   public isSignaturePolymorphic(): boolean {
     return this.isSignaturePolymorphicMethod;

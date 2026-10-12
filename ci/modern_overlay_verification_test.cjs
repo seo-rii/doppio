@@ -72,6 +72,24 @@ const withVarargsDescriptor = '(Z)Ljava/lang/invoke/MethodHandle;';
 let withVarargsOverlay;
 const spreadArgumentDescriptor = '(Ljava/lang/Object;I)V';
 let spreadArgumentOverlay;
+const varHandleFactories = [
+  ['java/lang/invoke/MethodHandles', 'arrayElementVarHandle', '(Ljava/lang/Class;)Ljava/lang/invoke/VarHandle;', 1,
+    '(Ljava/lang/Class<*>;)Ljava/lang/invoke/VarHandle;', []],
+  ['java/lang/invoke/MethodHandles', 'varHandleInvoker', '(Ljava/lang/invoke/VarHandle$AccessMode;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;', 2, null, []],
+  ['java/lang/invoke/MethodHandles', 'varHandleExactInvoker', '(Ljava/lang/invoke/VarHandle$AccessMode;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;', 2, null, []],
+  ['java/lang/invoke/MethodHandles$Lookup', 'findVarHandle', '(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/invoke/VarHandle;', 4,
+    '(Ljava/lang/Class<*>;Ljava/lang/String;Ljava/lang/Class<*>;)Ljava/lang/invoke/VarHandle;', ['java/lang/NoSuchFieldException', 'java/lang/IllegalAccessException']],
+  ['java/lang/invoke/MethodHandles$Lookup', 'findStaticVarHandle', '(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/invoke/VarHandle;', 4,
+    '(Ljava/lang/Class<*>;Ljava/lang/String;Ljava/lang/Class<*>;)Ljava/lang/invoke/VarHandle;', ['java/lang/NoSuchFieldException', 'java/lang/IllegalAccessException']],
+  ['java/lang/invoke/MethodHandles$Lookup', 'unreflectVarHandle', '(Ljava/lang/reflect/Field;)Ljava/lang/invoke/VarHandle;', 2,
+    null, ['java/lang/IllegalAccessException']]
+];
+const virtualDescriptor = '(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;';
+const isVarHandleDelegate = (className, name, descriptor) =>
+  varHandleFactories.some(entry => entry[0] === className && entry[1] === name && entry[2] === descriptor) ||
+  className === 'java/lang/invoke/MethodHandles$Lookup' && name === 'findVirtual' && descriptor === virtualDescriptor;
+let lookupVirtualOverlay;
+let lookupVirtualAlias;
 
 before(async () => {
   const {readStructureLayout} = await import('./java_class_structure_test.mjs');
@@ -127,7 +145,13 @@ before(async () => {
       const bytes = overlaid.subarray(code.instructionsOffset, code.instructionsOffset + code.codeLength);
       const old = beforeLayout.methods.entries.find(other => other.descriptor === member.descriptor &&
         (other.name === member.name || className === 'java/time/Duration' &&
-          member.name === 'toBigDecimalSeconds' && other.name === 'toSeconds'));
+          member.name === 'toBigDecimalSeconds' && other.name === 'toSeconds' ||
+          className === 'java/lang/invoke/MethodHandles$Lookup' &&
+          member.name === 'doppioFindVirtualBase' && other.name === 'findVirtual'));
+      if (className === 'java/lang/invoke/MethodHandles$Lookup' && member.descriptor === virtualDescriptor) {
+        if (member.name === 'findVirtual') lookupVirtualOverlay = {original, overlaid, old, member, pool: afterLayout.pool};
+        if (member.name === 'doppioFindVirtualBase') lookupVirtualAlias = {original, overlaid, old, member, pool: afterLayout.pool};
+      }
       if (className === 'java/lang/invoke/MethodHandles' && member.name === 'filterArguments' &&
         member.descriptor === filterArgumentsDescriptor) {
         assert.ok(!filterArgumentsOverlay, 'exactly one public filterArguments overload');
@@ -172,14 +196,15 @@ before(async () => {
   inventory = {selected, generated, all, unchanged};
 });
 
-test('overlay inventory adds filter, varargs and null-spread bodies while preserving 113 prior bodies and 1344 stock Code attributes', () => {
+test('C3 appends seven VarHandle delegates while preserving prior overlays and 1344 stock Code attributes', () => {
   assert.equal(inventory.selected.length, 37);
-  assert.equal(inventory.generated.length, 116);
+  assert.equal(inventory.generated.length, 123);
   assert.equal(inventory.unchanged, 1344);
   const identity = inventory.generated.map(({className, member, bytes}) =>
     [className, member.name, member.descriptor, member.flags, member.code.maxStack, member.code.maxLocals,
       bytes.toString('hex')]);
   const priorIdentity = identity.filter(([className, name, descriptor]) =>
+    !isVarHandleDelegate(className, name, descriptor) &&
     !(className === 'java/lang/invoke/MethodHandles' && name === 'filterArguments' &&
       descriptor === filterArgumentsDescriptor) &&
     !(className === 'java/lang/invoke/MethodHandle' && name === 'withVarargs' &&
@@ -201,6 +226,70 @@ test('overlay inventory adds filter, varargs and null-spread bodies while preser
     const original = execFileSync('unzip', ['-p', rtJar, name + '.class'], {timeout: 10000});
     assert.deepEqual(applyModernBootstrapOverlays('L' + name + ';', original), original);
   }
+});
+
+test('six VarHandle factories are parsed public delegates with exact descriptors and declared metadata', () => {
+  for (const [className, name, descriptor, argumentsCount, signature, exceptions] of varHandleFactories) {
+    const entry = inventory.generated.find(candidate => candidate.className === className &&
+      candidate.member.name === name && candidate.member.descriptor === descriptor);
+    assert.ok(entry, name + ': parsed Code instead of a native trap');
+    const {member, input} = entry, pool = input.constantPool;
+    const lookup = className.endsWith('$Lookup');
+    assert.equal(member.flags, lookup ? 0x0001 : 0x0009);
+    assert.equal(member.code.maxStack, argumentsCount);
+    assert.equal(member.code.maxLocals, argumentsCount);
+    assert.equal(member.code.handlerCount, 0);
+    assert.deepEqual(member.code.attributes.entries, []);
+    assert.deepEqual(member.attributes.entries.map(attribute => attribute.name),
+      ['Code', ...(signature ? ['Signature'] : []), ...(exceptions.length ? ['Exceptions'] : [])]);
+    const decoded = decodeMethodCode(input);
+    assert.deepEqual(decoded.instructions.map(instruction => instruction.opcode),
+      [...Array.from({length: argumentsCount}, (_, index) => 0x2a + index), 0xb8, 0xb0]);
+    const target = pool.get(decoded.instructions[argumentsCount].cpIndex);
+    assert.equal(target.classInfo.name, 'Ljava/lang/invoke/DoppioVarHandles;');
+    assert.equal(target.nameAndTypeInfo.name, name);
+    assert.equal(target.nameAndTypeInfo.descriptor,
+      lookup ? '(Ljava/lang/invoke/MethodHandles$Lookup;' + descriptor.slice(1) : descriptor);
+    // Parse the emitted attribute payloads rather than trusting source declarations.
+    const owner = lookup ? lookupVirtualOverlay : filterArgumentsOverlay;
+    const signatureAttribute = member.attributes.entries.find(attribute => attribute.name === 'Signature');
+    if (signature) assert.equal(owner.pool[owner.overlaid.readUInt16BE(signatureAttribute.body)].value, signature);
+    const exceptionAttribute = member.attributes.entries.find(attribute => attribute.name === 'Exceptions');
+    if (exceptions.length) {
+      const count = owner.overlaid.readUInt16BE(exceptionAttribute.body);
+      assert.equal(count, exceptions.length);
+      assert.deepEqual(Array.from({length: count}, (_, index) => {
+        const constant = owner.pool[owner.overlaid.readUInt16BE(exceptionAttribute.body + 2 + 2 * index)];
+        return owner.pool[constant.first].value;
+      }), exceptions);
+    }
+  }
+});
+
+test('Lookup findVirtual routes through a public parsed delegate but preserves the complete stock body privately', () => {
+  assert.ok(lookupVirtualOverlay && lookupVirtualAlias);
+  const {original, overlaid, old, member, pool} = lookupVirtualOverlay;
+  const alias = lookupVirtualAlias.member;
+  assert.equal(member.flags, old.flags);
+  assert.equal(alias.flags, 0x0002);
+  assert.equal(alias.descriptorIndex, old.descriptorIndex);
+  assert.deepEqual(overlaid.subarray(alias.start + 4, alias.end), original.subarray(old.start + 4, old.end),
+    'alias changes only access flags/name, preserving complete Code and non-Code attributes');
+  const retained = (bytes, attributes) => attributes.entries.filter(attribute => attribute.name !== 'Code')
+    .map(attribute => ({name: attribute.name, bytes: bytes.subarray(attribute.start, attribute.end)}));
+  assert.deepEqual(retained(overlaid, member.attributes), retained(original, old.attributes));
+  const entry = inventory.generated.find(candidate => candidate.className === 'java/lang/invoke/MethodHandles$Lookup' &&
+    candidate.member.name === 'findVirtual' && candidate.member.descriptor === virtualDescriptor);
+  assert.deepEqual(decodeMethodCode(entry.input).instructions.map(instruction => instruction.opcode),
+    [0x2a, 0x2b, 0x2c, 0x2d, 0xb8, 0xb0]);
+  assert.equal(member.code.maxStack, 4);
+  assert.equal(member.code.maxLocals, 4);
+  assert.equal(member.code.handlerCount, 0);
+  const ref = pool[entry.bytes.readUInt16BE(5)], nameAndType = pool[ref.second];
+  assert.equal(pool[pool[ref.first].first].value, 'java/lang/invoke/DoppioVarHandles');
+  assert.equal(pool[nameAndType.first].value, 'findVirtual');
+  assert.equal(pool[nameAndType.second].value,
+    '(Ljava/lang/invoke/MethodHandles$Lookup;' + virtualDescriptor.slice(1));
 });
 
 test('withVarargs is a public nonfinal instance method with an exact parsed Code delegate', () => {
@@ -393,12 +482,12 @@ test('every generated overlay body passes pure decoding and type checking withou
   const {failures, obligations} = verifyAll(inventory.generated);
   assert.deepEqual(failures, []);
   assert.ok(obligations > 0, 'symbolic obligations are retained, not bypassed or claimed discharged');
-  t.diagnostic('116 generated methods checked; ' + obligations + ' metadata obligations remain for linking');
+  t.diagnostic('123 generated methods checked; ' + obligations + ' metadata obligations remain for linking');
 });
 
 test('all original and generated Code methods in transformed bootstrap classes pass pure verification', t => {
-  assert.equal(inventory.all.length, 1460);
+  assert.equal(inventory.all.length, 1467);
   const {failures, obligations} = verifyAll(inventory.all);
   assert.deepEqual(failures, []);
-  t.diagnostic('1460 methods checked; ' + obligations + ' metadata obligations remain for linking');
+  t.diagnostic('1467 methods checked; ' + obligations + ' metadata obligations remain for linking');
 });

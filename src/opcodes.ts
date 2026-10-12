@@ -1507,7 +1507,9 @@ export class Opcodes {
       if (!methodReference.hasAccess(thread, frame, false)) return;
       var m = methodReference.method;
       if (m.isSignaturePolymorphic()) {
-        switch (m.name) {
+        if (m.cls.getInternalName() === 'Ljava/lang/invoke/VarHandle;') {
+          code[pc] = OpCode.INVOKEHANDLE;
+        } else switch (m.name) {
           case 'invokeBasic':
             code[pc] = OpCode.INVOKEBASIC;
             break;
@@ -1753,7 +1755,7 @@ export class Opcodes {
   }
 
   /**
-   * Opcode for MethodHandle.invoke and MethodHandle.invokeExact.
+   * Opcode for MethodHandle invocation and linked VarHandle access modes.
    */
   public static invokehandle(thread: JVMThread, frame: BytecodeStackFrame, code: Buffer) {
     const pc = frame.pc;
@@ -1775,6 +1777,11 @@ export class Opcodes {
 
     if (!isNull(thread, frame, args[0])) {
       opStack.dropFromTop(paramSize);
+      if (methodReference.varHandleInvoker !== null && methodReference.varHandleInvoker !== undefined) {
+        // The original VarHandle is now the invoker's first coordinate. Keep
+        // every original wide padding slot and the linker's appendix intact.
+        args.unshift(methodReference.varHandleInvoker);
+      }
       // fcn will handle invoking 'this' and such.
       // TODO: If this can be varargs, pass in parameter types to the function.
       fcn(thread, null, args);
