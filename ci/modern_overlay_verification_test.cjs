@@ -40,7 +40,7 @@ const {verifyMethodTypes} = load('BytecodeTypeVerifier');
 const rtJar = path.join(repoRoot, 'vendor/java_home/lib/rt.jar');
 const exactClasses = [
   'java/lang/Thread', 'java/lang/ref/Reference', 'java/lang/Class', 'java/lang/reflect/Executable',
-  'java/lang/reflect/Constructor', 'java/lang/reflect/AccessibleObject',
+  'java/lang/reflect/Constructor', 'java/lang/reflect/AccessibleObject', 'java/lang/reflect/Field',
   'sun/reflect/annotation/TypeAnnotation$LocationInfo', 'sun/reflect/annotation/AnnotatedTypeFactory',
   'sun/reflect/generics/reflectiveObjects/ParameterizedTypeImpl', 'java/lang/ClassLoader',
   'java/lang/System', 'java/lang/Runtime', 'java/lang/Character', 'java/lang/Math', 'java/lang/StrictMath',
@@ -88,6 +88,14 @@ const virtualDescriptor = '(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/invoke
 const isVarHandleDelegate = (className, name, descriptor) =>
   varHandleFactories.some(entry => entry[0] === className && entry[1] === name && entry[2] === descriptor) ||
   className === 'java/lang/invoke/MethodHandles$Lookup' && name === 'findVirtual' && descriptor === virtualDescriptor;
+const hiddenFieldSetters = new Set(['set', 'setBoolean', 'setByte', 'setChar', 'setShort', 'setInt', 'setLong', 'setFloat', 'setDouble']);
+const isHiddenClassDelegate = (className, name) =>
+  className === 'java/lang/invoke/MethodHandles' && ['classData', 'classDataAt'].includes(name) ||
+  className === 'java/lang/invoke/MethodHandles$Lookup' &&
+    ['defineHiddenClass', 'defineHiddenClassWithClassData', 'unreflectSetter'].includes(name) ||
+  className === 'java/lang/reflect/Field' && hiddenFieldSetters.has(name) ||
+  className === 'java/lang/Class' && name === 'getCanonicalName';
+const hiddenAliases = [];
 let lookupVirtualOverlay;
 let lookupVirtualAlias;
 
@@ -147,7 +155,19 @@ before(async () => {
         (other.name === member.name || className === 'java/time/Duration' &&
           member.name === 'toBigDecimalSeconds' && other.name === 'toSeconds' ||
           className === 'java/lang/invoke/MethodHandles$Lookup' &&
-          member.name === 'doppioFindVirtualBase' && other.name === 'findVirtual'));
+          member.name === 'doppioFindVirtualBase' && other.name === 'findVirtual' ||
+          className === 'java/lang/invoke/MethodHandles$Lookup' &&
+          member.name === 'doppioHiddenFinalBase$unreflectSetter' && other.name === 'unreflectSetter' ||
+          className === 'java/lang/reflect/Field' &&
+          member.name === 'doppioHiddenFinalBase$' + other.name && hiddenFieldSetters.has(other.name) ||
+          className === 'java/lang/Class' && member.name === 'doppioHiddenCanonicalNameBase' && other.name === 'getCanonicalName'));
+      if (member.name.startsWith('doppioHiddenFinalBase$') || member.name === 'doppioHiddenCanonicalNameBase') {
+        assert.ok(old?.code, 'C5 alias has an exact stock declaration');
+        assert.equal(member.flags, (old.flags & ~7) | 2, 'Only public access changes to private');
+        assert.deepEqual(overlaid.subarray(member.code.start, member.code.end), original.subarray(old.code.start, old.code.end),
+          'C5 preserves complete alias Code and StackMapTable bytes');
+        hiddenAliases.push({className, member, old});
+      }
       if (className === 'java/lang/invoke/MethodHandles$Lookup' && member.descriptor === virtualDescriptor) {
         if (member.name === 'findVirtual') lookupVirtualOverlay = {original, overlaid, old, member, pool: afterLayout.pool};
         if (member.name === 'doppioFindVirtualBase') lookupVirtualAlias = {original, overlaid, old, member, pool: afterLayout.pool};
@@ -196,14 +216,18 @@ before(async () => {
   inventory = {selected, generated, all, unchanged};
 });
 
-test('C3 appends seven VarHandle delegates while preserving prior overlays and 1344 stock Code attributes', () => {
-  assert.equal(inventory.selected.length, 37);
-  assert.equal(inventory.generated.length, 123);
-  assert.equal(inventory.unchanged, 1344);
+test('C5 preserves C3 and earlier body hashes, adding15 public delegates and43 untouched stock Field Code attributes', () => {
+  assert.equal(inventory.selected.length, 38);
+  assert.equal(inventory.generated.length, 138);
+  assert.equal(inventory.unchanged, 1387);
+  assert.equal(inventory.generated.filter(entry => isHiddenClassDelegate(entry.className, entry.member.name)).length, 15);
+  assert.equal(hiddenAliases.length, 11);
+  assert.equal(hiddenAliases.filter(entry => entry.className === 'java/lang/reflect/Field').length, 9);
   const identity = inventory.generated.map(({className, member, bytes}) =>
     [className, member.name, member.descriptor, member.flags, member.code.maxStack, member.code.maxLocals,
       bytes.toString('hex')]);
   const priorIdentity = identity.filter(([className, name, descriptor]) =>
+    !isHiddenClassDelegate(className, name) &&
     !isVarHandleDelegate(className, name, descriptor) &&
     !(className === 'java/lang/invoke/MethodHandles' && name === 'filterArguments' &&
       descriptor === filterArgumentsDescriptor) &&
@@ -482,12 +506,12 @@ test('every generated overlay body passes pure decoding and type checking withou
   const {failures, obligations} = verifyAll(inventory.generated);
   assert.deepEqual(failures, []);
   assert.ok(obligations > 0, 'symbolic obligations are retained, not bypassed or claimed discharged');
-  t.diagnostic('123 generated methods checked; ' + obligations + ' metadata obligations remain for linking');
+  t.diagnostic('138 generated methods checked; ' + obligations + ' metadata obligations remain for linking');
 });
 
 test('all original and generated Code methods in transformed bootstrap classes pass pure verification', t => {
-  assert.equal(inventory.all.length, 1467);
+  assert.equal(inventory.all.length, 1525);
   const {failures, obligations} = verifyAll(inventory.all);
   assert.deepEqual(failures, []);
-  t.diagnostic('1467 methods checked; ' + obligations + ' metadata obligations remain for linking');
+  t.diagnostic('1525 methods checked; ' + obligations + ' metadata obligations remain for linking');
 });

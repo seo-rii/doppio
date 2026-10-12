@@ -647,12 +647,32 @@ export class ArrayClassData<T> extends ClassData {
   private _constructor: IJVMConstructor<JVMTypes.JVMArray<T>> = null;
   private jsArrayConstructor: string = null;
 
-  constructor(componentType: string, loader: ClassLoader) {
+  constructor(componentType: string, loader: ClassLoader, component?: ClassData) {
     super(loader);
     this.className = `[${componentType}`;
     // ArrayClassData objects are ABSTRACT, FINAL, and PUBLIC.
     this.accessFlags = new Flags(0x411);
     this.componentClassName = componentType;
+    // Hidden array mirrors carry their component identity directly. They are
+    // never named or published in an initiating loader's namespace.
+    this.componentClass = component || null;
+  }
+
+  public getExternalName(): string {
+    var component = this.componentClass;
+    if (component instanceof ReferenceClassData && component.isHidden()) {
+      return '[L' + component.getExternalName() + ';';
+    }
+    if (component instanceof ArrayClassData && component.hasHiddenComponent()) {
+      return '[' + component.getExternalName();
+    }
+    return super.getExternalName();
+  }
+
+  public hasHiddenComponent(): boolean {
+    var component = this.componentClass;
+    return component instanceof ReferenceClassData ? component.isHidden() :
+      component instanceof ArrayClassData && component.hasHiddenComponent();
   }
 
   /**
@@ -676,7 +696,7 @@ export class ArrayClassData<T> extends ClassData {
     }
     this.loader.bootstrap.loadClass(thread, 'Ljava/lang/Object;', superclass => {
       if (superclass === null) { cb(null); return; }
-      this.loader.loadClass(thread, this.componentClassName, component => {
+      var admit = (component: ClassData) => {
         if (component === null) { cb(null); return; }
         var complete = (metadata: ClassData) => {
           if (metadata === null) { cb(null); return; }
@@ -687,7 +707,9 @@ export class ArrayClassData<T> extends ClassData {
         // initializer are irrelevant to creation of an array of that element.
         if (component instanceof ArrayClassData) component.resolve(thread, complete, explicit);
         else complete(component);
-      }, explicit);
+      };
+      if (this.componentClass !== null) admit(this.componentClass);
+      else this.loader.loadClass(thread, this.componentClassName, admit, explicit);
     }, explicit);
   }
 
@@ -707,7 +729,7 @@ export class ArrayClassData<T> extends ClassData {
   public tryToResolve(): boolean {
     var loader = this.loader,
       superClassCdata = <ReferenceClassData<JVMTypes.java_lang_Object>> loader.bootstrap.getLoadedClass("Ljava/lang/Object;"),
-      componentClassCdata = loader.getLoadedClass(this.componentClassName);
+      componentClassCdata = this.componentClass || loader.getLoadedClass(this.componentClassName);
 
     if (superClassCdata === null || componentClassCdata === null ||
         componentClassCdata instanceof ArrayClassData && !componentClassCdata.tryToResolve()) {
@@ -918,6 +940,9 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
   private minorVersion: number;
   public majorVersion: number;
   public constantPool: ConstantPool;
+  private thisClassReference: ClassReference;
+  private hiddenDefinition: {name: string; packageName: string;
+    classData: JVMTypes.java_lang_Object; strong: boolean} = null;
   /**
    * All of the fields directly defined by this class.
    */
@@ -997,7 +1022,8 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
         this.majorVersion >= 49 && (classFlags & 0x2000) !== 0 || this.accessFlags.isFinal() && this.accessFlags.isAbstract()) {
       throw new Error('Invalid class access flags');
     }
-    this.className = this.constantPool.getTyped<ClassReference>(byteStream.getUint16(), ConstantPoolItemType.CLASS).name;
+    this.thisClassReference = this.constantPool.getTyped<ClassReference>(byteStream.getUint16(), ConstantPoolItemType.CLASS);
+    this.className = this.thisClassReference.name;
     if (this.className[0] !== 'L') throw new Error('this_class cannot be an array');
     validateBinaryClassName(this.className.slice(1, -1));
     // super reference is 0 when there's no super (basically just java.lang.Object)
@@ -1070,6 +1096,35 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
 
   public getSuperClassReference(): ClassReference {
     return this.superClassRef;
+  }
+
+  /** The original class file is parsed and validated before this private VM
+   * identity is minted. Only this_class changes: descriptor strings and other
+   * Class constants must keep their original spelling and resolution rules. */
+  public markHidden(suffix: string, classData: JVMTypes.java_lang_Object, strong: boolean): void {
+    assert(this.hiddenDefinition === null && !this.isHierarchyResolved(), 'Hidden identity must be minted before derivation');
+    assert(/^[A-Za-z0-9_$-]+$/.test(suffix), 'Hidden suffix must be an unqualified VM-generated name');
+    var name = this.getExternalName(), packageName = this.getPackageName();
+    this.hiddenDefinition = {name: name + '/' + suffix, packageName, classData, strong};
+    this.className = this.className.slice(0, -1) + '.' + suffix + ';';
+    this.thisClassReference.name = this.className;
+    this.thisClassReference.cls = this;
+  }
+
+  public isHidden(): boolean { return !!this.hiddenDefinition; }
+
+  public isStrongHidden(): boolean { return !!this.hiddenDefinition && this.hiddenDefinition.strong; }
+
+  public getHiddenClassData(): JVMTypes.java_lang_Object {
+    return this.hiddenDefinition ? this.hiddenDefinition.classData : null;
+  }
+
+  public getExternalName(): string {
+    return this.hiddenDefinition ? this.hiddenDefinition.name : super.getExternalName();
+  }
+
+  public getPackageName(): string {
+    return this.hiddenDefinition ? this.hiddenDefinition.packageName : super.getPackageName();
   }
 
   public getInterfaceClassReferences(): ClassReference[] {
@@ -1484,6 +1539,9 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
   }
 
   public getNestHostReference(): ClassReference {
+    // Hidden nests are established from the defining Lookup, never from the
+    // original payload's NestHost attribute. The VM records an explicit host.
+    if (this.isHidden()) return null;
     var host = <NestHost> this.getAttribute('NestHost');
     return host === null ? null : host.hostClass;
   }

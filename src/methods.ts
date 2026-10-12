@@ -630,9 +630,20 @@ export function canOverrideMethod(candidate: Method, base: Method): boolean {
 
 /** Arguments already use JVM word slots, including category-two padding.
  * The ordinary frame entry gate and monitor protocol remain authoritative. */
+function isHiddenFinalAlias(thread: JVMThread, method: Method): boolean {
+  if (method.name.indexOf('doppioHiddenFinalBase$') !== 0) return false;
+  var bootstrap = thread.getBsCl();
+  return method.cls === bootstrap.getLoadedClass('Ljava/lang/reflect/Field;') ||
+    method.name === 'doppioHiddenFinalBase$unreflectSetter' &&
+      method.cls === bootstrap.getLoadedClass('Ljava/lang/invoke/MethodHandles$Lookup;');
+}
+
 export function invokeExactMethod(thread: JVMThread, method: Method, receiver: JVMTypes.java_lang_Object,
     args: any[], cb?: (e?: JVMTypes.java_lang_Throwable, value?: any) => void): boolean {
-  if (cb) (<any> thread).stack.push(new InternalStackFrame(cb));
+  var hiddenFinalAlias = isHiddenFinalAlias(thread, method);
+  // Only this exact pre-entry guard can throw directly into its own callback;
+  // ordinary native and bytecode method callback boundaries are unchanged.
+  if (cb) (<any> thread).stack.push(new InternalStackFrame(cb, hiddenFinalAlias));
   if (!method.accessFlags.isStatic() && receiver == null) {
     thread.throwNewException('Ljava/lang/NullPointerException;', '');
     return false;
@@ -640,6 +651,26 @@ export function invokeExactMethod(thread: JVMThread, method: Method, receiver: J
   if (method.accessFlags.isAbstract()) {
     thread.throwNewException('Ljava/lang/AbstractMethodError;', method.fullSignature);
     return false;
+  }
+  // C5 keeps stock Code under private aliases. Deep reflection or a private
+  // Lookup must not turn those names into a hidden-final write bypass. Check
+  // only exact bootstrap alias declarations and the actual captured Field;
+  // guest classes with similar names gain neither authority nor restrictions.
+  if (hiddenFinalAlias) {
+    var bootstrap = thread.getBsCl(), field: JVMTypes.java_lang_reflect_Field = null;
+    if (method.cls === bootstrap.getLoadedClass('Ljava/lang/reflect/Field;')) {
+      field = <JVMTypes.java_lang_reflect_Field> receiver;
+    } else if (method.name === 'doppioHiddenFinalBase$unreflectSetter' &&
+        method.cls === bootstrap.getLoadedClass('Ljava/lang/invoke/MethodHandles$Lookup;')) {
+      field = <JVMTypes.java_lang_reflect_Field> args[0];
+    }
+    if (field !== null && field !== undefined) {
+      var declaring = <ReferenceClassData<JVMTypes.java_lang_Object>> field['java/lang/reflect/Field/clazz'].$cls;
+      if (declaring.isHidden() && declaring.getFieldFromSlot(field['java/lang/reflect/Field/slot']).accessFlags.isFinal()) {
+        thread.throwNewException('Ljava/lang/IllegalAccessException;', 'Hidden class final fields are not modifiable');
+        return false;
+      }
+    }
   }
   // Callee locals are writable, including when callers share the empty argument vector.
   var locals = method.accessFlags.isStatic() ? (args || []).slice() : [receiver].concat(args || []);
@@ -677,7 +708,7 @@ export function invokeSpecialMethod(thread: JVMThread, caller: ReferenceClassDat
 export function invokeVirtualMethod(thread: JVMThread, resolved: Method, receiver: JVMTypes.java_lang_Object,
     args: any[], cb?: (e?: JVMTypes.java_lang_Throwable, value?: any) => void,
     symbolicInterface?: ReferenceClassData<JVMTypes.java_lang_Object>): boolean {
-  if (cb) (<any> thread).stack.push(new InternalStackFrame(cb));
+  if (cb) (<any> thread).stack.push(new InternalStackFrame(cb, isHiddenFinalAlias(thread, resolved)));
   if (resolved.accessFlags.isStatic()) {
     thread.throwNewException('Ljava/lang/IncompatibleClassChangeError;', resolved.fullSignature + ' is static');
     return false;

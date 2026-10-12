@@ -20,11 +20,12 @@ import ClassLoader = Doppio.VM.ClassFile.ClassLoader;
 import * as JVMTypes from '../../includes/JVMTypes';
 import {setImmediate} from 'browserfs';
 import {refreshMemberNameMethodTarget} from '../method_handles';
-import {getKnownNestHost, resolveNestHost, isVirtualMachineError} from '../ClassAccess';
+import {getKnownNestHost, resolveNestHost, registerHiddenNestHost, isVirtualMachineError} from '../ClassAccess';
 import varHandleNatives from './java_lang_invoke';
 
 export default function (): any {
   var debug = logging.debug;
+  var hiddenClassSequence = 0;
 
   function innerClassAccessFlags(cls: ReferenceClassData<JVMTypes.java_lang_Object>): number {
     var myClass = cls.getInternalName(),
@@ -320,7 +321,7 @@ export default function (): any {
     }
 
     public static 'isHidden()Z'(thread: JVMThread, javaThis: JVMTypes.java_lang_Class): boolean {
-      return false;
+      return javaThis.$cls instanceof ReferenceClassData && javaThis.$cls.isHidden();
     }
 
     public static 'isInstance(Ljava/lang/Object;)Z'(thread: JVMThread, javaThis: JVMTypes.java_lang_Class, obj: JVMTypes.java_lang_Object): boolean {
@@ -761,6 +762,12 @@ export default function (): any {
     }
 
     public static 'getPackageName(Ljava/lang/Class;)Ljava/lang/String;'(thread: JVMThread, type: JVMTypes.java_lang_Class): JVMTypes.java_lang_String {
+      if (type.$cls instanceof ReferenceClassData ? type.$cls.isHidden() :
+          type.$cls instanceof ArrayClassData && type.$cls.hasHiddenComponent()) {
+        var leaf = type.$cls;
+        while (leaf instanceof ArrayClassData) leaf = leaf.getComponentClass();
+        return util.initString(thread.getBsCl(), leaf.getPackageName());
+      }
       var internalName = type.$cls.getInternalName(),
         packageName: string,
         externalName: string,
@@ -814,6 +821,13 @@ export default function (): any {
         return null;
       }
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      if (type.$cls instanceof ReferenceClassData ? type.$cls.isHidden() :
+          type.$cls instanceof ArrayClassData && type.$cls.hasHiddenComponent()) {
+        loader.getHiddenArrayClass(type.$cls).resolve(thread, arrayCls => {
+          if (arrayCls !== null) thread.asyncReturn(arrayCls.getClassObject(thread));
+        });
+        return null;
+      }
       loader.resolveClass(thread, '[' + internalName, (arrayCls: ClassData) => {
         if (arrayCls !== null) {
           thread.asyncReturn(arrayCls.getClassObject(thread));
@@ -825,6 +839,18 @@ export default function (): any {
     public static 'describeConstable(Ljava/lang/Class;)Ljava/util/Optional;'(thread: JVMThread, type: JVMTypes.java_lang_Class): any {
       var descriptor = type.$cls.getInternalName();
       thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      if (type.$cls instanceof ReferenceClassData ? type.$cls.isHidden() :
+          type.$cls instanceof ArrayClassData && type.$cls.hasHiddenComponent()) {
+        thread.getBsCl().initializeClass(thread, 'Ljava/util/Optional;', (optionalCls: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+          if (optionalCls === null) return;
+          (<any> optionalCls.getConstructor(thread))['java/util/Optional/empty()Ljava/util/Optional;'](
+            thread, [], (failure?: JVMTypes.java_lang_Throwable, result?: JVMTypes.java_lang_Object) => {
+              if (failure) thread.throwException(failure);
+              else thread.asyncReturn(result);
+            });
+        });
+        return null;
+      }
       thread.getBsCl().initializeClass(thread, 'Ljava/lang/constant/ClassDesc;', (classDescCls: ReferenceClassData<JVMTypes.java_lang_Object>) => {
         if (classDescCls === null) {
           return;
@@ -1413,10 +1439,51 @@ export default function (): any {
     }
 
     public static 'newArray(Ljava/lang/Class;I)Ljava/lang/Object;'(thread: JVMThread, cls: JVMTypes.java_lang_Class, len: number): JVMTypes.JVMArray<any> {
+      if (cls.$cls instanceof ReferenceClassData ? cls.$cls.isHidden() :
+          cls.$cls instanceof ArrayClassData && cls.$cls.hasHiddenComponent()) {
+        if (len < 0) {
+          thread.throwNewException('Ljava/lang/NegativeArraySizeException;', String(len));
+          return null;
+        }
+        var array = cls.$cls.getLoader().getHiddenArrayClass(cls.$cls);
+        if (array.tryToResolve()) return util.newArrayFromClass(thread, array, len);
+        thread.setStatus(ThreadStatus.ASYNC_WAITING);
+        array.resolve(thread, resolved => {
+          if (resolved !== null) thread.asyncReturn(util.newArrayFromClass(thread, array, len));
+        });
+        return null;
+      }
       return util.newArray<any>(thread, cls.$cls.getLoader(), `[${cls.$cls.getInternalName()}`, len);
     }
 
     public static 'multiNewArray(Ljava/lang/Class;[I)Ljava/lang/Object;'(thread: JVMThread, jco: JVMTypes.java_lang_Class, lens: JVMTypes.JVMArray<number>): JVMTypes.JVMArray<any> {
+      if (jco.$cls instanceof ReferenceClassData ? jco.$cls.isHidden() :
+          jco.$cls instanceof ArrayClassData && jco.$cls.hasHiddenComponent()) {
+        for (var i = 0; i < lens.array.length; i++) {
+          if (lens.array[i] < 0) {
+            thread.throwNewException('Ljava/lang/NegativeArraySizeException;', String(lens.array[i]));
+            return null;
+          }
+        }
+        var mirrors: ArrayClassData<any>[] = [], component = jco.$cls;
+        for (var rank = 0; rank < lens.array.length; rank++) {
+          var array = component.getLoader().getHiddenArrayClass(component);
+          if (!array.tryToResolve()) {
+            thread.throwNewException('Ljava/lang/InternalError;', 'Hidden array component metadata unavailable');
+            return null;
+          }
+          mirrors.push(array);
+          component = array;
+        }
+        var allocate = (depth: number): JVMTypes.JVMArray<any> => {
+          var result = util.newArrayFromClass(thread, mirrors[lens.array.length - depth - 1], lens.array[depth]);
+          if (depth + 1 < lens.array.length) {
+            for (var index = 0; index < result.array.length; index++) result.array[index] = allocate(depth + 1);
+          }
+          return result;
+        };
+        return allocate(0);
+      }
       var typeStr = (new Array(lens.array.length + 1)).join('[') + jco.$cls.getInternalName();
       if (jco.$cls.isInitialized(thread)) {
         return util.multiNewArray<any>(thread, jco.$cls.getLoader(), typeStr, lens.array);
@@ -2455,6 +2522,8 @@ export default function (): any {
       rv = new lookupCons(thread);
       rv['java/lang/invoke/MethodHandles$Lookup/lookupClass'] = targetClass;
       rv['java/lang/invoke/MethodHandles$Lookup/allowedModes'] = 0x000f;
+      // A private teleport is full privilege in the selected unnamed-module
+      // model, but never ORIGINAL and therefore cannot read hidden class data.
       (<any> rv)[LOOKUP_MODERN_MODES] = 0x001f;
       return rv;
     }
@@ -2868,6 +2937,150 @@ export default function (): any {
           if (resolvedClass !== null) thread.asyncReturn(definedClass.getClassObject(thread));
         }, false);
       });
+    }
+  }
+
+  class java_lang_invoke_DoppioHiddenClasses {
+    private static isHiddenFinalField(field: JVMTypes.java_lang_reflect_Field): boolean {
+      var cls = <ReferenceClassData<JVMTypes.java_lang_Object>> field['java/lang/reflect/Field/clazz'].$cls;
+      return cls.isHidden() && cls.getFieldFromSlot(field['java/lang/reflect/Field/slot']).accessFlags.isFinal();
+    }
+
+    public static 'defineHiddenClass0(Ljava/lang/invoke/MethodHandles$Lookup;[BLjava/lang/Object;Z[Ljava/lang/invoke/MethodHandles$Lookup$ClassOption;)Ljava/lang/invoke/MethodHandles$Lookup;'(
+      thread: JVMThread, lookup: JVMTypes.java_lang_invoke_MethodHandles$Lookup,
+      bytes: JVMTypes.JVMArray<number>, classData: JVMTypes.java_lang_Object, initialize: boolean,
+      options: JVMTypes.JVMArray<JVMTypes.java_lang_Object>
+    ): void {
+      if (lookup === null || bytes === null || options === null) {
+        thread.throwNewException('Ljava/lang/NullPointerException;', '');
+        return;
+      }
+      var modes = java_lang_invoke_MethodHandles$Lookup.getModernModes(lookup);
+      if ((modes & (LOOKUP_PRIVATE | LOOKUP_MODULE)) !== (LOOKUP_PRIVATE | LOOKUP_MODULE)) {
+        thread.throwNewException('Ljava/lang/IllegalAccessException;', 'Lookup does not have full privilege access');
+        return;
+      }
+      var nestmate = false, strong = false,
+        optionClass = thread.getBsCl().getLoadedClass('Ljava/lang/invoke/MethodHandles$Lookup$ClassOption;');
+      for (var i = 0; i < options.array.length; i++) {
+        var option = options.array[i];
+        if (option === null) {
+          thread.throwNewException('Ljava/lang/NullPointerException;', '');
+          return;
+        }
+        if (option.getClass() !== optionClass) {
+          thread.throwNewException('Ljava/lang/IllegalArgumentException;', 'Invalid hidden class option');
+          return;
+        }
+        var name = (<JVMTypes.java_lang_String> (<any> option)['java/lang/Enum/name']).toString();
+        if (name === 'NESTMATE' && !nestmate) nestmate = true;
+        else if (name === 'STRONG' && !strong) strong = true;
+        else {
+          thread.throwNewException('Ljava/lang/IllegalArgumentException;', 'Invalid or duplicate hidden class option');
+          return;
+        }
+      }
+      var lookupClass = <ReferenceClassData<JVMTypes.java_lang_Object>>
+          (<JVMTypes.java_lang_Class> lookup['java/lang/invoke/MethodHandles$Lookup/lookupClass']).$cls,
+        loader = lookupClass.getLoader(), candidate: ReferenceClassData<JVMTypes.java_lang_Object>;
+      try {
+        candidate = new ReferenceClassData<JVMTypes.java_lang_Object>(
+          util.byteArray2Buffer(bytes.array, 0, bytes.array.length), lookupClass.getProtectionDomain(), loader);
+      } catch (failure) {
+        var parseError = <any> failure;
+        thread.throwNewException(failure instanceof ClassFileVersionError ?
+          'Ljava/lang/UnsupportedClassVersionError;' : 'Ljava/lang/ClassFormatError;',
+          parseError && parseError.message ? parseError.message : String(parseError));
+        return;
+      }
+      if ((candidate.accessFlags.getRawByte() & 0x8000) !== 0 ||
+          candidate.getPackageName() !== lookupClass.getPackageName()) {
+        thread.throwNewException('Ljava/lang/IllegalArgumentException;', 'Class is not in the lookup class package');
+        return;
+      }
+      candidate.markHidden('0x' + (++hiddenClassSequence).toString(16), classData, strong);
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      var define = () => loader.defineHiddenParsedClass(thread, candidate, linked => {
+        if (linked === null) return;
+        var complete = () => {
+          var lookupMetadata = <ReferenceClassData<JVMTypes.java_lang_Object>> lookup.getClass(),
+            result = <JVMTypes.java_lang_invoke_MethodHandles$Lookup> new (lookupMetadata.getConstructor(thread))(thread);
+          // Never copy a trusted Lookup or select caller-controlled authority.
+          result['java/lang/invoke/MethodHandles$Lookup/lookupClass'] = candidate.getClassObject(thread);
+          result['java/lang/invoke/MethodHandles$Lookup/allowedModes'] = 0x000f;
+          (<any> result)[LOOKUP_MODERN_MODES] = 0x005f;
+          thread.asyncReturn(result);
+        };
+        if (initialize) candidate.initialize(thread, ready => { if (ready !== null) complete(); }, true);
+        else complete();
+      });
+      if (nestmate) resolveNestHost(thread, lookupClass, host => {
+        if (host !== null) { registerHiddenNestHost(candidate, host); define(); }
+      });
+      else { registerHiddenNestHost(candidate, candidate); define(); }
+    }
+
+    public static 'classData0(Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/Object;'(
+      thread: JVMThread, lookup: JVMTypes.java_lang_invoke_MethodHandles$Lookup
+    ): void {
+      if (lookup === null) {
+        thread.throwNewException('Ljava/lang/NullPointerException;', '');
+        return;
+      }
+      if ((java_lang_invoke_MethodHandles$Lookup.getModernModes(lookup) & LOOKUP_ORIGINAL) === 0) {
+        thread.throwNewException('Ljava/lang/IllegalAccessException;', 'Lookup does not have ORIGINAL access');
+        return;
+      }
+      var cls = <ReferenceClassData<JVMTypes.java_lang_Object>>
+        (<JVMTypes.java_lang_Class> lookup['java/lang/invoke/MethodHandles$Lookup/lookupClass']).$cls;
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      cls.initialize(thread, ready => {
+        if (ready !== null) thread.asyncReturn(cls.getHiddenClassData());
+      }, true);
+    }
+
+    public static 'checkFieldWritable(Ljava/lang/reflect/Field;)V'(
+      thread: JVMThread, field: JVMTypes.java_lang_reflect_Field
+    ): void {
+      if (field === null) {
+        thread.throwNewException('Ljava/lang/NullPointerException;', '');
+        return;
+      }
+      if (java_lang_invoke_DoppioHiddenClasses.isHiddenFinalField(field)) {
+        thread.throwNewException('Ljava/lang/IllegalAccessException;', 'Hidden class final fields are not modifiable');
+      }
+    }
+
+    public static 'unreflectSetterBase(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/reflect/Field;)Ljava/lang/invoke/MethodHandle;'(
+      thread: JVMThread, lookup: JVMTypes.java_lang_invoke_MethodHandles$Lookup, field: JVMTypes.java_lang_reflect_Field
+    ): void {
+      if (lookup === null) {
+        thread.throwNewException('Ljava/lang/NullPointerException;', '');
+        return;
+      }
+      if (field === null || java_lang_invoke_DoppioHiddenClasses.isHiddenFinalField(field)) {
+        java_lang_invoke_DoppioHiddenClasses['checkFieldWritable(Ljava/lang/reflect/Field;)V'](thread, field);
+        return;
+      }
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      (<any> lookup)['java/lang/invoke/MethodHandles$Lookup/doppioHiddenFinalBase$unreflectSetter(Ljava/lang/reflect/Field;)Ljava/lang/invoke/MethodHandle;'](
+        thread, [field], (failure?: JVMTypes.java_lang_Throwable, result?: JVMTypes.java_lang_invoke_MethodHandle) => {
+          if (failure) thread.throwException(failure);
+          else thread.asyncReturn(result);
+        });
+    }
+
+    public static 'canonicalName(Ljava/lang/Class;)Ljava/lang/String;'(
+      thread: JVMThread, cls: JVMTypes.java_lang_Class
+    ): JVMTypes.java_lang_String {
+      if (cls.$cls instanceof ReferenceClassData && cls.$cls.isHidden()) return null;
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      (<any> cls)['java/lang/Class/doppioHiddenCanonicalNameBase()Ljava/lang/String;'](thread, [],
+        (failure?: JVMTypes.java_lang_Throwable, result?: JVMTypes.java_lang_String) => {
+          if (failure) thread.throwException(failure);
+          else thread.asyncReturn(result);
+        });
+      return null;
     }
   }
 
@@ -3333,6 +3546,7 @@ export default function (): any {
     'java/lang/invoke/MethodHandles': java_lang_invoke_MethodHandles,
     'java/lang/invoke/MethodHandles$Lookup': java_lang_invoke_MethodHandles$Lookup,
     'java/lang/invoke/DoppioMethodHandles': java_lang_invoke_DoppioMethodHandles,
+    'java/lang/invoke/DoppioHiddenClasses': java_lang_invoke_DoppioHiddenClasses,
     'java/lang/invoke/MethodHandleNatives': java_lang_invoke_MethodHandleNatives,
     'java/lang/invoke/MethodHandle': java_lang_invoke_MethodHandle
   };

@@ -3262,6 +3262,196 @@ function addJavaLangInvokeMethodHandleModernOverlays(data: Buffer): Buffer {
   ]);
 }
 
+/** C5 delegates append their constants after every retained invoke overlay.
+ * Public factories retain real Code, declared checked exceptions and varargs
+ * metadata; private VM hooks remain only on the fixed helper class. */
+function addJavaLangInvokeHiddenClassOverlays(data: Buffer, lookup: boolean): Buffer {
+  var cp = constantPoolEnd(data), constants: Buffer[] = [], nextIndex = cp.count;
+  function utf8(value: string): number { constants.push(utf8Constant(value)); return nextIndex++; }
+  function cls(value: string): number {
+    var name = utf8(value), index = nextIndex++;
+    constants.push(Buffer.concat([Buffer.from([7]), u2(name)]));
+    return index;
+  }
+  function method(owner: number, name: string, descriptor: string): number {
+    var n = utf8(name), d = utf8(descriptor), pair = nextIndex++;
+    constants.push(Buffer.concat([Buffer.from([12]), u2(n), u2(d)]));
+    var index = nextIndex++;
+    constants.push(Buffer.concat([Buffer.from([10]), u2(owner), u2(pair)]));
+    return index;
+  }
+  var codeName = utf8('Code'), signatureName = utf8('Signature'), exceptionsName = utf8('Exceptions'),
+    helper = cls('java/lang/invoke/DoppioHiddenClasses'), illegalAccess = cls('java/lang/IllegalAccessException'),
+    lookupType = 'Ljava/lang/invoke/MethodHandles$Lookup;', optionType = '[Ljava/lang/invoke/MethodHandles$Lookup$ClassOption;',
+    entries = lookup ? [
+      {name: 'defineHiddenClass', descriptor: '([BZ' + optionType + ')' + lookupType,
+        loads: [0x2a, 0x2b, 0x1c, 0x2d], words: 4,
+        signature: '([BZ' + optionType + ')' + lookupType, varargs: true},
+      {name: 'defineHiddenClassWithClassData', descriptor: '([BLjava/lang/Object;Z' + optionType + ')' + lookupType,
+        loads: [0x2a, 0x2b, 0x2c, 0x1d, 0x19, 4], words: 5,
+        signature: '([BLjava/lang/Object;Z' + optionType + ')' + lookupType, varargs: true}
+    ] : [
+      {name: 'classData', descriptor: '(' + lookupType + 'Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object;',
+        loads: [0x2a, 0x2b, 0x2c], words: 3,
+        signature: '<T:Ljava/lang/Object;>(' + lookupType + 'Ljava/lang/String;Ljava/lang/Class<TT;>;)TT;', varargs: false},
+      {name: 'classDataAt', descriptor: '(' + lookupType + 'Ljava/lang/String;Ljava/lang/Class;I)Ljava/lang/Object;',
+        loads: [0x2a, 0x2b, 0x2c, 0x1d], words: 4,
+        signature: '<T:Ljava/lang/Object;>(' + lookupType + 'Ljava/lang/String;Ljava/lang/Class<TT;>;I)TT;', varargs: false}
+    ],
+    bodies = entries.map(entry => {
+      var name = utf8(entry.name), descriptor = utf8(entry.descriptor),
+        target = method(helper, entry.name, lookup ? '(' + lookupType + entry.descriptor.slice(1) : entry.descriptor),
+        code = Buffer.concat([Buffer.from(entry.loads.concat([0xb8])), u2(target), Buffer.from([0xb0])]),
+        attributes = [Buffer.concat([u2(codeName), u4(12 + code.length), u2(entry.words), u2(entry.words),
+          u4(code.length), code, u2(0), u2(0)]),
+          Buffer.concat([u2(exceptionsName), u4(4), u2(1), u2(illegalAccess)])];
+      if (!lookup) attributes.push(Buffer.concat([u2(signatureName), u4(2), u2(utf8(entry.signature))]));
+      return Buffer.concat([u2((lookup ? 0x0001 : 0x0009) | (entry.varargs ? 0x0080 : 0)),
+        u2(name), u2(descriptor), u2(attributes.length), Buffer.concat(attributes)]);
+    }),
+    extra = Buffer.concat(constants), withConstants = Buffer.concat([data.slice(0, 8), u2(nextIndex),
+      data.slice(10, cp.offset), extra, data.slice(cp.offset)]), table = methodsInfo(withConstants, cp.offset + extra.length);
+  return Buffer.concat([withConstants.slice(0, table.countOffset), u2(table.count + bodies.length),
+    withConstants.slice(table.countOffset + 2, table.endOffset), Buffer.concat(bodies), withConstants.slice(table.endOffset)]);
+}
+
+/** The release-9 exact-binary-name enum is a genuine nested public static
+ * Lookup member at runtime and for the compiler-facing bootstrap artifact. */
+function addHiddenClassOptionMetadata(data: Buffer): Buffer {
+  var names: {[index: number]: string} = {}, cp = constantPoolEnd(data, names),
+    constants = Buffer.concat([
+      utf8Constant('InnerClasses'), utf8Constant('java/lang/invoke/MethodHandles$Lookup$ClassOption'),
+      Buffer.concat([Buffer.from([7]), u2(cp.count + 1)]),
+      utf8Constant('java/lang/invoke/MethodHandles$Lookup'), Buffer.concat([Buffer.from([7]), u2(cp.count + 3)]),
+      utf8Constant('ClassOption')
+    ]),
+    withConstants = Buffer.concat([data.slice(0, 8), u2(cp.count + 6), data.slice(10, cp.offset),
+      constants, data.slice(cp.offset)]),
+    table = methodsInfo(withConstants, cp.offset + constants.length), countOffset = table.endOffset,
+    count = withConstants.readUInt16BE(countOffset), offset = countOffset + 2,
+    entry = Buffer.concat([u2(cp.count + 2), u2(cp.count + 4), u2(cp.count + 5), u2(0x4019)]);
+  for (var i = 0; i < count; i++) {
+    var nameIndex = withConstants.readUInt16BE(offset), length = withConstants.readUInt32BE(offset + 2);
+    if (names[nameIndex] === 'InnerClasses') {
+      var members = withConstants.readUInt16BE(offset + 6);
+      return Buffer.concat([withConstants.slice(0, offset + 2), u4(length + entry.length), u2(members + 1),
+        withConstants.slice(offset + 8, offset + 6 + length), entry, withConstants.slice(offset + 6 + length)]);
+    }
+    offset += 6 + length;
+  }
+  return Buffer.concat([withConstants.slice(0, countOffset), u2(count + 1), withConstants.slice(countOffset + 2),
+    u2(cp.count), u4(2 + entry.length), u2(1), entry]);
+}
+
+function addHiddenUnreflectSetterOverlay(data: Buffer): Buffer {
+  var names: {[index: number]: string} = {}, cp = constantPoolEnd(data, names),
+    descriptor = '(Ljava/lang/reflect/Field;)Ljava/lang/invoke/MethodHandle;',
+    constants = Buffer.concat([utf8Constant('Code'), utf8Constant('doppioHiddenFinalBase$unreflectSetter'),
+      utf8Constant('java/lang/invoke/DoppioHiddenClasses'), Buffer.concat([Buffer.from([7]), u2(cp.count + 2)]),
+      utf8Constant('unreflectSetter'), utf8Constant('(Ljava/lang/invoke/MethodHandles$Lookup;' + descriptor.slice(1)),
+      Buffer.concat([Buffer.from([12]), u2(cp.count + 4), u2(cp.count + 5)]),
+      Buffer.concat([Buffer.from([10]), u2(cp.count + 3), u2(cp.count + 6)])]),
+    table = methodsInfo(data, cp.offset), offset = table.countOffset + 2, alias: Buffer = null;
+  for (var i = 0; i < table.count; i++) {
+    var end = skipMember(data, offset);
+    if (names[data.readUInt16BE(offset + 2)] === 'unreflectSetter' && names[data.readUInt16BE(offset + 4)] === descriptor) {
+      alias = Buffer.concat([u2((data.readUInt16BE(offset) & ~0x0007) | 0x0002), u2(cp.count + 1), data.slice(offset + 4, end)]);
+      break;
+    }
+    offset = end;
+  }
+  if (alias === null) throw new Error('Stock Lookup.unreflectSetter is missing');
+  var withConstants = Buffer.concat([data.slice(0, 8), u2(cp.count + 8), data.slice(10, cp.offset), constants, data.slice(cp.offset)]),
+    bodyOffset = cp.offset + constants.length, rewritten = replaceMethodCode(withConstants, bodyOffset,
+      'unreflectSetter', descriptor, cp.count, 2, 2, Buffer.concat([Buffer.from([0x2a, 0x2b, 0xb8]), u2(cp.count + 7), Buffer.from([0xb0])]));
+  table = methodsInfo(rewritten, bodyOffset);
+  return Buffer.concat([rewritten.slice(0, table.countOffset), u2(table.count + 1),
+    rewritten.slice(table.countOffset + 2, table.endOffset), alias, rewritten.slice(table.endOffset)]);
+}
+
+function addHiddenCanonicalNameOverlay(data: Buffer): Buffer {
+  var names: {[index: number]: string} = {}, cp = constantPoolEnd(data, names),
+    descriptor = '()Ljava/lang/String;',
+    constants = Buffer.concat([utf8Constant('Code'), utf8Constant('doppioHiddenCanonicalNameBase'),
+      utf8Constant('java/lang/invoke/DoppioHiddenClasses'), Buffer.concat([Buffer.from([7]), u2(cp.count + 2)]),
+      utf8Constant('canonicalName'), utf8Constant('(Ljava/lang/Class;)Ljava/lang/String;'),
+      Buffer.concat([Buffer.from([12]), u2(cp.count + 4), u2(cp.count + 5)]),
+      Buffer.concat([Buffer.from([10]), u2(cp.count + 3), u2(cp.count + 6)])]),
+    table = methodsInfo(data, cp.offset), offset = table.countOffset + 2, alias: Buffer = null;
+  for (var i = 0; i < table.count; i++) {
+    var end = skipMember(data, offset);
+    if (names[data.readUInt16BE(offset + 2)] === 'getCanonicalName' && names[data.readUInt16BE(offset + 4)] === descriptor) {
+      alias = Buffer.concat([u2((data.readUInt16BE(offset) & ~0x0007) | 0x0002), u2(cp.count + 1), data.slice(offset + 4, end)]);
+      break;
+    }
+    offset = end;
+  }
+  if (alias === null) throw new Error('Stock Class.getCanonicalName is missing');
+  var withConstants = Buffer.concat([data.slice(0, 8), u2(cp.count + 8), data.slice(10, cp.offset), constants, data.slice(cp.offset)]),
+    bodyOffset = cp.offset + constants.length, rewritten = replaceMethodCode(withConstants, bodyOffset,
+      'getCanonicalName', descriptor, cp.count, 1, 1, Buffer.concat([Buffer.from([0x2a, 0xb8]), u2(cp.count + 7), Buffer.from([0xb0])]));
+  table = methodsInfo(rewritten, bodyOffset);
+  return Buffer.concat([rewritten.slice(0, table.countOffset), u2(table.count + 1),
+    rewritten.slice(table.countOffset + 2, table.endOffset), alias, rewritten.slice(table.endOffset)]);
+}
+
+/** Guard only hidden-class final writes, preserving each complete stock Code
+ * body and its StackMapTable under a private alias. Ordinary final fields and
+ * records retain their existing behavior outside the selected C5 boundary. */
+function addHiddenFinalFieldWriteOverlays(data: Buffer): Buffer {
+  var names: {[index: number]: string} = {}, cp = constantPoolEnd(data, names),
+    constants: Buffer[] = [], nextIndex = cp.count;
+  function utf8(value: string): number { constants.push(utf8Constant(value)); return nextIndex++; }
+  function cls(value: string): number {
+    var name = utf8(value), index = nextIndex++;
+    constants.push(Buffer.concat([Buffer.from([7]), u2(name)])); return index;
+  }
+  function ref(owner: number, nameIndex: number, descriptorIndex: number): number {
+    var pair = nextIndex++, index = nextIndex++;
+    constants.push(Buffer.concat([Buffer.from([12]), u2(nameIndex), u2(descriptorIndex)]),
+      Buffer.concat([Buffer.from([10]), u2(owner), u2(pair)]));
+    return index;
+  }
+  var codeName = utf8('Code'), helper = cls('java/lang/invoke/DoppioHiddenClasses'), owner = cls('java/lang/reflect/Field'),
+    guard = ref(helper, utf8('checkFieldWritable'), utf8('(Ljava/lang/reflect/Field;)V')),
+    table = methodsInfo(data, cp.offset), offset = table.countOffset + 2, aliases: Buffer[] = [],
+    rewrites: {name: string; descriptor: string; words: number; code: Buffer}[] = [],
+    types: {[name: string]: {descriptor: string; load: number; width: number}} = {
+      set: {descriptor: 'Ljava/lang/Object;', load: 0x2c, width: 1},
+      setBoolean: {descriptor: 'Z', load: 0x1c, width: 1},
+      setByte: {descriptor: 'B', load: 0x1c, width: 1},
+      setChar: {descriptor: 'C', load: 0x1c, width: 1},
+      setShort: {descriptor: 'S', load: 0x1c, width: 1},
+      setInt: {descriptor: 'I', load: 0x1c, width: 1},
+      setLong: {descriptor: 'J', load: 0x20, width: 2},
+      setFloat: {descriptor: 'F', load: 0x24, width: 1},
+      setDouble: {descriptor: 'D', load: 0x28, width: 2}
+    };
+  for (var i = 0; i < table.count; i++) {
+    var end = skipMember(data, offset), name = names[data.readUInt16BE(offset + 2)], type = types[name],
+      descriptor = names[data.readUInt16BE(offset + 4)];
+    if (type && descriptor === '(Ljava/lang/Object;' + type.descriptor + ')V') {
+      var aliasName = utf8('doppioHiddenFinalBase$' + name),
+        alias = ref(owner, aliasName, data.readUInt16BE(offset + 4));
+      aliases.push(Buffer.concat([u2((data.readUInt16BE(offset) & ~0x0007) | 0x0002), u2(aliasName), data.slice(offset + 4, end)]));
+      rewrites.push({name, descriptor, words: 2 + type.width, code: Buffer.concat([
+        Buffer.from([0x2a, 0xb8]), u2(guard), Buffer.from([0x2a, 0x2b, type.load, 0xb7]), u2(alias), Buffer.from([0xb1])
+      ])});
+    }
+    offset = end;
+  }
+  if (aliases.length !== 9) throw new Error('Stock Field write declaration inventory changed');
+  var extra = Buffer.concat(constants), rewritten = Buffer.concat([data.slice(0, 8), u2(nextIndex),
+    data.slice(10, cp.offset), extra, data.slice(cp.offset)]), bodyOffset = cp.offset + extra.length;
+  rewrites.forEach(entry => {
+    rewritten = replaceMethodCode(rewritten, bodyOffset, entry.name, entry.descriptor,
+      codeName, entry.words, entry.words, entry.code);
+  });
+  table = methodsInfo(rewritten, bodyOffset);
+  return Buffer.concat([rewritten.slice(0, table.countOffset), u2(table.count + aliases.length),
+    rewritten.slice(table.countOffset + 2, table.endOffset), Buffer.concat(aliases), rewritten.slice(table.endOffset)]);
+}
+
 function addJavaLangInvokeSpreadArgumentModernOverlay(data: Buffer): Buffer {
   var utf8Constants: {[index: number]: string} = {},
     cp = constantPoolEnd(data, utf8Constants),
@@ -3872,6 +4062,7 @@ export function applyModernBootstrapOverlays(typeStr: string, data: Buffer): Buf
     data = addJavaLangInvokeMethodHandlesModernOverlays(data);
     data = addJavaLangInvokeFilterArgumentsModernOverlay(data);
     data = addJavaLangInvokeVarHandleModernOverlays(data, false);
+    data = addJavaLangInvokeHiddenClassOverlays(data, false);
   }
   if (typeStr === 'Ljava/lang/invoke/MethodHandle;') {
     data = addJavaLangInvokeMethodHandleModernOverlays(data);
@@ -3882,7 +4073,12 @@ export function applyModernBootstrapOverlays(typeStr: string, data: Buffer): Buf
   if (typeStr === 'Ljava/lang/invoke/MethodHandles$Lookup;') {
     data = addJavaLangInvokeMethodHandlesLookupModernOverlays(data);
     data = addJavaLangInvokeVarHandleModernOverlays(data, true);
+    data = addJavaLangInvokeHiddenClassOverlays(data, true);
+    data = addHiddenClassOptionMetadata(data);
+    data = addHiddenUnreflectSetterOverlay(data);
   }
+  if (typeStr === 'Ljava/lang/invoke/MethodHandles$Lookup$ClassOption;') data = addHiddenClassOptionMetadata(data);
+  if (typeStr === 'Ljava/lang/reflect/Field;') data = addHiddenFinalFieldWriteOverlays(data);
   if (typeStr === 'Ljava/nio/MappedByteBuffer;') {
     data = addJavaNioMappedByteBufferModernOverlays(data);
   }
@@ -3892,6 +4088,7 @@ export function applyModernBootstrapOverlays(typeStr: string, data: Buffer): Buf
       typeStr === 'Ljava/lang/String;') {
     data = addNominalConstantDescOverlay(data, typeStr);
   }
+  if (typeStr === 'Ljava/lang/Class;') data = addHiddenCanonicalNameOverlay(data);
   return data;
 }
 
@@ -3936,6 +4133,10 @@ export abstract class ClassLoader {
   /** Candidates are not part of the initiating-loader namespace until every
    * direct-supertype admission check has succeeded. */
   private pendingDefinitions: { [typeStr: string]: PendingClassDefinition } = {};
+  private hiddenArrays = new WeakMap<ClassData, ArrayClassData<any>>();
+  /** STRONG retains the VM identity, but does not make its name discoverable.
+   * Weak unloading/GC behavior is outside this interpreter's compatibility gate. */
+  private strongHiddenClasses: ReferenceClassData<JVMTypes.java_lang_Object>[] = [];
   /**
    * Stores callbacks that are waiting for another thread to finish loading
    * the specified class.
@@ -4039,6 +4240,43 @@ export abstract class ClassLoader {
       cb: (cls: ReferenceClassData<T>) => void, ancestry?: ClassDerivationPath): void {
     if (candidate.getLoader() !== this) throw new Error('Definition candidate belongs to another loader');
     this.deriveClass({thread, candidate, callback: cb, ancestry: new Set(ancestry || definitionAncestry(thread))});
+  }
+
+  /** Hidden derivation verifies the actual candidate without reserving,
+   * publishing, initiating or applying a loading constraint to its name. */
+  public defineHiddenParsedClass<T extends JVMTypes.java_lang_Object>(thread: JVMThread, candidate: ReferenceClassData<T>,
+      cb: (cls: ReferenceClassData<T>) => void): void {
+    if (candidate.getLoader() !== this || !candidate.isHidden()) throw new Error('Invalid hidden definition candidate');
+    var ancestry = new Set(definitionAncestry(thread)), path = new Set(ancestry);
+    path.add(candidate);
+    asyncForEach(candidate.getInterfaceClassReferences(), (ref, next) => {
+      if (ref.cls !== null) next();
+      else this.loadClass(thread, ref.name, loaded => next(loaded === null ? true : undefined), false, path);
+    }, failure => {
+      if (failure) { cb(null); return; }
+      candidate.resolveHierarchy(thread, hierarchy => {
+        if (hierarchy === null) { cb(null); return; }
+        candidate.resolve(thread, linked => {
+          if (linked !== null && candidate.isStrongHidden()) this.strongHiddenClasses.push(candidate);
+          cb(linked === null ? null : candidate);
+        }, false);
+      }, false, ancestry);
+    });
+  }
+
+  /** Array creation requires an already held component identity. Invalid
+   * hidden descriptors never become a loader lookup or a public namespace key. */
+  public getHiddenArrayClass<T>(component: ClassData): ArrayClassData<T> {
+    if (component.getLoader() !== this || !(component instanceof ReferenceClassData ? component.isHidden() :
+        component instanceof ArrayClassData && component.hasHiddenComponent())) {
+      throw new Error('Hidden array requires an exact hidden component');
+    }
+    var array = this.hiddenArrays.get(component);
+    if (array === undefined) {
+      array = new ArrayClassData<any>(component.getInternalName(), this, component);
+      this.hiddenArrays.set(component, array);
+    }
+    return array;
   }
 
   protected definitionError(thread: JVMThread, name: string, message: string): void {

@@ -16,6 +16,17 @@ interface NestHostResolution {
 // VirtualMachineError interrupts the determination and permits another attempt.
 var nestHosts = new WeakMap<ReferenceClass, NestHostResolution>();
 
+/** Fixed VM capability: the hidden defining path has resolved the Lookup's
+ * actual host before the hidden candidate can execute. This does not add a
+ * discoverable NestMembers name or make any caller-selected host authoritative. */
+export function registerHiddenNestHost(cls: ReferenceClass, host: ReferenceClass): void {
+  if (!cls.isHidden() || cls.getLoader() !== host.getLoader() ||
+      cls.getPackageName() !== host.getPackageName() || nestHosts.has(cls)) {
+    throw new Error('Invalid hidden nest registration');
+  }
+  nestHosts.set(cls, {host, waiters: []});
+}
+
 export function isVirtualMachineError(failure: JVMTypes.java_lang_Throwable, cls: ReferenceClass): boolean {
   // Exception taxonomy uses the actual bootstrap identity, not a same-named
   // class from another defining loader. This check must not load another class.

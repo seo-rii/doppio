@@ -5037,10 +5037,17 @@ function modernJava(grunt: IGrunt) {
       inputHashPath = path.join(workDir, 'input.sha256'),
       artifactHashPath = path.join(workDir, 'artifact.sha256'),
       compiledTransformer = path.resolve('build/dev-cli/src/ClassLoader.js'),
-      inputs = [runtimeJar, 'src/ClassLoader.ts', 'tasks/modern_java.ts', compiledTransformer],
+      hiddenOptionEntry = 'java/lang/invoke/MethodHandles$Lookup$ClassOption.class',
+      hiddenOptionSource = 'classes/modern_classlib/java/lang/invoke/MethodHandles$Lookup$ClassOption.java',
+      hiddenOptionCompiled = path.join('classes/modern_classlib/out', hiddenOptionEntry),
+      inputs = [runtimeJar, 'src/ClassLoader.ts', 'tasks/modern_java.ts', compiledTransformer,
+        hiddenOptionSource, hiddenOptionCompiled],
       force = process.env.DOPPIO_FORCE_MODERN_BOOTSTRAP_OVERLAY === '1';
     if (!fs.existsSync(compiledTransformer)) {
       grunt.fail.fatal('Compiled bootstrap overlay transformer is missing: ' + compiledTransformer);
+    }
+    if (!fs.existsSync(hiddenOptionCompiled)) {
+      grunt.fail.fatal('Compiled hidden ClassOption shim is missing; run javac_modern_classlib: ' + hiddenOptionCompiled);
     }
 
     var inputHasher = crypto.createHash('sha256');
@@ -5097,6 +5104,15 @@ function modernJava(grunt: IGrunt) {
         transformedClasses.push(relativePath.replace(/\\/g, '/'));
       }
     });
+    // Lookup's public varargs descriptors reference the genuine nested enum.
+    // Stock Java8 has no such class, so include its exact compiled+overlaid
+    // bytes as a hashed input rather than a fabricated compiler declaration.
+    var hiddenOptionBytes = transformer.applyModernBootstrapOverlays(
+      'Ljava/lang/invoke/MethodHandles$Lookup$ClassOption;', fs.readFileSync(hiddenOptionCompiled)),
+      hiddenOptionOutput = path.join(outDir, hiddenOptionEntry);
+    grunt.file.mkdir(path.dirname(hiddenOptionOutput));
+    fs.writeFileSync(hiddenOptionOutput, hiddenOptionBytes);
+    transformedClasses.push(hiddenOptionEntry);
 
     transformedClasses.sort();
     var expectedTransformedClasses = [
@@ -5118,6 +5134,7 @@ function modernJava(grunt: IGrunt) {
       'java/lang/Thread.class',
       'java/lang/invoke/MethodHandle.class',
       'java/lang/invoke/MethodHandleImpl.class',
+      'java/lang/invoke/MethodHandles$Lookup$ClassOption.class',
       'java/lang/invoke/MethodHandles$Lookup.class',
       'java/lang/invoke/MethodHandles.class',
       'java/lang/ref/Reference.class',
@@ -5129,6 +5146,7 @@ function modernJava(grunt: IGrunt) {
       'java/lang/reflect/AnnotatedWildcardType.class',
       'java/lang/reflect/Constructor.class',
       'java/lang/reflect/Executable.class',
+      'java/lang/reflect/Field.class',
       'java/nio/MappedByteBuffer.class',
       'java/time/Duration.class',
       'java/util/concurrent/TimeUnit.class',
