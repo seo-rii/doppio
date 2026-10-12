@@ -1756,15 +1756,19 @@ expanded.
   assignability, descriptor equality and resolution for ordinary, nested,
   local, anonymous, interface, enum, annotation, JDK, primitive, void, and
   array classes, plus `Lookup.unreflect` and `Lookup.findVirtual` through both
-  `Class` and `Constable`. Hidden classes and arrays whose element type is
-  hidden remain outside this surface because hidden-class definition is not
-  implemented.
+  `Class` and `Constable`. The separate selected C5 corpus now also checks
+  empty constables for actual hidden classes and arrays with hidden components;
+  broader nominal descriptor resolution remains C6 work.
 - `java.lang.Class.isHidden()` is a parsed public native Java 15 method, so
   direct calls, reflective lookup and enumeration, `Method.invoke`, and
   `Lookup.unreflect` share one implementation with HotSpot-compatible
   `IntrinsicCandidate` metadata. Coverage includes false results for non-hidden
   ordinary, nested, local, anonymous, JDK, primitive, void, and array classes.
-  Hidden class definition and discovery are not implemented.
+  The separate [selected C5 evidence](phase-c-invocation.md#c5-verified-batch-exit)
+  adds true results for actual hidden definitions and false for their arrays,
+  with definition/class-data initialization, Lookup authority, identity/nest and
+  reflective final-write restrictions. Hidden classes/arrays remain unavailable
+  through ordinary name discovery; GC/unloading and named modules are unproven.
 - `java.lang.System$Logger` covers the tested Java 9 nested interface and
   `Level` enum type surface, level metadata, and default log-method delegation
   for custom logger implementations, including null validation and lazy
@@ -2746,7 +2750,54 @@ outside the selected C3 claim. The negative reflection case covers only fixed
 unreflected erased handles; mixed unsupported/type priority is explicitly
 pinned-native evidence. View/buffer/off-heap handles, fences, arbitrary NaN
 payloads, maximal arities and complete module/loader/access lattices are not
-established. The full conversion/combinator/VarHandle API, memory ordering,
-general bootstrap, hidden definitions, named modules and public class-file API
-remain unclaimed. Source units remain unassessed; C4–C7 and full Phase C/package
-conformance are still pending.
+established. At that C3 exit the full conversion/combinator/VarHandle API,
+memory ordering, general bootstrap, hidden definitions, named modules and
+public class-file API remained unclaimed. The later selected C4/C5 exits below
+do not complete any full owner/API matrix; source units remain unassessed.
+
+## User Bootstrap And Hidden-Class Evidence
+
+[C4's selected matrix](phase-c-invocation.md#c4-verified-batch-exit) adds 48 user
+dynamic-constant, invokedynamic and error cases. At frozen `8d38c63e2`, all 18
+pinned Java 21/25 native/Node/Chromium cells and 288 outcomes pass. Six directly
+generated original 65/69 instruction classes plus 18 untouched javac artifacts
+are bound to actual BootstrapMethods operands and 200 case-linked Code probes.
+Shared support outputs repeat across directories, so this is not 24 distinct
+binary names. Resolution retains caller Lookup, ordered nested arguments,
+selected adaptation, exact lexical-site identities and single-thread mutable/
+volatile target updates. Existing compiler-generated fast paths are retained.
+
+Native unwrapped-Error retry policy and repeated bootstrap wrapper/cause-object
+identity are explicitly outside the comparison matrix. Runtime units separately
+check specified Error caching. Concurrent linkage, maximal arity and cross-thread
+visibility are not established by these selected value/error traces.
+
+[C5's independent matrix](phase-c-invocation.md#c5-verified-batch-exit) adds 48
+definition, identity and class-data cases; all 18 original-javac Java 21/25
+native/Node/Chromium cells and 288 outcomes pass at the same implementation.
+The six compilations retain 26 class-file artifacts, 234 case-linked Code probes
+and separate raw proofs for 14 payload artifacts/all 34 payload Code methods.
+Only runtime this_class identity is rebound; ordinary self-type descriptors
+remain unchanged and continue through the genuine verifier.
+
+Full-privilege definition, ORIGINAL class-data authority, passive/eager
+initialization, repeated identity isolation, NESTMATE/STRONG, hidden arrays and
+non-discovery are selected. Hidden-final write guards preserve ordinary stock
+paths and deny accessible private-alias reflection/MethodHandle bypasses.
+`classDataAt` bounds use the specified IndexOutOfBoundsException family rather
+than demanding a concrete exception subtype chosen by the retained List.
+Generated name suffix values, GC/unloading, arbitrary raw InnerClasses reflection fidelity,
+mixed-invalid-input priority, SecurityManager and named modules remain unclaimed.
+
+The compiler-facing projection has 43 exact class-only entries, including the
+genuinely compiled ClassOption enum. The independent stock-overlay verifier
+checks 1,525 Code methods across 38 selected stock classes: 138 generated/
+rewritten and 1,387 byte-identical stock bodies, with eleven intact C5 aliases
+and historical hashes/branch frames preserved. These are metadata inventory
+counts, not passing semantic cases. See the batch exit for fresh C1–C3,
+B1–B8, original 323-fixture and selected compiler-consumer verification.
+
+The next batch is C6 nominal constants, then C7's public class-file library.
+Full Phase C/JVM-003/004/005/API conformance, memory ordering, concurrency,
+named modules and hidden-class GC remain open. No Pro review was produced:
+the consultation failed at the model-picker UI before chat creation.

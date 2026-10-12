@@ -5,8 +5,8 @@ Phase C owns `JVM-003`, `JVM-004`, `JVM-005` and `LIB-007` from the
 B1–B8 loading, verification, linking and language foundation; that foundation
 does not establish general method-handle, bootstrap or module conformance.
 This is an ordered batch plan, not a single feature, effort estimate or new
-support level. The selected C1, C2 and C3 batches are verified. The next planned
-batch is C4; C4–C7 remain pending and may need further subdivision before
+support level. The selected C1–C5 batches are verified. The next planned
+batch is C6; C6–C7 remain pending and may need further subdivision before
 implementation.
 
 ## Batches and dependencies
@@ -145,22 +145,103 @@ visibility or general atomicity. D owns that evidence. View/buffer/off-heap
 handles, fences, extreme arities, complete protected/module/loader lattices,
 nominal VarHandle descriptions and complete API conformance are not this exit.
 
+## C4 selected scope
+
+C4 has a separate fixed 48-case inventory: 16 user dynamic-constant, 16
+invokedynamic and 16 linkage-error cases. It covers caller Lookup identity and
+private access, ordered nested bootstrap arguments, selected primitive/wide
+conversion and varargs/constructor bootstrap handles, null/reference identity,
+one-time successful resolution, ConstantCallSite target capture and single-thread
+MutableCallSite/VolatileCallSite target changes. Distinct instructions and
+methods sharing one CP entry retain distinct lexical call-site identities.
+
+The bootstrap instruction classes are directly generated original final-version
+65/69 inputs, not rewritten javac carriers. Their drivers/support classes are
+untouched genuine javac outputs. Independent Code and BootstrapMethods proofs
+bind the actual instruction locations, method-handle kinds/owners and ordered
+nested arguments. This is a finite user-bootstrap matrix, not arbitrary graphs,
+maximal arities, concurrent linkage or cross-thread visibility.
+
+Native-first error boundaries are explicit. Both pinned native releases retry
+a user bootstrap throwing an unwrapped AssertionError. Those cases check only
+the first original Error identity/pass-through; native retry policy is unclaimed.
+Wrapped failures check the first cause, repeated outer error class and bootstrap
+non-reexecution. Repeated wrapper/cause-object identity is not claimed: native
+cached indy BootstrapMethodError loses its cause on repeat, while cached condy
+retains the cause class but not the original cause object. Runtime units separately
+check the VM's specified Error caching; native agreement does not close that
+specification difference. No exception allowlist waives failed guest execution.
+
+References include [JVMS 21 §5.4.3.6](https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-5.html#jvms-5.4.3.6),
+[JVMS 25 §5.4.3.6](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-5.html#jvms-5.4.3.6)
+and the release-specific MethodHandle, Lookup and CallSite contracts. Ownership
+remains JVM-004, not an expansion of JVM-003's completion claim.
+
+## C5 selected scope
+
+C5 independently selects 48 cases, with 16 per group:
+
+- Definition: full-privilege and reduced-mode Lookup boundaries, passive/eager
+  initialization, malformed/version/package failures, interfaces, STRONG and
+  NESTMATE options, and genuine unchanged self-descriptor verification failure.
+- Identity: repeated definitions/instance isolation, actual this_class literals
+  versus unchanged ordinary self-type descriptors, names/packages, held-component
+  arrays, non-discovery, nest membership/private access, reflection and
+  MethodHandle invocation, hidden-final write restrictions and C3 VarHandle reads.
+- Class data: exact stored identity and initialization, absent data, selected
+  reference casts, primitive unboxing/widening and failures, original mutable
+  List indexing, and ORIGINAL authority before disclosure or initialization.
+
+All valid definition payloads are unchanged original javac 21/25 class files.
+Negative API requests explicitly copy bytes for malformed/future-version cases;
+they do not rewrite the valid compiler inventory. Only the original this_class
+entry receives a hidden identity at runtime. Self-type descriptors still name
+the ordinary class, so returning hidden this to such a descriptor is a genuine
+VerifyError rather than a reason to rewrite descriptors or waive verification.
+Raw payload Code and exact resource-loader operands are replayed independently
+of the runtime. Generated hidden name suffix values are never compared.
+
+Hidden classes/arrays stay out of named and initiating loader namespaces.
+NESTMATE uses the actual defining Lookup's resolved host, not the payload's raw
+NestHost, and does not add a discoverable NestMembers name. All nine reflected
+Field write families and Lookup.unreflectSetter reject hidden finals, including
+accessible private-alias Method/MethodHandle routes; ordinary/mutable fields
+retain their stock paths. STRONG retention is implemented, but collection,
+unloading and weak-versus-strong GC behavior are not proven.
+
+The classDataAt bounds contract checks the specified IndexOutOfBoundsException
+family, not a concrete exception subtype chosen by a List implementation. The
+pinned native ArrayList throws IndexOutOfBoundsException for a negative index;
+the retained guest List
+throws its allowed ArrayIndexOutOfBoundsException subtype. Other selected
+failures retain exact exception-class checks. Arbitrary raw InnerClasses
+reflection fidelity, mixed-invalid-input priority, SecurityManager and
+named-module authority are outside this batch.
+
+References are the [Java 21 hidden-definition Lookup API](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/invoke/MethodHandles.Lookup.html),
+[Java 25 hidden-definition Lookup API](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/invoke/MethodHandles.Lookup.html)
+and [Java 25 classDataAt contract](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/invoke/MethodHandles.html#classDataAt(java.lang.invoke.MethodHandles.Lookup,java.lang.String,java.lang.Class,int)).
+JVM-005 owns this finite evidence; C6 nominal resolution, G's module model and
+GC/unloading remain separate.
+
 ## Evidence and retained compatibility
 
-The C1, C2 and C3 gates must retain the genuine compiler recipes and raw outcomes
+The C1–C5 gates must retain the original input recipes and raw outcomes
 from each applicable release and host, with source, class, runtime, toolchain and Git
 provenance. Fixed expected traces and completion markers must be checked
 independently of native-versus-guest equality. Two equally incomplete runs cannot
 pass by agreeing. Failed compilation or execution, timeout, missing cases,
 filtered hosts and incomplete output fail the selected gate.
 
-Class-file proofs must bind the actual source and genuine compiled inventory,
+Class-file proofs must bind the actual source and original compiled/generated inventory,
 then decode relevant method/field references, signature-polymorphic call
 descriptors and wide-slot instructions independently of runtime execution.
 Changing a class major version, injecting a carrier class or substituting a
 shim probe for an unexecuted operation is not genuine 21/25 evidence. Shared
 library shims and native/runtime implementation paths stay separately described
-in the [invoke design](design/java-lang-invoke.md).
+in the [invoke design](design/java-lang-invoke.md). C4's original generated
+instruction classes are explicitly distinguished from its untouched javac
+drivers; C5's original javac definition payloads have a separate raw-byte proof.
 
 Retain the original Java 8 invocation/lambda corpus and Java 17 lookup,
 lookup-mode/private-lookup, unreflect, conversion, combinator and control-flow
@@ -235,6 +316,35 @@ CI uploads the raw official ledger after success or failure. The workflow
 checker rejects omitted unit files, filtered/diagnostic commands, error
 swallowing and cross-wired artifacts. All broad completion flags remain false,
 including C3's explicit memory-order/concurrent-visibility flags.
+
+## Reproduce and interpret C4/C5
+
+After the same strict CLI/browser builds and pinned-toolchain preparation:
+
+```sh
+yarn ci:bootstrap-linkage:test
+yarn ci:bootstrap-linkage
+yarn ci:hidden-class:test
+yarn ci:hidden-class
+```
+
+The mandatory full-host commands are
+`node ci/java_methodhandle_bootstrap_test.mjs --browser` and
+`node ci/java_methodhandle_hidden_class_test.mjs --browser`. Their separate
+official ledgers are `build/java-methodhandle-bootstrap-results.json` and
+`build/java-methodhandle-hidden-class-results.json`. Each requires all six
+release/group input recipes and 18 native/Node/Chromium cells. C4 retains both
+its original-generator and genuine-javac recipes; C5 retains the genuine-javac
+recipes and original definition-payload/resource proofs.
+
+C4's dedicated tests include its contract and runtime linkage units. C5's
+include its contract, actual parser/loader/runtime, compiled API metadata and
+real invocation-entry guard units. CI requires the exact files and full-host
+commands and uploads each raw ledger after success or failure. Separate
+inventories/namespaces prevent C1–C5 substitution; missing, stale, dirty,
+pruned or cross-wired evidence fails. Diagnostic/native-only ledgers cannot
+replace the official gates. All broader flags remain false, including C4's
+concurrent/maximal-arity and C5's GC/named-module flags.
 
 ## C1 verified batch exit
 
@@ -425,8 +535,129 @@ unavailable; no Pro review exists. Independent local architecture/API/native
 reviews and original native/guest executions supplied the actual review and
 verification evidence. No persistent login or shared broker state was changed.
 
-The selected C3 batch is verified; C4–C7 remain pending. Full Phase C, JVM-003,
-source-unit/API conformance, general bootstrap, complete VarHandle execution,
-named-module runtime, memory ordering and concurrent visibility remain
-unclaimed. Broader completion flags stay false and source ownership is
-unchanged. The next planned batch is C4's user bootstrap linkage.
+At that C3 exit, C4–C7 remained pending and no broader owner/API, module or
+memory-model claim was made. The later selected C4/C5 exits follow; indexed
+source ownership remains unchanged.
+
+## C4 verified batch exit
+
+At frozen implementation `8d38c63e2`, all 48 selected C4 cases pass in all 18
+pinned Java 21/25 native/Node/Chromium cells: 288 outcomes, zero failed,
+missing, skipped or timed-out required executions.
+
+Six isolated release/group directories retain original-generation and
+genuine-javac recipes for 24 class-file artifacts (65/69, minor 0): six original
+generated Calls inputs and 18 untouched
+javac driver/support outputs. Shared support artifacts repeat, so these are
+not 24 distinct binary names. Independent proofs bind 200 actual-Code probes
+and 108 constrained dynamic instruction locations to bootstrap handles/ordered
+nested arguments, including distinct lexical sites sharing one CP index.
+Neither repeated probes nor payload decoding is dynamic branch/JIT coverage.
+
+The official ledger SHA-256 is
+`e79f4979c2925fa688d578ac9c8945f38ec646aea0578a6fbc6d1f78b1e0032e`.
+It binds original recipes, bytes, fixed traces and source/toolchain/runtime/Git
+provenance at this implementation, not an arbitrary later runtime.
+
+The first native/Node diagnostic at `1ad64afa3` retained passing native and
+condy/error cells but failed the volatile target-update cases with the missing
+setCallSiteTargetVolatile native. Its raw failure is archived as SHA-256
+`d2f0145ca3e2b472f0dc684be2021923b1e57b2caca80d22f34bbe2af23419c1`;
+Chromium was not run. The fixed exact-site target hook preserves the public
+stock type/null validation and one-bootstrap policy. Runtime/registration
+units and the fresh full-host gate pass without changing C4 expectations.
+
+Native-first unwrapped-Error retry and repeated-wrapper/cause boundaries remain
+the explicit exclusions above. Specified guest Error caching is independently
+unit-tested, not inferred from conflicting native retries. Concurrent linkage,
+maximal arity, cross-thread visibility and complete JVM-004 remain unclaimed.
+
+## C5 verified batch exit
+
+At the same frozen implementation, all 48 independent C5 cases pass in all 18
+pinned Java 21/25 native/Node/Chromium cells: 288 outcomes with no failed,
+missing, skipped or timed-out required executions.
+
+Six genuine compilations retain 26 untouched class-file artifacts (65/69,
+minor 0), 234 case-linked Code probes and separate raw-byte/resource proofs
+for 14 payload artifacts and all 34 payload Code methods. Shared support
+outputs repeat; payload inventory is not a count of successful hidden
+definitions or dynamic branch coverage. No valid payload headers, descriptors
+or instructions are rewritten to obtain the comparison results.
+
+The official C5 ledger SHA-256 is
+`b70fe55c26a76e16f6cd1ab7f39dcbc9239583d640f3eb59085177b07245b6dd`.
+It binds original payload/compiler/resource recipes, fixed traces and unchanged
+source/toolchain/runtime/Git inputs.
+
+The first native/Node diagnostic at `1ad64afa3` failed hidden final-field reads
+and an over-specific negative-index exception assertion. The raw failure is
+archived as SHA-256
+`5ba3e43d250e14f57ca6e30e2f613f681d612963f90758a960c1894d560f2b48`;
+Chromium was not run. Hidden Field storage keys are now rebound to the actual
+declaring identity before constructor generation, retaining original self-type
+descriptors. The shared alias guard also accepts ordinary partial VM method
+declarations, restoring the unchanged retained reflection unit.
+
+A separate original native/Node bounds diagnostic establishes the specified
+IndexOutOfBoundsException family: native negative ArrayList access throws that
+class, while the retained guest throws its ArrayIndexOutOfBoundsException
+subtype. Only this concrete-subtype overconstraint was corrected; exact other
+error checks remain. No List implementation rewrite, exception reallocation,
+allowlist or host waiver was added. The final full-host gate checks the fixed
+family trace and the underlying failing operation.
+
+Full-privilege definition and ORIGINAL data access, exact stored identities,
+initialization, arrays/non-discovery, selected NESTMATE/STRONG and hidden-final
+reflection/MethodHandle/VarHandle restrictions are verified in the bounded
+matrix. GC/unloading, named modules, SecurityManager, arbitrary raw InnerClasses
+reflection fidelity, mixed-invalid-input priority and complete JVM-005 remain
+unclaimed. Empty hidden Class constables are a C5 restriction, not C6 resolution.
+
+## C4/C5 shared verification and remaining work
+
+The same clean implementation also passes:
+
+- Fresh C1/C2/C3 full-host gates: 360/288/288 outcomes, with separate ledgers
+  SHA-256 `6bd1bbe6d7049c991218c52e3e531f4701be645a17b28e0d71c73dfcc6f47196`,
+  `4149a7769c6d378af38d1947b9e234f9c33dbc1741d2c5c0d956005d2a5234b5` and `38db036259e94724a5bde2230dc397bdd7c4d5cdb80c9b8a5e3bccfca928ac88`.
+  C1–C5 total 252 distinct selected cases, 96 cells and 1,512 outcomes; these
+  are finite-case counts, not API/spec coverage percentages.
+- Strict release CLI/browser builds, ES5 type checking, the actual workflow
+  checker and complete workflow mutation tests.
+- 1,118 unit/contract tests, zero failures; one existing optional pinned-JDK
+  error-category diagnostic is skipped (1,119 total). No mandatory C4/C5 skip.
+- All 15 B1–B8 and separate retained-language/launcher/evolved-switch host gates;
+  their existing explicit native-oracle/launcher boundaries are unchanged.
+- All original 323 fixtures (77 legacy, 246 modern), with unchanged source,
+  class and golden bytes and zero failures/timeouts. All four supervisor
+  snapshots plus launch are identical, SHA-256 `1374743371c3d5e2af3bab49f9446b28e4ea7ea9553a61bc848785fec82ab92f`.
+- Selected Kotlin 2.4.0 and Scala 2.13.18 MethodHandle compiler smokes, compiled
+  inside Doppio and checked on Node against native Java 17 with lock-verified
+  inputs (389/268 seconds). These do not claim Chromium/full language support.
+- Two forced deterministic compiler-JAR generations with 43 exact class-only
+  entries and SHA-256
+  `0db0822f6f71bb10a9102c40ccf5c87fc785d1b2c7e24d4772f7afc6ffc28bd5`.
+
+The overlay verifier independently checks 138 generated/rewritten Code bodies
+and 1,387 byte-identical stock bodies: 1,525 total across 38 selected stock
+classes. Eleven C5 aliases retain complete original Code/StackMapTable bytes.
+Historical 113/112-body hashes and twelve branchful bodies/all 48 frames remain
+unchanged. This scoped metadata inventory is separate from the 43-entry
+compiler-facing projection and from semantic outcome counts.
+
+The private fail-closed final verification receipt has exit code 0 and SHA-256
+`af95b7205ab1bcc2b969dab62e5cf7af795012cc18218d9295670cf78cbd9af8`;
+it verifies fully exited supervisors, exact frozen HEAD,
+all five official ledgers, the unchanged retained inputs and final runtime bytes
+before documentation-only commits. Runtime snapshot SHA-256 is
+`47c694675afb5a9aff80f8e40725592a5123d3df3bc7675581f12a729464900e`.
+The Pro consultation failed at the model picker before chat creation, so no Pro
+review exists. Independent local reviews and genuine native/guest execution
+are the review evidence; shared login/broker state was not changed.
+
+The selected C1–C5 batches are verified. C6 nominal constants and C7's public
+class-file library remain pending. Full Phase C/JVM-003/004/005/source-unit/API
+conformance, memory ordering, concurrency, named modules and hidden-class GC
+remain unclaimed. All broader completion flags stay false and source ownership
+is unchanged. The next planned batch is C6.

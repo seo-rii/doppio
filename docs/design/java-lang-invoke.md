@@ -53,9 +53,11 @@ implemented:
    `StringConcatFactory`, `CONSTANT_Dynamic`, records, and sealed classes share
    class loading and bootstrap code.
 
-These are retained smoke instructions, not the Phase C evidence gate. C1–C3
-add genuine, untouched javac 21/25 fixtures under `classes/modern_fixture`,
-independent Code/trace contracts and strict native/Node/Chromium gates. A
+These are retained smoke instructions, not the Phase C evidence gate. C1–C5
+add original final-version 21/25 inputs under `classes/modern_fixture`,
+independent Code/trace contracts and strict native/Node/Chromium gates. C4
+distinguishes directly generated original bootstrap instruction classes from
+untouched javac drivers; C5 proves the original javac definition payloads. A
 compile-error waiver or Java 17 smoke cannot replace those gates. At the batch
 boundary, rerun the original retained sources, class files and goldens without
 regenerating them; see the [Phase C reproduction commands](../phase-c-invocation.md).
@@ -579,14 +581,108 @@ Ordered aliases prove only the selected single-thread values, not fences,
 concurrent visibility or general Java memory-model conformance.
 
 The dedicated CI command also runs storage/linkage/native boundary and actual
-compiled metadata tests. At this implementation the overlay verifier checks
+compiled metadata tests. At the historical C3 exit the overlay verifier checked
 123 generated/rewritten bodies plus 1,344 unchanged stock Code attributes:
 all 1,467 Code methods across 37 classes, including 12 unchanged branchful
 bodies/48 full frames. Prior 113/112 body hashes remain identical; the separate
-compiler-only artifact contains exactly 41 classes. Fresh C1/C2 and retained
-compatibility evidence is recorded in the batch exit. C4–C7, descriptor
-resolution, full VarHandle/API coverage, named modules and D's memory-model
-evidence remain unclaimed.
+compiler-only artifact contained exactly 41 classes. Fresh C1/C2 and retained
+compatibility evidence is recorded in that batch exit. At that point C4–C7,
+descriptor resolution, full VarHandle/API coverage, named modules and D's
+memory-model evidence remained unclaimed. The later C4/C5 exits follow.
+
+## C4 User Bootstrap Linkage
+
+The [selected C4 gate](../phase-c-invocation.md#c4-verified-batch-exit) covers
+48 fixed cases with 200 case-linked Code probes and separate original-generator
+and genuine-javac recipes. It adds no opcode/JIT path or verifier exemption.
+The existing concat, record, switch and ConstantBootstraps fast paths remain
+available; selected unknown user bootstraps now execute their actual handles.
+
+`BootstrapLinkage.ts` stores resolution state per condy CP entry and per
+lexical method/BCI indy site. Successful nulls, objects and exact wide values
+are cached; failed bootstrap Errors are retained, non-Errors are wrapped once
+in BootstrapMethodError with their original cause, and transient prerequisite
+failures reset rather than publish partial success. The guest exception
+boundary catches bootstrap Errors beyond LinkageError. Same-thread recursive
+resolution produces a guest StackOverflowError, not JS recursion or a dead wait.
+Concurrent linkage/progress is not proven by those synchronous tests.
+
+The VM constructs the actual CP owner's stock Lookup with legacy modes 15 and
+modern modes 95; guest code is given neither IMPL_LOOKUP nor a trusted factory.
+Handle, declared type and ordered static arguments resolve before invocation,
+including nested condy and typed primitive boxing with exact gLong values.
+Actual `invokeWithArguments` performs bootstrap adaptation/varargs collection,
+including constructor handles. Direct invocation avoids the retained Java 8
+CallSite.makeSite wrapper's incompatible modern Error handling. Typed identity
+handles validate/convert condy results; indy independently validates CallSite
+and exact target type with genuine Java failure causes.
+
+Stock Invokers link ConstantCallSite through linkToTargetMethod with its target
+appendix, and mutable/volatile sites through linkToCallSiteMethod with the
+CallSite appendix. This does not invoke the bootstrap twice. The normal and
+volatile native target hooks update the same exact held site identity without
+yielding; selected single-thread target changes do not prove memory visibility.
+
+Native unwrapped-Error retry policy and repeated error-wrapper/cause identity
+remain outside the comparison matrix, as detailed in the batch scope. Separate
+runtime units test the specified cached-Error policy. Neither full JVM-004
+conformance nor named-module/concurrent linkage is claimed.
+
+## C5 Hidden Identity And Class Data
+
+The [selected C5 gate](../phase-c-invocation.md#c5-verified-batch-exit) covers
+48 fixed cases using unchanged original javac 21/25 payloads. Independent
+proofs retain 14 payload-file artifacts, all 34 payload Code methods and exact
+resource-loading operands in addition to 234 case-linked Code probes.
+
+The original class file is validated before minting an independent hidden
+identity. Only this_class is rebound; ordinary self-type descriptors and other
+Class constants are unchanged. Declared Field storage keys are rebound before
+constructor generation, so bytecode, VM-index reflection and captured VarHandle
+storage share the same cell. Hidden candidates pass existing hierarchy,
+verification and preparation gates without entering named/initiating loader
+namespaces. Repeated definitions have different actual ClassData identities.
+
+Definition requires PRIVATE+MODULE full privilege. The returned Lookup is bound
+to the actual hidden class, with legacy modes 15 and modern modes 95 including
+ORIGINAL; it does not copy or return IMPL_LOOKUP. The existing privateLookupIn
+path yields modern modes 31 without ORIGINAL. Both the parsed Java class-data
+facade and its fixed private native hook enforce ORIGINAL before initialization
+or disclosure. classData initializes the exact class and preserves absent-data
+null. Reference values use Class.cast; selected primitive unboxing/widening uses
+MethodHandles.identity(type).invoke(value). classDataAt delegates indexing to
+the associated original List; its bounds evidence checks the specified exception
+family, not a concrete exception subtype chosen by that List implementation.
+
+Array mirrors cache by exact held component identity, remain undiscoverable and
+do not initialize the component. Arrays themselves have isHidden false while
+their component identity and original package are preserved. NESTMATE records
+the defining Lookup's actual resolved host, ignoring the payload's raw NestHost
+and excluding the hidden class from named NestMembers enumeration. STRONG adds
+private loader retention, without a GC/unloading claim. Canonical names are
+absent and Class.describeConstable returns empty for hidden classes/arrays;
+this does not establish C6's descriptor-resolution matrix.
+
+Nine Field write wrappers and Lookup.unreflectSetter reject hidden finals.
+Their private aliases retain complete stock Code/StackMapTable bytes, but cannot
+be used as a bypass through accessible reflection or MethodHandles. The shared
+invocation gate checks exact bootstrap declaration identity and actual Field
+metadata, using the direct-exception callback boundary only for these guarded
+aliases. Ordinary fields, partial VM declarations and unrelated methods keep
+their prior path; changing only the public wrappers would not close the boundary.
+
+The actual parsed/compiled metadata tests validate the new public varargs APIs,
+checked exceptions, generic signatures and genuinely compiled nested ClassOption
+enum. The separate compiler-facing JAR contains 43 class-only entries. Its
+stock-overlay verification inventory has 138 generated/rewritten Code bodies
+and 1,387 byte-identical retained stock bodies: 1,525 total across 38 selected
+stock classes. Eleven C5 aliases preserve complete original Code. The historical
+113/112-body hashes and all 48 frames in the twelve existing branchful overlays
+are unchanged. These metadata counts are not semantic outcome counts.
+
+GC/unloading, named modules, SecurityManager, arbitrary raw InnerClasses
+reflection fidelity and mixed-invalid-input error priority remain unclaimed.
+C6/C7 and complete Phase C/JVM-003/004/005/API conformance remain pending.
 
 ## Open Design Questions
 
