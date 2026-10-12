@@ -53,7 +53,7 @@ implemented:
    `StringConcatFactory`, `CONSTANT_Dynamic`, records, and sealed classes share
    class loading and bootstrap code.
 
-These are retained smoke instructions, not the Phase C evidence gate. C1/C2
+These are retained smoke instructions, not the Phase C evidence gate. C1–C3
 add genuine, untouched javac 21/25 fixtures under `classes/modern_fixture`,
 independent Code/trace contracts and strict native/Node/Chromium gates. A
 compile-error waiver or Java 17 smoke cannot replace those gates. At the batch
@@ -523,12 +523,70 @@ The three order-sensitive cases are `pinned-native-regression`, because the
 API body pseudocode and generic-loop API Note disagree; this does not resolve
 that specification-documentation conflict.
 
-The overlay verifier checks 116 generated/rewritten bodies and 1,344 unchanged
+At that C2 implementation, the overlay verifier checked 116 generated/rewritten bodies and 1,344 unchanged
 stock Code attributes: all 1,460 Code methods across 37 transformed classes,
 including 12 branchful bodies with 48 explicit full frames. Both historical
 generated-body identity hashes remain unchanged. The deterministic
 compiler-only bootstrap JAR separately contains 41 exact class-only entries.
-C3–C7 and full Phase C/JVM-003 conformance remain unclaimed.
+That historical C2 result did not establish later C3–C7 or full Phase C/JVM-003
+conformance.
+
+## C3 Genuine VarHandle Execution Evidence
+
+The [selected C3 gate](../phase-c-invocation.md#c3-verified-batch-exit) has a
+separate 48-case field/static, array and interoperation inventory. At clean
+`15bbeab5b`, all 18 genuine Java 21/25 native/Node/Chromium cells and 288
+outcomes pass. Fixed traces and 186 case-linked actual Code probes bind the
+original compiler bytes; repeated probes are not branch/JIT coverage.
+
+The shared-library `VarHandle` declares all 31 canonical public-final-native-
+varargs modes with their Object/void/boolean erased returns. Its immutable
+value/coordinate metadata and exact/default views retain the same private VM
+capability. Public MethodHandles/Lookup factories are parsed Code delegates
+with exact flags, generic signatures and checked exceptions. Field factories
+authorize through the supplied Lookup getter, then independently validate the
+actual Field/type/staticness before installing its declaration identity.
+`unreflectVarHandle` never uses the reflected field's accessible override.
+
+For a symbolic access type `T`, excluding the VarHandle receiver, the VM builds
+a real MethodHandle with type `(VarHandle, T.parameters)T.return`. A selector
+checks each receiver's behavior/support and returns its canonical bound mode
+handle, exact or adapted to `T`. It filters the leading argument of the stock
+`exactInvoker(T)`. CP resolution constructs `T` using the caller loader and
+links `invokeExact` with a separate leading-VarHandle descriptor. Only then
+does it publish the canonical declaration, bridge, MemberName and appendix.
+Original CP descriptors/word counts remain unchanged. Existing INVOKEHANDLE
+null-checks the original receiver before adding the bridge and preserves wide
+padding/appendix slots; no new opcode, JIT path or verifier exemption is added.
+Modern signature-polymorphic classification has no Object-return requirement.
+
+Two private zero-argument native bridges resolve only fixed bootstrap
+`operate`/`select` members. They keep the stock trusted Lookup internal and
+accept no caller owner/name/type. This avoids Java 8's illegal package-caller
+Lookup while retaining the existing `--release 9` compiler recipe, whose API
+symbols omit the internal field. Caller field authorization never uses this
+trusted path. Normal `Lookup.findVirtual` retains its complete original body
+under a private alias; only VarHandle mode requests select the new invoker.
+
+Storage captures exact Field/declaration or ArrayClassData identities. Wrapper
+boxing classes and actual static declarations are prepared before one
+synchronous typed storage operation; RMW is not split into yielding Java
+reads/writes. Long operations use exact gLong arithmetic, narrow integers wrap,
+floats round to binary32, references compare by identity and selected floating
+comparisons use raw bits. Runtime array covariance validates NEW values even on
+comparison misses. Pending failures never receive a normal async return.
+Ordered aliases prove only the selected single-thread values, not fences,
+concurrent visibility or general Java memory-model conformance.
+
+The dedicated CI command also runs storage/linkage/native boundary and actual
+compiled metadata tests. At this implementation the overlay verifier checks
+123 generated/rewritten bodies plus 1,344 unchanged stock Code attributes:
+all 1,467 Code methods across 37 classes, including 12 unchanged branchful
+bodies/48 full frames. Prior 113/112 body hashes remain identical; the separate
+compiler-only artifact contains exactly 41 classes. Fresh C1/C2 and retained
+compatibility evidence is recorded in the batch exit. C4–C7, descriptor
+resolution, full VarHandle/API coverage, named modules and D's memory-model
+evidence remain unclaimed.
 
 ## Open Design Questions
 

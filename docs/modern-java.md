@@ -2722,7 +2722,30 @@ C1/C2 execution is skipped. The overlay verifier independently checks all
 1,460 Code bodies in its 37-class inventory; the compiler-only bootstrap
 artifact has a separate, exact 41-class inventory.
 
-This does not establish the complete conversion lattice, arbitrary combinator
-graphs, executable VarHandles or memory ordering, general bootstrap linkage,
-hidden definitions, named-module access or the public class-file API. Source
-units remain unassessed; C3–C7 and full Phase C/package conformance are unclaimed.
+[C3's selected matrix](phase-c-invocation.md#c3-verified-batch-exit) adds 48
+field/static, array and interoperation cases. At clean `15bbeab5b`, all 18
+pinned Java 21/25 native/Node/Chromium cells and 288 outcomes pass. Original
+javac bytes prove 186 case-linked Code probes and all 31 access-mode names;
+single-thread ordered-mode values are not a memory-order/concurrency proof.
+Field capabilities retain actual declarations and caller Lookup authorization;
+mode invocation uses caller-typed MethodHandle linkage and synchronous typed
+storage updates. Exact/default views, bound handles and selected invokers are
+verified without rewriting the broader retained getter/Unsafe paths.
+
+Fresh C1/C2 gates (360/288 outcomes), strict builds, 982 unit/contract tests,
+all 15 batch-boundary host gates, the original unchanged 323 fixtures and the
+selected Kotlin/Scala compiler smokes pass at that same implementation. One
+existing optional unit diagnostic is skipped; no mandatory execution skips.
+All 1,467 Code methods in the 37-class overlay inventory pass verification,
+with 1,344 stock Code attributes and historical generated-body identities
+unchanged. The compiler-only bootstrap artifact retains 41 exact classes.
+
+Factory/query initialization timing and `Method.invoke` placeholders remain
+outside the selected C3 claim. The negative reflection case covers only fixed
+unreflected erased handles; mixed unsupported/type priority is explicitly
+pinned-native evidence. View/buffer/off-heap handles, fences, arbitrary NaN
+payloads, maximal arities and complete module/loader/access lattices are not
+established. The full conversion/combinator/VarHandle API, memory ordering,
+general bootstrap, hidden definitions, named modules and public class-file API
+remain unclaimed. Source units remain unassessed; C4–C7 and full Phase C/package
+conformance are still pending.

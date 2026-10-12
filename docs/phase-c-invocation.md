@@ -5,8 +5,8 @@ Phase C owns `JVM-003`, `JVM-004`, `JVM-005` and `LIB-007` from the
 B1–B8 loading, verification, linking and language foundation; that foundation
 does not establish general method-handle, bootstrap or module conformance.
 This is an ordered batch plan, not a single feature, effort estimate or new
-support level. The selected C1 and C2 batches are verified. The next planned
-batch is C3; C3–C7 remain pending and may need further subdivision before
+support level. The selected C1, C2 and C3 batches are verified. The next planned
+batch is C4; C4–C7 remain pending and may need further subdivision before
 implementation.
 
 ## Batches and dependencies
@@ -101,9 +101,53 @@ See the [Java 21 counted-range contract](https://docs.oracle.com/en/java/javase/
 and [Java 25 counted-range contract](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/invoke/MethodHandles.html#countedLoop(java.lang.invoke.MethodHandle,java.lang.invoke.MethodHandle,java.lang.invoke.MethodHandle,java.lang.invoke.MethodHandle)).
 No other case is promoted merely by agreeing with native output.
 
+## C3 selected scope
+
+C3 has an independent fixed 48-case inventory, with 16 cases per group:
+
+- Fields/static fields: all 31 access-mode names through original call-site
+  descriptors; selected primitive/reference values, overflow and narrow wraps,
+  exact long witnesses, identity comparisons, signed zero/observed quiet NaN,
+  final/read-only rejection, inherited/private capabilities, factory and
+  receiver errors, zero static coordinates and declaration initialization.
+- Arrays: the same selected value families plus null/bounds checks, neighboring
+  element preservation, covariant NEW-value store checks even on failed
+  comparisons, nested reference elements and descriptor/adaptation failures.
+- Interoperation: immutable coordinates, canonical mode types/support masks,
+  access-mode names, exact/default behavior views, boxing/widening/casts,
+  bound `toMethodHandle`, exact/adaptable invokers, `Lookup.findVirtual`,
+  `unreflectVarHandle` without an accessible override and fixed erased
+  unreflected placeholders that reject execution.
+
+The field/static API guarantees initialization by the supported operation;
+it does not prohibit earlier factory initialization. Factory/query timing is
+explicitly unclaimed. Class-literal passivity, initialization by first access
+and one-time actual declaration initialization are checked. Weak CAS accepts
+either allowed result with its matching state; neither first-call success nor
+bounded progress is required. Floating comparisons cover signed zero and an
+observed quiet NaN, not arbitrary NaN payload preservation.
+
+One mixed unsupported/type-mismatch case is a `pinned-native-regression`, not
+a normative error-priority claim. The reflection-negative case uses only
+`Lookup.unreflect(Method).asFixedArity()` at the erased Object/void/boolean
+signatures. `Method.invoke` is excluded: the archived pinned Java 21 run wraps
+`UnsatisfiedLinkError`, while 25 wraps the documented
+`UnsupportedOperationException`. No cross-release exception waiver is used.
+Those native-first scope corrections preceded guest execution; guest fixes
+did not relax the final case IDs, traces, error expectations or timeouts.
+
+References are the [Java 21 VarHandle API](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/invoke/VarHandle.html),
+[Java 25 VarHandle API](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/invoke/VarHandle.html),
+the release-specific Lookup/MethodHandles contracts and
+[JVMS 25 §2.9.3](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-2.html#jvms-2.9.3).
+Single-thread ordered-mode values do not prove memory ordering, concurrent
+visibility or general atomicity. D owns that evidence. View/buffer/off-heap
+handles, fences, extreme arities, complete protected/module/loader lattices,
+nominal VarHandle descriptions and complete API conformance are not this exit.
+
 ## Evidence and retained compatibility
 
-The C1 and C2 gates must retain the genuine compiler recipes and raw outcomes
+The C1, C2 and C3 gates must retain the genuine compiler recipes and raw outcomes
 from each applicable release and host, with source, class, runtime, toolchain and Git
 provenance. Fixed expected traces and completion markers must be checked
 independently of native-versus-guest equality. Two equally incomplete runs cannot
@@ -171,6 +215,26 @@ ordered trace and source/runtime/toolchain/Git integrity checks. Separate
 literal inventories and ledger namespaces prevent C1/C2 substitution; their
 contract suites exercise the same adversarial checks. Filtered diagnostics
 never replace official results or claim a full Phase C/API exit.
+
+## Reproduce and interpret C3
+
+After the same strict CLI/browser builds and pinned-toolchain preparation:
+
+```sh
+yarn ci:varhandle-execution:test
+yarn ci:varhandle-execution
+```
+
+The dedicated test command includes the contract, storage, linkage, native
+boundary and actual compiled API metadata tests. The full execution command is
+`node ci/java_methodhandle_varhandle_test.mjs --browser`, with ledger
+`build/java-methodhandle-varhandle-results.json`. Six genuine compiler recipes
+and all 18 native/Node/Chromium cells are mandatory. C3 has its own literal
+inventory and official/diagnostic namespaces; C1/C2 cannot substitute for it.
+CI uploads the raw official ledger after success or failure. The workflow
+checker rejects omitted unit files, filtered/diagnostic commands, error
+swallowing and cross-wired artifacts. All broad completion flags remain false,
+including C3's explicit memory-order/concurrent-visibility flags.
 
 ## C1 verified batch exit
 
@@ -293,9 +357,76 @@ methods are retained. The compiler-only bootstrap JAR separately contains 41
 exact class-only entries.
 
 C1 and C2 retain separate inventories and ledgers while sharing the immutable
-evidence protocol. The selected C2 batch is verified; C3–C7 remain pending.
+evidence protocol. At that C2 exit, C3–C7 remained pending; the later selected
+C3 exit is recorded below.
 Full Phase C, JVM-003, source-unit/API conformance, general bootstrap dispatch,
 VarHandle execution and named-module runtime conformance remain unclaimed.
 All broader completion flags stay false and indexed source ownership is
-unchanged. The next batch is C3's executable VarHandle matrix; memory ordering
-still requires D's separate execution-model evidence.
+unchanged. That historical C2 result did not establish executable VarHandles;
+memory ordering still requires D's separate execution-model evidence.
+
+## C3 verified batch exit
+
+At clean implementation commit `15bbeab5b`, the selected C3 gate passes on the
+pinned Java 21/25 toolchains and both guest hosts:
+
+- 48 fixed cases: 16 field/static, 16 array and 16 interoperation cases, with
+  72 selected ordered trace events.
+- Six genuine compilations, 16 untouched class files (majors 65/69, minor 0)
+  and 186 case-linked actual Code probes. Repeated helper probes are not
+  distinct-method, dynamic-branch or JIT-coverage counts.
+- All 18 native/Node/Chromium cells and 288 outcomes pass, with no failed,
+  missing, skipped or timed-out required executions.
+
+The 2026-10-12 UTC verified C3 ledger SHA-256 is
+`a7b1e090a299c623f58d01fac0d9d25edb420ae160f388b7d52e40afe80828b4`.
+It binds original sources/compiler recipes, class inventories, decoded Code
+operands, fixed traces and unchanged toolchain/runtime/Git provenance at that
+implementation, not an arbitrary later runtime.
+
+Three failed native/Node diagnostics remain archived: the native map registrar
+ABI (`b466ce4fbc476a409f33d71084641bfb27cb11059f610f820560339e6435bc71`),
+illegal bootstrap helper lookup (`d493835420fd9cd5180d65d5ff43446db89e745d314712d601339839fff80a39`)
+and field factory error taxonomy (`e33189e56c112bf77f46accac95d342bd56e1788f0ba852e59831e3af32bf2cf`).
+Chromium was deliberately not run in those diagnostics. Corrections retained
+all final expectations: ordinary native method maps, two fixed private
+bootstrap member bridges and independent exact Field/type/staticness
+validation with checked factory errors. Caller field authorization remains on
+the supplied Lookup; the broader retained getter/Unsafe paths were not rewritten.
+
+The same frozen implementation also passes:
+
+- Fresh C1 and C2 full-host gates: 360 and 288 outcomes respectively. Their
+  separate ledger SHA-256 values are
+  `1e9199da9dcefad13d6bfa641898c7b821fa6f6fc71c8250b810721571f7d034`
+  and `734d3452aac5e171e9850d4d658d895044414aa57113bcb842ddc0761ef671b6`.
+- Strict release CLI/browser builds, ES5 type checking, the actual workflow
+  checker and complete mutation tests.
+- 982 unit/contract tests; one existing optional pinned-JDK error-category
+  diagnostic is skipped (983 total, zero failures). No required C3 test skips.
+- All 15 B1–B8 and separate retained-language/launcher/evolved-switch host gates.
+- The original 323 fixtures (77 legacy, 246 modern), with source/class/golden
+  bytes unchanged and zero failures/timeouts. All four supervisor input
+  snapshots plus the launch snapshot are identical (SHA-256
+  `a2372a93ad9668c844eafa35caaa8e50ff0aea36500834d11ef534fc276421d5`).
+- Selected Kotlin 2.4.0 and Scala 2.13.18 MethodHandle compiler smokes, compiled
+  inside Doppio and checked on Node against native Java 17 with lock-verified
+  inputs. These do not establish Chromium or complete language conformance.
+
+The overlay verifier checks 123 generated/rewritten bodies plus 1,344 unchanged
+stock Code attributes: all 1,467 Code methods across 37 transformed classes,
+including the unchanged 12 branchful bodies/48 full frames. Historical 113/112
+generated-body hashes remain identical; the original complete Lookup
+`findVirtual` body is retained under a private alias. The compiler-only
+bootstrap JAR remains a separate exact 41-class inventory.
+
+The Pro consultation failed before chat creation because the model picker was
+unavailable; no Pro review exists. Independent local architecture/API/native
+reviews and original native/guest executions supplied the actual review and
+verification evidence. No persistent login or shared broker state was changed.
+
+The selected C3 batch is verified; C4–C7 remain pending. Full Phase C, JVM-003,
+source-unit/API conformance, general bootstrap, complete VarHandle execution,
+named-module runtime, memory ordering and concurrent visibility remain
+unclaimed. Broader completion flags stay false and source ownership is
+unchanged. The next planned batch is C4's user bootstrap linkage.
