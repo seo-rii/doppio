@@ -7,6 +7,7 @@ import java.lang.classfile.attribute.StackMapFrameInfo.ObjectVerificationTypeInf
 import java.lang.classfile.attribute.StackMapFrameInfo.UninitializedVerificationTypeInfo;
 import java.lang.classfile.attribute.StackMapTableAttribute;
 import java.lang.classfile.constantpool.ClassEntry;
+import java.lang.classfile.constantpool.Utf8Entry;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.MethodTypeDesc;
 import java.util.ArrayList;
@@ -15,14 +16,20 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 
 /** Pure library verification: no definition, loading, initialization or host verifier. */
 final class DoppioClassFileVerifier {
   private DoppioClassFileVerifier() {}
 
   static List<VerifyError> verify(byte[] bytes) {
+    return verify(bytes, name -> null);
+  }
+
+  static List<VerifyError> verify(byte[] bytes, Function<Utf8Entry, AttributeMapper<?>> customAttributes) {
     Objects.requireNonNull(bytes);
-    try { return verify(DoppioClassReader.parse(bytes)); }
+    Objects.requireNonNull(customAttributes);
+    try { return verify(DoppioClassReader.parse(bytes, customAttributes)); }
     catch (IllegalArgumentException malformed) { return error(malformed.getMessage()); }
   }
 

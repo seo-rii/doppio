@@ -5,6 +5,10 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.lang.classfile.constantpool.DoppioConstantPool;
 import java.lang.classfile.constantpool.LoadableConstantEntry;
+import java.lang.classfile.constantpool.ClassEntry;
+import java.lang.classfile.constantpool.FieldRefEntry;
+import java.lang.classfile.constantpool.InvokeDynamicEntry;
+import java.lang.classfile.constantpool.MemberRefEntry;
 import java.lang.classfile.instruction.BranchInstruction;
 import java.lang.classfile.instruction.ConstantInstruction;
 import java.lang.classfile.instruction.ConvertInstruction;
@@ -12,6 +16,7 @@ import java.lang.classfile.instruction.ExceptionCatch;
 import java.lang.classfile.instruction.FieldInstruction;
 import java.lang.classfile.instruction.IncrementInstruction;
 import java.lang.classfile.instruction.InvokeInstruction;
+import java.lang.classfile.instruction.InvokeDynamicInstruction;
 import java.lang.classfile.instruction.LabelTarget;
 import java.lang.classfile.instruction.LoadInstruction;
 import java.lang.classfile.instruction.LookupSwitchInstruction;
@@ -171,10 +176,10 @@ final class DoppioCodeAssembler {
         if (from >= to) throw new IllegalArgumentException("Exception range must be nonempty and ordered");
         int catchIndex = 0;
         if (handler.catchType().isPresent()) {
-          DoppioBuilders.requireSharedPool(pool, handler.catchType().get().constantPool());
-          String descriptor = handler.catchType().get().asSymbol().descriptorString();
+          ClassEntry catchType = (ClassEntry) pool.importEntry(handler.catchType().get());
+          String descriptor = catchType.asSymbol().descriptorString();
           if (descriptor.charAt(0) != 'L') throw new IllegalArgumentException("Catch type must be a class type");
-          catchIndex = handler.catchType().get().index();
+          catchIndex = catchType.index();
         }
         handlers.add(new int[] {from, to, destination, catchIndex});
       }
@@ -284,19 +289,25 @@ final class DoppioCodeAssembler {
     ByteArrayOutputStream bytes = new ByteArrayOutputStream(); DataOutputStream output = new DataOutputStream(bytes);
     int opcode = instruction.opcode().bytecode();
     if (instruction instanceof ConstantInstruction) {
-      ConstantInstruction constant = (ConstantInstruction) instruction; output.writeByte(opcode);
+      ConstantInstruction constant = (ConstantInstruction) instruction;
       if (opcode == 0x10 || opcode == 0x11) {
+        output.writeByte(opcode);
         int value = ((Number) (Object) constant.constantValue()).intValue();
         if (opcode == 0x10) output.writeByte(value); else output.writeShort(value);
       } else if (constant instanceof ConstantInstruction.LoadConstantInstruction) {
-        LoadableConstantEntry entry = ((ConstantInstruction.LoadConstantInstruction) constant).constantEntry();
-        DoppioBuilders.requireSharedPool(pool, entry.constantPool());
+        LoadableConstantEntry entry = (LoadableConstantEntry) pool.importEntry(
+          ((ConstantInstruction.LoadConstantInstruction) constant).constantEntry());
+        if (opcode != 0x12 && opcode != 0x13 && opcode != 0x14)
+          throw new IllegalArgumentException("Unsupported constant-pool load opcode");
+        opcode = entry.typeKind().slotSize() == 2 ? 0x14 : entry.index() <= 255 ? 0x12 : 0x13;
+        output.writeByte(opcode);
         if (opcode == 0x12) {
-          if (entry.index() > 255) throw new IllegalArgumentException("ldc operand requires wide encoding");
           output.writeByte(entry.index());
-        } else if (opcode == 0x13 || opcode == 0x14) u2(output, entry.index());
-        else throw new IllegalArgumentException("Unsupported constant-pool load opcode");
-      } else if (opcode < 1 || opcode > 15) throw new IllegalArgumentException("Unsupported constant instruction");
+        } else u2(output, entry.index());
+      } else {
+        if (opcode < 1 || opcode > 15) throw new IllegalArgumentException("Unsupported constant instruction");
+        output.writeByte(opcode);
+      }
     } else if (instruction instanceof LoadInstruction) {
       LoadInstruction load = (LoadInstruction) instruction; local(output, load.typeKind(), load.slot(), true);
     } else if (instruction instanceof StoreInstruction) {
@@ -311,19 +322,23 @@ final class DoppioCodeAssembler {
       } else { output.writeByte(196); output.writeByte(132); u2(output, increment.slot()); output.writeShort(amount); }
     } else if (instruction instanceof FieldInstruction) {
       FieldInstruction field = (FieldInstruction) instruction;
-      DoppioBuilders.requireSharedPool(pool, field.field().constantPool());
+      FieldRefEntry entry = (FieldRefEntry) pool.importEntry(field.field());
       if (opcode < 178 || opcode > 181) throw new IllegalArgumentException("Unsupported field opcode");
-      output.writeByte(opcode); u2(output, field.field().index());
+      output.writeByte(opcode); u2(output, entry.index());
     } else if (instruction instanceof InvokeInstruction) {
       InvokeInstruction invoke = (InvokeInstruction) instruction;
-      DoppioBuilders.requireSharedPool(pool, invoke.method().constantPool());
+      MemberRefEntry entry = (MemberRefEntry) pool.importEntry(invoke.method());
       if (opcode < 182 || opcode > 185) throw new IllegalArgumentException("Unsupported invocation opcode");
-      output.writeByte(opcode); u2(output, invoke.method().index());
+      output.writeByte(opcode); u2(output, entry.index());
       if (opcode == 185) {
         int parameters = DoppioBuilders.argumentSlots(invoke.type().stringValue()) + 1;
         if (parameters > 255) throw new IllegalArgumentException("invokeinterface slot limit exceeded");
         output.writeByte(parameters); output.writeByte(0);
       }
+    } else if (instruction instanceof InvokeDynamicInstruction) {
+      InvokeDynamicEntry entry = (InvokeDynamicEntry) pool.importEntry(((InvokeDynamicInstruction) instruction).invokedynamic());
+      if (opcode != 186) throw new IllegalArgumentException("Unsupported dynamic invocation opcode");
+      output.writeByte(186); u2(output, entry.index()); output.writeShort(0);
     } else if (instruction instanceof OperatorInstruction) {
       if (!(opcode >= 96 && opcode <= 103 || opcode >= 148 && opcode <= 152))
         throw new UnsupportedOperationException("Unselected arithmetic opcode");
@@ -341,8 +356,8 @@ final class DoppioCodeAssembler {
     else if (instruction instanceof ThrowInstruction) output.writeByte(191);
     else if (instruction instanceof NewObjectInstruction) {
       NewObjectInstruction allocation = (NewObjectInstruction) instruction;
-      DoppioBuilders.requireSharedPool(pool, allocation.className().constantPool());
-      output.writeByte(187); u2(output, allocation.className().index());
+      ClassEntry entry = (ClassEntry) pool.importEntry(allocation.className());
+      output.writeByte(187); u2(output, entry.index());
     } else throw new UnsupportedOperationException("Unselected instruction generation");
     output.flush(); return bytes.toByteArray();
   }
@@ -360,6 +375,11 @@ final class DoppioCodeAssembler {
       String descriptor = ((InvokeInstruction) instruction).type().stringValue();
       return DoppioBuilders.fieldSlots(MethodTypeDesc.ofDescriptor(descriptor).returnType().descriptorString()) -
         DoppioBuilders.argumentSlots(descriptor) - (opcode == 184 ? 0 : 1);
+    }
+    if (instruction instanceof InvokeDynamicInstruction) {
+      String descriptor = ((InvokeDynamicInstruction) instruction).type().stringValue();
+      return DoppioBuilders.fieldSlots(MethodTypeDesc.ofDescriptor(descriptor).returnType().descriptorString()) -
+        DoppioBuilders.argumentSlots(descriptor);
     }
     if (instruction instanceof OperatorInstruction) {
       if (opcode >= 148 && opcode <= 152) return opcode == 148 || opcode >= 151 ? -3 : -1;

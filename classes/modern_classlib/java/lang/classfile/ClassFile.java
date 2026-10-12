@@ -2,6 +2,7 @@ package java.lang.classfile;
 
 import java.lang.classfile.constantpool.ClassEntry;
 import java.lang.classfile.constantpool.ConstantPoolBuilder;
+import java.lang.classfile.constantpool.Utf8Entry;
 import java.lang.constant.ClassDesc;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -9,6 +10,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /** Selected Java25 public pipeline, not the VM's class reader. */
 public interface ClassFile {
@@ -32,6 +34,18 @@ public interface ClassFile {
     STACK_MAPS_WHEN_REQUIRED, GENERATE_STACK_MAPS, DROP_STACK_MAPS
   }
   enum ConstantPoolSharingOption implements Option { SHARED_POOL, NEW_POOL }
+  enum AttributesProcessingOption implements Option {
+    PASS_ALL_ATTRIBUTES, DROP_UNKNOWN_ATTRIBUTES, DROP_UNSTABLE_ATTRIBUTES
+  }
+  interface AttributeMapperOption extends Option {
+    Function<Utf8Entry, AttributeMapper<?>> attributeMapper();
+    static AttributeMapperOption of(Function<Utf8Entry, AttributeMapper<?>> mapper) {
+      Objects.requireNonNull(mapper);
+      return new AttributeMapperOption() {
+        public Function<Utf8Entry, AttributeMapper<?>> attributeMapper() { return mapper; }
+      };
+    }
+  }
 
   static ClassFile of() { return new DoppioClassFile(new Option[0]); }
   static ClassFile of(Option... options) { return new DoppioClassFile(options); }

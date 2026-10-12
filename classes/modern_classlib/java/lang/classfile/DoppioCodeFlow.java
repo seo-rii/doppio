@@ -2,6 +2,8 @@ package java.lang.classfile;
 
 import java.lang.classfile.constantpool.ClassEntry;
 import java.lang.classfile.constantpool.ConstantPool;
+import java.lang.classfile.constantpool.ConstantDynamicEntry;
+import java.lang.classfile.constantpool.InvokeDynamicEntry;
 import java.lang.classfile.constantpool.FieldRefEntry;
 import java.lang.classfile.constantpool.MemberRefEntry;
 import java.lang.classfile.constantpool.PoolEntry;
@@ -383,6 +385,18 @@ final class DoppioCodeFlow {
         }
         case 178: case 179: case 180: case 181: field(state, opcode, u2(code, bci + 1)); break;
         case 182: case 183: case 184: case 185: invoke(state, opcode, u2(code, bci + 1), bci); break;
+        case 186: {
+          if (code[bci + 3] != 0 || code[bci + 4] != 0) throw new VerifyError("Invalid invokedynamic operands");
+          InvokeDynamicEntry call = pool.entryByIndex(u2(code, bci + 1), InvokeDynamicEntry.class);
+          checkBootstrap(call.bootstrap());
+          String name = call.name().stringValue();
+          if ("<init>".equals(name) || "<clinit>".equals(name)) throw new VerifyError("Invalid invokedynamic name");
+          MethodTypeDesc signature = call.typeSymbol();
+          for (int i = signature.parameterCount() - 1; i >= 0; i--) assign(state.pop(), signature.parameterType(i).descriptorString());
+          String result = signature.returnType().descriptorString();
+          if (!"V".equals(result)) state.push(value(result));
+          break;
+        }
         case 187: {
           ClassDesc allocated = pool.entryByIndex(u2(code, bci + 1), ClassEntry.class).asSymbol();
           if (!allocated.isClassOrInterface()) throw new VerifyError("new requires a class type");
@@ -421,10 +435,33 @@ final class DoppioCodeFlow {
         case 8: result = value("Ljava/lang/String;"); break;
         case 15: result = value("Ljava/lang/invoke/MethodHandle;"); break;
         case 16: result = value("Ljava/lang/invoke/MethodType;"); break;
-        case 17: unsupported("dynamic constant verification"); return;
+        case 17: {
+          ConstantDynamicEntry constant = (ConstantDynamicEntry) entry;
+          checkBootstrap(constant.bootstrap());
+          String name = constant.name().stringValue();
+          if ("<init>".equals(name) || "<clinit>".equals(name)) throw new VerifyError("Invalid dynamic constant name");
+          result = value(constant.typeSymbol().descriptorString()); break;
+        }
         default: throw new VerifyError("Non-loadable constant");
       }
       if (wide != (result.slots() == 2)) throw new VerifyError("Incorrect ldc category"); state.push(result);
+    }
+    void checkBootstrap(BootstrapMethodEntry bootstrap) {
+      // Verify linkage metadata only; never execute a bootstrap to obtain a verdict.
+      int kind = bootstrap.bootstrapMethod().kind();
+      if (kind != 6 && kind != 8) throw new VerifyError("Bootstrap method must be static or a constructor");
+      MemberRefEntry reference = bootstrap.bootstrapMethod().reference();
+      if (reference.tag() != 10 && reference.tag() != 11)
+        throw new VerifyError("Bootstrap method must reference a method");
+      String name = reference.nameAndType().name().stringValue();
+      MethodTypeDesc type = MethodTypeDesc.ofDescriptor(reference.nameAndType().type().stringValue());
+      if (kind == 8) {
+        if (reference.tag() != 10 || !"<init>".equals(name) ||
+            !"V".equals(type.returnType().descriptorString()))
+          throw new VerifyError("Constructor bootstrap must reference a void class constructor");
+      } else if ("<init>".equals(name) || "<clinit>".equals(name)) {
+        throw new VerifyError("Static bootstrap cannot reference an initializer");
+      }
     }
     void field(State state, int opcode, int index) {
       FieldRefEntry field = pool.entryByIndex(index, FieldRefEntry.class);

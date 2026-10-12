@@ -34,14 +34,22 @@ public final class DoppioClassReader {
   private DoppioClassReader() {}
 
   public static ClassModel parse(byte[] bytes) {
+    return parse(bytes, entry -> null);
+  }
+
+  public static ClassModel parse(byte[] bytes, Function<Utf8Entry, AttributeMapper<?>> customAttributes) {
     byte[] retained = Objects.requireNonNull(bytes).clone();
-    Input input = new Input(retained);
+    Input input = new Input(retained, Objects.requireNonNull(customAttributes));
     require(retained, 0, 8);
     if (input.readInt(0) != ClassFile.MAGIC_NUMBER) throw new IllegalArgumentException("Invalid class-file magic");
     int minor = input.readU2(4), major = input.readU2(6);
     if (major < 45 || major > 69) throw new IllegalArgumentException("Unsupported class-file version");
     int[] cursor = {8};
     input.pool = DoppioConstantPool.decode(retained, cursor);
+    // Public custom mappers may resolve dynamic constants before traversal reaches
+    // the class attributes. Bind the class-level bootstrap records first, just
+    // as a native ClassReader exposes them independently of attribute order.
+    bindBootstrapMethods(input, cursor[0]);
     Cursor data = new Cursor(input, cursor[0]);
     int mask = data.u2();
     ClassEntry name = input.pool.entryByIndex(data.u2(), ClassEntry.class);
@@ -84,24 +92,51 @@ public final class DoppioClassReader {
     model.methods = immutable(methods);
     model.attributes = readAttributes(model, data, false);
     if (data.at != retained.length) throw new IllegalArgumentException("Trailing class-file bytes");
-    boolean bootstrapSeen = false;
-    for (Attribute<?> attribute : model.attributes) if ("BootstrapMethods".equals(attribute.attributeName().stringValue())) {
-      if (bootstrapSeen) throw new IllegalArgumentException("Duplicate BootstrapMethods attribute");
-      bootstrapSeen = true; input.pool.bootstrapMethods(attributePayload(attribute));
-    }
     input.pool.freeze();
     return model;
+  }
+
+  private static void bindBootstrapMethods(Input input, int bodyStart) {
+    Cursor data = new Cursor(input, bodyStart);
+    data.skip(6); // flags, this_class, super_class
+    data.skip(data.u2() * 2); // interfaces
+    for (int memberKind = 0; memberKind < 2; memberKind++) {
+      int count = data.u2();
+      for (int member = 0; member < count; member++) {
+        data.skip(6); // flags, name, descriptor
+        int attributes = data.u2();
+        for (int index = 0; index < attributes; index++) {
+          data.u2(); int length = data.length(); data.skip(length);
+        }
+      }
+    }
+    boolean seen = false;
+    int count = data.u2();
+    for (int index = 0; index < count; index++) {
+      Utf8Entry name = input.pool.entryByIndex(data.u2(), Utf8Entry.class);
+      int length = data.length();
+      if ("BootstrapMethods".equals(name.stringValue())) {
+        if (seen) throw new IllegalArgumentException("Duplicate BootstrapMethods attribute");
+        seen = true; input.pool.bootstrapMethods(data.bytes(length));
+      } else data.skip(length);
+    }
+    if (data.at != input.bytes.length) throw new IllegalArgumentException("Trailing class-file bytes");
   }
 
   private static List<Attribute<?>> readAttributes(AttributedElement owner, Cursor data, boolean method) {
     int count = data.u2();
     List<Attribute<?>> attributes = new ArrayList<Attribute<?>>();
     boolean stackMapSeen = false;
+    boolean bootstrapSeen = false;
     for (int index = 0; index < count; index++) {
       Utf8Entry name = data.input.pool.entryByIndex(data.u2(), Utf8Entry.class);
       int length = data.length();
       int start = data.at;
       byte[] payload = data.bytes(length);
+      if ("BootstrapMethods".equals(name.stringValue())) {
+        if (bootstrapSeen) throw new IllegalArgumentException("Duplicate BootstrapMethods attribute");
+        bootstrapSeen = true;
+      }
       if (method && "Code".equals(name.stringValue())) {
         attributes.add(readCode((MethodModel) owner, data.input, name, start, payload));
       } else if (owner instanceof CodeValue && "StackMapTable".equals(name.stringValue())) {
@@ -112,7 +147,8 @@ public final class DoppioClassReader {
         if (length != 2) throw new IllegalArgumentException("Invalid SourceFile length");
         attributes.add(new SourceFileValue(name, data.input.pool.entryByIndex(u2(payload, 0), Utf8Entry.class), data.input.pool, payload));
       } else {
-        attributes.add(new RawAttribute(name, data.input.pool, payload));
+        Attribute<?> decoded = DoppioAttributes.read(owner, data.input, name, start, payload);
+        attributes.add(decoded == null ? new RawAttribute(name, data.input.pool, payload) : decoded);
       }
     }
     return immutable(attributes);
@@ -264,6 +300,8 @@ public final class DoppioClassReader {
   }
   public static byte[] attributePayload(Attribute<?> attribute) {
     Objects.requireNonNull(attribute);
+    byte[] typedPayload = DoppioAttributes.retainedPayload(attribute);
+    if (typedPayload != null) return typedPayload;
     if (attribute instanceof RawAttribute) return ((RawAttribute) attribute).payload.clone();
     if (attribute instanceof SourceFileValue) {
       byte[] payload = ((SourceFileValue) attribute).payload;
@@ -276,6 +314,8 @@ public final class DoppioClassReader {
   }
   public static ConstantPool sourcePool(Attribute<?> attribute) {
     Objects.requireNonNull(attribute);
+    ConstantPool typedPool = DoppioAttributes.sourcePool(attribute);
+    if (typedPool != null) return typedPool;
     if (attribute instanceof RawAttribute) return ((RawAttribute) attribute).pool;
     if (attribute instanceof SourceFileValue) return ((SourceFileValue) attribute).pool;
     if (attribute instanceof CodeValue) return ((CodeValue) attribute).pool;
@@ -313,7 +353,7 @@ public final class DoppioClassReader {
   };
   private static final AttributeMapper<CodeAttribute> CODE_MAPPER = new AttributeMapper<CodeAttribute>() {
     public String name() { return "Code"; }
-    public AttributeStability stability() { return AttributeStability.LABELS; }
+    public AttributeStability stability() { return AttributeStability.CP_REFS; }
     public CodeAttribute readAttribute(AttributedElement owner, ClassReader reader, int at) {
       if (!(owner instanceof MethodModel) || !(reader instanceof Input)) throw new IllegalArgumentException("Unsupported Code reader context");
       int length = reader.readInt(at - 4);
@@ -591,6 +631,12 @@ public final class DoppioClassReader {
             throw new IllegalArgumentException("Invalid invokeinterface operands");
           break;
         }
+        case INVOKE_DYNAMIC: {
+          if (bytes[cursor + 2] != 0 || bytes[cursor + 3] != 0)
+            throw new IllegalArgumentException("Invalid invokedynamic zero operands");
+          instruction = InvokeDynamicInstruction.of(code.pool.entryByIndex(u2(bytes, cursor), InvokeDynamicEntry.class));
+          break;
+        }
         default: throw new IllegalArgumentException("Instruction modeling is outside the selected pipeline: " + opcode);
       }
       elements.add(instruction);
@@ -684,6 +730,7 @@ public final class DoppioClassReader {
         throw new IllegalArgumentException("Truncated attribute data");
     }
     int u2() { check(2); int value = input.readU2(at); at += 2; return value; }
+    void skip(int length) { check(length); at += length; }
     int length() {
       check(4);
       int value = input.readInt(at); at += 4;
@@ -701,10 +748,13 @@ public final class DoppioClassReader {
   }
   private static final class Input implements ClassReader {
     final byte[] bytes;
+    final Function<Utf8Entry, AttributeMapper<?>> customAttributes;
     DoppioConstantPool pool;
     ClassValue model;
-    Input(byte[] bytes) { this.bytes = bytes; }
-    public Function<Utf8Entry, AttributeMapper<?>> customAttributes() { return entry -> null; }
+    Input(byte[] bytes, Function<Utf8Entry, AttributeMapper<?>> customAttributes) {
+      this.bytes = bytes; this.customAttributes = customAttributes;
+    }
+    public Function<Utf8Entry, AttributeMapper<?>> customAttributes() { return customAttributes; }
     public int flags() { return model.flags.flagsMask(); }
     public ClassEntry thisClassEntry() { return model.name; }
     public Optional<ClassEntry> superclassEntry() { return model.superclass(); }
@@ -733,6 +783,9 @@ public final class DoppioClassReader {
     public double readDouble(int at) { return Double.longBitsToDouble(readLong(at)); }
     public byte[] readBytes(int at, int length) { require(bytes, at, length); return Arrays.copyOfRange(bytes, at, at + length); }
     public void copyBytesTo(BufWriter writer, int at, int length) { Objects.requireNonNull(writer).writeBytes(readBytes(at, length)); }
+  }
+  public static ConstantPool readerPool(ClassReader reader) {
+    return reader instanceof Input ? ((Input) reader).pool : reader;
   }
   private static final class FlagsValue implements AccessFlags {
     final int mask;
@@ -850,13 +903,15 @@ public final class DoppioClassReader {
       this.name = name; this.pool = pool; this.payload = payload.clone();
       this.mapper = new AttributeMapper<UnknownAttribute>() {
         public String name() { return RawAttribute.this.name.stringValue(); }
-        public AttributeStability stability() { return AttributeStability.UNKNOWN; }
+        public AttributeStability stability() { return DoppioAttributes.opaqueStability(name()); }
+        public boolean allowMultiple() { return DoppioAttributes.opaqueAllowMultiple(name()); }
         public UnknownAttribute readAttribute(AttributedElement owner, ClassReader reader, int at) {
           return new RawAttribute(reader.readEntry(at - 6, Utf8Entry.class), reader, reader.readBytes(at, reader.readInt(at - 4)));
         }
         public void writeAttribute(BufWriter writer, UnknownAttribute attribute) {
-          if (attribute instanceof RawAttribute && !writer.canWriteDirect(sourcePool(attribute)))
-            throw new IllegalArgumentException("Unknown attribute requires the held original pool");
+          if (attribute instanceof RawAttribute && !writer.canWriteDirect(sourcePool(attribute)) &&
+              stability() != AttributeStability.STATELESS)
+            throw new UnsupportedOperationException("Opaque attribute cannot be safely remapped to a fresh pool");
           byte[] payload = attribute.contents();
           writer.writeIndex(attribute.attributeName()); writer.writeInt(payload.length); writer.writeBytes(payload);
         }

@@ -6,15 +6,20 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.lang.classfile.BootstrapMethodEntry;
+import java.lang.classfile.ClassReader;
+import java.lang.classfile.DoppioClassReader;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDesc;
 import java.lang.constant.DirectMethodHandleDesc;
+import java.lang.constant.DynamicCallSiteDesc;
+import java.lang.constant.DynamicConstantDesc;
 import java.lang.constant.MethodHandleDesc;
 import java.lang.constant.MethodTypeDesc;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -23,8 +28,10 @@ import java.util.Objects;
 public final class DoppioConstantPool implements ConstantPoolBuilder {
   private final List<Entry> entries = new ArrayList<Entry>();
   private final Map<String, Entry> interned = new HashMap<String, Entry>();
+  private final Map<String, BootstrapMethodEntry> internedBootstraps = new HashMap<String, BootstrapMethodEntry>();
   private final ConstantPool directSource;
-  private List<BootstrapMethodEntry> bootstraps = Collections.emptyList();
+  private final List<BootstrapMethodEntry> bootstraps = new ArrayList<BootstrapMethodEntry>();
+  private boolean bootstrapPayloadRead;
   private boolean frozen;
 
   public DoppioConstantPool() { this(null); }
@@ -95,21 +102,23 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
     DoppioConstantPool copy = new DoppioConstantPool(original);
     for (Entry entry : original.entries) if (entry != null)
       copy.append(entry.tag, entry.first, entry.second, entry.value, entry.raw.clone(), false);
-    List<BootstrapMethodEntry> methods = new ArrayList<BootstrapMethodEntry>();
     for (BootstrapMethodEntry method : original.bootstraps) {
       MethodHandleEntry handle = copy.entryByIndex(method.bootstrapMethod().index(), MethodHandleEntry.class);
       List<LoadableConstantEntry> arguments = new ArrayList<LoadableConstantEntry>();
       for (LoadableConstantEntry argument : method.arguments())
         arguments.add(copy.entryByIndex(argument.index(), LoadableConstantEntry.class));
-      methods.add(new Bootstrap(copy, methods.size(), handle, arguments));
+      Bootstrap retained = new Bootstrap(copy, copy.bootstraps.size(), handle, arguments);
+      copy.bootstraps.add(retained);
+      String key = bootstrapKey(handle, arguments);
+      if (!copy.internedBootstraps.containsKey(key)) copy.internedBootstraps.put(key, retained);
     }
-    copy.bootstraps = Collections.unmodifiableList(methods);
     return copy;
   }
 
-  public void freeze() { frozen = true; }
+  public void freeze() { validateBootstrapReferences(); frozen = true; }
   public boolean canWriteDirect(ConstantPool source) {
     Objects.requireNonNull(source);
+    if (source instanceof ClassReader) source = DoppioClassReader.readerPool((ClassReader) source);
     return source == this || source == directSource;
   }
   public int size() { return entries.size(); }
@@ -132,6 +141,7 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
 
   public void bootstrapMethods(byte[] payload) {
     if (frozen) throw new IllegalStateException("The parsed pool is immutable");
+    if (bootstrapPayloadRead || !bootstraps.isEmpty()) throw new IllegalArgumentException("Duplicate BootstrapMethods attribute");
     Objects.requireNonNull(payload);
     require(payload, 0, 2);
     int count = u2(payload, 0), cursor = 2;
@@ -148,7 +158,50 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
       methods.add(new Bootstrap(this, index, handle, arguments));
     }
     if (cursor != payload.length) throw new IllegalArgumentException("Trailing bootstrap bytes");
-    bootstraps = Collections.unmodifiableList(methods);
+    bootstrapPayloadRead = true;
+    bootstraps.addAll(methods);
+    for (BootstrapMethodEntry method : methods) {
+      String key = bootstrapKey(method.bootstrapMethod(), method.arguments());
+      if (!internedBootstraps.containsKey(key)) internedBootstraps.put(key, method);
+    }
+  }
+
+  /** Selected finite bootstrap graphs are checked without resolving a bootstrap or loading a class. */
+  public void validateBootstrapReferences() {
+    IdentityHashMap<PoolEntry, Boolean> active = new IdentityHashMap<PoolEntry, Boolean>();
+    IdentityHashMap<PoolEntry, Boolean> complete = new IdentityHashMap<PoolEntry, Boolean>();
+    for (Entry entry : entries) if (entry instanceof DynamicConstantPoolEntry) {
+      DynamicConstantPoolEntry dynamic = (DynamicConstantPoolEntry) entry;
+      bootstrapMethodEntry(dynamic.bootstrapMethodIndex());
+      if (entry.tag == 17) {
+        ClassDesc type = ClassDesc.ofDescriptor(dynamic.type().stringValue());
+        if ("V".equals(type.descriptorString())) throw new IllegalArgumentException("A dynamic constant cannot have void type");
+        validateDynamicGraph((ConstantDynamicEntry) entry, active, complete, 0);
+      } else MethodTypeDesc.ofDescriptor(dynamic.type().stringValue());
+    }
+  }
+  private void validateDynamicGraph(ConstantDynamicEntry entry, IdentityHashMap<PoolEntry, Boolean> active,
+      IdentityHashMap<PoolEntry, Boolean> complete, int depth) {
+    if (complete.containsKey(entry)) return;
+    if (depth > 256) throw new UnsupportedOperationException("Dynamic bootstrap graph exceeds the selected finite depth");
+    if (active.put(entry, Boolean.TRUE) != null)
+      throw new UnsupportedOperationException("Cyclic dynamic bootstrap graphs are outside the selected pool model");
+    for (LoadableConstantEntry argument : entry.bootstrap().arguments()) if (argument instanceof ConstantDynamicEntry)
+      validateDynamicGraph((ConstantDynamicEntry) argument, active, complete, depth + 1);
+    active.remove(entry); complete.put(entry, Boolean.TRUE);
+  }
+
+  public byte[] encodeBootstrapMethods() {
+    validateBootstrapReferences();
+    try {
+      ByteArrayOutputStream bytes = new ByteArrayOutputStream(); DataOutputStream out = new DataOutputStream(bytes);
+      out.writeShort(bootstraps.size());
+      for (BootstrapMethodEntry method : bootstraps) {
+        out.writeShort(method.bootstrapMethod().index()); out.writeShort(method.arguments().size());
+        for (LoadableConstantEntry argument : method.arguments()) out.writeShort(argument.index());
+      }
+      out.flush(); return bytes.toByteArray();
+    } catch (IOException impossible) { throw new IllegalArgumentException(impossible); }
   }
 
   public byte[] encode() {
@@ -201,6 +254,165 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
     MethodTypeDesc.ofDescriptor(descriptor.stringValue());
     return (MethodTypeEntry) intern(16, utf8Entry(descriptor.stringValue()).index(), 0, null);
   }
+  public MethodHandleEntry methodHandleEntry(int kind, MemberRefEntry reference) {
+    MemberRefEntry local = (MemberRefEntry) importEntry(Objects.requireNonNull(reference));
+    return (MethodHandleEntry) intern(15, kind, local.index(), null);
+  }
+  public LoadableConstantEntry loadableConstantEntry(ConstantDesc constant) {
+    return nominalEntry(Objects.requireNonNull(constant), new NominalState());
+  }
+  public ConstantDynamicEntry constantDynamicEntry(DynamicConstantDesc<?> descriptor) {
+    return nominalDynamic(Objects.requireNonNull(descriptor), new NominalState());
+  }
+  public InvokeDynamicEntry invokeDynamicEntry(DynamicCallSiteDesc descriptor) {
+    Objects.requireNonNull(descriptor);
+    BootstrapMethodEntry bootstrap = nominalBootstrap((DirectMethodHandleDesc) descriptor.bootstrapMethod(),
+      Arrays.asList(descriptor.bootstrapArgs()), new NominalState());
+    return invokeDynamicEntry(bootstrap, nameAndTypeEntry(descriptor.invocationName(), descriptor.invocationType()));
+  }
+  public BootstrapMethodEntry bsmEntry(DirectMethodHandleDesc method, List<ConstantDesc> arguments) {
+    return nominalBootstrap(Objects.requireNonNull(method), Objects.requireNonNull(arguments), new NominalState());
+  }
+  private LoadableConstantEntry nominalEntry(ConstantDesc descriptor, NominalState state) {
+    if (descriptor instanceof DynamicConstantDesc<?>) return nominalDynamic((DynamicConstantDesc<?>) descriptor, state);
+    return ConstantPoolBuilder.super.loadableConstantEntry(descriptor);
+  }
+  private ConstantDynamicEntry nominalDynamic(DynamicConstantDesc<?> descriptor, NominalState state) {
+    ConstantDynamicEntry cached = state.entries.get(descriptor);
+    if (cached != null) return cached;
+    if (state.active.size() >= 256) throw new UnsupportedOperationException("Nominal bootstrap graph exceeds the selected finite depth");
+    if (state.active.put(descriptor, Boolean.TRUE) != null)
+      throw new UnsupportedOperationException("Cyclic nominal bootstrap graphs are outside the selected pool model");
+    try {
+      BootstrapMethodEntry bootstrap = nominalBootstrap(descriptor.bootstrapMethod(),
+        Arrays.asList(descriptor.bootstrapArgs()), state);
+      ConstantDynamicEntry value = constantDynamicEntry(bootstrap, nameAndTypeEntry(descriptor.constantName(), descriptor.constantType()));
+      state.entries.put(descriptor, value); return value;
+    } finally { state.active.remove(descriptor); }
+  }
+  private BootstrapMethodEntry nominalBootstrap(DirectMethodHandleDesc method, List<ConstantDesc> arguments, NominalState state) {
+    Objects.requireNonNull(method); Objects.requireNonNull(arguments);
+    if (arguments.size() > 65535) throw new IllegalArgumentException("Bootstrap argument limit exceeded");
+    List<LoadableConstantEntry> imported = new ArrayList<LoadableConstantEntry>(arguments.size());
+    for (ConstantDesc argument : arguments) imported.add(nominalEntry(Objects.requireNonNull(argument), state));
+    return bsmEntry(methodHandleEntry(method), imported);
+  }
+  private static final class NominalState {
+    final IdentityHashMap<DynamicConstantDesc<?>, ConstantDynamicEntry> entries = new IdentityHashMap<DynamicConstantDesc<?>, ConstantDynamicEntry>();
+    final IdentityHashMap<DynamicConstantDesc<?>, Boolean> active = new IdentityHashMap<DynamicConstantDesc<?>, Boolean>();
+  }
+  public InvokeDynamicEntry invokeDynamicEntry(BootstrapMethodEntry bootstrap, NameAndTypeEntry member) {
+    return (InvokeDynamicEntry) dynamic(18, bootstrap, member, new ImportState());
+  }
+  public ConstantDynamicEntry constantDynamicEntry(BootstrapMethodEntry bootstrap, NameAndTypeEntry member) {
+    return (ConstantDynamicEntry) dynamic(17, bootstrap, member, new ImportState());
+  }
+  private Entry dynamic(int tag, BootstrapMethodEntry bootstrap, NameAndTypeEntry member, ImportState state) {
+    NameAndTypeEntry local = (NameAndTypeEntry) importEntry(Objects.requireNonNull(member), state);
+    if (tag == 17) {
+      ClassDesc type = ClassDesc.ofDescriptor(local.type().stringValue());
+      if ("V".equals(type.descriptorString())) throw new IllegalArgumentException("A dynamic constant cannot have void type");
+    } else MethodTypeDesc.ofDescriptor(local.type().stringValue());
+    BootstrapMethodEntry imported = importBootstrap(Objects.requireNonNull(bootstrap), state);
+    return intern(tag, imported.bsmIndex(), local.index(), null);
+  }
+  public BootstrapMethodEntry bsmEntry(MethodHandleEntry method, List<LoadableConstantEntry> arguments) {
+    Objects.requireNonNull(method); Objects.requireNonNull(arguments);
+    return bootstrap(method, arguments, new ImportState());
+  }
+  private BootstrapMethodEntry bootstrap(MethodHandleEntry method, List<LoadableConstantEntry> arguments, ImportState state) {
+    if (arguments.size() > 65535) throw new IllegalArgumentException("Bootstrap argument limit exceeded");
+    MethodHandleEntry handle = (MethodHandleEntry) importEntry(Objects.requireNonNull(method), state);
+    List<LoadableConstantEntry> imported = new ArrayList<LoadableConstantEntry>(arguments.size());
+    for (LoadableConstantEntry argument : arguments)
+      imported.add((LoadableConstantEntry) importEntry(Objects.requireNonNull(argument), state));
+    String key = bootstrapKey(handle, imported);
+    BootstrapMethodEntry found = internedBootstraps.get(key);
+    if (found != null) return found;
+    if (frozen) throw new IllegalStateException("The parsed pool is immutable");
+    if (bootstraps.size() >= 65535) throw new IllegalArgumentException("Bootstrap method limit exceeded");
+    Bootstrap value = new Bootstrap(this, bootstraps.size(), handle, imported);
+    bootstraps.add(value); internedBootstraps.put(key, value);
+    return value;
+  }
+  private static String bootstrapKey(MethodHandleEntry method, List<LoadableConstantEntry> arguments) {
+    StringBuilder key = new StringBuilder().append(method.index());
+    for (LoadableConstantEntry argument : arguments) key.append(':').append(argument.index());
+    return key.toString();
+  }
+
+  /** Rebuild references and bootstrap indexes from their semantic children, never from foreign numeric indexes. */
+  public PoolEntry importEntry(PoolEntry source) { return importEntry(Objects.requireNonNull(source), new ImportState()); }
+  public BootstrapMethodEntry importBootstrap(BootstrapMethodEntry source) {
+    return importBootstrap(Objects.requireNonNull(source), new ImportState());
+  }
+  private PoolEntry importEntry(PoolEntry source, ImportState state) {
+    if (source instanceof Entry && canWriteDirect(source.constantPool())) {
+      PoolEntry retained = entryByIndex(source.index());
+      if (source.constantPool() != this || retained == source) return retained;
+      throw new IllegalArgumentException("An owned pool entry must be canonical");
+    }
+    PoolEntry cached = state.entries.get(source);
+    if (cached != null) return cached;
+    state.enter(source);
+    try {
+      PoolEntry value;
+      switch (source.tag()) {
+        case 1: value = utf8Entry(((Utf8Entry) source).stringValue()); break;
+        case 3: value = intEntry(((IntegerEntry) source).intValue()); break;
+        case 4: value = floatEntry(((FloatEntry) source).floatValue()); break;
+        case 5: value = longEntry(((LongEntry) source).longValue()); break;
+        case 6: value = doubleEntry(((DoubleEntry) source).doubleValue()); break;
+        case 7: value = classEntry(((ClassEntry) source).name()); break;
+        case 8: value = stringEntry(((StringEntry) source).utf8()); break;
+        case 9: case 10: case 11: {
+          MemberRefEntry member = (MemberRefEntry) source;
+          ClassEntry owner = (ClassEntry) importEntry(member.owner(), state);
+          NameAndTypeEntry name = (NameAndTypeEntry) importEntry(member.nameAndType(), state);
+          value = intern(source.tag(), owner.index(), name.index(), null); break;
+        }
+        case 12: {
+          NameAndTypeEntry name = (NameAndTypeEntry) source;
+          value = nameAndTypeEntry(name.name(), name.type()); break;
+        }
+        case 15: {
+          MethodHandleEntry handle = (MethodHandleEntry) source;
+          value = intern(15, handle.kind(), importEntry(handle.reference(), state).index(), null); break;
+        }
+        case 16: value = methodTypeEntry(((MethodTypeEntry) source).descriptor()); break;
+        case 17: case 18: {
+          DynamicConstantPoolEntry dynamic = (DynamicConstantPoolEntry) source;
+          value = dynamic(source.tag(), dynamic.bootstrap(), dynamic.nameAndType(), state); break;
+        }
+        default: throw new UnsupportedOperationException("Unselected constant-pool import tag " + source.tag());
+      }
+      state.entries.put(source, value); return value;
+    } catch (ClassCastException malformed) {
+      throw new IllegalArgumentException("Constant-pool entry tag does not match its typed model", malformed);
+    } finally { state.leave(source); }
+  }
+  private BootstrapMethodEntry importBootstrap(BootstrapMethodEntry source, ImportState state) {
+    if (source instanceof Bootstrap && canWriteDirect(source.constantPool()))
+      return bootstrapMethodEntry(source.bsmIndex());
+    BootstrapMethodEntry cached = state.bootstraps.get(source);
+    if (cached != null) return cached;
+    state.enter(source);
+    try {
+      BootstrapMethodEntry value = bootstrap(source.bootstrapMethod(), source.arguments(), state);
+      state.bootstraps.put(source, value); return value;
+    } finally { state.leave(source); }
+  }
+  private static final class ImportState {
+    final IdentityHashMap<PoolEntry, PoolEntry> entries = new IdentityHashMap<PoolEntry, PoolEntry>();
+    final IdentityHashMap<BootstrapMethodEntry, BootstrapMethodEntry> bootstraps = new IdentityHashMap<BootstrapMethodEntry, BootstrapMethodEntry>();
+    final IdentityHashMap<Object, Boolean> active = new IdentityHashMap<Object, Boolean>();
+    void enter(Object value) {
+      if (active.size() >= 256) throw new UnsupportedOperationException("Constant-pool import exceeds the selected finite depth");
+      if (active.put(value, Boolean.TRUE) != null)
+        throw new UnsupportedOperationException("Cyclic constant-pool imports are outside the selected pool model");
+    }
+    void leave(Object value) { active.remove(value); }
+  }
   public IntegerEntry intEntry(int value) { return (IntegerEntry) intern(3, value, 0, Integer.valueOf(value)); }
   public FloatEntry floatEntry(float value) { return (FloatEntry) intern(4, Float.floatToRawIntBits(value), 0, Float.valueOf(value)); }
   public LongEntry longEntry(long value) { return (LongEntry) intern(5, 0, 0, Long.valueOf(value)); }
@@ -235,6 +447,8 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
       case 12: entry = new NameType(this, index, tag, first, second, value, raw); break;
       case 15: entry = new HandleValue(this, index, tag, first, second, value, raw); break;
       case 16: entry = new MethodTypeValue(this, index, tag, first, second, value, raw); break;
+      case 17: entry = new ConstantDynamicValue(this, index, tag, first, second, value, raw); break;
+      case 18: entry = new InvokeDynamicValue(this, index, tag, first, second, value, raw); break;
       default: entry = new Entry(this, index, tag, first, second, value, raw);
     }
     entries.add(entry);
@@ -399,6 +613,44 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
       return MethodHandleDesc.ofMethod(kind, reference.owner().asSymbol(), reference.name().stringValue(),
         MethodTypeDesc.ofDescriptor(reference.type().stringValue()));
     }
+  }
+  private static class DynamicValue extends Entry implements DynamicConstantPoolEntry {
+    DynamicValue(DoppioConstantPool p, int i, int t, int a, int b, Object v, byte[] r) { super(p, i, t, a, b, v, r); }
+    public BootstrapMethodEntry bootstrap() { return pool.bootstrapMethodEntry(first); }
+    public int bootstrapMethodIndex() { return first; }
+    public NameAndTypeEntry nameAndType() { return pool.entryByIndex(second, NameAndTypeEntry.class); }
+  }
+  private DynamicConstantDesc<?> dynamicSymbol(ConstantDynamicValue entry, SymbolState state) {
+    if (entry.symbol != null) return entry.symbol;
+    if (state.active.size() >= 256)
+      throw new UnsupportedOperationException("Dynamic symbol graph exceeds the selected finite depth");
+    if (state.active.put(entry, Boolean.TRUE) != null)
+      throw new UnsupportedOperationException("Cyclic dynamic symbols are outside the selected pool model");
+    try {
+      BootstrapMethodEntry bootstrap = entry.bootstrap();
+      List<LoadableConstantEntry> entries = bootstrap.arguments();
+      ConstantDesc[] arguments = new ConstantDesc[entries.size()];
+      for (int index = 0; index < arguments.length; index++) {
+        LoadableConstantEntry argument = entries.get(index);
+        arguments[index] = argument instanceof ConstantDynamicValue ?
+          ((ConstantDynamicValue) argument).pool.dynamicSymbol((ConstantDynamicValue) argument, state) : argument.constantValue();
+      }
+      DynamicConstantDesc<?> symbol = DynamicConstantDesc.ofNamed(bootstrap.bootstrapMethod().asSymbol(),
+        entry.name().stringValue(), entry.typeSymbol(), arguments);
+      entry.symbol = symbol;
+      return symbol;
+    } finally { state.active.remove(entry); }
+  }
+  private static final class SymbolState {
+    final IdentityHashMap<ConstantDynamicValue, Boolean> active = new IdentityHashMap<ConstantDynamicValue, Boolean>();
+  }
+  private static final class ConstantDynamicValue extends DynamicValue implements ConstantDynamicEntry {
+    DynamicConstantDesc<?> symbol;
+    ConstantDynamicValue(DoppioConstantPool p, int i, int t, int a, int b, Object v, byte[] r) { super(p, i, t, a, b, v, r); }
+    public DynamicConstantDesc<?> asSymbol() { return pool.dynamicSymbol(this, new SymbolState()); }
+  }
+  private static final class InvokeDynamicValue extends DynamicValue implements InvokeDynamicEntry {
+    InvokeDynamicValue(DoppioConstantPool p, int i, int t, int a, int b, Object v, byte[] r) { super(p, i, t, a, b, v, r); }
   }
   private static final class Bootstrap implements BootstrapMethodEntry {
     final ConstantPool pool;

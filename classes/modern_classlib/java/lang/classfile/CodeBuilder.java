@@ -2,6 +2,7 @@ package java.lang.classfile;
 
 import java.lang.classfile.constantpool.FieldRefEntry;
 import java.lang.classfile.constantpool.ClassEntry;
+import java.lang.classfile.constantpool.InvokeDynamicEntry;
 import java.lang.classfile.constantpool.LoadableConstantEntry;
 import java.lang.classfile.constantpool.MemberRefEntry;
 import java.lang.classfile.instruction.ConstantInstruction;
@@ -17,6 +18,7 @@ import java.lang.classfile.instruction.TableSwitchInstruction;
 import java.lang.classfile.instruction.ThrowInstruction;
 import java.lang.classfile.instruction.FieldInstruction;
 import java.lang.classfile.instruction.InvokeInstruction;
+import java.lang.classfile.instruction.InvokeDynamicInstruction;
 import java.lang.classfile.instruction.LoadInstruction;
 import java.lang.classfile.instruction.OperatorInstruction;
 import java.lang.classfile.instruction.ReturnInstruction;
@@ -24,6 +26,7 @@ import java.lang.classfile.instruction.StackInstruction;
 import java.lang.classfile.instruction.StoreInstruction;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDesc;
+import java.lang.constant.DynamicCallSiteDesc;
 import java.lang.constant.MethodTypeDesc;
 import java.util.Objects;
 import java.util.List;
@@ -139,7 +142,7 @@ public interface CodeBuilder extends ClassFileBuilder<CodeElement, CodeBuilder> 
   default CodeBuilder ldc(ConstantDesc value) { return ldc(constantPool().loadableConstantEntry(Objects.requireNonNull(value))); }
   default CodeBuilder ldc(LoadableConstantEntry entry) {
     Objects.requireNonNull(entry);
-    Opcode opcode = entry.tag() == 5 || entry.tag() == 6 ? Opcode.LDC2_W : entry.index() <= 255 ? Opcode.LDC : Opcode.LDC_W;
+    Opcode opcode = entry.typeKind().slotSize() == 2 ? Opcode.LDC2_W : entry.index() <= 255 ? Opcode.LDC : Opcode.LDC_W;
     return with(ConstantInstruction.ofLoad(opcode, entry));
   }
   default CodeBuilder aconst_null() { return with(DoppioBuilders.intrinsic(Opcode.ACONST_NULL)); }
@@ -190,4 +193,6 @@ public interface CodeBuilder extends ClassFileBuilder<CodeElement, CodeBuilder> 
   default CodeBuilder invokestatic(ClassDesc owner, String name, MethodTypeDesc type) { return invoke(Opcode.INVOKESTATIC, owner, name, type, false); }
   default CodeBuilder invokevirtual(ClassDesc owner, String name, MethodTypeDesc type) { return invoke(Opcode.INVOKEVIRTUAL, owner, name, type, false); }
   default CodeBuilder invokeinterface(ClassDesc owner, String name, MethodTypeDesc type) { return invoke(Opcode.INVOKEINTERFACE, owner, name, type, true); }
+  default CodeBuilder invokedynamic(InvokeDynamicEntry entry) { return with(InvokeDynamicInstruction.of(entry)); }
+  default CodeBuilder invokedynamic(DynamicCallSiteDesc descriptor) { return invokedynamic(constantPool().invokeDynamicEntry(Objects.requireNonNull(descriptor))); }
 }

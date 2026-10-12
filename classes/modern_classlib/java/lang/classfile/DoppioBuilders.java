@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.lang.classfile.attribute.CodeAttribute;
 import java.lang.classfile.attribute.SourceFileAttribute;
 import java.lang.classfile.attribute.StackMapTableAttribute;
+import java.lang.classfile.attribute.BootstrapMethodsAttribute;
 import java.lang.classfile.constantpool.ClassEntry;
 import java.lang.classfile.constantpool.ConstantPool;
 import java.lang.classfile.constantpool.ConstantPoolBuilder;
@@ -77,15 +78,15 @@ final class DoppioBuilders {
   }
 
   static byte[] build(ClassEntry name, DoppioConstantPool pool, Consumer<? super ClassBuilder> handler,
-      ClassFile.StackMapsOption stackMaps) {
-    ClassSink builder = new ClassSink(name, pool, stackMaps);
+      ClassFile.StackMapsOption stackMaps, ClassFile.AttributesProcessingOption attributesProcessing) {
+    ClassSink builder = new ClassSink(name, pool, stackMaps, attributesProcessing, false);
     handler.accept(builder);
     return builder.bytes();
   }
 
   static byte[] transform(ClassModel model, ClassEntry name, DoppioConstantPool pool, ClassTransform transform,
-      ClassFile.StackMapsOption stackMaps) {
-    ClassSink builder = new ClassSink(name, pool, stackMaps);
+      ClassFile.StackMapsOption stackMaps, ClassFile.AttributesProcessingOption attributesProcessing, boolean remapBound) {
+    ClassSink builder = new ClassSink(name, pool, stackMaps, attributesProcessing, remapBound);
     builder.transform(model, transform);
     return builder.bytes();
   }
@@ -105,6 +106,8 @@ final class DoppioBuilders {
     ClassEntry superclass();
     List<ClassEntry> interfaces();
     int majorVersion();
+    ClassFile.AttributesProcessingOption attributesProcessing();
+    boolean remapBound();
   }
 
   private static Context context(Object builder) {
@@ -150,6 +153,8 @@ final class DoppioBuilders {
     public ClassEntry superclass() { return context.superclass(); }
     public List<ClassEntry> interfaces() { return context.interfaces(); }
     public int majorVersion() { return context.majorVersion(); }
+    public ClassFile.AttributesProcessingOption attributesProcessing() { return context.attributesProcessing(); }
+    public boolean remapBound() { return context.remapBound(); }
     public ConstantPoolBuilder constantPool() { return pool(); }
     public ClassBuilder with(ClassElement element) { transform.accept(target, Objects.requireNonNull(element)); return this; }
     public ClassBuilder withField(Utf8Entry name, Utf8Entry type, Consumer<? super FieldBuilder> handler) {
@@ -234,6 +239,8 @@ final class DoppioBuilders {
     final DoppioConstantPool pool;
     final ClassFile.StackMapsOption stackMaps;
     final ClassEntry name;
+    final ClassFile.AttributesProcessingOption attributesProcessing;
+    final boolean remapBound;
     int flags = ClassFile.ACC_SUPER;
     int major = 69, minor = 0;
     ClassEntry superclass;
@@ -241,8 +248,10 @@ final class DoppioBuilders {
     final List<FieldModel> fields = new ArrayList<FieldModel>();
     final List<MethodModel> methods = new ArrayList<MethodModel>();
     final List<Attribute<?>> attributes = new ArrayList<Attribute<?>>();
-    ClassSink(ClassEntry name, DoppioConstantPool pool, ClassFile.StackMapsOption stackMaps) {
+    ClassSink(ClassEntry name, DoppioConstantPool pool, ClassFile.StackMapsOption stackMaps,
+        ClassFile.AttributesProcessingOption attributesProcessing, boolean remapBound) {
       this.pool = Objects.requireNonNull(pool); this.stackMaps = Objects.requireNonNull(stackMaps);
+      this.attributesProcessing = Objects.requireNonNull(attributesProcessing); this.remapBound = remapBound;
       this.name = pool.classEntry(pool.utf8Entry(Objects.requireNonNull(name).name().stringValue()));
       this.superclass = pool.classEntry(ClassDesc.of("java.lang.Object"));
     }
@@ -252,6 +261,8 @@ final class DoppioBuilders {
     public ClassEntry superclass() { return superclass; }
     public List<ClassEntry> interfaces() { return interfaces; }
     public int majorVersion() { return major; }
+    public ClassFile.AttributesProcessingOption attributesProcessing() { return attributesProcessing; }
+    public boolean remapBound() { return remapBound; }
     public ConstantPoolBuilder constantPool() { return pool; }
     public ClassBuilder with(ClassElement element) {
       Objects.requireNonNull(element);
@@ -294,10 +305,21 @@ final class DoppioBuilders {
         u2(output, interfaces.size());
         for (ClassEntry entry : interfaces) u2(output, pool.classEntry(pool.utf8Entry(entry.name().stringValue())).index());
         u2(output, fields.size());
-        for (FieldModel field : fields) output.write(fieldBytes(pool, field));
+        for (FieldModel field : fields) output.write(fieldBytes(this, field));
         u2(output, methods.size());
-        for (MethodModel method : methods) output.write(methodBytes(pool, method));
-        writeAttributes(output, pool, attributes);
+        for (MethodModel method : methods) output.write(methodBytes(this, method));
+        // Custom writers can import dynamic constants too: derive bootstrap metadata last.
+        ByteArrayOutputStream attributeBytes = new ByteArrayOutputStream();
+        DataOutputStream attributeOutput = new DataOutputStream(attributeBytes);
+        List<Attribute<?>> selected = selectedAttributes(attributes, attributesProcessing);
+        for (Attribute<?> attribute : selected) writeAttribute(attributeOutput, pool, attribute, attributesProcessing);
+        u2(output, selected.size() + (pool.bootstrapMethodCount() == 0 ? 0 : 1));
+        output.write(attributeBytes.toByteArray());
+        if (pool.bootstrapMethodCount() != 0) {
+          byte[] bootstrap = pool.encodeBootstrapMethods();
+          u2(output, pool.utf8Entry("BootstrapMethods").index()); output.writeInt(bootstrap.length); output.write(bootstrap);
+        }
+        pool.validateBootstrapReferences();
         output.flush();
         ByteArrayOutputStream result = new ByteArrayOutputStream(); DataOutputStream header = new DataOutputStream(result);
         header.writeInt(ClassFile.MAGIC_NUMBER); u2(header, minor); u2(header, major);
@@ -451,6 +473,11 @@ final class DoppioBuilders {
         if (source == null) throw new UnsupportedOperationException("Manual stack-map attributes are outside the selected builder");
         return this; // Rewriting regenerates frames rather than retaining stale offsets.
       }
+      if (element instanceof Attribute) {
+        Attribute<?> attribute = (Attribute<?>) element;
+        if (DoppioAttributes.shouldWrite(attribute, owner.attributesProcessing())) addAttribute(attributes, attribute);
+        return this;
+      }
       if (element instanceof LabelTarget) element = DoppioClassReader.labelTarget(label(((LabelTarget) element).label()));
       else if (element instanceof BranchInstruction) {
         BranchInstruction branch = (BranchInstruction) element;
@@ -517,7 +544,8 @@ final class DoppioBuilders {
       if (nextLocal > 65535) throw new IllegalArgumentException("Local-variable limit exceeded");
       return result;
     }
-    CodeValue value() { return new CodeValue(owner, name, type, flags, elements, nextLocal, start, end); }
+    final List<Attribute<?>> attributes = new ArrayList<Attribute<?>>();
+    CodeValue value() { return new CodeValue(owner, name, type, flags, elements, attributes, nextLocal, start, end); }
   }
 
   private static final class CodeValue implements CodeAttribute {
@@ -526,11 +554,14 @@ final class DoppioBuilders {
     final Utf8Entry name, type;
     final int flags, allocatedLocals;
     final List<CodeElement> elements;
+    final List<Attribute<?>> attributes;
     final Label start, end;
-    CodeValue(ClassContext owner, Utf8Entry name, Utf8Entry type, int flags, List<CodeElement> elements, int allocatedLocals,
+    CodeValue(ClassContext owner, Utf8Entry name, Utf8Entry type, int flags, List<CodeElement> elements,
+        List<Attribute<?>> attributes, int allocatedLocals,
         Label start, Label end) {
       this.owner = owner; this.pool = owner.pool(); this.name = name; this.type = type;
       this.flags = flags; this.elements = immutable(elements);
+      this.attributes = immutable(attributes);
       this.allocatedLocals = allocatedLocals; this.start = start; this.end = end;
     }
     public Utf8Entry attributeName() { return pool.utf8Entry("Code"); }
@@ -541,9 +572,11 @@ final class DoppioBuilders {
       for (CodeElement element : elements) if (element instanceof ExceptionCatch) handlers.add((ExceptionCatch) element);
       return immutable(handlers);
     }
-    public List<Attribute<?>> attributes() { return Collections.emptyList(); }
+    public List<Attribute<?>> attributes() { return attributes; }
     public void forEach(Consumer<? super CodeElement> consumer) {
-      Objects.requireNonNull(consumer); for (CodeElement element : elements) consumer.accept(element);
+      Objects.requireNonNull(consumer);
+      for (Attribute<?> attribute : attributes) consumer.accept((CodeElement) attribute);
+      for (CodeElement element : elements) consumer.accept(element);
     }
     public int maxStack() { return encodeCode(this).maxStack; }
     public int maxLocals() { return encodeCode(this).maxLocals; }
@@ -563,7 +596,7 @@ final class DoppioBuilders {
     Objects.requireNonNull(value);
     String name = value.attributeName().stringValue();
     for (int index = attributes.size() - 1; index >= 0; index--) {
-      if (value instanceof SourceFileAttribute && attributes.get(index).attributeName().stringValue().equals(name)) attributes.remove(index);
+      if (!value.attributeMapper().allowMultiple() && attributes.get(index).attributeName().stringValue().equals(name)) attributes.remove(index);
     }
     attributes.add(value);
   }
@@ -573,23 +606,35 @@ final class DoppioBuilders {
       throw new IllegalArgumentException("Opaque bound data cannot be remapped to another constant pool");
   }
 
-  private static byte[] fieldBytes(DoppioConstantPool pool, FieldModel field) throws IOException {
+  private static byte[] fieldBytes(ClassContext owner, FieldModel field) throws IOException {
+    DoppioConstantPool pool = owner.pool();
     if (!(field instanceof FieldValue)) {
-      requireSharedPool(pool, field.fieldName().constantPool());
-      return DoppioClassReader.memberBytes(field);
+      if (!owner.remapBound() && owner.attributesProcessing() == ClassFile.AttributesProcessingOption.PASS_ALL_ATTRIBUTES) {
+        requireSharedPool(pool, field.fieldName().constantPool());
+        return DoppioClassReader.memberBytes(field);
+      }
+      field = new FieldValue(pool, pool.utf8Entry(field.fieldName().stringValue()),
+        pool.utf8Entry(field.fieldType().stringValue()), field.flags().flagsMask(), field.attributes());
     }
     FieldValue value = (FieldValue) field;
     requireSharedPool(pool, value.pool);
     ByteArrayOutputStream bytes = new ByteArrayOutputStream(); DataOutputStream output = new DataOutputStream(bytes);
     u2(output, value.flags.flagsMask()); u2(output, pool.utf8Entry(value.name.stringValue()).index());
-    u2(output, pool.utf8Entry(value.type.stringValue()).index()); writeAttributes(output, pool, value.attributes);
+    u2(output, pool.utf8Entry(value.type.stringValue()).index());
+    writeAttributes(output, pool, value.attributes, owner.attributesProcessing());
     output.flush(); return bytes.toByteArray();
   }
 
-  private static byte[] methodBytes(DoppioConstantPool pool, MethodModel method) throws IOException {
+  private static byte[] methodBytes(ClassContext owner, MethodModel method) throws IOException {
+    DoppioConstantPool pool = owner.pool();
     if (!(method instanceof MethodValue)) {
-      requireSharedPool(pool, method.methodName().constantPool());
-      return DoppioClassReader.memberBytes(method);
+      if (!owner.remapBound() && owner.attributesProcessing() == ClassFile.AttributesProcessingOption.PASS_ALL_ATTRIBUTES) {
+        requireSharedPool(pool, method.methodName().constantPool());
+        return DoppioClassReader.memberBytes(method);
+      }
+      method = new MethodValue(pool, pool.utf8Entry(method.methodName().stringValue()),
+        pool.utf8Entry(method.methodType().stringValue()), method.flags().flagsMask(),
+        method.code().orElse(null), methodAttributes(method));
     }
     MethodValue value = (MethodValue) method;
     requireSharedPool(pool, value.pool);
@@ -598,46 +643,101 @@ final class DoppioBuilders {
       if (!original.isPresent() || !original.get().methodType().stringValue().equals(value.type.stringValue()) ||
           ((original.get().flags().flagsMask() ^ value.flags.flagsMask()) & ClassFile.ACC_STATIC) != 0)
         throw new IllegalArgumentException("Bound Code cannot be copied into a different method descriptor/staticness");
+      if (owner.remapBound()) {
+        // These bound tables carry both CP indexes and bytecode offsets. The selected
+        // reader does not yet expose their label-based elements; never silently lose
+        // them when rebuilding Code for a fresh pool.
+        for (Attribute<?> attribute : selectedAttributes(value.code.attributes(), owner.attributesProcessing())) {
+          String name = attribute.attributeName().stringValue();
+          if ("LocalVariableTable".equals(name) || "LocalVariableTypeTable".equals(name))
+            throw new UnsupportedOperationException("Fresh-pool Code remapping does not support " + name);
+        }
+        CodeSink sink = new CodeSink(owner, value.name, value.type, value.flags.flagsMask());
+        sink.transform(value.code, CodeTransform.ACCEPT_ALL);
+        value = new MethodValue(pool, value.name, value.type, value.flags.flagsMask(), sink.value(), methodAttributes(value));
+      }
     }
     ByteArrayOutputStream bytes = new ByteArrayOutputStream(); DataOutputStream output = new DataOutputStream(bytes);
     u2(output, value.flags.flagsMask()); u2(output, pool.utf8Entry(value.name.stringValue()).index());
-    u2(output, pool.utf8Entry(value.type.stringValue()).index()); writeAttributes(output, pool, value.attributes);
+    u2(output, pool.utf8Entry(value.type.stringValue()).index());
+    writeAttributes(output, pool, value.attributes, owner.attributesProcessing());
     output.flush(); return bytes.toByteArray();
   }
 
-  private static void writeAttributes(DataOutputStream output, DoppioConstantPool pool, List<Attribute<?>> attributes)
-      throws IOException {
-    u2(output, attributes.size());
-    for (Attribute<?> attribute : attributes) {
-      byte[] payload;
-      if (attribute instanceof SourceFileAttribute) {
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream(); DataOutputStream value = new DataOutputStream(bytes);
-        u2(value, pool.utf8Entry(((SourceFileAttribute) attribute).sourceFile().stringValue()).index());
-        value.flush(); payload = bytes.toByteArray();
-      } else if (attribute instanceof CodeValue) {
-        CodeValue code = (CodeValue) attribute;
-        requireSharedPool(pool, code.pool);
-        EncodedCode encoded = encodeCode(code);
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream(); DataOutputStream value = new DataOutputStream(bytes);
-        u2(value, encoded.maxStack); u2(value, encoded.maxLocals);
-        value.writeInt(encoded.bytes.length); value.write(encoded.bytes);
-        u2(value, encoded.handlers.size());
-        for (int[] handler : encoded.handlers) {
-          u2(value, handler[0]); u2(value, handler[1]); u2(value, handler[2]); u2(value, handler[3]);
-        }
-        if (encoded.stackMap == null) u2(value, 0);
-        else {
-          u2(value, 1); u2(value, pool.utf8Entry("StackMapTable").index());
-          value.writeInt(encoded.stackMap.length); value.write(encoded.stackMap);
-        }
-        value.flush(); payload = bytes.toByteArray();
-      } else {
-        requireSharedPool(pool, DoppioClassReader.sourcePool(attribute));
-        payload = DoppioClassReader.attributePayload(attribute);
+  private static List<Attribute<?>> methodAttributes(MethodModel method) {
+    List<Attribute<?>> attributes = new ArrayList<Attribute<?>>();
+    for (Attribute<?> attribute : method.attributes()) if (!(attribute instanceof CodeModel)) attributes.add(attribute);
+    return attributes;
+  }
+
+  private static List<Attribute<?>> selectedAttributes(List<Attribute<?>> attributes,
+      ClassFile.AttributesProcessingOption policy) {
+    List<Attribute<?>> selected = new ArrayList<Attribute<?>>();
+    for (Attribute<?> attribute : attributes)
+      if (!(attribute instanceof BootstrapMethodsAttribute) && DoppioAttributes.shouldWrite(attribute, policy)) selected.add(attribute);
+    return selected;
+  }
+
+  private static void writeAttributes(DataOutputStream output, DoppioConstantPool pool,
+      List<Attribute<?>> attributes, ClassFile.AttributesProcessingOption policy) throws IOException {
+    List<Attribute<?>> selected = selectedAttributes(attributes, policy);
+    u2(output, selected.size());
+    for (Attribute<?> attribute : selected) writeAttribute(output, pool, attribute, policy);
+  }
+
+  private static void writeAttribute(DataOutputStream output, DoppioConstantPool pool,
+      Attribute<?> attribute, ClassFile.AttributesProcessingOption policy) throws IOException {
+    byte[] payload;
+    if (attribute instanceof SourceFileAttribute) {
+      ByteArrayOutputStream bytes = new ByteArrayOutputStream(); DataOutputStream value = new DataOutputStream(bytes);
+      u2(value, pool.utf8Entry(((SourceFileAttribute) attribute).sourceFile().stringValue()).index());
+      value.flush(); payload = bytes.toByteArray();
+    } else if (attribute instanceof CodeValue) {
+      CodeValue code = (CodeValue) attribute;
+      requireSharedPool(pool, code.pool);
+      EncodedCode encoded = encodeCode(code);
+      ByteArrayOutputStream bytes = new ByteArrayOutputStream(); DataOutputStream value = new DataOutputStream(bytes);
+      u2(value, encoded.maxStack); u2(value, encoded.maxLocals);
+      value.writeInt(encoded.bytes.length); value.write(encoded.bytes);
+      u2(value, encoded.handlers.size());
+      for (int[] handler : encoded.handlers) {
+        u2(value, handler[0]); u2(value, handler[1]); u2(value, handler[2]); u2(value, handler[3]);
       }
-      u2(output, pool.utf8Entry(attribute.attributeName().stringValue()).index());
-      output.writeInt(payload.length); output.write(payload);
+      List<Attribute<?>> selected = selectedAttributes(code.attributes, policy);
+      u2(value, selected.size() + (encoded.stackMap == null ? 0 : 1));
+      for (Attribute<?> nested : selected) writeAttribute(value, pool, nested, policy);
+      if (encoded.stackMap != null) {
+        u2(value, pool.utf8Entry("StackMapTable").index());
+        value.writeInt(encoded.stackMap.length); value.write(encoded.stackMap);
+      }
+      value.flush(); payload = bytes.toByteArray();
+    } else if (attribute instanceof CodeAttribute) {
+      CodeAttribute code = (CodeAttribute) attribute;
+      requireSharedPool(pool, DoppioClassReader.sourcePool(attribute));
+      if (policy == ClassFile.AttributesProcessingOption.PASS_ALL_ATTRIBUTES) payload = DoppioClassReader.attributePayload(attribute);
+      else {
+        // Shared-pool policy changes need not decode/rewrite unsupported instruction families.
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream(); DataOutputStream value = new DataOutputStream(bytes);
+        u2(value, code.maxStack()); u2(value, code.maxLocals());
+        byte[] instructions = code.codeArray(); value.writeInt(instructions.length); value.write(instructions);
+        u2(value, code.exceptionHandlers().size());
+        for (ExceptionCatch handler : code.exceptionHandlers()) {
+          u2(value, code.labelToBci(handler.tryStart())); u2(value, code.labelToBci(handler.tryEnd()));
+          u2(value, code.labelToBci(handler.handler()));
+          u2(value, handler.catchType().isPresent() ? handler.catchType().get().index() : 0);
+        }
+        writeAttributes(value, pool, code.attributes(), policy); value.flush(); payload = bytes.toByteArray();
+      }
+    } else if (attribute instanceof StackMapTableAttribute) {
+      requireSharedPool(pool, DoppioClassReader.sourcePool(attribute));
+      payload = DoppioClassReader.attributePayload(attribute);
+    } else {
+      DoppioBufWriter writer = new DoppioBufWriter(pool);
+      DoppioAttributes.write(writer, attribute);
+      output.write(writer.bytes()); return;
     }
+    u2(output, pool.utf8Entry(attribute.attributeName().stringValue()).index());
+    output.writeInt(payload.length); output.write(payload);
   }
 
   private static void u2(DataOutputStream output, int value) throws IOException {
