@@ -121,15 +121,6 @@ public final class ClassFileVerifierRegression {
     return changed;
   }
 
-  private static void unsupportedBranch(byte[] bytes) {
-    ClassFile api = ClassFile.of();
-    try { api.verify(bytes); throw new AssertionError("Unsupported branch silently verified"); }
-    catch (UnsupportedOperationException expected) {
-      check(expected.getClass() == UnsupportedOperationException.class, "Wrong unsupported error");
-    }
-    completed++;
-  }
-
   public static void main(String[] arguments) throws Exception {
     valid("integer", sample("()I", false, 1, 0, 10, 0x10, 42, 0xac));
     valid("wide-arguments", sample("(JJ)J", false, 4, 4, 10, 0x1e, 0x20, 0x61, 0xad));
@@ -148,7 +139,7 @@ public final class ClassFileVerifierRegression {
     invalid("category-two-pop", sample("()V", false, 2, 0, 10, 0x09, 0x57, 0xb1));
     malformed("interface-constructor-reference", interfaceConstructorReference(
         sample("()V", true, 1, 1, 10, 0x2a, 0xb7, 0, 11, 0xb1)));
-    unsupportedBranch(sample("()V", false, 0, 0, 10, 0xa7, 0, 3, 0xb1));
+    invalid("missing-branch-stack-map", sample("()V", false, 0, 0, 10, 0xa7, 0, 3, 0xb1));
     check(completed == 15, "Incomplete regression execution");
     System.out.println("CLASSFILE_VERIFIER_REGRESSION_OK|15");
   }

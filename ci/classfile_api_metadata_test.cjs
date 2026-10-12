@@ -68,7 +68,15 @@ before(async () => {
     'instruction/ConstantInstruction', 'instruction/ConstantInstruction$LoadConstantInstruction',
     'instruction/LoadInstruction', 'instruction/StoreInstruction', 'instruction/ReturnInstruction',
     'instruction/FieldInstruction', 'instruction/InvokeInstruction', 'instruction/OperatorInstruction',
-    'instruction/StackInstruction', 'DoppioClassReader', 'DoppioBuilders$ClassSink', 'DoppioBuilders$FieldSink',
+    'instruction/StackInstruction', 'instruction/BranchInstruction', 'instruction/LabelTarget',
+    'instruction/SwitchCase', 'instruction/TableSwitchInstruction', 'instruction/LookupSwitchInstruction',
+    'instruction/ExceptionCatch', 'instruction/IncrementInstruction', 'instruction/ConvertInstruction',
+    'instruction/ThrowInstruction', 'instruction/NewObjectInstruction',
+    'attribute/StackMapTableAttribute', 'attribute/StackMapFrameInfo',
+    'attribute/StackMapFrameInfo$VerificationTypeInfo', 'attribute/StackMapFrameInfo$SimpleVerificationTypeInfo',
+    'attribute/StackMapFrameInfo$ObjectVerificationTypeInfo', 'attribute/StackMapFrameInfo$UninitializedVerificationTypeInfo',
+    'DoppioClassFileVerifier', 'DoppioCodeFlow', 'DoppioCodeAssembler',
+    'DoppioClassReader', 'DoppioBuilders$ClassSink', 'DoppioBuilders$FieldSink',
     'DoppioBuilders$MethodSink', 'DoppioBuilders$CodeSink']) {
     const filename = path.join(output, prefix, relative + '.class');
     const stat = fs.lstatSync(filename);
@@ -228,8 +236,52 @@ test('actual complete opcode metadata is enum-shaped while unselected behavior r
   assert.equal(method('Opcode', 'isWide', '()Z').flags, 1);
 });
 
-function runDiagnosticMain(name, marker) {
-  const output = path.join(temporary, name);
+test('compiled CFG operand models preserve native public descriptors and real factory bodies', () => {
+  for (const owner of ['instruction/BranchInstruction', 'instruction/LabelTarget', 'instruction/SwitchCase',
+    'instruction/TableSwitchInstruction', 'instruction/LookupSwitchInstruction', 'attribute/StackMapFrameInfo']) {
+    assert.equal(units.get(owner).layout.flags, 0x0601, owner + ' is a genuine public interface');
+  }
+  for (const [owner, name, descriptor] of [
+    ['instruction/BranchInstruction', 'target', '()Ljava/lang/classfile/Label;'],
+    ['instruction/LabelTarget', 'label', '()Ljava/lang/classfile/Label;'],
+    ['instruction/SwitchCase', 'caseValue', '()I'],
+    ['instruction/SwitchCase', 'target', '()Ljava/lang/classfile/Label;'],
+    ['instruction/TableSwitchInstruction', 'cases', '()Ljava/util/List;'],
+    ['instruction/LookupSwitchInstruction', 'defaultTarget', '()Ljava/lang/classfile/Label;'],
+    ['attribute/StackMapTableAttribute', 'entries', '()Ljava/util/List;'],
+    ['attribute/StackMapFrameInfo', 'frameType', '()I'],
+    ['attribute/StackMapFrameInfo', 'locals', '()Ljava/util/List;'],
+    ['attribute/StackMapFrameInfo$VerificationTypeInfo', 'tag', '()I'],
+    ['attribute/StackMapFrameInfo$ObjectVerificationTypeInfo', 'className', '()Ljava/lang/classfile/constantpool/ClassEntry;'],
+    ['attribute/StackMapFrameInfo$UninitializedVerificationTypeInfo', 'newTarget', '()Ljava/lang/classfile/Label;'],
+  ]) assert.equal(method(owner, name, descriptor).flags, 0x0401);
+  for (const [owner, descriptor] of [
+    ['instruction/BranchInstruction', '(Ljava/lang/classfile/Opcode;Ljava/lang/classfile/Label;)Ljava/lang/classfile/instruction/BranchInstruction;'],
+    ['instruction/SwitchCase', '(ILjava/lang/classfile/Label;)Ljava/lang/classfile/instruction/SwitchCase;'],
+    ['instruction/TableSwitchInstruction', '(IILjava/lang/classfile/Label;Ljava/util/List;)Ljava/lang/classfile/instruction/TableSwitchInstruction;'],
+    ['instruction/LookupSwitchInstruction', '(Ljava/lang/classfile/Label;Ljava/util/List;)Ljava/lang/classfile/instruction/LookupSwitchInstruction;'],
+    ['attribute/StackMapTableAttribute', '(Ljava/util/List;)Ljava/lang/classfile/attribute/StackMapTableAttribute;'],
+    ['attribute/StackMapFrameInfo', '(Ljava/lang/classfile/Label;Ljava/util/List;Ljava/util/List;)Ljava/lang/classfile/attribute/StackMapFrameInfo;'],
+  ]) {
+    assert.equal(method(owner, 'of', descriptor).flags, 9);
+    assert.ok(calls(owner, 'of', descriptor).some(value => value.cp.owner === 'java.lang.classfile.DoppioClassReader'));
+  }
+  assert.ok(!units.get('instruction/LabelTarget').layout.methods.entries.some(value => value.name === 'of'),
+    'Native LabelTarget has no public static factory');
+  for (const [name, tag] of [['ITEM_TOP',0],['ITEM_INTEGER',1],['ITEM_FLOAT',2],['ITEM_DOUBLE',3],
+    ['ITEM_LONG',4],['ITEM_NULL',5],['ITEM_UNINITIALIZED_THIS',6],['ITEM_OBJECT',7],['ITEM_UNINITIALIZED',8]])
+    assert.equal(integerConstant('attribute/StackMapFrameInfo$VerificationTypeInfo', name), tag);
+});
+
+test('public code conveniences link to actual branch and label bodies', () => {
+  assert.ok(calls('CodeBuilder', 'labelBinding', '(Ljava/lang/classfile/Label;)Ljava/lang/classfile/CodeBuilder;')
+    .some(value => value.cp.owner === 'java.lang.classfile.DoppioClassReader' && value.cp.name === 'labelTarget'));
+  for (const name of ['goto_', 'goto_w', 'ifeq', 'ifne', 'iflt', 'ifge', 'ifgt', 'ifle', 'if_icmpeq', 'if_acmpne', 'ifnull', 'ifnonnull'])
+    assert.ok(calls('CodeBuilder', name, '(Ljava/lang/classfile/Label;)Ljava/lang/classfile/CodeBuilder;').some(value => value.cp.name === 'branch'));
+});
+
+function runDiagnosticMain(name, marker, mainName = name) {
+  const output = path.join(temporary, mainName);
   fs.mkdirSync(output);
   // The new package is not exported by release-9 java.base metadata. Compile
   // the diagnostic source as part of the patched module, then run its genuine
@@ -237,7 +289,7 @@ function runDiagnosticMain(name, marker) {
   checked('javac', ['--release', '9', '--patch-module', 'java.base=' + path.join(classlib, 'out') +
     path.delimiter + path.join(root, 'ci'), '-d', output, path.join(root, 'ci', name + '.java')], root);
   const result = checked(process.execPath, ['--no-deprecation', path.join(root, 'build/release-cli/console/runner.js'),
-    '-cp', output, 'classes.modern_test.' + name], root, 60000);
+    '-cp', output, 'classes.modern_test.' + mainName], root, 60000);
   assert.equal(result.stdout.replaceAll('\r\n', '\n'), marker + '\n');
   assert.equal(result.stderr, '');
 }
@@ -248,4 +300,21 @@ test('actual guest public verifier rejects diagnostic type/state failures withou
 
 test('actual guest public pools retain only the exact source and reject divergent sibling raw-copy authority', () => {
   runDiagnosticMain('ClassFilePoolRegression', 'CLASSFILE_POOL_REGRESSION_OK|10');
+});
+
+test('actual guest CFG verifier applies declared frames and rejects invalid joins/handlers without definition', () => {
+  runDiagnosticMain('ClassFileControlFlowRegression', 'CLASSFILE_CONTROL_FLOW_REGRESSION_OK|24');
+});
+
+test('actual guest CFG reader exposes canonical labels, compressed frames and native-shaped factories', () => {
+  runDiagnosticMain('ClassFileControlFlowReaderRegression', 'CLASSFILE_CONTROL_FLOW_READER_REGRESSION_OK|40');
+});
+
+test('checked CFG reader rejects malformed instruction/frame boundaries including explicitly stricter empty ranges', () => {
+  runDiagnosticMain('ClassFileControlFlowReaderRegression', 'CLASSFILE_CONTROL_FLOW_READER_BOUNDS_OK|25',
+    'ClassFileControlFlowReaderRegression$CheckedBounds');
+});
+
+test('actual guest CFG writer rejects foreign identities and documents selected overflow/key boundaries', () => {
+  runDiagnosticMain('ClassFileControlFlowWriterRegression', 'CLASSFILE_CONTROL_FLOW_WRITER_REGRESSION_OK|10');
 });
