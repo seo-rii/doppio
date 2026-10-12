@@ -500,6 +500,46 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Check phase C user bootstrap contracts
+        timeout-minutes: 3
+        run: node --test ci/java_methodhandle_bootstrap_contract_test.mjs ci/bootstrap_linkage_test.cjs
+
+      # C4 retains original generated class files and genuine javac drivers;
+      # native, Node and Chromium execute the exact same bytes and case inventory.
+      - name: Run Java user bootstrap compatibility
+        id: java_methodhandle_bootstrap
+        timeout-minutes: 40
+        run: node ci/java_methodhandle_bootstrap_test.mjs --browser
+
+      - name: Upload Java user bootstrap ledger
+        if: always() && steps.java_methodhandle_bootstrap.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-methodhandle-bootstrap-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Check phase C hidden class contracts
+        timeout-minutes: 3
+        run: node --test ci/java_methodhandle_hidden_class_contract_test.mjs ci/hidden_class_runtime_test.cjs ci/hidden_class_metadata_test.cjs ci/hidden_class_entry_guard_test.cjs
+
+      # C5 additionally proves original payload Code and exact resource binding.
+      # Selected lifetime/identity checks do not prove garbage collection or modules.
+      - name: Run Java hidden class compatibility
+        id: java_methodhandle_hidden_class
+        timeout-minutes: 40
+        run: node ci/java_methodhandle_hidden_class_test.mjs --browser
+
+      - name: Upload Java hidden class ledger
+        if: always() && steps.java_methodhandle_hidden_class.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-methodhandle-hidden-class-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Check evolved switch ledger contract
         timeout-minutes: 1
         run: node --test ci/java_pattern_evolution_contract_test.mjs

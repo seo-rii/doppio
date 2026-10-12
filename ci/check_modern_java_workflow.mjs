@@ -25,6 +25,11 @@ const methodHandleCollectionRunnerCommand = 'node ci/java_methodhandle_collectio
 const varHandleUnitCommand = 'node --test ci/java_methodhandle_varhandle_contract_test.mjs ci/varhandle_storage_test.cjs ' +
   'ci/varhandle_linkage_test.cjs ci/varhandle_native_boundary_test.cjs ci/varhandle_api_metadata_test.cjs';
 const varHandleRunnerCommand = 'node ci/java_methodhandle_varhandle_test.mjs --browser';
+const bootstrapUnitCommand = 'node --test ci/java_methodhandle_bootstrap_contract_test.mjs ci/bootstrap_linkage_test.cjs';
+const bootstrapRunnerCommand = 'node ci/java_methodhandle_bootstrap_test.mjs --browser';
+const hiddenClassUnitCommand = 'node --test ci/java_methodhandle_hidden_class_contract_test.mjs ci/hidden_class_runtime_test.cjs ' +
+  'ci/hidden_class_metadata_test.cjs ci/hidden_class_entry_guard_test.cjs';
+const hiddenClassRunnerCommand = 'node ci/java_methodhandle_hidden_class_test.mjs --browser';
 
 function stripUnquotedComments(text) {
   return text.split('\n').map((line) => {
@@ -926,6 +931,42 @@ for (const [name, fields] of [
     '  if-no-files-found: error',
     '  retention-days: 7',
   ]],
+  ['Check phase C user bootstrap contracts', [
+    'timeout-minutes: 3',
+    `run: ${bootstrapUnitCommand}`,
+  ]],
+  ['Run Java user bootstrap compatibility', [
+    'id: java_methodhandle_bootstrap',
+    'timeout-minutes: 40',
+    `run: ${bootstrapRunnerCommand}`,
+  ]],
+  ['Upload Java user bootstrap ledger', [
+    "if: always() && steps.java_methodhandle_bootstrap.outcome != 'skipped'",
+    'uses: actions/upload-artifact@v7',
+    'with:',
+    '  path: build/java-methodhandle-bootstrap-results.json',
+    '  archive: false',
+    '  if-no-files-found: error',
+    '  retention-days: 7',
+  ]],
+  ['Check phase C hidden class contracts', [
+    'timeout-minutes: 3',
+    `run: ${hiddenClassUnitCommand}`,
+  ]],
+  ['Run Java hidden class compatibility', [
+    'id: java_methodhandle_hidden_class',
+    'timeout-minutes: 40',
+    `run: ${hiddenClassRunnerCommand}`,
+  ]],
+  ['Upload Java hidden class ledger', [
+    "if: always() && steps.java_methodhandle_hidden_class.outcome != 'skipped'",
+    'uses: actions/upload-artifact@v7',
+    'with:',
+    '  path: build/java-methodhandle-hidden-class-results.json',
+    '  archive: false',
+    '  if-no-files-found: error',
+    '  retention-days: 7',
+  ]],
   ['Check evolved switch ledger contract', [
     'timeout-minutes: 1',
     'run: node --test ci/java_pattern_evolution_contract_test.mjs',
@@ -1100,6 +1141,12 @@ const runtimeOrder = [
   'Check phase C VarHandle execution contracts',
   'Run Java VarHandle execution compatibility',
   'Upload Java VarHandle execution ledger',
+  'Check phase C user bootstrap contracts',
+  'Run Java user bootstrap compatibility',
+  'Upload Java user bootstrap ledger',
+  'Check phase C hidden class contracts',
+  'Run Java hidden class compatibility',
+  'Upload Java hidden class ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -1135,6 +1182,12 @@ for (const command of [methodHandleCollectionUnitCommand, methodHandleCollection
 for (const command of [varHandleUnitCommand, varHandleRunnerCommand]) {
   if (countLiteral(runtimeJob, `        run: ${command}\n`) !== 1) {
     fail(`Modern Java workflow must execute VarHandle execution command exactly once: ${command}`);
+  }
+}
+for (const [name, commands] of [['user bootstrap', [bootstrapUnitCommand, bootstrapRunnerCommand]],
+  ['hidden class', [hiddenClassUnitCommand, hiddenClassRunnerCommand]]]) {
+  for (const command of commands) if (countLiteral(runtimeJob, `        run: ${command}\n`) !== 1) {
+    fail(`Modern Java workflow must execute ${name} command exactly once: ${command}`);
   }
 }
 

@@ -101,6 +101,13 @@ const varHandleUnits = ['ci/java_methodhandle_varhandle_contract_test.mjs', 'ci/
   'ci/varhandle_linkage_test.cjs', 'ci/varhandle_native_boundary_test.cjs', 'ci/varhandle_api_metadata_test.cjs'];
 const varHandleUnitCommand = `node --test ${varHandleUnits.join(' ')}`;
 const varHandleRunnerCommand = 'node ci/java_methodhandle_varhandle_test.mjs --browser';
+const bootstrapUnits = ['ci/java_methodhandle_bootstrap_contract_test.mjs', 'ci/bootstrap_linkage_test.cjs'];
+const bootstrapUnitCommand = `node --test ${bootstrapUnits.join(' ')}`;
+const bootstrapRunnerCommand = 'node ci/java_methodhandle_bootstrap_test.mjs --browser';
+const hiddenClassUnits = ['ci/java_methodhandle_hidden_class_contract_test.mjs', 'ci/hidden_class_runtime_test.cjs',
+  'ci/hidden_class_metadata_test.cjs', 'ci/hidden_class_entry_guard_test.cjs'];
+const hiddenClassUnitCommand = `node --test ${hiddenClassUnits.join(' ')}`;
+const hiddenClassRunnerCommand = 'node ci/java_methodhandle_hidden_class_test.mjs --browser';
 const memberGates = [
   {name: 'member resolution', units: memberResolutionUnits, unitCommand: memberResolutionUnitCommand,
     runnerCommand: memberResolutionRunnerCommand, stepId: 'java_member_resolution',
@@ -134,6 +141,12 @@ const memberGates = [
   {name: 'VarHandle execution', units: varHandleUnits, unitCommand: varHandleUnitCommand,
     runnerCommand: varHandleRunnerCommand, stepId: 'java_methodhandle_varhandle',
     ledger: 'build/java-methodhandle-varhandle-results.json', timeout: 40},
+  {name: 'user bootstrap', units: bootstrapUnits, unitCommand: bootstrapUnitCommand,
+    runnerCommand: bootstrapRunnerCommand, stepId: 'java_methodhandle_bootstrap',
+    ledger: 'build/java-methodhandle-bootstrap-results.json', timeout: 40},
+  {name: 'hidden class', units: hiddenClassUnits, unitCommand: hiddenClassUnitCommand,
+    runnerCommand: hiddenClassRunnerCommand, stepId: 'java_methodhandle_hidden_class',
+    ledger: 'build/java-methodhandle-hidden-class-results.json', timeout: 40},
 ];
 const packageScripts = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).scripts;
 for (const [name, command] of [
@@ -165,6 +178,10 @@ for (const [name, command] of [
   ['ci:methodhandle-collection', methodHandleCollectionRunnerCommand],
   ['ci:varhandle-execution:test', varHandleUnitCommand],
   ['ci:varhandle-execution', varHandleRunnerCommand],
+  ['ci:bootstrap-linkage:test', bootstrapUnitCommand],
+  ['ci:bootstrap-linkage', bootstrapRunnerCommand],
+  ['ci:hidden-class:test', hiddenClassUnitCommand],
+  ['ci:hidden-class', hiddenClassRunnerCommand],
 ]) {
   if (packageScripts[name] !== command) {
     throw new Error(`${name} must retain the complete compatibility command: ${command}`);
@@ -368,6 +385,12 @@ for (const name of [
   'Check phase C VarHandle execution contracts',
   'Run Java VarHandle execution compatibility',
   'Upload Java VarHandle execution ledger',
+  'Check phase C user bootstrap contracts',
+  'Run Java user bootstrap compatibility',
+  'Upload Java user bootstrap ledger',
+  'Check phase C hidden class contracts',
+  'Run Java hidden class compatibility',
+  'Upload Java hidden class ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -855,6 +878,70 @@ for (const [original, replacement] of [
   );
 }
 
+for (const gate of [
+  {name: 'user bootstrap', contractName: 'Check phase C user bootstrap contracts', runName: 'Run Java user bootstrap compatibility',
+    uploadName: 'Upload Java user bootstrap ledger', unitCommand: bootstrapUnitCommand, runnerCommand: bootstrapRunnerCommand,
+    stepId: 'java_methodhandle_bootstrap', ledgerBase: 'java-methodhandle-bootstrap'},
+  {name: 'hidden class', contractName: 'Check phase C hidden class contracts', runName: 'Run Java hidden class compatibility',
+    uploadName: 'Upload Java hidden class ledger', unitCommand: hiddenClassUnitCommand, runnerCommand: hiddenClassRunnerCommand,
+    stepId: 'java_methodhandle_hidden_class', ledgerBase: 'java-methodhandle-hidden-class'},
+]) {
+  for (const replacement of ['echo selected contracts checked', gate.runnerCommand.replace(' --browser', ' --diagnostic'),
+    ...['--case selected', '--group selected', '--fixture selected', '--host node', '--guest node', '--skip-native',
+      '--allow-oracle-waiver', '; exit 0', '| tee selected.log'].map(suffix => gate.runnerCommand + ' ' + suffix),
+    'DOPPIO_VERIFY_SOURCE=1 ' + gate.runnerCommand]) {
+    expectCheckerFailure(`filtered, diagnostic or swallowed ${gate.name} runner: ${replacement}`,
+      {workflow: replaceRequired(realWorkflow, `run: ${gate.runnerCommand}\n`, `run: ${replacement}\n`)},
+      'exact bounded, fail-closed baseline command or artifact contract');
+  }
+  for (const replacement of [gate.unitCommand.replace('node --test', 'node --test --test-name-pattern=selected'),
+    gate.unitCommand + ' --test-name-pattern=selected', 'DOPPIO_VERIFY_SOURCE=1 ' + gate.unitCommand,
+    gate.unitCommand + '; exit 0', 'echo selected contracts checked']) {
+    expectCheckerFailure(`filtered or substituted ${gate.name} units: ${replacement}`,
+      {workflow: replaceRequired(realWorkflow, `run: ${gate.unitCommand}\n`, `run: ${replacement}\n`)},
+      'exact bounded, fail-closed baseline command or artifact contract');
+  }
+  for (const name of [gate.contractName, gate.runName, gate.uploadName]) {
+    for (const field of ['if: false', '"if": false', 'continue-on-error: true', 'continue-on-error: false',
+      'shell: bash {0}', 'working-directory: ignored', 'env: {DOPPIO_VERIFY_SOURCE: 1}']) {
+      expectCheckerFailure(`${name} gains noncanonical scheduling/context field ${field}`,
+        {workflow: replaceRequired(realWorkflow, `      - name: ${name}\n`, `      - name: ${name}\n        ${field}\n`)},
+        'exact bounded, fail-closed baseline command or artifact contract');
+    }
+    const start = realWorkflow.indexOf(`      - name: ${name}\n`), end = realWorkflow.indexOf('\n      - name:', start + 1) + 1;
+    if (start < 0 || end <= start) throw new Error('Missing complete new phase fixture ' + name);
+    const block = realWorkflow.slice(start, end);
+    expectCheckerFailure(`duplicate ${gate.name} step ${name}`, {workflow: replaceRequired(realWorkflow, block, block + block)},
+      `contain the ${name} step exactly once`);
+    if (name !== gate.uploadName) expectCheckerFailure(`renamed duplicate ${gate.name} command ${name}`,
+      {workflow: replaceRequired(realWorkflow, block, block + block.replace(`- name: ${name}\n`, '- name: Duplicate phase C command\n'))},
+      `execute ${gate.name} command exactly once`);
+  }
+  for (const [name, minutes, command] of [[gate.contractName, 3, gate.unitCommand], [gate.runName, 40, gate.runnerCommand]]) {
+    for (const replacement of ['timeout-minutes: 0', 'timeout-minutes: 1000', `timeout-minutes: "${minutes}"`,
+      `timeout-minutes: \${{ ${minutes} }}`, `timeout-minutes: ${minutes}\n        timeout-minutes: ${minutes}`, `"timeout-minutes": ${minutes}`]) {
+      expectCheckerFailure(`unbounded or ambiguous ${name} timeout: ${replacement}`,
+        {workflow: replaceRequired(realWorkflow, `timeout-minutes: ${minutes}\n        run: ${command}\n`, `${replacement}\n        run: ${command}\n`)},
+        'exact bounded, fail-closed baseline command or artifact contract');
+    }
+  }
+  const condition = `if: always() && steps.${gate.stepId}.outcome != 'skipped'`, ledger = `path: build/${gate.ledgerBase}-results.json`;
+  for (const other of ['java-methodhandle-core', 'java-methodhandle-collection', 'java-methodhandle-varhandle',
+    'java-methodhandle-bootstrap', 'java-methodhandle-hidden-class']) if (other !== gate.ledgerBase) {
+    expectCheckerFailure(`cross-wired ${gate.name} ledger to ${other}`,
+      {workflow: replaceRequired(realWorkflow, ledger, `path: build/${other}-results.json`)},
+      'exact bounded, fail-closed baseline command or artifact contract');
+  }
+  for (const [original, replacement] of [[condition, "if: always() && steps.java_final_language.outcome != 'skipped'"],
+    [ledger, `path: build/${gate.ledgerBase}-native-only-results.json`], [ledger, `path: build/${gate.ledgerBase}-diagnostic-results.json`],
+    [`${condition}\n        uses: actions/upload-artifact@v7`, `${condition}\n        uses: actions/upload-artifact@v6`],
+    [`${ledger}\n          archive: false\n          if-no-files-found: error\n          retention-days: 7`,
+      `${ledger}\n          archive: false\n          if-no-files-found: error\n          retention-days: 0`]]) {
+    expectCheckerFailure(`discarded or diagnostic ${gate.name} raw ledger: ${original}`,
+      {workflow: replaceRequired(realWorkflow, original, replacement)}, 'exact bounded, fail-closed baseline command or artifact contract');
+  }
+}
+
 // B4d must execute the whole genuine two-release/three-host runner, never a
 // filtered diagnostic or a replacement command that merely reports success.
 for (const command of [
@@ -1049,7 +1136,13 @@ for (const [firstName, secondName] of [
   ['Upload Java method handle collection ledger', 'Check phase C VarHandle execution contracts'],
   ['Check phase C VarHandle execution contracts', 'Run Java VarHandle execution compatibility'],
   ['Run Java VarHandle execution compatibility', 'Upload Java VarHandle execution ledger'],
-  ['Upload Java VarHandle execution ledger', 'Check evolved switch ledger contract'],
+  ['Upload Java VarHandle execution ledger', 'Check phase C user bootstrap contracts'],
+  ['Check phase C user bootstrap contracts', 'Run Java user bootstrap compatibility'],
+  ['Run Java user bootstrap compatibility', 'Upload Java user bootstrap ledger'],
+  ['Upload Java user bootstrap ledger', 'Check phase C hidden class contracts'],
+  ['Check phase C hidden class contracts', 'Run Java hidden class compatibility'],
+  ['Run Java hidden class compatibility', 'Upload Java hidden class ledger'],
+  ['Upload Java hidden class ledger', 'Check evolved switch ledger contract'],
 ]) {
   expectCheckerFailure(
     `member resolution/access dependency reversed: ${firstName} before ${secondName}`,
