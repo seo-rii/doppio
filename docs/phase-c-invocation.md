@@ -1239,3 +1239,46 @@ runtime SHA-256:
 This receipt explicitly binds the test-only HEAD delta rather than pretending
 all producers used one HEAD. C7d2–C7d5 remain open; all17 initial-gate broader
 flags, including c7Complete/c7dComplete, are false.
+
+### C7d2 implementation and frozen verification status (2026-10-13)
+
+Implementation is committed locally on `modern`; this profile is **not closed**
+and has not been pushed while its mandatory host gate fails.
+
+- Seven typed memory instruction families, 73 CodeBuilder methods, genuine
+  unbound nominal constant-pool entries, complete modern opcode family
+  reading/writing, typed stack/array/type/monitor flow, short-jump widening,
+  and PATCH/KEEP dead-code policies are implemented. PATCH also removes or
+  splits exception ranges as required by the native output contract.
+- Native diagnostics pass95 memory,82 flow and14 writer checks. Fresh-source
+  guest diagnostics pass the same checks. All14 writer checks remain required;
+  their layout/policy processes retain the60s cap. Indexed opcode dispatch,
+  immutable flow snapshots with copy-on-change joins, and private NOP byte
+  encoding reduce long-Code overhead without changing public value identity.
+- Frozen implementation HEAD is
+  `52a92908710be83ff62a0d24d80f0321bc977c0b`. Strict CLI/browser builds,
+  ES5 type checking, complete workflow mutations and all307 C7 unit tests pass
+  with no failure, cancellation or skip. The prior aggregate writer timeout
+  attempts remain preserved; no timeout was raised and no case was waived.
+- Four unchanged Java25 original callers supply32 cases,9 class rows,
+  97 named helper/callback methods,32 returned-array routes and61 output
+  method bodies. Independent contracts66 pass; the complete native byte proof
+  passes. The mandatory native25/Node/Chromium gate has10 passed cells and
+  two failed cells out of12: arrays pass native, but both guests fail while
+  executing a valid partial reference `multianewarray` (`String[][][]`, one
+  allocated dimension). Emitted bytes already passed pure ClassFile verification;
+  the exception is in the existing VM array-constructor path, not a successful
+  library or host outcome. No recipe, expected output or artifact is replaced.
+- The failed ledger is retained at
+  `/home/seorii/logs/doppio-c7d-step2-frozen-instructions-foxoKq/failed-ledger.json`
+  (producer exit1). Unit producer exit0:
+  `/home/seorii/logs/doppio-c7d-step2-frozen-units-koVj5n/run.log`.
+  Build/workflow exit0 logs are respectively
+  `/home/seorii/logs/doppio-c7d-step2-frozen-build-0p5bjP/run.log` and
+  `/home/seorii/logs/doppio-c7d-step2-frozen-workflow-SqTjav/run.log`.
+
+Fixing the discovered VM execution defect requires approval to expand this
+LIB-007 library work into the VM implementation. Until then C7d2 remains open,
+C7d3–C7d5 implementation has not started, all17 broader completion flags remain
+false, and no final aggregate receipt is claimed. C7a–C7d1 host gates, C1–C6/B
+gates, retained323 and compiler consumers have not been rerun in this profile.
