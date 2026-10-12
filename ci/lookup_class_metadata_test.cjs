@@ -9,7 +9,8 @@ const runtime = process.env.DOPPIO_RELEASE_CLI_ROOT || path.resolve(__dirname, '
 
 const sourceModules = new Set(['doppiojvm', 'VM', 'ClassFile', 'ClassData', 'ClassLoader', 'ConstantPool', 'threading', 'methods', 'util',
   'ClassVerification', 'ClassPreparation', 'LoadingConstraints', 'BytecodeVerifier', 'BytecodeTypeVerifier', 'VerificationRelations',
-  'GeneratedAdapters', 'LambdaAdapters', 'ReflectionAdapters', 'SymbolicResolution', 'ClassAccess', 'method_handles', 'natives/java_lang']);
+  'GeneratedAdapters', 'LambdaAdapters', 'ReflectionAdapters', 'SymbolicResolution', 'ClassAccess', 'method_handles', 'natives/java_lang',
+  'natives/java_lang_constant', 'natives/java_lang_invoke', 'VarHandleStorage']);
 const cache = new Map();
 function load(name) {
   const filename = path.join(runtime, 'src', name + '.js');
@@ -43,7 +44,8 @@ const FLAGS = 'java/lang/invoke/MemberName/flags';
 // units do not claim to be genuine class-file or native-JVM compatibility tests.
 function world(options = {}) {
   const state = {ready: options.ready || false, declaringReady: options.ready || false,
-    statuses: [], returns: [], errors: [], resolutions: [], lookups: [], constructors: [], indices: [], executions: []};
+    statuses: [], returns: [], errors: [], resolutions: [], lookups: [], constructors: [], indices: [], executions: [],
+    typeReady: options.typeReady !== false, typeResolutions: []};
   const refKind = options.refKind || Kind.INVOKESTATIC;
   const field = options.field || false;
   const constructor = options.constructor === true;
@@ -68,7 +70,19 @@ function world(options = {}) {
     isCallerSensitive: () => false,
     vmTargetBridgeMethods: []
   });
-  const targetField = {cls: declaring, name, accessFlags: new Flags(refKind === Kind.GETSTATIC ? 9 : 1)};
+  const fieldType = {getInternalName: () => options.requestedDescriptor || descriptor};
+  const actualFieldType = options.foreignIdentity ? {getInternalName: () => descriptor} : fieldType;
+  const fieldLoader = {
+    getResolvedClass(requested) {
+      assert.equal(requested, descriptor);
+      return state.typeReady ? actualFieldType : null;
+    },
+    resolveClass(caller, requested, callback, explicit) {
+      assert.equal(caller, thread); assert.equal(requested, descriptor);
+      state.typeResolutions.push({callback, explicit});
+    }
+  };
+  const targetField = {cls: declaring, name, rawDescriptor: descriptor, accessFlags: new Flags(refKind === Kind.GETSTATIC ? 9 : 1)};
   const jsConstructor = {[method.escapedFullSignature](...args) { state.executions.push(args); }};
   const noInitialization = () => assert.fail('MemberName resolution must not initialize its target');
   function getConstructor(caller) {
@@ -83,6 +97,7 @@ function world(options = {}) {
     isVerified: () => true,
     isHierarchyResolved: () => true,
     isResolved: () => state.ready,
+    getLoader: () => fieldLoader,
     getExternalName: () => 'fixture.Target',
     getConstructor,
     initialize: noInitialization,
@@ -98,11 +113,11 @@ function world(options = {}) {
       state.lookups.push(signature);
       return options.missing ? null : method;
     },
-    fieldLookup(requested) {
+    fieldLookup(requested, requestedDescriptor) {
       assert.equal(state.ready, true, 'Native field lookup must wait for full linking');
       assert.equal(requested, name);
       state.lookups.push(requested);
-      return options.missing ? null : targetField;
+      return options.missing || requestedDescriptor !== descriptor ? null : targetField;
     },
     getVMIndexForMethod(selected) {
       assert.equal(state.ready, true);
@@ -118,16 +133,16 @@ function world(options = {}) {
     }
   });
   if (declaring !== clazz) Object.assign(declaring, {
-    getConstructor, initialize: noInitialization, tryToInitialize: noInitialization
+    getConstructor, getLoader: () => fieldLoader, initialize: noInitialization, tryToInitialize: noInitialization
   });
   const member = {
     'java/lang/invoke/MemberName/clazz': {$cls: clazz},
     'java/lang/invoke/MemberName/name': {toString: () => name},
-    'java/lang/invoke/MemberName/type': {toString: () => descriptor},
+    'java/lang/invoke/MemberName/type': field ? {$cls: fieldType} : {toString: () => descriptor},
     [FLAGS]: initialFlags
   };
   return {
-    state, clazz, declaring, member, method, targetField, initialFlags, refKind, thread,
+    state, clazz, declaring, member, method, targetField, fieldType, fieldLoader, initialFlags, refKind, thread,
     invoke: () => resolveMember(thread, member, null),
     succeed() {
       assert.equal(state.resolutions.length, 1);
@@ -176,13 +191,13 @@ function privateNestWorld(field = false, separateLoaders = false) {
   const w = world({ready: true, field, refKind: field ? Kind.GETSTATIC : Kind.INVOKESTATIC});
   const vme = {getInternalName: () => 'Ljava/lang/VirtualMachineError;', isSubclass(base) { return this === base; }};
   const bootstrap = {getLoadedClass: name => name === 'Ljava/lang/VirtualMachineError;' ? vme : null};
-  const requests = [], commonLoader = {bootstrap}, lookup = Object.create(ReferenceClassData.prototype);
+  const requests = [], commonLoader = {bootstrap, getResolvedClass: () => w.fieldType}, lookup = Object.create(ReferenceClassData.prototype);
   const members = ['Lfixture/Lookup;', 'Lfixture/Declaring;'];
   const host = Object.assign(Object.create(ReferenceClassData.prototype), {
     getInternalName: () => 'Lfixture/Host;', getPackageName: () => 'fixture', getLoader: () => commonLoader,
     getNestHostReference: () => null, getNestMemberNames: () => members
   });
-  const secondLoader = separateLoaders ? {bootstrap} : commonLoader;
+  const secondLoader = separateLoaders ? {bootstrap, getResolvedClass: () => w.fieldType} : commonLoader;
   const otherHost = separateLoaders ? Object.assign(Object.create(ReferenceClassData.prototype), {
     getInternalName: host.getInternalName, getPackageName: host.getPackageName, getLoader: () => secondLoader,
     getNestHostReference: () => null, getNestMemberNames: () => members
@@ -350,6 +365,59 @@ test('field member resolution waits for linking and preserves field indices with
     assert.equal(w.member.vmindex, 17);
     assert.equal(w.member.vmtarget, undefined);
   }
+});
+
+test('field binding rejects an existing name with a different descriptor before publishing an offset', () => {
+  const w = world({ready: true, field: true, refKind: Kind.GETFIELD, requestedDescriptor: 'J'});
+  assert.equal(w.invoke(), undefined);
+  assert.deepEqual(w.state.errors.map(error => error.kind), ['Ljava/lang/NoSuchFieldError;']);
+  assert.deepEqual(w.state.indices, []);
+  assert.equal(w.member[FLAGS], w.initialFlags);
+  assert.equal(w.member.vmindex, undefined);
+});
+
+test('field binding rejects a same-descriptor foreign defining-loader Class identity', () => {
+  const w = world({ready: true, field: true, refKind: Kind.GETFIELD, foreignIdentity: true});
+  assert.equal(w.invoke(), undefined);
+  assert.deepEqual(w.state.errors.map(error => error.kind), ['Ljava/lang/NoSuchFieldError;']);
+  assert.deepEqual(w.state.indices, []);
+  assert.equal(w.member[FLAGS], w.initialFlags);
+  assert.equal(w.member.vmindex, undefined);
+});
+
+test('field type linking is passive and completes before publishing the exact field offset', () => {
+  const w = world({ready: true, field: true, refKind: Kind.GETFIELD, typeReady: false});
+  assert.equal(w.invoke(), undefined);
+  assert.deepEqual(w.state.statuses, [ThreadStatus.ASYNC_WAITING]);
+  assert.equal(w.state.typeResolutions.length, 1);
+  assert.equal(w.state.typeResolutions[0].explicit, false);
+  assert.deepEqual(w.state.indices, []);
+  assert.equal(w.member.vmindex, undefined);
+  w.state.typeReady = true; w.state.typeResolutions[0].callback(w.fieldType);
+  assert.deepEqual(w.state.returns, [w.member]);
+  assert.deepEqual(w.state.errors, []);
+  assert.deepEqual(w.state.indices, [w.targetField]);
+  assert.equal(w.member.vmindex, 17);
+});
+
+test('asynchronous field type failure keeps the original failure and publishes nothing', () => {
+  const w = world({ready: true, field: true, refKind: Kind.GETFIELD, typeReady: false});
+  assert.equal(w.invoke(), undefined);
+  const failure = {kind: 'Ljava/lang/NoClassDefFoundError;'};
+  w.thread.throwException(failure); w.state.typeResolutions[0].callback(null);
+  assert.deepEqual(w.state.errors, [failure]);
+  assert.deepEqual(w.state.returns, []); assert.deepEqual(w.state.indices, []);
+  assert.equal(w.member[FLAGS], w.initialFlags); assert.equal(w.member.vmindex, undefined);
+});
+
+test('retained VM-initialized String field descriptors bind only the exact actual descriptor', () => {
+  const w = world({ready: true, field: true, refKind: Kind.GETFIELD});
+  const stringClass = {};
+  w.thread.getBsCl = () => ({getLoadedClass: name => name === 'Ljava/lang/String;' ? stringClass : null});
+  w.member['java/lang/invoke/MemberName/type'] = {getClass: () => stringClass, toString: () => 'I'};
+  assert.equal(w.invoke(), w.member);
+  assert.deepEqual(w.state.indices, [w.targetField]); assert.deepEqual(w.state.errors, []);
+  assert.equal(w.member.vmindex, 17);
 });
 
 test('virtual, interface, and constructor bridges retain dispatch kinds after the full-link gate', () => {

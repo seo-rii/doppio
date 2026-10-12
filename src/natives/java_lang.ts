@@ -3253,8 +3253,30 @@ export default function (): any {
           }
           break;
         case MemberNameConstants.IS_FIELD:
-          var fieldTarget = clazz.fieldLookup(name);
+          var requestedFieldType = (<JVMTypes.java_lang_Class> type).$cls,
+            fieldDescriptor = requestedFieldType ? requestedFieldType.getInternalName() :
+              type.getClass() === thread.getBsCl().getLoadedClass('Ljava/lang/String;') ? type.toString() : null,
+            fieldTarget = fieldDescriptor === null ? null : clazz.fieldLookup(name, fieldDescriptor);
           if (fieldTarget !== null) {
+            // The requested Class is part of the member identity. Matching a
+            // name (or even a descriptor from a different defining loader) must
+            // not publish an offset for another field type.
+            var actualFieldType = fieldTarget.cls.getLoader().getResolvedClass(fieldTarget.rawDescriptor);
+            if (actualFieldType === null) {
+              thread.setStatus(ThreadStatus.ASYNC_WAITING);
+              fieldTarget.cls.getLoader().resolveClass(thread, fieldTarget.rawDescriptor, actual => {
+                if (actual === null) return;
+                var resolved = java_lang_invoke_MethodHandleNatives[
+                  'resolve(Ljava/lang/invoke/MemberName;Ljava/lang/Class;)Ljava/lang/invoke/MemberName;'](
+                    thread, memberName, lookupClass);
+                if (resolved !== undefined) thread.asyncReturn(resolved);
+              }, false);
+              return;
+            }
+            if (requestedFieldType && actualFieldType !== requestedFieldType) {
+              thread.throwNewException('Ljava/lang/NoSuchFieldError;', 'Incorrect field value type identity');
+              return;
+            }
             if (fieldTarget.accessFlags.isPrivate() && waitForPrivateNest(fieldTarget.cls)) return;
             flags |= fieldTarget.accessFlags.getRawByte();
             if (fieldTarget.accessFlags.isPrivate() && lookupCls !== null &&
