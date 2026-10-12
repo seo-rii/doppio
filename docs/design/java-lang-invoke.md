@@ -766,8 +766,8 @@ authority alone. Rebuilt Code drops stale offset/frame/debug attributes.
 Verification never defines or initializes the class as its verdict, and
 unsupported families reject explicitly. At the historical C7a exit, forced
 stack-map generation rejected before callbacks; C7b below supersedes that
-selected boundary. Fresh-pool transform remapping is not implemented.
-C7c–C7d retain extended attributes/bootstrap models, hierarchy/general
+selected boundary. C7c below supersedes the historical fresh-pool restriction.
+C7d retains hierarchy/general
 verification and remaining public ABI, including
 intrinsic/argument constant-instruction factories and full reflective topology.
 
@@ -800,6 +800,43 @@ general frame/allocation lattices remain unclaimed. Independent host outputs
 have complete selected Code/CFG/frame proofs, not general native-byte parity
 or dynamic callback coverage. C7a's unchanged 32 cases also pass; full Phase C,
 LIB-007, source-unit/API, modules, concurrency and GC flags remain false.
+
+## C7c selected class-file attributes and fresh pools
+
+The [selected C7c exit](../phase-c-invocation.md#c7c-verified-batch-exit) adds
+24 original Java25 cases/nine native25/Node/Chromium cells/72 outcomes.
+Typed extended attributes and genuine CustomAttribute/AttributeMapperOption
+callbacks use real ClassReader offsets and full BufWriter headers/payloads.
+Built-ins retain lookup precedence. Signature support is raw UTF8, not trees;
+BootstrapMethods derives from actual CP bootstrap entries, never a writable
+ClassElement. Custom objects retain native processing-option behavior, while
+raw unknown/unstable payload policies are applied before writing.
+
+NEW_POOL imports typed entries and nested bootstrap graphs semantically,
+reassembles actual Code operand widths and rebinds branch/switch/handler/frame
+offsets. Prefilled strings/bootstrap entries change actual LDC and CP18 indexes;
+unused source entries disappear. Exact-source raw-copy authority remains
+separate from successful semantic import. Pooled condy descriptions cache
+shared DAG nodes and reject cycles/finite-depth overflow without resolution.
+
+Dynamic verification uses declared types and metadata, never bootstrap
+execution, class definition or initialization. Selected invalid bootstrap
+metadata rejects more strictly than the pinned native verifier; the diagnostic
+records that difference separately from the original parity gate. Retained
+opaque CP/label payloads and unsupported bound local-variable debug tables
+reject fresh remapping explicitly, not by silently dropping them. General
+attribute/debug relocation, LABELS codecs and mapper cross-model/reentrant
+traversal remain unproven; reader callbacks currently run during eager parsing.
+
+Each host independently returns 22 valid arrays and defines/invokes them:
+66 complete output proofs, separate from 12 original artifact rows, 51 named
+functions, four codec methods and 22 static returned-array routes. C7a–C7c
+together pass 72 cases/27 cells/216 outcomes at `21439e0d7`; this is not native
+byte/CP parity or full API coverage. Strict builds, 1,357 selected B/C units
+(one existing optional skip), CI mutation guards and the unchanged 44-entry
+compiler JAR pass. C1–C6 full host/retained323/compiler consumers were not
+rerun here. C7d and full Phase C/LIB-007/API/source-unit/module/concurrency/GC
+conformance remain open.
 
 ## Open Design Questions
 

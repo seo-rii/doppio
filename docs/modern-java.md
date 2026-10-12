@@ -2319,7 +2319,7 @@ expanded.
   byte/model verification errors are covered. The pure-Java verifier does not
   define/initialize classes to produce its verdict; typed-invalid output is
   retained but never defined. Shared-pool raw copies require exact source
-  identity, and regenerated Code drops stale offset/frame/debug attributes.
+  identity; selected rebuilt Code rebinds offsets and regenerates frames.
 - [C7b's selected expansion](phase-c-invocation.md#c7b-verified-batch-exit)
   verifies another 16 original-javac25 cases/six cells/48 outcomes: labels,
   integer/reference predicates, loops, switch padding/defaults, ordered handlers,
@@ -2327,22 +2327,32 @@ expanded.
   and wide DOUBLE local joins plus branchful insertion/identity transforms are
   covered. Declared frames govern downstream checks, not just inferred states.
   DROP outputs lacking required frames remain invalid and are never defined.
+- [C7c's selected expansion](phase-c-invocation.md#c7c-verified-batch-exit)
+  verifies 24 more original Java25 cases/nine cells/72 outcomes: typed extended
+  attributes, genuine custom reader/writer callbacks, CP17/18/bootstrap models
+  and actual NEW_POOL semantic remapping. LDC width, branch/switch/frame offsets
+  and bootstrap indexes really change; each host independently creates and
+  defines/invokes 22 valid arrays. Raw Signature text is supported, not signature
+  trees. Built-in attribute names take precedence over custom lookup.
 - Short branch overflow, duplicate table keys and empty/reversed handler ranges
   reject explicitly rather than implementing native widening/default repair.
   Arbitrary hierarchy, protected constructor invokes, dead-code rewriting and
-  general frame/allocation lattices remain unsupported. C7c retains extended/
-  custom attributes, bootstrap/indy/condy models and fresh-pool remapping; C7d
-  retains hierarchy/resolvers, general verification and remaining ABI/reflective
-  topology. `NEW_POOL` transformation still throws `IllegalArgumentException`.
+  general frame/allocation lattices remain unsupported. C7d retains hierarchy/
+  resolvers, general verification and remaining ABI/reflective topology.
+  NEW_POOL now remaps selected bound members/Code/attributes/bootstrap graphs;
+  retained opaque CP/label payloads and unselected bound local-variable debug
+  tables reject explicitly. Native supports those debug tables; this is a
+  selected boundary, not full native remapping parity. Mapper cross-model/
+  reentrant traversal, arbitrary LABELS codecs and signature trees remain open.
   Forced generation is now supported for the selected C7b pipeline, superseding
   C7a's historical pre-callback unsupported boundary.
 - `ConstantInstruction.ofIntrinsic`/`ofArgument` and their nested public types,
   full sealed/non-sealed reflection, all attributes/opcodes/versions and complete
   API/source-unit conformance remain open. Legal selected instruction encodings
   are compared, not byte-for-byte native pool/class parity or general callback
-  data flow. C7a/C7b together pass 48 cases/18 cells/144 outcomes on the C7b
+  data flow. C7a–C7c together pass 72 cases/27 cells/216 outcomes on the C7c
   implementation; this does not complete the public API. See the
-  [C7b boundaries](phase-c-invocation.md#c7b-selected-control-flow-and-stack-maps).
+  [C7c boundaries](phase-c-invocation.md#c7c-selected-attributes-bootstrap-models-and-fresh-pools).
 
 ## Known Collection Factory Gaps
 
@@ -2887,8 +2897,15 @@ The final fail-closed local receipt has exit code 0 and SHA-256
 the batch exit records its path, runtime and individual ledger/input hashes.
 No C7a Pro review was produced: consultation failed before
 chat creation. At that historical C7a exit, C7b–C7d were the follow-ups.
-The [C7b selected exit](phase-c-invocation.md#c7b-verified-batch-exit) now adds
+The [C7b selected exit](phase-c-invocation.md#c7b-verified-batch-exit) added
 16 cases/six cells/48 outcomes and rechecks the unchanged 32 C7a cases on
-`2e7cbf57b`. C7c–C7d, wider CFG/frame families and full
+`2e7cbf57b`. The [C7c selected exit](phase-c-invocation.md#c7c-verified-batch-exit)
+adds 24 cases/nine cells/72 outcomes and rechecks both unchanged public-library
+gates at `21439e0d7`: 72 cases/27 cells/216 outcomes. Strict builds, 1,357
+passing units (one existing optional skip), full workflow guards and the
+unchanged compiler JAR also pass. A transient JAR-regeneration input-guard
+failure is preserved; the identical-runtime full-gate rerun passes. C1–C6
+host gates, retained323 and compiler consumers were not rerun in this turn.
+C7d, unselected attributes/debug/mapper families, wider CFG/frame families and full
 Phase C/LIB-007/JVM/API/source-unit, module, memory-order/concurrency and GC
 contracts remain open; all broader flags stay false.
