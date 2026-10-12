@@ -2,6 +2,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const crypto=require('node:crypto'),cp=require('node:child_process');
 const {before,after,test}=require('node:test');
+const {compileClassFileMetadata}=require('./compile_classfile_metadata.cjs');
 const root=path.resolve(__dirname,'..'),classlib=path.join(root,'classes/modern_classlib'),units=new Map();
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 let temporary,readStructureLayout,decodeCoreCode;
@@ -25,10 +26,7 @@ before(async()=>{
   const excluded=new Set(['java/lang/System$Logger.java','java/lang/System$DoppioLogger.java','sun/invoke/util/VerifyAccess.java']);
   const inputs=sources(classlib).filter(file=>!excluded.has(path.relative(classlib,file).split(path.sep).join('/')));
   const original=inputs.map(file=>[file,sha(fs.readFileSync(file))]),runtime=path.join(root,'vendor/java_home/lib/rt.jar'),runtimeHash=sha(fs.readFileSync(runtime));
-  checked('jar',['--extract','--file',runtime,'java/nio/file/FileTreeIterator.class','java/nio/file/FileTreeWalker.class',
-    'java/nio/file/FileTreeWalker$1.class','java/nio/file/FileTreeWalker$DirectoryNode.class',
-    'java/nio/file/FileTreeWalker$Event.class','java/nio/file/FileTreeWalker$EventType.class'],support);
-  checked('javac',['-J-Dfile.encoding=UTF8','--release','9','--patch-module','java.base='+classlib+path.delimiter+support,'-d',output,...inputs]);
+  compileClassFileMetadata({root,classlib,output,support,inputs,checked});
   assert.deepEqual(inputs.map(file=>[file,sha(fs.readFileSync(file))]),original);assert.equal(sha(fs.readFileSync(runtime)),runtimeHash);
   for(const name of ['ClassFile','ClassFile$AttributeMapperOption','ClassFile$AttributesProcessingOption','CustomAttribute','BufWriter',
     'DoppioBufWriter','DoppioAttributes','DoppioClassFile','DoppioClassFileVerifier','DoppioCodeFlow','CodeBuilder',

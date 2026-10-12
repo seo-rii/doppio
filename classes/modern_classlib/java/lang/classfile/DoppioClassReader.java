@@ -15,7 +15,6 @@ import java.lang.classfile.attribute.UnknownAttribute;
 import java.lang.classfile.constantpool.*;
 import java.lang.classfile.instruction.*;
 import java.lang.constant.ClassDesc;
-import java.lang.constant.ConstantDesc;
 import java.lang.constant.ConstantDescs;
 import java.lang.constant.MethodTypeDesc;
 import java.lang.reflect.AccessFlag;
@@ -409,32 +408,14 @@ public final class DoppioClassReader {
     for (Opcode opcode : Opcode.values()) if (opcode.bytecode() == bytecode) return opcode;
     throw new IllegalArgumentException("Invalid opcode " + bytecode);
   }
-  public static ConstantInstruction intrinsic(Opcode opcode) {
-    Objects.requireNonNull(opcode);
-    int code = opcode.bytecode();
-    Object value; TypeKind kind;
-    if (code == 1) { value = ConstantDescs.NULL; kind = TypeKind.REFERENCE; }
-    else if (code >= 2 && code <= 8) { value = Integer.valueOf(code - 3); kind = TypeKind.INT; }
-    else if (code >= 9 && code <= 10) { value = Long.valueOf(code - 9); kind = TypeKind.LONG; }
-    else if (code >= 11 && code <= 13) { value = Float.valueOf(code - 11); kind = TypeKind.FLOAT; }
-    else if (code >= 14 && code <= 15) { value = Double.valueOf(code - 14); kind = TypeKind.DOUBLE; }
-    else throw new IllegalArgumentException("Not an intrinsic constant");
-    return new ConstantValue(opcode, value, kind);
+  public static ConstantInstruction.IntrinsicConstantInstruction intrinsic(Opcode opcode) {
+    return ConstantInstruction.ofIntrinsic(opcode);
   }
-  public static ConstantInstruction argument(Opcode opcode, int value) {
-    Objects.requireNonNull(opcode);
-    if (opcode != Opcode.BIPUSH && opcode != Opcode.SIPUSH) throw new IllegalArgumentException("Not an argument constant");
-    if (opcode == Opcode.BIPUSH && (value < -128 || value > 127) ||
-        opcode == Opcode.SIPUSH && (value < -32768 || value > 32767)) throw new IllegalArgumentException("Constant operand overflow");
-    return new ConstantValue(opcode, Integer.valueOf(value), TypeKind.INT);
+  public static ConstantInstruction.ArgumentConstantInstruction argument(Opcode opcode, int value) {
+    return ConstantInstruction.ofArgument(opcode, value);
   }
   public static ConstantInstruction.LoadConstantInstruction loadConstant(Opcode opcode, LoadableConstantEntry constant) {
-    Objects.requireNonNull(opcode); Objects.requireNonNull(constant);
-    if (opcode != Opcode.LDC && opcode != Opcode.LDC_W && opcode != Opcode.LDC2_W)
-      throw new IllegalArgumentException("Not a constant-pool load opcode");
-    if ((opcode == Opcode.LDC2_W) != (constant.typeKind().slotSize() == 2))
-      throw new IllegalArgumentException("Constant category does not match opcode");
-    return new LoadConstantValue(opcode, constant);
+    return ConstantInstruction.ofLoad(opcode, constant);
   }
   public static LoadInstruction load(TypeKind kind, int slot) { return load(localOpcode(kind, slot, true), slot); }
   public static StoreInstruction store(TypeKind kind, int slot) { return store(localOpcode(kind, slot, false), slot); }
@@ -1062,19 +1043,6 @@ public final class DoppioClassReader {
     InstructionValue(Opcode opcode) { this.opcode = opcode; }
     public Opcode opcode() { return opcode; }
     public int sizeInBytes() { return opcode.sizeIfFixed(); }
-  }
-  private static final class ConstantValue extends InstructionValue implements ConstantInstruction {
-    final Object value;
-    final TypeKind kind;
-    ConstantValue(Opcode opcode, Object value, TypeKind kind) { super(opcode); this.value = value; this.kind = kind; }
-    public ConstantDesc constantValue() { return (ConstantDesc) value; }
-    public TypeKind typeKind() { return kind; }
-  }
-  private static final class LoadConstantValue extends InstructionValue implements ConstantInstruction.LoadConstantInstruction {
-    final LoadableConstantEntry constant;
-    LoadConstantValue(Opcode opcode, LoadableConstantEntry constant) { super(opcode); this.constant = constant; }
-    public LoadableConstantEntry constantEntry() { return constant; }
-    public ConstantDesc constantValue() { return constant.constantValue(); }
   }
   private static final class LoadValue extends InstructionValue implements LoadInstruction {
     final int slot;

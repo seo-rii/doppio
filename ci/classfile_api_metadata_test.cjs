@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const {after, before, test} = require('node:test');
+const {compileClassFileMetadata} = require('./compile_classfile_metadata.cjs');
 const root = path.resolve(__dirname, '..');
 const classlib = path.join(root, 'classes/modern_classlib');
 const prefix = 'java/lang/classfile/';
@@ -47,14 +48,10 @@ before(async () => {
   const original = inputs.map(filename => [filename, sha(fs.readFileSync(filename))]);
   const runtime = path.join(root, 'vendor/java_home/lib/rt.jar');
   const originalRuntime = sha(fs.readFileSync(runtime));
-  const supportEntries = ['java/nio/file/FileTreeIterator.class', 'java/nio/file/FileTreeWalker.class',
-    'java/nio/file/FileTreeWalker$1.class', 'java/nio/file/FileTreeWalker$DirectoryNode.class',
-    'java/nio/file/FileTreeWalker$Event.class', 'java/nio/file/FileTreeWalker$EventType.class'];
-  checked('jar', ['--extract', '--file', runtime, ...supportEntries], support);
-  // Exactly the production release-9 source compilation, but with fresh private
-  // output/support directories. No compiled modern_classlib/out input is read.
-  checked('javac', ['-J-Dfile.encoding=UTF8', '--release', '9', '--patch-module',
-    'java.base=' + classlib + path.delimiter + support, '-d', output, ...inputs], root);
+  // Fresh production-shaped compilation: exact covariance files use system
+  // nominal boxed declarations, every remaining file retains --release 9.
+  // No compiled modern_classlib/out input is read.
+  compileClassFileMetadata({root, classlib, output, support, inputs, checked});
   assert.deepEqual(inputs.map(filename => [filename, sha(fs.readFileSync(filename))]), original, 'Source bytes stayed fixed');
   assert.equal(sha(fs.readFileSync(runtime)), originalRuntime, 'Retained runtime JAR stayed fixed');
   for (const relative of ['ClassFileElement', 'ClassElement', 'FieldElement', 'MethodElement', 'CodeElement',
@@ -65,7 +62,8 @@ before(async () => {
     'constantpool/ConstantPool', 'constantpool/ConstantPoolBuilder', 'constantpool/PoolEntry',
     'constantpool/Utf8Entry', 'constantpool/ClassEntry', 'constantpool/LongEntry', 'constantpool/DoubleEntry',
     'constantpool/ConstantPoolException', 'constantpool/DoppioConstantPool',
-    'instruction/ConstantInstruction', 'instruction/ConstantInstruction$LoadConstantInstruction',
+    'instruction/ConstantInstruction', 'instruction/ConstantInstruction$IntrinsicConstantInstruction',
+    'instruction/ConstantInstruction$ArgumentConstantInstruction', 'instruction/ConstantInstruction$LoadConstantInstruction',
     'instruction/LoadInstruction', 'instruction/StoreInstruction', 'instruction/ReturnInstruction',
     'instruction/FieldInstruction', 'instruction/InvokeInstruction', 'instruction/OperatorInstruction',
     'instruction/StackInstruction', 'instruction/BranchInstruction', 'instruction/LabelTarget',
@@ -85,7 +83,7 @@ before(async () => {
     assert.equal(bytes.readUInt16BE(6), 53, 'Actual release-9 classfile, not a rewritten header');
     units.set(relative, {bytes, layout: readStructureLayout(bytes)});
   }
-  assert.ok(!fs.existsSync(path.join(output, prefix, 'instruction/ConstantInstruction$ArgumentConstantInstruction.class')));
+  assert.ok(fs.existsSync(path.join(output, prefix, 'instruction/ConstantInstruction$ArgumentConstantInstruction.class')));
 });
 after(() => { if (temporary) fs.rmSync(temporary, {recursive: true, force: true}); });
 
@@ -218,7 +216,10 @@ test('selected instruction types expose native public operand descriptors withou
     '()Ljava/lang/classfile/constantpool/LoadableConstantEntry;').flags, 0x0401);
   assert.equal(method('instruction/FieldInstruction', 'field', '()Ljava/lang/classfile/constantpool/FieldRefEntry;').flags, 0x0401);
   assert.equal(method('instruction/InvokeInstruction', 'method', '()Ljava/lang/classfile/constantpool/MemberRefEntry;').flags, 0x0401);
-  assert.ok(!units.get('instruction/ConstantInstruction').layout.methods.entries.some(value => ['ofIntrinsic', 'ofArgument'].includes(value.name)));
+  assert.equal(method('instruction/ConstantInstruction', 'ofIntrinsic',
+    '(Ljava/lang/classfile/Opcode;)Ljava/lang/classfile/instruction/ConstantInstruction$IntrinsicConstantInstruction;').flags, 9);
+  assert.equal(method('instruction/ConstantInstruction', 'ofArgument',
+    '(Ljava/lang/classfile/Opcode;I)Ljava/lang/classfile/instruction/ConstantInstruction$ArgumentConstantInstruction;').flags, 9);
   assert.ok(!units.get('AccessFlags').layout.methods.entries.some(value => value.name.startsWith('of')));
 });
 

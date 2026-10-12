@@ -4952,7 +4952,7 @@ function modernJava(grunt: IGrunt) {
       outDir = 'classes/modern_classlib/out',
       compileSupportDir = 'build/modern-classlib-compile-support',
       runtimeJar = path.resolve('vendor/java_home/lib/rt.jar'),
-      runtimePatchPath = srcDir + path.delimiter + compileSupportDir,
+      runtimePatchPath = outDir + path.delimiter + srcDir + path.delimiter + compileSupportDir,
       compileSupportEntries = [
         'java/nio/file/FileTreeIterator.class',
         'java/nio/file/FileTreeWalker.class',
@@ -4968,8 +4968,12 @@ function modernJava(grunt: IGrunt) {
           src === srcDir + '/java/lang/System$DoppioLogger.java' ||
           src === srcDir + '/sun/invoke/util/VerifyAccess.java';
       }),
+      covariantInputFiles = inputFiles.filter(function(src: string): boolean {
+        return src === srcDir + '/java/lang/classfile/instruction/ConstantInstruction.java' ||
+          src === srcDir + '/java/lang/classfile/instruction/DoppioConstantInstructions.java';
+      }),
       normalInputFiles = inputFiles.filter(function(src: string): boolean {
-        return specialInputFiles.indexOf(src) === -1;
+        return specialInputFiles.indexOf(src) === -1 && covariantInputFiles.indexOf(src) === -1;
       }),
       newestSource = inputFiles.concat(['tasks/modern_java.ts', runtimeJar]).reduce(function(
           newest: Date, src: string): Date {
@@ -5002,13 +5006,14 @@ function modernJava(grunt: IGrunt) {
           done();
         });
     }
-    if (normalInputFiles.length === 0) {
-      compileSpecialFiles();
-      return;
-    }
-    grunt.file.delete(compileSupportDir);
-    grunt.file.mkdir(compileSupportDir);
-    child_process.execFile(
+    function compileNormalFiles(): void {
+      if (normalInputFiles.length === 0) {
+        compileSpecialFiles();
+        return;
+      }
+      grunt.file.delete(compileSupportDir);
+      grunt.file.mkdir(compileSupportDir);
+      child_process.execFile(
       jarTool,
       ['--extract', '--file', runtimeJar].concat(compileSupportEntries),
       { cwd: compileSupportDir },
@@ -5024,6 +5029,25 @@ function modernJava(grunt: IGrunt) {
             }
             compileSpecialFiles();
           });
+      });
+    }
+    // Integer has been nominal since Java12. These two real Java9-language
+    // sources need the host's boxed covariance to emit their genuine Integer /
+    // ConstantDesc bridges; every other normal source still uses --release9.
+    // Compile first so a clean output tree supplies the ABI to the second pass.
+    if (covariantInputFiles.length !== 2) {
+      grunt.fail.fatal('Expected exactly two covariant constant-instruction sources.');
+      return;
+    }
+    child_process.exec(shellEscape(grunt.config('build.javac')) +
+      ' -J-Dfile.encoding=UTF8 -source 9 -target 9 -implicit:none --patch-module java.base=' +
+      shellEscape(srcDir) + ' -d ' + shellEscape(outDir) + ' ' + covariantInputFiles.map(shellEscape).join(' '),
+      function(err?: any, stdout?: Buffer, stderr?: Buffer) {
+        if (err) {
+          grunt.fail.fatal('Error compiling covariant constant-instruction sources: ' + err + '\n' +
+            stdout.toString() + stderr.toString());
+        }
+        compileNormalFiles();
       });
   });
 
