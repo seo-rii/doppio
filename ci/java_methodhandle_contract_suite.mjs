@@ -20,7 +20,7 @@ const sourceIndex = JSON.parse(fs.readFileSync(path.join(root, 'ci/plan_spec_sou
 
 // Identical adversarial evidence checks run against every concrete harness.
 export function registerMethodHandleContractTests(harness, {phaseId, caseCount, groupCount, harnessFilename, contractFilename, ledgerBase}) {
-  const apiOwner = phaseId === 'C4' ? 'JVM-004' : phaseId === 'C5' ? 'JVM-005' : 'JVM-003';
+  const apiOwner = phaseId === 'C4' ? 'JVM-004' : phaseId === 'C5' ? 'JVM-005' : phaseId === 'C6' ? 'LIB-007' : 'JVM-003';
   const {methodHandleGroups, methodHandleHosts, methodHandleReleases, methodHandleTimeouts,
   validateMethodHandleGroups, methodHandleSourceUnits, createMethodHandleLedger, assertMethodHandleLedger,
   assertMethodHandleCompilation, assertMethodHandleExecution, assertMethodHandleProvenance, captureMethodHandleOutput,
@@ -312,7 +312,10 @@ export function registerMethodHandleContractTests(harness, {phaseId, caseCount, 
       ...(phaseId === 'C4' ? ['ci/generate_user_bootstrap_fixtures.mjs', 'ci/java_user_bootstrap_bytecode.mjs',
         'ci/bootstrap_case_helpers.mjs', 'ci/bootstrap_condy_cases.mjs', 'ci/bootstrap_indy_cases.mjs', 'ci/bootstrap_error_cases.mjs'] : []),
       ...(phaseId === 'C5' ? ['ci/hidden_class_cases.mjs', 'ci/java_hidden_class_bytecode.mjs',
-        'classes/modern_fixture/hiddenclass/HiddenClassSupport.java', 'classes/modern_fixture/hiddenclass/foreign/ForeignPayload.java'] : [])])
+        'classes/modern_fixture/hiddenclass/HiddenClassSupport.java', 'classes/modern_fixture/hiddenclass/foreign/ForeignPayload.java'] : []),
+      ...(phaseId === 'C6' ? ['ci/nominal_constant_cases.mjs', 'ci/nominal_type_cases.mjs', 'ci/nominal_handle_cases.mjs',
+        'ci/nominal_dynamic_cases.mjs', 'ci/nominal_varhandle_cases.mjs', 'ci/java_nominal_constant_bytecode.mjs',
+        'classes/modern_fixture/nominalconstant/NominalConstantSupport.java'] : [])])
       assert.ok(inputs.includes(path.join(root, relative)), 'Mandatory actual input ' + relative);
     for (const group of methodHandleGroups) for (const source of [group.source, ...(group.additionalSources || [])])
       assert.ok(inputs.includes(path.join(root, source)), 'Original compiler source ' + source);

@@ -8,6 +8,7 @@ import {coreOpcodeNames, inspectCoreClasses, proveCoreGroup} from './java_core_b
 import {inspectUserBootstrapClasses, proveUserBootstrapGroup, assertUserBootstrapProofs} from './java_user_bootstrap_bytecode.mjs';
 import {generateUserBootstrapFixtures} from './generate_user_bootstrap_fixtures.mjs';
 import {hiddenPayloadContracts, proveHiddenClassGroup, assertHiddenClassProofs} from './java_hidden_class_bytecode.mjs';
+import {nominalInputContracts, proveNominalConstantGroup, assertNominalConstantProofs} from './java_nominal_constant_bytecode.mjs';
 import {assertCoreCompilerSources, assertCoreResult, checkCoreCompilation, checkCoreExecution,
   CoreIntegrityError} from './java_core_semantics_test.mjs';
 import {inspectClassFiles, runCommand, runtimeSnapshot, validateToolchains} from './run_java_compatibility.mjs';
@@ -28,12 +29,13 @@ const freeze = value => {
 export function createMethodHandleHarness({scope, groups, requiredInventory, harnessUrl, contractFilename, ledgerBase, phaseId}) {
   const harnessPath = fileURLToPath(harnessUrl), contractPath = path.join(repoRoot, 'ci', contractFilename);
   const phaseLedgers = {C1: 'java-methodhandle-core', C2: 'java-methodhandle-collection',
-    C3: 'java-methodhandle-varhandle', C4: 'java-methodhandle-bootstrap', C5: 'java-methodhandle-hidden-class'};
-  const apiOwner = phaseId === 'C4' ? 'JVM-004' : phaseId === 'C5' ? 'JVM-005' : 'JVM-003';
+    C3: 'java-methodhandle-varhandle', C4: 'java-methodhandle-bootstrap', C5: 'java-methodhandle-hidden-class',
+    C6: 'java-methodhandle-nominal-constant'};
+  const apiOwner = phaseId === 'C4' ? 'JVM-004' : phaseId === 'C5' ? 'JVM-005' : phaseId === 'C6' ? 'LIB-007' : 'JVM-003';
   assert.ok(Object.hasOwn(phaseLedgers, phaseId));
   assert.ok(harnessPath.startsWith(path.join(repoRoot, 'ci') + path.sep));
   assert.match(contractFilename, /^java_methodhandle_[a-z_]+_contract_test\.mjs$/);
-  assert.match(ledgerBase, /^java-methodhandle-(?:core|collection|varhandle|bootstrap|hidden-class)$/);
+  assert.match(ledgerBase, /^java-methodhandle-(?:core|collection|varhandle|bootstrap|hidden-class|nominal-constant)$/);
   assert.equal(ledgerBase, phaseLedgers[phaseId],
     'Each phase retains its own official and diagnostic ledger namespace');
   const methodHandleScope = scope;
@@ -47,7 +49,10 @@ export function createMethodHandleHarness({scope, groups, requiredInventory, har
     'namedModuleRuntimeConformanceProven', ...(phaseId === 'C3' ?
       ['varHandleMemoryOrderingConformanceProven', 'varHandleConcurrentVisibilityConformanceProven'] : []),
     ...(phaseId === 'C4' ? ['bootstrapConcurrentLinkageConformanceProven', 'bootstrapMaximalArityConformanceProven'] : []),
-    ...(phaseId === 'C5' ? ['hiddenClassGarbageCollectionConformanceProven', 'hiddenClassNamedModuleConformanceProven'] : [])]);
+    ...(phaseId === 'C5' ? ['hiddenClassGarbageCollectionConformanceProven', 'hiddenClassNamedModuleConformanceProven'] : []),
+    ...(phaseId === 'C6' ? ['lib007Complete', 'nominalConstantResolutionConformanceProven',
+      'nominalConstantLoaderLatticeConformanceProven', 'nominalConstantMaximalArityConformanceProven',
+      'hiddenClassGarbageCollectionConformanceProven'] : [])]);
   const inventory = freeze(requiredInventory);
   const selectedHosts = mode => mode === 'native-only' ? ['native'] : mode === 'diagnostic' ? ['native', 'node'] : methodHandleHosts;
   const records = () => methodHandleReleases.flatMap(release => methodHandleGroups.map(group => ({release, group})));
@@ -94,11 +99,12 @@ export function createMethodHandleHarness({scope, groups, requiredInventory, har
     for (const [n, group] of groups.entries()) {
       assert.deepEqual(group.cases.map(entry => entry.id), inventory[n].ids, 'Independent mandatory ' + phaseId + ' case IDs');
       assert.deepEqual(group.releases, methodHandleReleases, 'Both final-profile releases');
-      const prefix = phaseId === 'C3' ? 'VarHandle' : phaseId === 'C4' ? 'Bootstrap' : phaseId === 'C5' ? 'HiddenClass' : 'MethodHandle';
+      const prefix = phaseId === 'C3' ? 'VarHandle' : phaseId === 'C4' ? 'Bootstrap' : phaseId === 'C5' ? 'HiddenClass' :
+        phaseId === 'C6' ? 'Nominal' : 'MethodHandle';
       assert.match(group.source, new RegExp('^classes/modern_fixture/' + prefix + '[A-Za-z]+Final\\.java$'));
       assert.match(group.mainClass, new RegExp('^classes\\.modern_test\\.' + prefix + '[A-Za-z]+Final$'));
       assert.match(group.completionMarker, phaseId === 'C3' ? /^VARHANDLE_[A-Z_]+_OK$/ : phaseId === 'C4' ? /^BOOTSTRAP_[A-Z_]+_OK$/ :
-        phaseId === 'C5' ? /^HIDDEN_CLASS_[A-Z_]+_OK$/ : /^METHODHANDLE_[A-Z_]+_OK$/);
+        phaseId === 'C5' ? /^HIDDEN_CLASS_[A-Z_]+_OK$/ : phaseId === 'C6' ? /^NOMINAL_[A-Z_]+_OK$/ : /^METHODHANDLE_[A-Z_]+_OK$/);
       assert.ok(group.cases.length > 0, 'Nonempty ' + phaseId + ' corpus');
       assert.ok(Array.isArray(group.driverClassNames) && group.driverClassNames.includes(group.mainClass) &&
         group.driverClassNames.every(binaryName) && new Set(group.driverClassNames).size === group.driverClassNames.length,
@@ -119,12 +125,19 @@ export function createMethodHandleHarness({scope, groups, requiredInventory, har
         assert.deepEqual([...group.driverClassNames].sort(),
           [expected.mainClass, 'classes.modern_test.HiddenClassSupport', ...expected.payloads.map(payload => payload.name)].sort(),
         'Exact original C5 main/support/payload compiler inventory');
-      } else assert.ok(!Object.hasOwn(group, 'hiddenPayloads'), 'Only C5 owns hidden-class payload proof inputs');
+      } else if (phaseId === 'C6') {
+        const expected = nominalInputContracts[group.id]; assert.ok(expected, 'Independent literal C6 compiler/payload group');
+        for (const key of ['source', 'mainClass', 'completionMarker', 'driverClassNames', 'additionalSources'])
+          assert.deepEqual(group[key], expected[key], 'Exact independent C6 original compiler contract: ' + key);
+        assert.deepEqual(group.hiddenPayloads, expected.payloads.map(payload => payload.name),
+          'Exact independently bound C6 hidden restriction payload inventory');
+      } else assert.ok(!Object.hasOwn(group, 'hiddenPayloads'), 'Only C5/C6 own hidden-class payload proof inputs');
       const extra = group.additionalSources || [];
       if (phaseId === 'C3') assert.equal(extra.length, 0, 'C3 uses original explicit driver units only');
       assert.ok(Array.isArray(extra) && extra.every(source => phaseId === 'C4' ? source === 'classes/modern_fixture/BootstrapTestSupport.java' :
         phaseId === 'C5' ? ['classes/modern_fixture/hiddenclass/HiddenClassSupport.java',
           'classes/modern_fixture/hiddenclass/foreign/ForeignPayload.java'].includes(source) :
+          phaseId === 'C6' ? nominalInputContracts[group.id].additionalSources.includes(source) :
           /^classes\/modern_fixture\/methodhandle_lookup\/[A-Za-z0-9_]+\.java$/.test(source)),
         'Explicit bounded Lookup companion sources');
       if (phaseId === 'C4') assert.deepEqual(extra, ['classes/modern_fixture/BootstrapTestSupport.java']);
@@ -142,7 +155,8 @@ export function createMethodHandleHarness({scope, groups, requiredInventory, har
           'Explicit selected-case limitations');
         assert.ok(Array.isArray(entry.primarySources) && entry.primarySources.length > 0 && entry.primarySources.every(url =>
           /^https:\/\/docs\.oracle\.com\/(?:en\/java\/javase\/(?:21|25)\/docs\/api\/java\.base\/java\/lang\/invoke\/|javase\/specs\/)/.test(url) ||
-          phaseId === 'C5' && /^https:\/\/docs\.oracle\.com\/en\/java\/javase\/(?:21|25)\/docs\/api\/java\.base\/java\/lang\/(?:Class|reflect\/Field)\.html$/.test(url)),
+          phaseId === 'C5' && /^https:\/\/docs\.oracle\.com\/en\/java\/javase\/(?:21|25)\/docs\/api\/java\.base\/java\/lang\/(?:Class|reflect\/Field)\.html$/.test(url) ||
+          phaseId === 'C6' && /^https:\/\/docs\.oracle\.com\/en\/java\/javase\/(?:21|25)\/docs\/api\/java\.base\/java\/lang\/(?:constant\/(?:ConstantDesc|ClassDesc|MethodTypeDesc|MethodHandleDesc|DirectMethodHandleDesc(?:\.Kind)?|DynamicConstantDesc|ConstantDescs)|Class|Enum\.EnumDesc)\.html$/.test(url)),
         'Primary API/specification contract sources');
         assert.ok(entry.anchors && Object.keys(entry.anchors).length > 0 && Object.entries(entry.anchors).every(([spec, anchors]) =>
           ['JLS', 'JVMS'].includes(spec) && Array.isArray(anchors) && anchors.length > 0 && anchors.every(anchor => typeof anchor === 'string' && anchor.length > 0)),
@@ -276,6 +290,7 @@ export function createMethodHandleHarness({scope, groups, requiredInventory, har
     }
     if (phaseId === 'C4') assertUserBootstrapProofs(record, group);
     if (phaseId === 'C5') assertHiddenClassProofs(record, group);
+    if (phaseId === 'C6') assertNominalConstantProofs(record, group);
   }
 
   function assertMethodHandleExecution(cell, record, group, prepared) {
@@ -507,12 +522,15 @@ export function createMethodHandleHarness({scope, groups, requiredInventory, har
           assertMethodHandleCompilation(record, group, prepared);
           record.bytecodeProofs = bytecodeProofs(group, output, record.classFiles);
           if (phaseId === 'C5') record.hiddenPayloadProofs = proveHiddenClassGroup(group, output, record.classFiles);
+          if (phaseId === 'C6') record.nominalConstantProofs = proveNominalConstantGroup(group, output, record.classFiles);
           assertMethodHandleProofs(record, group); checkpoint();
           const checkLocal = () => integrity(() => {
             assert.deepEqual(inspectClassFiles(output, record.release, group.mainClass), record.classFiles, 'Original classes unchanged');
             assert.deepEqual(bytecodeProofs(group, output, record.classFiles), record.bytecodeProofs, 'Actual Code proof replay');
             if (phaseId === 'C5') assert.deepEqual(proveHiddenClassGroup(group, output, record.classFiles), record.hiddenPayloadProofs,
               'Original hidden-class payload proof replay');
+            if (phaseId === 'C6') assert.deepEqual(proveNominalConstantGroup(group, output, record.classFiles), record.nominalConstantProofs,
+              'Original nominal-constant hidden payload proof replay');
           });
           for (const cell of record.executions) {
             if (!selectedHosts(ledger.requestedMode).includes(cell.host)) {cell.reason = 'Explicit diagnostic mode excludes this mandatory host'; checkpoint(); continue;}
@@ -540,6 +558,7 @@ export function createMethodHandleHarness({scope, groups, requiredInventory, har
         integrity(() => {
           assert.deepEqual(bytecodeProofs(group, record.classpath.directory, record.classFiles), record.bytecodeProofs);
           if (phaseId === 'C5') assert.deepEqual(proveHiddenClassGroup(group, record.classpath.directory, record.classFiles), record.hiddenPayloadProofs);
+          if (phaseId === 'C6') assert.deepEqual(proveNominalConstantGroup(group, record.classpath.directory, record.classFiles), record.nominalConstantProofs);
         });
       }
       ledger.gitEnd = await provenance(); assert.deepEqual(ledger.gitEnd, ledger.gitStart);
