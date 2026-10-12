@@ -3419,6 +3419,13 @@ export default function (): any {
     public static 'setCallSiteTargetNormal(Ljava/lang/invoke/CallSite;Ljava/lang/invoke/MethodHandle;)V'(thread: JVMThread, callSite: JVMTypes.java_lang_invoke_CallSite, methodHandle: JVMTypes.java_lang_invoke_MethodHandle): void {
       callSite['java/lang/invoke/CallSite/target'] = methodHandle;
     }
+
+    public static 'setCallSiteTargetVolatile(Ljava/lang/invoke/CallSite;Ljava/lang/invoke/MethodHandle;)V'(thread: JVMThread, callSite: JVMTypes.java_lang_invoke_CallSite, methodHandle: JVMTypes.java_lang_invoke_MethodHandle): void {
+      // The retained Java setTarget body checks null and MethodType before
+      // entering this VM hook. This synchronous target update supports the
+      // selected single-thread consumer, not a cross-thread visibility claim.
+      callSite['java/lang/invoke/CallSite/target'] = methodHandle;
+    }
   }
 
   class java_lang_invoke_MethodHandle {

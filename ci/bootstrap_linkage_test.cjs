@@ -401,3 +401,32 @@ test('declared type failure precedes static arguments and retains its original e
   assert.ok(!w.state.events.includes('late')); assert.equal(w.state.calls.length, 0);
   assert.equal(w.thread.errors[0], w.state.typeError);
 });
+
+test('the actual native registrar installs both CallSite target-update hooks', () => {
+  const natives = load('natives/java_lang').default(), name = 'java/lang/invoke/MethodHandleNatives',
+    registry = {natives: {}}, JVM = require(path.join(runtime, 'src/jvm')).default;
+  JVM.prototype.registerNatives.call(registry, natives);
+  for (const kind of ['Normal', 'Volatile']) {
+    const signature = 'setCallSiteTarget' + kind + '(Ljava/lang/invoke/CallSite;Ljava/lang/invoke/MethodHandle;)V',
+      registered = JVM.prototype.getNative.call(registry, 'L' + name + ';', signature);
+    assert.equal(typeof registered, 'function');
+    assert.equal(registered, natives[name][signature]);
+  }
+});
+
+for (const kind of ['Normal', 'Volatile']) {
+  test('CallSite ' + kind + ' hook updates only its exact target synchronously', () => {
+    const natives = load('natives/java_lang').default()['java/lang/invoke/MethodHandleNatives'],
+      signature = 'setCallSiteTarget' + kind + '(Ljava/lang/invoke/CallSite;Ljava/lang/invoke/MethodHandle;)V',
+      key = 'java/lang/invoke/CallSite/target', original = {tag: 'original'}, first = {tag: 'first'}, second = {tag: 'second'},
+      callSite = {[key]: original, retained: {tag: 'unrelated-field'}}, unrelatedSite = {[key]: original},
+      thread = new Proxy({}, {get() { assert.fail('A target update must not yield, invoke Java, or asyncReturn'); }});
+    const retained = callSite.retained;
+    assert.equal(natives[signature](thread, callSite, first), undefined);
+    assert.equal(callSite[key], first); assert.equal(unrelatedSite[key], original);
+    assert.equal(callSite.retained, retained);
+    assert.equal(natives[signature](thread, callSite, second), undefined);
+    assert.equal(callSite[key], second); assert.equal(unrelatedSite[key], original);
+    assert.deepEqual(Object.keys(callSite), [key, 'retained']);
+  });
+}
