@@ -17,6 +17,8 @@ import {SymbolicResolution} from './SymbolicResolution';
 import {canAccessClass, resolveMemberAccess, getKnownNestHost, resolveNestHost, resolveNestMembers} from './ClassAccess';
 import {canAccessLambdaClass, canAccessLambdaMember} from './LambdaAdapters';
 import {canAccessReflectionClass, canAccessReflectionMember} from './ReflectionAdapters';
+import {BootstrapResolution, resolveBootstrapArguments, invokeBootstrap,
+  convertBootstrapConstant, throwInvalidBootstrapResult} from './BootstrapLinkage';
 
 /** Generated Java 8 forwarding code carries exact producer capabilities;
  * ordinary classes use the unnamed-module language access rules. */
@@ -4209,6 +4211,7 @@ export class DynamicConstant implements IConstantPoolItem {
   public nameAndTypeInfo: NameAndTypeInfo;
   private value: any = null;
   private resolved: boolean = false;
+  private resolution = new BootstrapResolution();
 
   constructor(bootstrapMethodAttrIndex: number, nameAndTypeInfo: NameAndTypeInfo) {
     this.bootstrapMethodAttrIndex = bootstrapMethodAttrIndex;
@@ -4220,6 +4223,57 @@ export class DynamicConstant implements IConstantPoolItem {
   }
 
   public resolve(thread: JVMThread, loader: ClassLoader, caller: ReferenceClassData<JVMTypes.java_lang_Object>, cb: (status: boolean) => void) {
+    this.resolution.resolve(thread, done => this.resolveUncached(thread, loader, caller, done), cb);
+  }
+
+  private resolveUserBootstrap(thread: JVMThread, loader: ClassLoader,
+      caller: ReferenceClassData<JVMTypes.java_lang_Object>, bootstrapMethod: [MethodHandle, IConstantPoolItem[]],
+      cb: (status: boolean) => void): void {
+    var handle = bootstrapMethod[0], descriptor = this.nameAndTypeInfo.descriptor;
+    if (!handle.isResolved()) {
+      handle.resolve(thread, loader, caller, success => {
+        if (success) this.resolveUserBootstrap(thread, loader, caller, bootstrapMethod, cb);
+        else cb(false);
+      }, false);
+      return;
+    }
+    // Unlike invokedynamic, CONSTANT_Dynamic requires the first parameter of
+    // the actual bootstrap handle to be exactly the bootstrap Lookup class.
+    var parameters = handle.methodHandle['java/lang/invoke/MethodHandle/type'][
+        'java/lang/invoke/MethodType/ptypes'].array,
+      lookupClass = thread.getBsCl().getLoadedClass('Ljava/lang/invoke/MethodHandles$Lookup;');
+    if (parameters.length === 0 || parameters[0].$cls !== lookupClass) {
+      thread.throwNewException('Ljava/lang/BootstrapMethodError;', 'Constant bootstrap requires a leading Lookup parameter');
+      cb(false);
+      return;
+    }
+    var typeResolved = (type: ClassData) => {
+      resolveBootstrapArguments(thread, loader, caller, bootstrapMethod[1], (success, args) => {
+        if (!success) { cb(false); return; }
+        invokeBootstrap(thread, caller, handle.methodHandle, this.nameAndTypeInfo.name,
+          type.getClassObject(thread), args, (invoked, value) => {
+            if (!invoked) { cb(false); return; }
+            convertBootstrapConstant(thread, type, value, (converted, result) => {
+              if (converted) { this.value = result; this.resolved = true; }
+              cb(converted);
+            });
+          });
+      });
+    };
+    if (descriptor.length === 1) typeResolved(loader.getInitializedClass(thread, descriptor));
+    else {
+      var reference = new ClassReference(descriptor);
+      // Hidden/anonymous self references are exact class identities, not names
+      // to be rediscovered in a loader's ordinary publication namespace.
+      if (descriptor === caller.getInternalName()) reference.cls = caller;
+      reference.resolve(thread, loader, caller, success => {
+        if (success) typeResolved(reference.cls);
+        else cb(false);
+      }, false);
+    }
+  }
+
+  private resolveUncached(thread: JVMThread, loader: ClassLoader, caller: ReferenceClassData<JVMTypes.java_lang_Object>, cb: (status: boolean) => void) {
     var bootstrapMethod = caller.getBootstrapMethod(this.bootstrapMethodAttrIndex),
       bootstrapRef = bootstrapMethod[0].getReference();
     if (bootstrapRef.classInfo.name === 'Ljava/lang/invoke/ConstantBootstraps;' &&
@@ -4275,7 +4329,7 @@ export class DynamicConstant implements IConstantPoolItem {
         if (!classArg.isResolved()) {
           classArg.resolve(thread, loader, caller, (status: boolean) => {
             if (status) {
-              this.resolve(thread, loader, caller, cb);
+              this.resolveUncached(thread, loader, caller, cb);
             } else {
               cb(false);
             }
@@ -4312,7 +4366,7 @@ export class DynamicConstant implements IConstantPoolItem {
       if (!castArg.isResolved()) {
         castArg.resolve(thread, loader, caller, (status: boolean) => {
           if (status) {
-            this.resolve(thread, loader, caller, cb);
+            this.resolveUncached(thread, loader, caller, cb);
           } else {
             cb(false);
           }
@@ -4435,7 +4489,7 @@ export class DynamicConstant implements IConstantPoolItem {
         if (!targetFieldRef.isResolved()) {
           targetFieldRef.resolve(thread, loader, caller, (status: boolean) => {
             if (status) {
-              this.resolve(thread, loader, caller, cb);
+              this.resolveUncached(thread, loader, caller, cb);
             } else {
               cb(false);
             }
@@ -4494,7 +4548,7 @@ export class DynamicConstant implements IConstantPoolItem {
           if (!putStaticArg.isResolved()) {
             putStaticArg.resolve(thread, loader, caller, (status: boolean) => {
               if (status) {
-                this.resolve(thread, loader, caller, cb);
+                this.resolveUncached(thread, loader, caller, cb);
               } else {
                 cb(false);
               }
@@ -4601,7 +4655,7 @@ export class DynamicConstant implements IConstantPoolItem {
           if (!putFieldReceiverArg.isResolved()) {
             putFieldReceiverArg.resolve(thread, loader, caller, (status: boolean) => {
               if (status) {
-                this.resolve(thread, loader, caller, cb);
+                this.resolveUncached(thread, loader, caller, cb);
               } else {
                 cb(false);
               }
@@ -4613,7 +4667,7 @@ export class DynamicConstant implements IConstantPoolItem {
           if (!putFieldValueArg.isResolved()) {
             putFieldValueArg.resolve(thread, loader, caller, (status: boolean) => {
               if (status) {
-                this.resolve(thread, loader, caller, cb);
+                this.resolveUncached(thread, loader, caller, cb);
               } else {
                 cb(false);
               }
@@ -4804,7 +4858,7 @@ export class DynamicConstant implements IConstantPoolItem {
         if (!fieldReceiverArg.isResolved()) {
           fieldReceiverArg.resolve(thread, loader, caller, (status: boolean) => {
             if (status) {
-              this.resolve(thread, loader, caller, cb);
+              this.resolveUncached(thread, loader, caller, cb);
             } else {
               cb(false);
             }
@@ -4913,7 +4967,7 @@ export class DynamicConstant implements IConstantPoolItem {
       if (!targetMethodRef.isResolved()) {
         targetMethodRef.resolve(thread, loader, caller, (status: boolean) => {
           if (status) {
-            this.resolve(thread, loader, caller, cb);
+            this.resolveUncached(thread, loader, caller, cb);
           } else {
             cb(false);
           }
@@ -4931,7 +4985,7 @@ export class DynamicConstant implements IConstantPoolItem {
           if (err) {
             cb(false);
           } else {
-            this.resolve(thread, loader, caller, cb);
+            this.resolveUncached(thread, loader, caller, cb);
           }
         });
         return;
@@ -5389,9 +5443,7 @@ export class DynamicConstant implements IConstantPoolItem {
         }
       }, false);
     } else {
-      thread.throwNewException('Ljava/lang/BootstrapMethodError;',
-        `Unsupported CONSTANT_Dynamic bootstrap: ${bootstrapRef.classInfo.name}.${bootstrapRef.nameAndTypeInfo.name}`);
-      cb(false);
+      this.resolveUserBootstrap(thread, loader, caller, bootstrapMethod, cb);
     }
   }
 
@@ -5450,6 +5502,7 @@ export class InvokeDynamic implements IConstantPoolItem {
    * optional 'appendix' argument.
    */
   private callSiteObjects: { [siteKey: string]: [JVMTypes.java_lang_invoke_MemberName, JVMTypes.java_lang_Object] } = {};
+  private callSiteResolutions: {[siteKey: string]: BootstrapResolution} = Object.create(null);
   private stringConcatRecipe: string = null;
   private stringConcatConstants: string[] = [];
   private objectMethodsMethodName: string = null;
@@ -6411,145 +6464,99 @@ export class InvokeDynamic implements IConstantPoolItem {
   }
 
   public constructCallSiteObject(thread: JVMThread, cl: ClassLoader, clazz: ReferenceClassData<JVMTypes.java_lang_Object>, siteKey: string, cb: (status: boolean) => void, explicit: boolean = true): void {
-    /**
-     * A call site specifier gives a symbolic reference to a method handle which
-     * is to serve as the bootstrap method for a dynamic call site (§4.7.23).
-     * The method handle is resolved to obtain a reference to an instance of
-     * java.lang.invoke.MethodHandle (§5.4.3.5).
-     */
+    var gate = this.callSiteResolutions[siteKey];
+    if (gate === undefined) gate = this.callSiteResolutions[siteKey] = new BootstrapResolution();
+    gate.resolve(thread, done => this.constructCallSiteObjectUncached(thread, cl, clazz, siteKey, done, explicit), cb);
+  }
+
+  private constructCallSiteObjectUncached(thread: JVMThread, cl: ClassLoader,
+      clazz: ReferenceClassData<JVMTypes.java_lang_Object>, siteKey: string,
+      cb: (status: boolean) => void, explicit: boolean): void {
     var bootstrapMethod = clazz.getBootstrapMethod(this.bootstrapMethodAttrIndex),
-      unresolvedItems: IConstantPoolItem[] = bootstrapMethod[1].concat(bootstrapMethod[0], this).filter((item: IConstantPoolItem) => !item.isResolved());
+      handle = bootstrapMethod[0];
+    // Existing selected compiler consumers retain their own executable paths.
+    if (this.constructStringConcatCallSiteObject(thread, cl, clazz, siteKey, bootstrapMethod, cb) ||
+        this.constructObjectMethodsCallSiteObject(thread, cl, siteKey, bootstrapMethod, cb) ||
+        this.constructSwitchCallSiteObject(thread, cl, clazz, siteKey, bootstrapMethod, cb)) return;
 
-    if (this.constructStringConcatCallSiteObject(thread, cl, clazz, siteKey, bootstrapMethod, cb)) {
+    // JVMS 5.4.3.6: handle first, declared type second, static arguments in order.
+    if (!handle.isResolved()) {
+      handle.resolve(thread, cl, clazz, success => {
+        if (success) this.constructCallSiteObjectUncached(thread, cl, clazz, siteKey, cb, explicit);
+        else cb(false);
+      }, explicit);
       return;
     }
-
-    if (this.constructObjectMethodsCallSiteObject(thread, cl, siteKey, bootstrapMethod, cb)) {
-      return;
-    }
-
-    if (this.constructSwitchCallSiteObject(thread, cl, clazz, siteKey, bootstrapMethod, cb)) {
-      return;
-    }
-
-    if (unresolvedItems.length > 0) {
-      // Resolve all needed constant pool items (including this one).
-      return util.asyncForEach(unresolvedItems, (cpItem: IConstantPoolItem, nextItem: (err?: any) => void) => {
-        cpItem.resolve(thread, cl, clazz, (status: boolean) => {
-          if (!status) {
-            nextItem("Failed.");
-          } else {
-            nextItem();
-          }
-        }, explicit);
-      }, (err?: any) => {
-        if (err) {
-          cb(false);
-        } else {
-          // Rerun. This time, all items are resolved.
-          this.constructCallSiteObject(thread, cl, clazz, siteKey, cb, explicit);
-        }
+    if (!this.isResolved()) {
+      this.resolve(thread, cl, clazz, success => {
+        if (success) this.constructCallSiteObjectUncached(thread, cl, clazz, siteKey, cb, explicit);
+        else cb(false);
       });
+      return;
     }
-
-    /**
-     * A call site specifier gives zero or more static arguments, which
-     * communicate application-specific metadata to the bootstrap method. Any
-     * static arguments which are symbolic references to classes, method
-     * handles, or method types are resolved, as if by invocation of the ldc
-     * instruction (§ldc), to obtain references to Class objects,
-     * java.lang.invoke.MethodHandle objects, and java.lang.invoke.MethodType
-     * objects respectively. Any static arguments that are string literals are
-     * used to obtain references to String objects.
-     */
-    function getArguments(): JVMTypes.JVMArray<JVMTypes.java_lang_Object> {
-      var cpItems = bootstrapMethod[1],
-        i: number, cpItem: IConstantPoolItem,
-        rvObj = new ((<ArrayClassData<JVMTypes.java_lang_Object>> thread.getBsCl().getInitializedClass(thread, '[Ljava/lang/Object;')).getConstructor(thread))(thread, cpItems.length),
-        rv = rvObj.array;
-      for (i = 0; i < cpItems.length; i++) {
-        cpItem = cpItems[i];
-        switch (cpItem.getType()) {
-          case ConstantPoolItemType.CLASS:
-            rv[i] = (<ClassReference> cpItem).cls.getClassObject(thread);
-            break;
-          case ConstantPoolItemType.METHOD_HANDLE:
-            rv[i] = (<MethodHandle> cpItem).methodHandle;
-            break;
-          case ConstantPoolItemType.METHOD_TYPE:
-            rv[i] = (<MethodType> cpItem).methodType;
-            break;
-          case ConstantPoolItemType.STRING:
-            rv[i] = (<ConstString> cpItem).value;
-            break;
-          case ConstantPoolItemType.UTF8:
-            rv[i] = thread.getJVM().internString((<ConstUTF8> cpItem).value);
-            break;
-          case ConstantPoolItemType.INTEGER:
-            rv[i] = (<PrimitiveClassData> cl.getInitializedClass(thread, 'I')).createWrapperObject(thread, (<ConstInt32> cpItem).value);
-            break;
-          case ConstantPoolItemType.LONG:
-            rv[i] = (<PrimitiveClassData> cl.getInitializedClass(thread, 'J')).createWrapperObject(thread, (<ConstLong> cpItem).value);
-            break;
-          case ConstantPoolItemType.FLOAT:
-            rv[i] = (<PrimitiveClassData> cl.getInitializedClass(thread, 'F')).createWrapperObject(thread, (<ConstFloat> cpItem).value);
-            break;
-          case ConstantPoolItemType.DOUBLE:
-            rv[i] = (<PrimitiveClassData> cl.getInitializedClass(thread, 'D')).createWrapperObject(thread, (<ConstDouble> cpItem).value);
-            break;
-          default:
-            assert(false, "Invalid CPItem for static args: " + ConstantPoolItemType[cpItem.getType()]);
-            break;
-        }
-      }
-      assert((() => {
-        var status = true;
-        cpItems.forEach((cpItem: IConstantPoolItem, i: number) => {
-          if (rv[i] === undefined) {
-            console.log("Undefined item at arg " + i + ": " + ConstantPoolItemType[cpItem.getType()]);
-            status = false;
-          } else if (rv[i] === null) {
-            console.log("Null item at arg " + i + ": " + ConstantPoolItemType[cpItem.getType()]);
-            status = false;
-          }
+    resolveBootstrapArguments(thread, cl, clazz, bootstrapMethod[1], (success, args) => {
+      if (!success) { cb(false); return; }
+      invokeBootstrap(thread, clazz, handle.methodHandle, this.nameAndTypeInfo.name,
+        this.methodType, args, (invoked, value) => {
+          if (!invoked) { cb(false); return; }
+          this.installUserCallSite(thread, siteKey, value, cb);
         });
-        return status;
-      })(), "Arguments cannot be undefined or null.");
-
-      return rvObj;
-    }
-
-    /**
-     * A call site specifier gives a method descriptor, TD. A reference to an
-     * instance of java.lang.invoke.MethodType is obtained as if by resolution
-     * of a symbolic reference to a method type with the same parameter and
-     * return types as TD (§5.4.3.5).
-     *
-     * Do what all OpenJDK-based JVMs do: Call
-     * MethodHandleNatives.linkCallSite with:
-     * - The class w/ the invokedynamic instruction
-     * - The bootstrap method
-     * - The name string from the nameAndTypeInfo
-     * - The methodType object from the nameAndTypeInfo
-     * - The static arguments from the bootstrap method.
-     * - A 1-length appendix box.
-     */
-    var methodName = thread.getJVM().internString(this.nameAndTypeInfo.name),
-      appendixArr = new ((<ArrayClassData<JVMTypes.java_lang_Object>> cl.getInitializedClass(thread, '[Ljava/lang/Object;')).getConstructor(thread))(thread, 1),
-      staticArgs = getArguments(),
-      mhn = <typeof JVMTypes.java_lang_invoke_MethodHandleNatives> (<ReferenceClassData<JVMTypes.java_lang_invoke_MethodHandleNatives>> cl.getInitializedClass(thread, 'Ljava/lang/invoke/MethodHandleNatives;')).getConstructor(thread);
-
-
-    mhn['java/lang/invoke/MethodHandleNatives/linkCallSite(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/invoke/MemberName;'](thread,
-      [clazz.getClassObject(thread), bootstrapMethod[0].methodHandle, methodName, this.methodType, staticArgs, appendixArr], (e?: JVMTypes.java_lang_Throwable, rv?: JVMTypes.java_lang_invoke_MemberName) => {
-      if (e) {
-        thread.throwException(e);
-        cb(false);
-      } else {
-        this.setResolved(siteKey, [rv, appendixArr.array[0]]);
-        cb(true);
-      }
     });
+  }
+
+  private installUserCallSite(thread: JVMThread, siteKey: string, value: JVMTypes.java_lang_Object,
+      cb: (status: boolean) => void): void {
+    var bootstrap = thread.getBsCl();
+    bootstrap.initializeClass(thread, 'Ljava/lang/invoke/CallSite;',
+      (callSiteClass: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+        if (callSiteClass === null) { cb(false); return; }
+        if (value === null || !value.getClass().isSubclass(callSiteClass)) {
+          throwInvalidBootstrapResult(thread, 'Ljava/lang/ClassCastException;',
+            'Bootstrap method failed to produce a CallSite', cb);
+          return;
+        }
+        var callSite = <JVMTypes.java_lang_invoke_CallSite> value;
+        callSite['type()Ljava/lang/invoke/MethodType;'](thread, [],
+          (typeError?: JVMTypes.java_lang_Throwable, actualType?: JVMTypes.java_lang_invoke_MethodType) => {
+            if (typeError) { thread.throwException(typeError); cb(false); return; }
+            actualType['equals(Ljava/lang/Object;)Z'](thread, [this.methodType],
+              (equalsError?: JVMTypes.java_lang_Throwable, equal?: number) => {
+                if (equalsError) { thread.throwException(equalsError); cb(false); return; }
+                if (!equal) {
+                  throwInvalidBootstrapResult(thread, 'Ljava/lang/invoke/WrongMethodTypeException;',
+                    'Bootstrap CallSite target type does not match the invokedynamic descriptor', cb);
+                  return;
+                }
+                bootstrap.initializeClass(thread, 'Ljava/lang/invoke/ConstantCallSite;',
+                  (constantClass: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+                    if (constantClass === null) { cb(false); return; }
+                    var constant = callSite.getClass().isSubclass(constantClass),
+                      withAppendix = (appendix: JVMTypes.java_lang_Object) => {
+                        bootstrap.initializeClass(thread, 'Ljava/lang/invoke/Invokers;',
+                          (invokers: ReferenceClassData<JVMTypes.java_lang_Object>) => {
+                            if (invokers === null) { cb(false); return; }
+                            var linker = constant ? 'linkToTargetMethod' : 'linkToCallSiteMethod';
+                            (<any> invokers.getConstructor(thread))[
+                              'java/lang/invoke/Invokers/' + linker +
+                              '(Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MemberName;'](
+                              thread, [this.methodType], (error?: JVMTypes.java_lang_Throwable,
+                                member?: JVMTypes.java_lang_invoke_MemberName) => {
+                                if (error) { thread.throwException(error); cb(false); }
+                                else { this.setResolved(siteKey, [member, appendix]); cb(true); }
+                              });
+                          }, false);
+                      };
+                    if (constant) {
+                      callSite['dynamicInvoker()Ljava/lang/invoke/MethodHandle;'](thread, [],
+                        (invokerError?: JVMTypes.java_lang_Throwable, target?: JVMTypes.java_lang_invoke_MethodHandle) => {
+                          if (invokerError) { thread.throwException(invokerError); cb(false); }
+                          else withAppendix(target);
+                        });
+                    } else withAppendix(callSite);
+                  }, false);
+              });
+          });
+      }, false);
   }
 
   private setResolved(siteKey: string, cso: [JVMTypes.java_lang_invoke_MemberName, JVMTypes.java_lang_Object]) {
