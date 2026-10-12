@@ -3,8 +3,13 @@ package java.lang.classfile;
 import java.lang.classfile.constantpool.FieldRefEntry;
 import java.lang.classfile.constantpool.ClassEntry;
 import java.lang.classfile.constantpool.InvokeDynamicEntry;
+import java.lang.classfile.constantpool.InterfaceMethodRefEntry;
 import java.lang.classfile.constantpool.LoadableConstantEntry;
 import java.lang.classfile.constantpool.MemberRefEntry;
+import java.lang.classfile.constantpool.MethodRefEntry;
+import java.lang.classfile.instruction.ArrayLoadInstruction;
+import java.lang.classfile.instruction.ArrayStoreInstruction;
+import java.lang.classfile.instruction.DoppioMemoryInstructions;
 import java.lang.classfile.instruction.ConstantInstruction;
 import java.lang.classfile.instruction.BranchInstruction;
 import java.lang.classfile.instruction.ConvertInstruction;
@@ -12,6 +17,11 @@ import java.lang.classfile.instruction.ExceptionCatch;
 import java.lang.classfile.instruction.IncrementInstruction;
 import java.lang.classfile.instruction.LookupSwitchInstruction;
 import java.lang.classfile.instruction.NewObjectInstruction;
+import java.lang.classfile.instruction.NewPrimitiveArrayInstruction;
+import java.lang.classfile.instruction.NewReferenceArrayInstruction;
+import java.lang.classfile.instruction.NewMultiArrayInstruction;
+import java.lang.classfile.instruction.TypeCheckInstruction;
+import java.lang.classfile.instruction.MonitorInstruction;
 import java.lang.classfile.instruction.NopInstruction;
 import java.lang.classfile.instruction.SwitchCase;
 import java.lang.classfile.instruction.TableSwitchInstruction;
@@ -115,6 +125,36 @@ public interface CodeBuilder extends ClassFileBuilder<CodeElement, CodeBuilder> 
   default CodeBuilder dcmpg() { return with(OperatorInstruction.of(Opcode.DCMPG)); }
   default CodeBuilder new_(ClassEntry className) { return with(NewObjectInstruction.of(className)); }
   default CodeBuilder new_(ClassDesc className) { return new_(constantPool().classEntry(Objects.requireNonNull(className))); }
+  default CodeBuilder arrayLoad(TypeKind kind) { return with(ArrayLoadInstruction.of(DoppioMemoryInstructions.arrayOpcode(kind, false))); }
+  default CodeBuilder arrayStore(TypeKind kind) { return with(ArrayStoreInstruction.of(DoppioMemoryInstructions.arrayOpcode(kind, true))); }
+  default CodeBuilder iaload() { return with(ArrayLoadInstruction.of(Opcode.IALOAD)); }
+  default CodeBuilder laload() { return with(ArrayLoadInstruction.of(Opcode.LALOAD)); }
+  default CodeBuilder faload() { return with(ArrayLoadInstruction.of(Opcode.FALOAD)); }
+  default CodeBuilder daload() { return with(ArrayLoadInstruction.of(Opcode.DALOAD)); }
+  default CodeBuilder aaload() { return with(ArrayLoadInstruction.of(Opcode.AALOAD)); }
+  default CodeBuilder baload() { return with(ArrayLoadInstruction.of(Opcode.BALOAD)); }
+  default CodeBuilder caload() { return with(ArrayLoadInstruction.of(Opcode.CALOAD)); }
+  default CodeBuilder saload() { return with(ArrayLoadInstruction.of(Opcode.SALOAD)); }
+  default CodeBuilder iastore() { return with(ArrayStoreInstruction.of(Opcode.IASTORE)); }
+  default CodeBuilder lastore() { return with(ArrayStoreInstruction.of(Opcode.LASTORE)); }
+  default CodeBuilder fastore() { return with(ArrayStoreInstruction.of(Opcode.FASTORE)); }
+  default CodeBuilder dastore() { return with(ArrayStoreInstruction.of(Opcode.DASTORE)); }
+  default CodeBuilder aastore() { return with(ArrayStoreInstruction.of(Opcode.AASTORE)); }
+  default CodeBuilder bastore() { return with(ArrayStoreInstruction.of(Opcode.BASTORE)); }
+  default CodeBuilder castore() { return with(ArrayStoreInstruction.of(Opcode.CASTORE)); }
+  default CodeBuilder sastore() { return with(ArrayStoreInstruction.of(Opcode.SASTORE)); }
+  default CodeBuilder arraylength() { return with(OperatorInstruction.of(Opcode.ARRAYLENGTH)); }
+  default CodeBuilder newarray(TypeKind component) { return with(NewPrimitiveArrayInstruction.of(component)); }
+  default CodeBuilder anewarray(ClassEntry component) { return with(NewReferenceArrayInstruction.of(component)); }
+  default CodeBuilder anewarray(ClassDesc component) { return anewarray(constantPool().classEntry(component)); }
+  default CodeBuilder multianewarray(ClassEntry type, int dimensions) { return with(NewMultiArrayInstruction.of(type, dimensions)); }
+  default CodeBuilder multianewarray(ClassDesc type, int dimensions) { return multianewarray(constantPool().classEntry(type), dimensions); }
+  default CodeBuilder checkcast(ClassEntry type) { return with(TypeCheckInstruction.of(Opcode.CHECKCAST, type)); }
+  default CodeBuilder checkcast(ClassDesc type) { return checkcast(constantPool().classEntry(type)); }
+  default CodeBuilder instanceOf(ClassEntry type) { return with(TypeCheckInstruction.of(Opcode.INSTANCEOF, type)); }
+  default CodeBuilder instanceOf(ClassDesc type) { return instanceOf(constantPool().classEntry(type)); }
+  default CodeBuilder monitorenter() { return with(MonitorInstruction.of(Opcode.MONITORENTER)); }
+  default CodeBuilder monitorexit() { return with(MonitorInstruction.of(Opcode.MONITOREXIT)); }
   default CodeBuilder loadLocal(TypeKind kind, int slot) { return with(LoadInstruction.of(kind, slot)); }
   default CodeBuilder storeLocal(TypeKind kind, int slot) { return with(StoreInstruction.of(kind, slot)); }
   default CodeBuilder iload(int slot) { return loadLocal(TypeKind.INT, slot); }
@@ -168,8 +208,43 @@ public interface CodeBuilder extends ClassFileBuilder<CodeElement, CodeBuilder> 
   default CodeBuilder dadd() { return with(OperatorInstruction.of(Opcode.DADD)); }
   default CodeBuilder isub() { return with(OperatorInstruction.of(Opcode.ISUB)); }
   default CodeBuilder lsub() { return with(OperatorInstruction.of(Opcode.LSUB)); }
+  default CodeBuilder fsub() { return with(OperatorInstruction.of(Opcode.FSUB)); }
   default CodeBuilder dsub() { return with(OperatorInstruction.of(Opcode.DSUB)); }
+  default CodeBuilder imul() { return with(OperatorInstruction.of(Opcode.IMUL)); }
+  default CodeBuilder lmul() { return with(OperatorInstruction.of(Opcode.LMUL)); }
+  default CodeBuilder fmul() { return with(OperatorInstruction.of(Opcode.FMUL)); }
+  default CodeBuilder dmul() { return with(OperatorInstruction.of(Opcode.DMUL)); }
+  default CodeBuilder idiv() { return with(OperatorInstruction.of(Opcode.IDIV)); }
+  default CodeBuilder ldiv() { return with(OperatorInstruction.of(Opcode.LDIV)); }
+  default CodeBuilder fdiv() { return with(OperatorInstruction.of(Opcode.FDIV)); }
+  default CodeBuilder ddiv() { return with(OperatorInstruction.of(Opcode.DDIV)); }
+  default CodeBuilder irem() { return with(OperatorInstruction.of(Opcode.IREM)); }
+  default CodeBuilder lrem() { return with(OperatorInstruction.of(Opcode.LREM)); }
+  default CodeBuilder frem() { return with(OperatorInstruction.of(Opcode.FREM)); }
+  default CodeBuilder drem() { return with(OperatorInstruction.of(Opcode.DREM)); }
+  default CodeBuilder ineg() { return with(OperatorInstruction.of(Opcode.INEG)); }
+  default CodeBuilder lneg() { return with(OperatorInstruction.of(Opcode.LNEG)); }
+  default CodeBuilder fneg() { return with(OperatorInstruction.of(Opcode.FNEG)); }
+  default CodeBuilder dneg() { return with(OperatorInstruction.of(Opcode.DNEG)); }
+  default CodeBuilder ishl() { return with(OperatorInstruction.of(Opcode.ISHL)); }
+  default CodeBuilder lshl() { return with(OperatorInstruction.of(Opcode.LSHL)); }
+  default CodeBuilder ishr() { return with(OperatorInstruction.of(Opcode.ISHR)); }
+  default CodeBuilder lshr() { return with(OperatorInstruction.of(Opcode.LSHR)); }
+  default CodeBuilder iushr() { return with(OperatorInstruction.of(Opcode.IUSHR)); }
+  default CodeBuilder lushr() { return with(OperatorInstruction.of(Opcode.LUSHR)); }
+  default CodeBuilder iand() { return with(OperatorInstruction.of(Opcode.IAND)); }
+  default CodeBuilder land() { return with(OperatorInstruction.of(Opcode.LAND)); }
+  default CodeBuilder ior() { return with(OperatorInstruction.of(Opcode.IOR)); }
+  default CodeBuilder lor() { return with(OperatorInstruction.of(Opcode.LOR)); }
+  default CodeBuilder ixor() { return with(OperatorInstruction.of(Opcode.IXOR)); }
+  default CodeBuilder lxor() { return with(OperatorInstruction.of(Opcode.LXOR)); }
   default CodeBuilder dup() { return with(StackInstruction.of(Opcode.DUP)); }
+  default CodeBuilder dup_x1() { return with(StackInstruction.of(Opcode.DUP_X1)); }
+  default CodeBuilder dup_x2() { return with(StackInstruction.of(Opcode.DUP_X2)); }
+  default CodeBuilder dup2() { return with(StackInstruction.of(Opcode.DUP2)); }
+  default CodeBuilder dup2_x1() { return with(StackInstruction.of(Opcode.DUP2_X1)); }
+  default CodeBuilder dup2_x2() { return with(StackInstruction.of(Opcode.DUP2_X2)); }
+  default CodeBuilder swap() { return with(StackInstruction.of(Opcode.SWAP)); }
   default CodeBuilder pop() { return with(StackInstruction.of(Opcode.POP)); }
   default CodeBuilder pop2() { return with(StackInstruction.of(Opcode.POP2)); }
   default CodeBuilder fieldAccess(Opcode opcode, FieldRefEntry field) { return with(FieldInstruction.of(opcode, field)); }
@@ -190,9 +265,17 @@ public interface CodeBuilder extends ClassFileBuilder<CodeElement, CodeBuilder> 
         constantPool().methodRefEntry(owner, name, type));
   }
   default CodeBuilder invokespecial(ClassDesc owner, String name, MethodTypeDesc type) { return invoke(Opcode.INVOKESPECIAL, owner, name, type, false); }
+  default CodeBuilder invokespecial(ClassDesc owner, String name, MethodTypeDesc type, boolean isInterface) { return invoke(Opcode.INVOKESPECIAL, owner, name, type, isInterface); }
+  default CodeBuilder invokespecial(MethodRefEntry method) { return invoke(Opcode.INVOKESPECIAL, method); }
+  default CodeBuilder invokespecial(InterfaceMethodRefEntry method) { return invoke(Opcode.INVOKESPECIAL, method); }
   default CodeBuilder invokestatic(ClassDesc owner, String name, MethodTypeDesc type) { return invoke(Opcode.INVOKESTATIC, owner, name, type, false); }
+  default CodeBuilder invokestatic(ClassDesc owner, String name, MethodTypeDesc type, boolean isInterface) { return invoke(Opcode.INVOKESTATIC, owner, name, type, isInterface); }
+  default CodeBuilder invokestatic(MethodRefEntry method) { return invoke(Opcode.INVOKESTATIC, method); }
+  default CodeBuilder invokestatic(InterfaceMethodRefEntry method) { return invoke(Opcode.INVOKESTATIC, method); }
   default CodeBuilder invokevirtual(ClassDesc owner, String name, MethodTypeDesc type) { return invoke(Opcode.INVOKEVIRTUAL, owner, name, type, false); }
+  default CodeBuilder invokevirtual(MethodRefEntry method) { return invoke(Opcode.INVOKEVIRTUAL, method); }
   default CodeBuilder invokeinterface(ClassDesc owner, String name, MethodTypeDesc type) { return invoke(Opcode.INVOKEINTERFACE, owner, name, type, true); }
+  default CodeBuilder invokeinterface(InterfaceMethodRefEntry method) { return invoke(Opcode.INVOKEINTERFACE, method); }
   default CodeBuilder invokedynamic(InvokeDynamicEntry entry) { return with(InvokeDynamicInstruction.of(entry)); }
   default CodeBuilder invokedynamic(DynamicCallSiteDesc descriptor) { return invokedynamic(constantPool().invokeDynamicEntry(Objects.requireNonNull(descriptor))); }
 }

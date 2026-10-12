@@ -26,19 +26,27 @@ import java.util.Objects;
 
 /** Internal checked Java constant-pool engine. Raw-copy authority is held source identity, not byte equality. */
 public final class DoppioConstantPool implements ConstantPoolBuilder {
+  private static final DoppioConstantPool TEMPORARY = new DoppioConstantPool(null, true);
   private final List<Entry> entries = new ArrayList<Entry>();
   private final Map<String, Entry> interned = new HashMap<String, Entry>();
   private final Map<String, BootstrapMethodEntry> internedBootstraps = new HashMap<String, BootstrapMethodEntry>();
   private final ConstantPool directSource;
+  private final boolean temporary;
   private final List<BootstrapMethodEntry> bootstraps = new ArrayList<BootstrapMethodEntry>();
   private boolean bootstrapPayloadRead;
   private boolean frozen;
 
   public DoppioConstantPool() { this(null); }
   private DoppioConstantPool(ConstantPool directSource) {
+    this(directSource, false);
+  }
+  private DoppioConstantPool(ConstantPool directSource, boolean temporary) {
     this.directSource = directSource;
+    this.temporary = temporary;
     entries.add(null);
   }
+  /** Unbound symbols have semantic children, never a writable indexed pool. */
+  public static ConstantPoolBuilder temporaryPool() { return TEMPORARY; }
 
   public static DoppioConstantPool decode(byte[] bytes, int[] cursor) {
     Objects.requireNonNull(bytes); Objects.requireNonNull(cursor);
@@ -118,23 +126,27 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
   public void freeze() { validateBootstrapReferences(); frozen = true; }
   public boolean canWriteDirect(ConstantPool source) {
     Objects.requireNonNull(source);
+    if (temporary) return false;
     if (source instanceof ClassReader) source = DoppioClassReader.readerPool((ClassReader) source);
     return source == this || source == directSource;
   }
-  public int size() { return entries.size(); }
+  public int size() { if (temporary) throw new UnsupportedOperationException(); return entries.size(); }
   public PoolEntry entryByIndex(int index) {
+    if (temporary) throw new UnsupportedOperationException();
     if (index <= 0 || index >= entries.size() || entries.get(index) == null)
       throw new ConstantPoolException("Unusable constant-pool index " + index);
     return entries.get(index);
   }
   public <T extends PoolEntry> T entryByIndex(int index, Class<T> type) {
+    if (temporary) throw new UnsupportedOperationException();
     Objects.requireNonNull(type);
     PoolEntry value = entryByIndex(index);
     if (!type.isInstance(value)) throw new ConstantPoolException("Wrong constant-pool entry type at " + index);
     return type.cast(value);
   }
-  public int bootstrapMethodCount() { return bootstraps.size(); }
+  public int bootstrapMethodCount() { if (temporary) throw new UnsupportedOperationException(); return bootstraps.size(); }
   public BootstrapMethodEntry bootstrapMethodEntry(int index) {
+    if (temporary) throw new UnsupportedOperationException();
     if (index < 0 || index >= bootstraps.size()) throw new ConstantPoolException("Invalid bootstrap index " + index);
     return bootstraps.get(index);
   }
@@ -217,17 +229,21 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
 
   public Utf8Entry utf8Entry(String value) {
     Objects.requireNonNull(value);
+    if (temporary) return (Utf8Entry) temporaryEntry(1, -1, null, null, value);
     return (Utf8Entry) intern(1, 0, 0, value);
   }
   public ClassEntry classEntry(String internalName) { return classEntry(utf8Entry(internalName)); }
   public ClassEntry classEntry(Utf8Entry name) {
     Objects.requireNonNull(name);
+    if (temporary) return (ClassEntry) temporaryEntry(7, -2, name, null, null);
     String value = name.stringValue();
     if (value.startsWith("[")) ClassDesc.ofDescriptor(value);
     else ClassDesc.ofInternalName(value);
     return (ClassEntry) intern(7, utf8Entry(value).index(), 0, null);
   }
   public NameAndTypeEntry nameAndTypeEntry(Utf8Entry name, Utf8Entry type) {
+    if (temporary) return (NameAndTypeEntry) temporaryEntry(12, -3,
+      Objects.requireNonNull(name), Objects.requireNonNull(type), null);
     return (NameAndTypeEntry) intern(12, utf8Entry(Objects.requireNonNull(name).stringValue()).index(),
       utf8Entry(Objects.requireNonNull(type).stringValue()).index(), null);
   }
@@ -242,19 +258,23 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
   }
   private Entry member(int tag, ClassEntry owner, NameAndTypeEntry member) {
     Objects.requireNonNull(owner); Objects.requireNonNull(member);
+    if (temporary) return temporaryEntry(tag, -3, owner, member, null);
     ClassEntry localOwner = classEntry(owner.name());
     NameAndTypeEntry localMember = nameAndTypeEntry(member.name(), member.type());
     return intern(tag, localOwner.index(), localMember.index(), null);
   }
   public MethodTypeEntry methodTypeEntry(MethodTypeDesc descriptor) {
+    if (temporary) throw new UnsupportedOperationException();
     return methodTypeEntry(utf8Entry(Objects.requireNonNull(descriptor).descriptorString()));
   }
   public MethodTypeEntry methodTypeEntry(Utf8Entry descriptor) {
+    if (temporary) throw new UnsupportedOperationException();
     Objects.requireNonNull(descriptor);
     MethodTypeDesc.ofDescriptor(descriptor.stringValue());
     return (MethodTypeEntry) intern(16, utf8Entry(descriptor.stringValue()).index(), 0, null);
   }
   public MethodHandleEntry methodHandleEntry(int kind, MemberRefEntry reference) {
+    if (temporary) throw new UnsupportedOperationException();
     MemberRefEntry local = (MemberRefEntry) importEntry(Objects.requireNonNull(reference));
     return (MethodHandleEntry) intern(15, kind, local.index(), null);
   }
@@ -308,6 +328,7 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
     return (ConstantDynamicEntry) dynamic(17, bootstrap, member, new ImportState());
   }
   private Entry dynamic(int tag, BootstrapMethodEntry bootstrap, NameAndTypeEntry member, ImportState state) {
+    if (temporary) throw new UnsupportedOperationException();
     NameAndTypeEntry local = (NameAndTypeEntry) importEntry(Objects.requireNonNull(member), state);
     if (tag == 17) {
       ClassDesc type = ClassDesc.ofDescriptor(local.type().stringValue());
@@ -317,6 +338,7 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
     return intern(tag, imported.bsmIndex(), local.index(), null);
   }
   public BootstrapMethodEntry bsmEntry(MethodHandleEntry method, List<LoadableConstantEntry> arguments) {
+    if (temporary) throw new UnsupportedOperationException();
     Objects.requireNonNull(method); Objects.requireNonNull(arguments);
     return bootstrap(method, arguments, new ImportState());
   }
@@ -413,12 +435,28 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
     }
     void leave(Object value) { active.remove(value); }
   }
-  public IntegerEntry intEntry(int value) { return (IntegerEntry) intern(3, value, 0, Integer.valueOf(value)); }
-  public FloatEntry floatEntry(float value) { return (FloatEntry) intern(4, Float.floatToRawIntBits(value), 0, Float.valueOf(value)); }
-  public LongEntry longEntry(long value) { return (LongEntry) intern(5, 0, 0, Long.valueOf(value)); }
-  public DoubleEntry doubleEntry(double value) { return (DoubleEntry) intern(6, 0, 0, Double.valueOf(value)); }
+  public IntegerEntry intEntry(int value) {
+    return (IntegerEntry) (temporary ? temporaryEntry(3, -1, null, null, Integer.valueOf(value)) : intern(3, value, 0, Integer.valueOf(value)));
+  }
+  public FloatEntry floatEntry(float value) {
+    return (FloatEntry) (temporary ? temporaryEntry(4, -1, null, null, Float.valueOf(value)) : intern(4, Float.floatToRawIntBits(value), 0, Float.valueOf(value)));
+  }
+  public LongEntry longEntry(long value) {
+    return (LongEntry) (temporary ? temporaryEntry(5, -1, null, null, Long.valueOf(value)) : intern(5, 0, 0, Long.valueOf(value)));
+  }
+  public DoubleEntry doubleEntry(double value) {
+    return (DoubleEntry) (temporary ? temporaryEntry(6, -1, null, null, Double.valueOf(value)) : intern(6, 0, 0, Double.valueOf(value)));
+  }
   public StringEntry stringEntry(Utf8Entry value) {
+    if (temporary) return (StringEntry) temporaryEntry(8, -2, Objects.requireNonNull(value), null, null);
     return (StringEntry) intern(8, utf8Entry(Objects.requireNonNull(value).stringValue()).index(), 0, null);
+  }
+
+  private Entry temporaryEntry(int tag, int index, PoolEntry first, PoolEntry second, Object value) {
+    Entry entry = createEntry(tag, index, 0, 0, value, null);
+    entry.firstReference = first;
+    entry.secondReference = second;
+    return entry;
   }
 
   private Entry intern(int tag, int first, int second, Object value) {
@@ -432,6 +470,14 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
     if (entries.size() + (tag == 5 || tag == 6 ? 2 : 1) > 65535)
       throw new IllegalArgumentException("Constant-pool limit exceeded");
     int index = entries.size();
+    Entry entry = createEntry(tag, index, first, second, value, raw);
+    entries.add(entry);
+    if (entry.width() == 2) entries.add(null);
+    String key = key(tag, first, second, value);
+    if (!interned.containsKey(key)) interned.put(key, entry);
+    return entry;
+  }
+  private Entry createEntry(int tag, int index, int first, int second, Object value, byte[] raw) {
     Entry entry;
     switch (tag) {
       case 1: entry = new Utf(this, index, tag, first, second, value, raw); break;
@@ -451,10 +497,6 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
       case 18: entry = new InvokeDynamicValue(this, index, tag, first, second, value, raw); break;
       default: entry = new Entry(this, index, tag, first, second, value, raw);
     }
-    entries.add(entry);
-    if (entry.width() == 2) entries.add(null);
-    String key = key(tag, first, second, value);
-    if (!interned.containsKey(key)) interned.put(key, entry);
     return entry;
   }
   private static String key(int tag, int first, int second, Object value) {
@@ -519,6 +561,7 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
     final int index, tag, first, second;
     final Object value;
     final byte[] raw;
+    PoolEntry firstReference, secondReference;
     Entry(DoppioConstantPool pool, int index, int tag, int first, int second, Object value, byte[] raw) {
       this.pool = pool; this.index = index; this.tag = tag; this.first = first; this.second = second; this.value = value; this.raw = raw;
     }
@@ -526,6 +569,12 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
     public int tag() { return tag; }
     public int index() { return index; }
     public int width() { return tag == 5 || tag == 6 ? 2 : 1; }
+    final <T extends PoolEntry> T firstReference(Class<T> type) {
+      return firstReference == null ? pool.entryByIndex(first, type) : type.cast(firstReference);
+    }
+    final <T extends PoolEntry> T secondReference(Class<T> type) {
+      return secondReference == null ? pool.entryByIndex(second, type) : type.cast(secondReference);
+    }
   }
   private static final class Utf extends Entry implements Utf8Entry {
     Utf(DoppioConstantPool p, int i, int t, int a, int b, Object v, byte[] r) { super(p, i, t, a, b, v, r); }
@@ -541,7 +590,7 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
   }
   private static final class ClassValue extends Entry implements ClassEntry {
     ClassValue(DoppioConstantPool p, int i, int t, int a, int b, Object v, byte[] r) { super(p, i, t, a, b, v, r); }
-    public Utf8Entry name() { return pool.entryByIndex(first, Utf8Entry.class); }
+    public Utf8Entry name() { return firstReference(Utf8Entry.class); }
     public String asInternalName() { return name().stringValue(); }
     public ClassDesc asSymbol() {
       String name = asInternalName(); return name.startsWith("[") ? ClassDesc.ofDescriptor(name) : ClassDesc.ofInternalName(name);
@@ -550,13 +599,13 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
   }
   private static final class NameType extends Entry implements NameAndTypeEntry {
     NameType(DoppioConstantPool p, int i, int t, int a, int b, Object v, byte[] r) { super(p, i, t, a, b, v, r); }
-    public Utf8Entry name() { return pool.entryByIndex(first, Utf8Entry.class); }
-    public Utf8Entry type() { return pool.entryByIndex(second, Utf8Entry.class); }
+    public Utf8Entry name() { return firstReference(Utf8Entry.class); }
+    public Utf8Entry type() { return secondReference(Utf8Entry.class); }
   }
   private static class Member extends Entry implements MemberRefEntry {
     Member(DoppioConstantPool p, int i, int t, int a, int b, Object v, byte[] r) { super(p, i, t, a, b, v, r); }
-    public ClassEntry owner() { return pool.entryByIndex(first, ClassEntry.class); }
-    public NameAndTypeEntry nameAndType() { return pool.entryByIndex(second, NameAndTypeEntry.class); }
+    public ClassEntry owner() { return firstReference(ClassEntry.class); }
+    public NameAndTypeEntry nameAndType() { return secondReference(NameAndTypeEntry.class); }
   }
   private static final class FieldValue extends Member implements FieldRefEntry {
     FieldValue(DoppioConstantPool p, int i, int t, int a, int b, Object v, byte[] r) { super(p, i, t, a, b, v, r); }
@@ -589,7 +638,7 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
   }
   private static final class StringValue extends Entry implements StringEntry {
     StringValue(DoppioConstantPool p, int i, int t, int a, int b, Object v, byte[] r) { super(p, i, t, a, b, v, r); }
-    public Utf8Entry utf8() { return pool.entryByIndex(first, Utf8Entry.class); }
+    public Utf8Entry utf8() { return firstReference(Utf8Entry.class); }
     public String stringValue() { return utf8().stringValue(); }
     public boolean equalsString(String value) { return stringValue().equals(value); }
     public ConstantDesc constantValue() { return (ConstantDesc) (Object) stringValue(); }
