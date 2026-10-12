@@ -415,6 +415,71 @@ test('invalid field metadata rejects capture without resolving, initializing or 
   error(w, 'Ljava/lang/NullPointerException;');
 });
 
+test('field factory missing/incorrect descriptors use NoSuchFieldException without weakening private capture', () => {
+  for (const [name, descriptor] of [['missing', 'I'], ['value', 'J']]) {
+    const w = world(), owner = w.register(new ReferenceClass('Lowner/Factory;', w.objectClass));
+    w.member(owner, 'value', 'I');
+    assert.equal(helper[signatures.final](w.thread, mirror(owner), text(name), mirror(w.primitives[descriptor]), 0), undefined);
+    error(w, 'Ljava/lang/NoSuchFieldException;'); assert.deepEqual(w.events, []);
+    const captureWorld = world(), captureOwner = captureWorld.register(new ReferenceClass('Lowner/Factory;', captureWorld.objectClass));
+    captureWorld.member(captureOwner, 'value', 'I'); const handle = {};
+    helper[signatures.field](captureWorld.thread, handle, mirror(captureOwner), text(name), mirror(captureWorld.primitives[descriptor]), 0);
+    error(captureWorld, 'Ljava/lang/InternalError;'); assert.equal(Object.hasOwn(handle, '$varHandleCapability'), false);
+  }
+  const w = world(), owner = w.register(new ReferenceClass('Lowner/ReportedType;', w.objectClass));
+  const actual = w.member(owner, 'value', 'I');
+  // Even an inconsistent metadata query must not substitute the getter's
+  // alleged return type for the real declaration descriptor.
+  owner.fieldLookup = () => actual;
+  helper[signatures.final](w.thread, mirror(owner), text('value'), mirror(w.primitives.J), 0);
+  error(w, 'Ljava/lang/NoSuchFieldException;'); assert.deepEqual(w.events, []);
+});
+
+test('field factory static/instance mismatches use IllegalAccessException, not an internal capture error', () => {
+  for (const isStatic of [false, true]) {
+    const w = world(), owner = w.register(new ReferenceClass('Lowner/Staticness;', w.objectClass));
+    w.member(owner, 'value', 'I', isStatic);
+    helper[signatures.final](w.thread, mirror(owner), text('value'), mirror(w.primitives.I), isStatic ? 0 : 1);
+    error(w, 'Ljava/lang/IllegalAccessException;'); assert.deepEqual(w.events, []);
+  }
+});
+
+test('field factory reference identity is checked against actual declaration-loader metadata', () => {
+  for (const final of [false, true]) {
+    const w = world(), owner = w.register(new ReferenceClass('Lbase/Reference;', w.objectClass));
+    const child = w.register(new ReferenceClass('Lchild/Reference;', owner));
+    w.member(owner, 'value', 'Ljava/lang/String;', false, final);
+    const reads = [], loader = owner.getLoader();
+    owner.getLoader = () => ({getLoadedClass(name) { reads.push(name); return loader.getLoadedClass(name); },
+      getResolvedClass: () => assert.fail('Factory must not resolve field type'),
+      initializeClass: () => assert.fail('Factory must not initialize field type')});
+    assert.equal(helper[signatures.final](w.thread, mirror(child), text('value'), mirror(w.stringClass), 0), final);
+    assert.deepEqual(reads, ['Ljava/lang/String;']); assert.deepEqual(w.events, []); assert.deepEqual(w.errors, []);
+    const foreign = new ReferenceClass('Ljava/lang/String;', w.objectClass);
+    helper[signatures.final](w.thread, mirror(child), text('value'), mirror(foreign), 0);
+    error(w, 'Ljava/lang/NoSuchFieldException;'); assert.deepEqual(w.events, []);
+  }
+});
+
+test('field factory null and impossible unlinked metadata retain their separate NPE/InternalError boundaries', () => {
+  for (const parameter of [0, 1, 2]) {
+    const w = world(), owner = w.register(new ReferenceClass('Lowner/NullMetadata;', w.objectClass));
+    const args = [mirror(owner), text('value'), mirror(w.primitives.I), 0]; args[parameter] = null;
+    helper[signatures.final](w.thread, ...args); error(w, 'Ljava/lang/NullPointerException;');
+  }
+  for (const stage of ['owner', 'declaration', 'reference-type']) {
+    const w = world(), owner = w.register(new ReferenceClass('Lowner/Unlinked;', w.objectClass));
+    const declared = w.register(new ReferenceClass('Lbase/Unlinked;', w.objectClass));
+    const descriptor = stage === 'reference-type' ? 'Ljava/lang/String;' : 'I';
+    const field = w.member(declared, 'value', descriptor); owner.fieldLookup = () => field;
+    if (stage === 'owner') owner.resolved = false;
+    if (stage === 'declaration') declared.resolved = false;
+    if (stage === 'reference-type') declared.getLoader = () => ({getLoadedClass: () => null});
+    helper[signatures.final](w.thread, mirror(owner), text('value'), mirror(stage === 'reference-type' ? w.stringClass : w.primitives.I), 0);
+    error(w, 'Ljava/lang/InternalError;'); assert.deepEqual(w.events, []);
+  }
+});
+
 test('array capture and view copying retain frozen exact capability identity', () => {
   const w = world(), state = w.arrayStorage('I', [17, 9, 23]), copy = {};
   helper[signatures.copy](w.thread, state.handle, copy);

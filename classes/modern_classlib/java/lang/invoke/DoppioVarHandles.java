@@ -27,7 +27,7 @@ public final class DoppioVarHandles {
   }
 
   private static VarHandle fieldHandle(Class<?> owner, String name, Class<?> type,
-      boolean isStatic, Class<?>[] coordinates) {
+      boolean isStatic, Class<?>[] coordinates) throws NoSuchFieldException, IllegalAccessException {
     DoppioVarHandle handle = new DoppioVarHandle(type, coordinates,
         fieldIsFinal(owner, name, type, isStatic), false);
     captureField(handle, owner, name, type, isStatic);
@@ -133,7 +133,8 @@ public final class DoppioVarHandles {
   // Lookup or use its authority for caller-requested fields.
   private static native MethodHandle operationHandle() throws NoSuchMethodException, IllegalAccessException;
   private static native MethodHandle selectorHandle() throws NoSuchMethodException, IllegalAccessException;
-  private static native boolean fieldIsFinal(Class<?> owner, String name, Class<?> type, boolean isStatic);
+  private static native boolean fieldIsFinal(Class<?> owner, String name, Class<?> type, boolean isStatic)
+      throws NoSuchFieldException, IllegalAccessException;
   private static native void captureField(VarHandle handle, Class<?> owner, String name,
       Class<?> type, boolean isStatic);
   private static native void captureArray(VarHandle handle, Class<?> arrayType);

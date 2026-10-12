@@ -122,8 +122,42 @@ export default function (): any {
     public static 'fieldIsFinal(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/Class;Z)Z'(
         thread: JVMThread, owner: JVMTypes.java_lang_Class, name: JVMTypes.java_lang_String,
         valueType: JVMTypes.java_lang_Class, isStatic: number): boolean {
-      var field = capture(thread, owner, name, valueType, isStatic);
-      return field === null ? undefined : field.accessFlags.isFinal();
+      if (owner === null || name === null || valueType === null) {
+        thread.throwNewException('Ljava/lang/NullPointerException;', 'Null VarHandle field metadata');
+        return;
+      }
+      if (!(owner.$cls instanceof ReferenceClassData) || !owner.$cls.isResolved()) {
+        thread.throwNewException('Ljava/lang/InternalError;', 'Unlinked VarHandle field owner');
+        return;
+      }
+      // A stock getter's reported MethodType is not authority for the variable
+      // type. Revalidate the actual descriptor before publishing the handle.
+      var descriptor = valueType.$cls.getInternalName(),
+        field = (<ReferenceClassData<JVMTypes.java_lang_Object>> owner.$cls).fieldLookup(name.toString(), descriptor);
+      if (field === null || field.rawDescriptor !== descriptor) {
+        thread.throwNewException('Ljava/lang/NoSuchFieldException;', 'No VarHandle field with the requested name and type');
+        return;
+      }
+      if (!field.cls.isResolved()) {
+        thread.throwNewException('Ljava/lang/InternalError;', 'Unlinked VarHandle field declaration');
+        return;
+      }
+      if (field.accessFlags.isStatic() !== (isStatic !== 0)) {
+        thread.throwNewException('Ljava/lang/IllegalAccessException;', 'Incorrect VarHandle field staticness');
+        return;
+      }
+      if (descriptor.charAt(0) === 'L' || descriptor.charAt(0) === '[') {
+        var actualType = field.cls.getLoader().getLoadedClass(descriptor);
+        if (actualType === null) {
+          thread.throwNewException('Ljava/lang/InternalError;', 'Unlinked VarHandle field value type');
+          return;
+        }
+        if (actualType !== valueType.$cls) {
+          thread.throwNewException('Ljava/lang/NoSuchFieldException;', 'Incorrect VarHandle field value type identity');
+          return;
+        }
+      }
+      return field.accessFlags.isFinal();
     }
 
     public static 'captureField(Ljava/lang/invoke/VarHandle;Ljava/lang/Class;Ljava/lang/String;Ljava/lang/Class;Z)V'(

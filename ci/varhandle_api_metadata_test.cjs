@@ -318,6 +318,33 @@ test('compiled user-field factories keep authorization on their supplied caller 
   }
 });
 
+test('compiled field identity validation retains checked errors before construction and capability installation', () => {
+  const unit = compiled.get('DoppioVarHandles');
+  const validationDescriptor = '(' + cls + text + cls + 'Z)Z';
+  const validation = method(unit, 'fieldIsFinal', validationDescriptor);
+  assert.equal(validation.flags, 0x010a);
+  assert.equal(validation.code, undefined);
+  assert.deepEqual(exceptions(unit, validation), ['java/lang/NoSuchFieldException', 'java/lang/IllegalAccessException']);
+  const fieldFactory = method(unit, 'fieldHandle', '(' + cls + text + cls + 'Z[' + cls + ')' + variable);
+  assert.equal(fieldFactory.flags, 0x000a);
+  assert.deepEqual(exceptions(unit, fieldFactory), ['java/lang/NoSuchFieldException', 'java/lang/IllegalAccessException']);
+  const body = code(unit, fieldFactory);
+  const findCall = (opcode, owner, name, descriptor) => {
+    const positions = body.flatMap((instruction, index) => instruction.name === opcode && instruction.cp?.tag === 10 &&
+      instruction.cp.owner === owner && instruction.cp.name === name && instruction.cp.descriptor === descriptor ? [index] : []);
+    assert.equal(positions.length, 1, 'One actual compiled invocation of ' + name + descriptor);
+    return positions[0];
+  };
+  const checked = findCall('invokestatic', 'java.lang.invoke.DoppioVarHandles', 'fieldIsFinal', validationDescriptor);
+  const constructed = findCall('invokespecial', 'java.lang.invoke.DoppioVarHandle', '<init>', '(' + cls + '[' + cls + 'ZZ)V');
+  const installed = findCall('invokestatic', 'java.lang.invoke.DoppioVarHandles', 'captureField',
+    '(' + variable + cls + text + cls + 'Z)V');
+  assert.ok(checked < constructed && constructed < installed,
+    'Type/static/final identity validation precedes constructor completion and captured capability installation');
+  // The Java new instruction may run first. No pre-allocation promise is made;
+  // the boundary is that a failing validation cannot construct/install a handle.
+});
+
 test('actual compiler bootstrap artifact has exactly the C3 public factories and typed helper delegates', () => {
   const factoryGroups = [
     ['MethodHandles', [
