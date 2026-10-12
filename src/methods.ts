@@ -431,6 +431,17 @@ export class Field extends AbstractMethodField {
     this.defaultFieldValue = this.getDefaultFieldValue();
   }
 
+  /** Hidden identity is minted after parsing but before hierarchy/constructor
+   * assembly. Every field consumer must use the same declaring-identity key;
+   * descriptor strings and field slots are deliberately not rewritten. */
+  public rebindHiddenOwner(): void {
+    if (!this.cls.isHidden() || this.cls.getFields().indexOf(this) === -1) {
+      throw new Error('Only a hidden declaration can rebind its own field key');
+    }
+    this.fullName = `${descriptor2typestr(this.cls.getInternalName())}/${this.name}`;
+    this.escapedFullName = reescapeJVMName(this.fullName);
+  }
+
   /**
    * Calls cb with the reflectedField if it succeeds. Calls cb with null if it
    * fails.

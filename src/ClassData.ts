@@ -1107,6 +1107,7 @@ export class ReferenceClassData<T extends JVMTypes.java_lang_Object> extends Cla
     var name = this.getExternalName(), packageName = this.getPackageName();
     this.hiddenDefinition = {name: name + '/' + suffix, packageName, classData, strong};
     this.className = this.className.slice(0, -1) + '.' + suffix + ';';
+    this.fields.forEach(field => field.rebindHiddenOwner());
     this.thisClassReference.name = this.className;
     this.thisClassReference.cls = this;
   }

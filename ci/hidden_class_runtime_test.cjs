@@ -10,7 +10,7 @@ const root = path.resolve(__dirname, '..');
 const runtime = process.env.DOPPIO_RELEASE_CLI_ROOT || path.join(root, 'build/release-cli');
 const sourceModules = new Set(['ClassData', 'ClassLoader', 'ConstantPool', 'threading', 'methods',
   'ClassVerification', 'ClassPreparation', 'LoadingConstraints', 'BytecodeVerifier', 'BytecodeTypeVerifier',
-  'VerificationRelations', 'ReflectionAdapters', 'GeneratedAdapters', 'LambdaAdapters', 'SymbolicResolution', 'ClassAccess', 'util', 'BootstrapLinkage']);
+  'VerificationRelations', 'ReflectionAdapters', 'GeneratedAdapters', 'LambdaAdapters', 'SymbolicResolution', 'ClassAccess', 'util', 'BootstrapLinkage', 'VarHandleStorage']);
 const cache = new Map();
 function load(name) {
   if (process.env.DOPPIO_VERIFY_SOURCE !== '1') return require(path.join(runtime, 'src', name + '.js'));
@@ -36,7 +36,7 @@ const u4 = value => { const bytes = Buffer.alloc(4); bytes.writeUInt32BE(value);
 // Deliberately synthetic bytes isolate actual parser, identity, derivation,
 // metadata resolver and array paths. Genuine javac21/25 and native/browser
 // execution are separate C5 corpus evidence, never claimed by these units.
-function classBytes({name = 'scope/Payload', parent = 'java/lang/Object', fields = [], selfReturn = false,
+function classBytes({name = 'scope/Payload', parent = 'java/lang/Object', fields = [], selfReturn = false, fieldReference = false,
     nestHost, flags = 0x21, major = 65} = {}) {
   const entries = [], constants = new Map();
   function utf(value) {
@@ -61,6 +61,14 @@ function classBytes({name = 'scope/Payload', parent = 'java/lang/Object', fields
   const self = cls(name), superClass = parent === null ? 0 : cls(parent), otherSelf = cls(name, true),
     members = fields.map(field => Buffer.concat([u2(field.flags || 1), u2(utf(field.name)),
       u2(utf(field.descriptor)), u2(0)])), methods = [], attributes = [];
+  let fieldRef;
+  if (fieldReference) {
+    const field = fields[0], fieldName = utf(field.name), descriptor = utf(field.descriptor);
+    entries.push(Buffer.concat([Buffer.from([12]), u2(fieldName), u2(descriptor)]));
+    const pair = entries.length;
+    entries.push(Buffer.concat([Buffer.from([9]), u2(self), u2(pair)]));
+    fieldRef = entries.length;
+  }
   if (selfReturn) {
     const code = Buffer.from([0x2a, 0xb0]), body = Buffer.concat([u2(1), u2(1), u4(code.length), code, u2(0), u2(0)]);
     methods.push(Buffer.concat([u2(1), u2(utf('self')), u2(utf('()L' + name + ';')), u2(1),
@@ -70,7 +78,7 @@ function classBytes({name = 'scope/Payload', parent = 'java/lang/Object', fields
   const bytes = Buffer.concat([u4(0xcafebabe), u2(0), u2(major), u2(entries.length + 1), ...entries,
     u2(flags), u2(self), u2(superClass), u2(0), u2(members.length), ...members,
     u2(methods.length), ...methods, u2(attributes.length), ...attributes]);
-  return {bytes, self, otherSelf};
+  return {bytes, self, otherSelf, fieldRef};
 }
 function world() {
   const loader = new ClassLoader(null), requests = [];
@@ -334,4 +342,32 @@ test('Class.getPackageName preserves the original runtime package of hidden clas
   }
   assert.deepEqual(w.requests, []);
   assert.deepEqual(owner.statuses, []);
+});
+
+for (const isStatic of [false, true]) test('hidden ' + (isStatic ? 'static' : 'instance') +
+    ' field Code, constructor storage, reflection slot and VarHandle use one rebound owner key', async () => {
+  const w = world(), {cls, input} = parse(w, {fields: [{name: 'wide', descriptor: 'J', flags: isStatic ? 0x19 : 0x11}], fieldReference: true}),
+    {captureVarHandleField, operateVarHandleStorage} = load('VarHandleStorage'),
+    Long = require(path.join(runtime, 'src/gLong')).default;
+  cls.markHidden('0x1', null, false);
+  assert.equal(await new Promise(resolve => w.loader.defineHiddenParsedClass(w.thread, cls, resolve)), cls);
+  assert.equal(cls.tryToInitialize(), true);
+  const field = cls.getFields()[0], reference = cls.constantPool.get(input.fieldRef);
+  assert.equal(await new Promise(resolve => reference.resolve(w.thread, w.loader, cls, resolve, false)), true);
+  assert.equal(field.fullName, 'scope/Payload.0x1/wide');
+  assert.equal(reference.fullFieldName, field.fullName);
+  assert.equal(cls.getFieldFromSlot(0), field);
+  const constructor = cls.getConstructor(null), owner = isStatic ? constructor : new constructor(null),
+    key = reference.fullFieldName, expected = Long.fromString('9007199254740993');
+  assert.ok(Object.hasOwn(owner, key), 'Generated default storage uses the exact renamed key');
+  assert.equal(Object.hasOwn(owner, 'scope/Payload/wide'), false, 'No stale ordinary-name storage remains');
+  owner[key] = expected;
+  const captured = captureVarHandleField(cls, 'wide', 'J', isStatic);
+  assert.equal(captured, field);
+  const result = operateVarHandleStorage(w.thread, {field: captured, readonly: true}, 'get', isStatic ? [] : [owner]);
+  assert.equal(result.ok, true);
+  assert.equal(result.value.toString(), '9007199254740993');
+  assert.equal(owner[field.fullName], expected, 'Reflection VM-index metadata reads the same cell');
+  assert.equal(field.rawDescriptor, 'J');
+  assert.deepEqual(w.thread.errors, []);
 });
