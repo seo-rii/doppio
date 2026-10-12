@@ -30,6 +30,10 @@ const bootstrapRunnerCommand = 'node ci/java_methodhandle_bootstrap_test.mjs --b
 const hiddenClassUnitCommand = 'node --test ci/java_methodhandle_hidden_class_contract_test.mjs ci/hidden_class_runtime_test.cjs ' +
   'ci/hidden_class_metadata_test.cjs ci/hidden_class_entry_guard_test.cjs';
 const hiddenClassRunnerCommand = 'node ci/java_methodhandle_hidden_class_test.mjs --browser';
+const nominalConstantUnitCommand = 'node --test ci/java_methodhandle_nominal_constant_contract_test.mjs ' +
+  'ci/nominal_constant_runtime_test.cjs ci/nominal_constant_overlays_test.cjs ' +
+  'ci/nominal_type_metadata_test.cjs ci/nominal_handle_metadata_test.cjs';
+const nominalConstantRunnerCommand = 'node ci/java_methodhandle_nominal_constant_test.mjs --browser';
 
 function stripUnquotedComments(text) {
   return text.split('\n').map((line) => {
@@ -967,6 +971,24 @@ for (const [name, fields] of [
     '  if-no-files-found: error',
     '  retention-days: 7',
   ]],
+  ['Check phase C nominal constant contracts', [
+    'timeout-minutes: 3',
+    `run: ${nominalConstantUnitCommand}`,
+  ]],
+  ['Run Java nominal constant compatibility', [
+    'id: java_methodhandle_nominal_constant',
+    'timeout-minutes: 40',
+    `run: ${nominalConstantRunnerCommand}`,
+  ]],
+  ['Upload Java nominal constant ledger', [
+    "if: always() && steps.java_methodhandle_nominal_constant.outcome != 'skipped'",
+    'uses: actions/upload-artifact@v7',
+    'with:',
+    '  path: build/java-methodhandle-nominal-constant-results.json',
+    '  archive: false',
+    '  if-no-files-found: error',
+    '  retention-days: 7',
+  ]],
   ['Check evolved switch ledger contract', [
     'timeout-minutes: 1',
     'run: node --test ci/java_pattern_evolution_contract_test.mjs',
@@ -1147,6 +1169,9 @@ const runtimeOrder = [
   'Check phase C hidden class contracts',
   'Run Java hidden class compatibility',
   'Upload Java hidden class ledger',
+  'Check phase C nominal constant contracts',
+  'Run Java nominal constant compatibility',
+  'Upload Java nominal constant ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -1185,7 +1210,8 @@ for (const command of [varHandleUnitCommand, varHandleRunnerCommand]) {
   }
 }
 for (const [name, commands] of [['user bootstrap', [bootstrapUnitCommand, bootstrapRunnerCommand]],
-  ['hidden class', [hiddenClassUnitCommand, hiddenClassRunnerCommand]]]) {
+  ['hidden class', [hiddenClassUnitCommand, hiddenClassRunnerCommand]],
+  ['nominal constant', [nominalConstantUnitCommand, nominalConstantRunnerCommand]]]) {
   for (const command of commands) if (countLiteral(runtimeJob, `        run: ${command}\n`) !== 1) {
     fail(`Modern Java workflow must execute ${name} command exactly once: ${command}`);
   }

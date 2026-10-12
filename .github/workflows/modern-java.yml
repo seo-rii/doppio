@@ -540,6 +540,24 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Check phase C nominal constant contracts
+        timeout-minutes: 3
+        run: node --test ci/java_methodhandle_nominal_constant_contract_test.mjs ci/nominal_constant_runtime_test.cjs ci/nominal_constant_overlays_test.cjs ci/nominal_type_metadata_test.cjs ci/nominal_handle_metadata_test.cjs
+
+      - name: Run Java nominal constant compatibility
+        id: java_methodhandle_nominal_constant
+        timeout-minutes: 40
+        run: node ci/java_methodhandle_nominal_constant_test.mjs --browser
+
+      - name: Upload Java nominal constant ledger
+        if: always() && steps.java_methodhandle_nominal_constant.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-methodhandle-nominal-constant-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Check evolved switch ledger contract
         timeout-minutes: 1
         run: node --test ci/java_pattern_evolution_contract_test.mjs

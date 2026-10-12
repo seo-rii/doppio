@@ -108,6 +108,10 @@ const hiddenClassUnits = ['ci/java_methodhandle_hidden_class_contract_test.mjs',
   'ci/hidden_class_metadata_test.cjs', 'ci/hidden_class_entry_guard_test.cjs'];
 const hiddenClassUnitCommand = `node --test ${hiddenClassUnits.join(' ')}`;
 const hiddenClassRunnerCommand = 'node ci/java_methodhandle_hidden_class_test.mjs --browser';
+const nominalConstantUnits = ['ci/java_methodhandle_nominal_constant_contract_test.mjs', 'ci/nominal_constant_runtime_test.cjs',
+  'ci/nominal_constant_overlays_test.cjs', 'ci/nominal_type_metadata_test.cjs', 'ci/nominal_handle_metadata_test.cjs'];
+const nominalConstantUnitCommand = `node --test ${nominalConstantUnits.join(' ')}`;
+const nominalConstantRunnerCommand = 'node ci/java_methodhandle_nominal_constant_test.mjs --browser';
 const memberGates = [
   {name: 'member resolution', units: memberResolutionUnits, unitCommand: memberResolutionUnitCommand,
     runnerCommand: memberResolutionRunnerCommand, stepId: 'java_member_resolution',
@@ -147,6 +151,9 @@ const memberGates = [
   {name: 'hidden class', units: hiddenClassUnits, unitCommand: hiddenClassUnitCommand,
     runnerCommand: hiddenClassRunnerCommand, stepId: 'java_methodhandle_hidden_class',
     ledger: 'build/java-methodhandle-hidden-class-results.json', timeout: 40},
+  {name: 'nominal constant', units: nominalConstantUnits, unitCommand: nominalConstantUnitCommand,
+    runnerCommand: nominalConstantRunnerCommand, stepId: 'java_methodhandle_nominal_constant',
+    ledger: 'build/java-methodhandle-nominal-constant-results.json', timeout: 40},
 ];
 const packageScripts = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).scripts;
 for (const [name, command] of [
@@ -182,6 +189,8 @@ for (const [name, command] of [
   ['ci:bootstrap-linkage', bootstrapRunnerCommand],
   ['ci:hidden-class:test', hiddenClassUnitCommand],
   ['ci:hidden-class', hiddenClassRunnerCommand],
+  ['ci:nominal-constant:test', nominalConstantUnitCommand],
+  ['ci:nominal-constant', nominalConstantRunnerCommand],
 ]) {
   if (packageScripts[name] !== command) {
     throw new Error(`${name} must retain the complete compatibility command: ${command}`);
@@ -391,6 +400,9 @@ for (const name of [
   'Check phase C hidden class contracts',
   'Run Java hidden class compatibility',
   'Upload Java hidden class ledger',
+  'Check phase C nominal constant contracts',
+  'Run Java nominal constant compatibility',
+  'Upload Java nominal constant ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -885,6 +897,9 @@ for (const gate of [
   {name: 'hidden class', contractName: 'Check phase C hidden class contracts', runName: 'Run Java hidden class compatibility',
     uploadName: 'Upload Java hidden class ledger', unitCommand: hiddenClassUnitCommand, runnerCommand: hiddenClassRunnerCommand,
     stepId: 'java_methodhandle_hidden_class', ledgerBase: 'java-methodhandle-hidden-class'},
+  {name: 'nominal constant', contractName: 'Check phase C nominal constant contracts', runName: 'Run Java nominal constant compatibility',
+    uploadName: 'Upload Java nominal constant ledger', unitCommand: nominalConstantUnitCommand, runnerCommand: nominalConstantRunnerCommand,
+    stepId: 'java_methodhandle_nominal_constant', ledgerBase: 'java-methodhandle-nominal-constant'},
 ]) {
   for (const replacement of ['echo selected contracts checked', gate.runnerCommand.replace(' --browser', ' --diagnostic'),
     ...['--case selected', '--group selected', '--fixture selected', '--host node', '--guest node', '--skip-native',
@@ -927,7 +942,7 @@ for (const gate of [
   }
   const condition = `if: always() && steps.${gate.stepId}.outcome != 'skipped'`, ledger = `path: build/${gate.ledgerBase}-results.json`;
   for (const other of ['java-methodhandle-core', 'java-methodhandle-collection', 'java-methodhandle-varhandle',
-    'java-methodhandle-bootstrap', 'java-methodhandle-hidden-class']) if (other !== gate.ledgerBase) {
+    'java-methodhandle-bootstrap', 'java-methodhandle-hidden-class', 'java-methodhandle-nominal-constant']) if (other !== gate.ledgerBase) {
     expectCheckerFailure(`cross-wired ${gate.name} ledger to ${other}`,
       {workflow: replaceRequired(realWorkflow, ledger, `path: build/${other}-results.json`)},
       'exact bounded, fail-closed baseline command or artifact contract');
@@ -1142,7 +1157,10 @@ for (const [firstName, secondName] of [
   ['Upload Java user bootstrap ledger', 'Check phase C hidden class contracts'],
   ['Check phase C hidden class contracts', 'Run Java hidden class compatibility'],
   ['Run Java hidden class compatibility', 'Upload Java hidden class ledger'],
-  ['Upload Java hidden class ledger', 'Check evolved switch ledger contract'],
+  ['Upload Java hidden class ledger', 'Check phase C nominal constant contracts'],
+  ['Check phase C nominal constant contracts', 'Run Java nominal constant compatibility'],
+  ['Run Java nominal constant compatibility', 'Upload Java nominal constant ledger'],
+  ['Upload Java nominal constant ledger', 'Check evolved switch ledger contract'],
 ]) {
   expectCheckerFailure(
     `member resolution/access dependency reversed: ${firstName} before ${secondName}`,

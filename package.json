@@ -148,6 +148,8 @@
     "ci:bootstrap-linkage": "node ci/java_methodhandle_bootstrap_test.mjs --browser",
     "ci:hidden-class:test": "node --test ci/java_methodhandle_hidden_class_contract_test.mjs ci/hidden_class_runtime_test.cjs ci/hidden_class_metadata_test.cjs ci/hidden_class_entry_guard_test.cjs",
     "ci:hidden-class": "node ci/java_methodhandle_hidden_class_test.mjs --browser",
+    "ci:nominal-constant:test": "node --test ci/java_methodhandle_nominal_constant_contract_test.mjs ci/nominal_constant_runtime_test.cjs ci/nominal_constant_overlays_test.cjs ci/nominal_type_metadata_test.cjs ci/nominal_handle_metadata_test.cjs",
+    "ci:nominal-constant": "node ci/java_methodhandle_nominal_constant_test.mjs --browser",
     "ci:java25-main": "node ci/java25_main_test.mjs --browser",
     "ci:java-uncaught-exit": "node ci/java_uncaught_exit_test.mjs --browser",
     "ci:java-uncaught-exit:test": "node ci/jvm_exit_status_test.cjs && node --test ci/java_uncaught_exit_contract_test.mjs",
