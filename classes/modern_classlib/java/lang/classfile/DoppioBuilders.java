@@ -686,7 +686,8 @@ final class DoppioBuilders {
       code.owner.superclass() == null ? null : code.owner.superclass().asSymbol(), interfaces,
       code.pool, code.name.stringValue(), MethodTypeDesc.ofDescriptor(code.type.stringValue()),
       code.flags, result.bytes, 65535, result.maxLocals, result.handlers);
-    return new EncodedCode(result, analyzed.maxStack, stackMap(code.pool, analyzed.frames));
+    return new EncodedCode(result, analyzed.maxStack,
+      analyzed.frames.isEmpty() ? null : stackMap(code.pool, analyzed.frames));
   }
 
   private static byte[] stackMap(DoppioConstantPool pool, List<DoppioCodeFlow.Frame> frames) {
