@@ -53,7 +53,7 @@ implemented:
    `StringConcatFactory`, `CONSTANT_Dynamic`, records, and sealed classes share
    class loading and bootstrap code.
 
-These are retained smoke instructions, not the Phase C evidence gate. C1–C5
+These are retained smoke instructions, not the Phase C evidence gate. C1–C6
 add original final-version 21/25 inputs under `classes/modern_fixture`,
 independent Code/trace contracts and strict native/Node/Chromium gates. C4
 distinguishes directly generated original bootstrap instruction classes from
@@ -661,7 +661,8 @@ the defining Lookup's actual resolved host, ignoring the payload's raw NestHost
 and excluding the hidden class from named NestMembers enumeration. STRONG adds
 private loader retention, without a GC/unloading claim. Canonical names are
 absent and Class.describeConstable returns empty for hidden classes/arrays;
-this does not establish C6's descriptor-resolution matrix.
+C5 alone does not establish nominal resolution. The separate selected C6
+matrix below adds that evidence without claiming general hidden-class lifetime.
 
 Nine Field write wrappers and Lookup.unreflectSetter reject hidden finals.
 Their private aliases retain complete stock Code/StackMapTable bytes, but cannot
@@ -673,8 +674,9 @@ their prior path; changing only the public wrappers would not close the boundary
 
 The actual parsed/compiled metadata tests validate the new public varargs APIs,
 checked exceptions, generic signatures and genuinely compiled nested ClassOption
-enum. The separate compiler-facing JAR contains 43 class-only entries. Its
-stock-overlay verification inventory has 138 generated/rewritten Code bodies
+enum. At the historical C5 exit, the separate compiler-facing JAR contains
+43 class-only entries. Its stock-overlay verification inventory has
+138 generated/rewritten Code bodies
 and 1,387 byte-identical retained stock bodies: 1,525 total across 38 selected
 stock classes. Eleven C5 aliases preserve complete original Code. The historical
 113/112-body hashes and all 48 frames in the twelve existing branchful overlays
@@ -682,7 +684,70 @@ are unchanged. These metadata counts are not semantic outcome counts.
 
 GC/unloading, named modules, SecurityManager, arbitrary raw InnerClasses
 reflection fidelity and mixed-invalid-input error priority remain unclaimed.
-C6/C7 and complete Phase C/JVM-003/004/005/API conformance remain pending.
+C7 and complete Phase C/JVM-003/004/005/API conformance remain pending; selected
+C6 evidence follows.
+
+## C6 nominal descriptor resolution
+
+The [selected C6 exit](../phase-c-invocation.md#c6-verified-batch-exit) belongs to
+LIB-007. Four independent original-javac 21/25 groups execute 64 cases through
+the actual ClassDesc, MethodTypeDesc, MethodHandleDesc, DynamicConstantDesc and
+VarHandleDesc APIs. Covariant Class/MethodType/MethodHandle/VarHandle resolvers
+and their genuine Object bridges are separately bound to compiled metadata;
+signature presence alone is not execution evidence.
+
+Type resolution preserves the supplied Lookup. MethodType resolution checks
+access to its actual return/parameter classes, not just a Class.forName-style
+loader search. When the requested field type is a Class mirror, MemberName
+resolution binds its exact runtime type and defining-loader identity before
+selecting storage; a same-name foreign Class cannot match it. The retained
+String-descriptor path checks the exact descriptor but has no caller-supplied
+Class identity to compare. The selected direct-handle
+description hooks inspect canonical VM-held member/type metadata and do not
+expose arbitrary declaration lookup, raw MemberName or IMPL_LOOKUP to guests.
+
+Class/MethodType/MethodHandle/VarHandle constable round trips use that held
+identity. Non-nominal hidden components, hidden owners and selected bound/
+non-direct handles return empty rather than inventing discoverable names.
+MethodType.toMethodDescriptorString now uses actual ClassData descriptors,
+including the hidden-name dot boundary; the Java 8 name-replacement algorithm
+could otherwise admit a non-nominal hidden type. Its entire original Code is
+retained under the exact private synthetic
+`$doppio$nominal$toMethodDescriptorString` alias. String cache/identity and
+performance are not new conformance claims.
+
+The DynamicConstantDesc user-bootstrap fallback resolves the real bootstrap
+MethodHandle and nested arguments using the supplied Lookup, then invokes in
+order with actual variable-arity handling. Repeated API resolution is uncached;
+C4's constant-pool entry cache and CP result conversion remain separate. Error
+objects pass through; selected other failures preserve BootstrapMethodError
+causes. Existing special ConstantBootstraps paths remain rather than becoming
+a general executable-bootstrap conformance claim. The erased result mismatch
+case is explicit pinned-native API characterization, not CP-ldc validation.
+
+VarHandle.VarHandleDesc is a genuinely compiled nested public API. Describing
+an actual instance/static/array handle projects fixed private capability
+metadata; resolving the descriptor uses the supplied Lookup and existing C3
+factories. Exact/loose invocation-behavior views preserve captured identity and
+read-only policy. There is no nominal authority shortcut, and descriptor
+metadata does not discharge C3 execution or
+D's memory-order/concurrency requirements.
+
+Independent proofs retain the original driver, resource, hidden payload and
+selected opaque companion Code; they do not assert static reachability or
+dynamic branch coverage. Selected validation, reduced-Lookup access, wide
+invocation/storage and hidden restrictions pass on all required hosts.
+Explicit canonical initialization and pinned-JDK category exclusions are
+documented in the batch exit, not hidden behind error whitelists.
+
+The shared runtime/compiler dispatch now includes MethodType: the compiler JAR
+has 44 class-only entries, while the distinct stock verifier inventories 39
+classes and 1,601 Code bodies (141 generated/rewritten, 1,460 retained).
+All eleven C5 aliases and the new MethodType alias preserve complete original
+Code; historical body hashes and branch frames are unchanged. The selected C6
+exit leaves all broader Phase C/LIB-007/source-unit/API,
+loader/access/conversion/maximal-arity,
+module, GC and concurrent conformance flags false.
 
 ## Open Design Questions
 
@@ -693,13 +758,12 @@ C6/C7 and complete Phase C/JVM-003/004/005/API conformance remain pending.
   drop transitions while retaining Java 8 low bits for existing access
   bytecode. Named-module teleporting lookups, non-null previous lookup classes,
   and cross-module `Lookup.in` transitions remain open.
-- Whether broad `MethodHandleDesc.resolveConstantDesc` should rely entirely on
-  `Lookup` once access checks converge, or keep descriptor-specific guards for
-  unsupported handle kinds and cross-package/protected receiver shapes.
-- Whether `DynamicConstantDesc.resolveConstantDesc` should eventually route
-  through executable bootstrap method handles for all descriptors, or keep
-  selected `ConstantBootstraps` branches in the shim until the runtime bootstrap
-  path is complete.
+- Which remaining MethodHandleDesc validation, cross-package/protected receiver,
+  custom-loader and module access shapes need evidence beyond C6's actual
+  caller-Lookup resolution, without adding descriptor-specific authority.
+- Which retained ConstantBootstraps special branches and additional user
+  bootstrap/adaptation/error families need convergence and independent evidence
+  beyond C6's executable DynamicConstantDesc fallback.
 - How much of the Java 17 JDK `java.lang.invoke` implementation can be reused
   with the existing Java 8 class library image.
 - The selected `whileLoop`, `doWhileLoop`, `countedLoop`, `iteratedLoop`, and

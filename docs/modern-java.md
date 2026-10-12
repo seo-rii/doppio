@@ -207,8 +207,8 @@ all eight direct-call descriptors and compare host/Doppio output using only the
 generated Doppio compiler bootstrap overlay. Difficulty: medium.
 
 Compiler bootstrap note: `modern-ci-release-cli` generates a deterministic
-compiler-only JAR containing 42 changed Java 8 bootstrap classes and the exact
-genuinely compiled/overlaid ClassOption enum: 43 class-only entries. Kotlin and
+compiler-only JAR containing 43 changed Java 8 bootstrap classes and the exact
+genuinely compiled/overlaid ClassOption enum: 44 class-only entries. Kotlin and
 Scala put this artifact before `doppio.jar` and `rt.jar` for source analysis,
 eliminating host JDK metadata
 from the main compiler, broad modern interop, duration, diagnostic, Kotlin
@@ -1758,7 +1758,8 @@ expanded.
   array classes, plus `Lookup.unreflect` and `Lookup.findVirtual` through both
   `Class` and `Constable`. The separate selected C5 corpus now also checks
   empty constables for actual hidden classes and arrays with hidden components;
-  broader nominal descriptor resolution remains C6 work.
+  selected nominal descriptor resolution is now independently checked by
+  [C6](phase-c-invocation.md#c6-verified-batch-exit), not completed by C5 alone.
 - `java.lang.Class.isHidden()` is a parsed public native Java 15 method, so
   direct calls, reflective lookup and enumeration, `Method.invoke`, and
   `Lookup.unreflect` share one implementation with HotSpot-compatible
@@ -2265,75 +2266,45 @@ expanded.
 
 ## Known Constant API Gaps
 
-- `java.lang.constant.ClassDesc`, `ConstantDesc`, `Constable`,
-  `MethodTypeDesc`, `MethodHandleDesc`, `DirectMethodHandleDesc`,
-  `ConstantDescs`, and `java.lang.invoke.TypeDescriptor` are minimal Java 12
-  class-library shims, with a narrow `DynamicConstantDesc` extension for tested
-  `ConstantDescs.TRUE`/`FALSE`/`NULL` dynamic constants and descriptor display
-  metadata.
-  The tested surface covers descriptor construction for classes, primitives,
-  arrays, and nested classes; package/display names; component lookup; equality;
-  resolving selected primitive/reference/array descriptors to `Class` through
-  the lookup class loader;
-  rejecting selected invalid binary/package/class member names through `ClassDesc.of`
-  and `ClassDesc.nested`;
-  rejecting empty, void-array, and unknown primitive descriptors through
-  `ClassDesc.ofDescriptor` and `ClassDesc.arrayType`; rejecting selected
-  malformed internal-name class descriptors with leading, doubled, or trailing
-  slashes; accepting rank-255 array descriptors and rejecting selected rank-256
-  descriptors through raw descriptor parsing and `arrayType`; selected
-  `MethodTypeDesc` method descriptor construction, transformations, and
-  `MethodType` resolution;
-  selected `MethodHandleDesc`/`DirectMethodHandleDesc` static method, virtual
-  method, special/interface-special method, constructor, getter, setter,
-  static-getter, and static-setter factories; selected `resolveConstantDesc`
-  execution for public same-class and selected JDK-class
-  static/virtual/special/interface-special methods, constructors,
-  static/instance fields, and `asType`; validation of owner
-  class/interface descriptors, method versus field lookup descriptors,
-  constructor return descriptors, and void field descriptors; `Kind.valueOf`
-  field/interface/class ref-kind mappings;
-  owner/name/lookup-descriptor metadata; invocation type descriptors; selected
-  `asType` wrapper display/equality/hash behavior; and OpenJDK-style display;
-  selected `ConstantDescs.CD_*` descriptor constants including
-  `CD_MethodHandleDesc_Kind`; `DEFAULT_NAME`; `NULL` resolution and
-  dynamic-constant display; and Java 17 `TRUE`/`FALSE` constant
-  names, boolean resolution, bootstrap args/list snapshots, equality,
-  `DynamicConstantDesc.ofCanonical` `NULL` identity, selected descriptor
-  `toString` formatting, selected descriptor-level
-  `DynamicConstantDesc.resolveConstantDesc` paths for `nullConstant`,
-  `primitiveClass`, `enumConstant`, `getStaticFinal`, and reference plus
-  selected primitive-target `explicitCast` exact and numeric conversion paths,
-  plus selected descriptor-level
-  `ConstantBootstraps.invoke` resolution for public static method handles with
-  constant arguments, primitive return widening, and reference cast failure
-  wrapping, selected
-  `BootstrapMethodError` failure wrapping for bad primitive names, missing enum
-  constants, and invalid reference/primitive explicit casts, selected `getStaticFinal`
-  missing-field and wrong-type
-  `NoSuchFieldError` failures, bootstrap method-handle descriptor constants including
-  nested `VarHandle$VarHandleDesc` and VarHandle bootstrap descriptors, and
-  constant/call-site bootstrap descriptor factory
-  metadata plus selected owner and parameter validation.
-- Broad `MethodHandleDesc`/`DirectMethodHandleDesc` resolution beyond the
-  tested public same-class static, virtual, special, interface-special,
-  constructor, field, and `asType` descriptor cases, exhaustive `asType`
-  semantics, exhaustive factory
-  validation, unsupported handle kinds beyond the tested descriptor cases,
-  broad `DynamicConstantDesc` bootstrap execution beyond the selected
-  descriptor-level `ConstantBootstraps.invoke` public-static method-handle
-  cases, failure handling beyond the
-  selected descriptor-level failure paths, and canonicalization beyond the
-  selected descriptor-level resolution paths,
-	  nominal descriptor interoperation with `ldc` constants,
-	  exhaustive `ConstantDescs` factory validation, core-class
-	  `Constable.describeConstable()` integration beyond the tested `Class`,
-	  `String`, `Integer`, `Long`, `Float`, `Double`, and selected `Enum`
-	  simple-constant direct-method bridges,
-	  exact OpenJDK descriptor validation beyond the tested descriptors, and full
-	  `Lookup` access checks are not implemented. See
-	  `docs/design/java-lang-invoke.md` for the gated
-  implementation plan for this surface.
+- The retained constant-library shims now have a separate [selected C6 execution
+  gate](phase-c-invocation.md#c6-verified-batch-exit): 64 original-javac 21/25
+  cases in four 16-case type, handle, dynamic and VarHandle groups. All 24
+  native/Node/Chromium cells and 384 mandatory outcomes pass. Earlier Java 12/17
+  descriptor, boolean/null, explicitCast/getStaticFinal and invoke smokes remain
+  retained evidence, not exhaustive API contracts.
+- Selected ClassDesc factories, metadata/ranks and caller-Lookup access;
+  MethodTypeDesc factories, immutable transformations and covariant/erased
+  resolution; eleven direct-handle kinds and selected constructor, field,
+  static/virtual/special/interface/asType execution; and actual Constable
+  round trips are covered. Class-mirror field requests bind captured runtime
+  class/member/loader identity rather than just a descriptor name; legacy
+  String-descriptor requests have no supplied Class identity to compare.
+  Hidden classes/components and
+  selected non-direct/bound handles remain non-nominal, not discoverable names.
+- DynamicConstantDesc adds a genuine user-bootstrap fallback with the supplied
+  Lookup/name/type, ordered nested arguments, wide variable arity, null/results,
+  repeated uncached API calls and selected Error/cause identities. Existing
+  ConstantBootstraps special fast paths remain; this is not a wholesale
+  rewrite or arbitrary-bootstrap proof. C4 CP-entry caching/result conversion
+  is separate. One erased result mismatch is pinned-native API characterization,
+  not a general nominal or CP-ldc type-conversion contract.
+- The genuinely compiled nested VarHandle.VarHandleDesc resolves executable
+  instance/static/array handles through the supplied Lookup and C3 factories.
+  Wide/reference storage, selected access/type/staticness/final errors,
+  describeConstable/canonical round trips, passive resolution, exact/loose
+  invocation-behavior view identity and held hidden capabilities are checked.
+  Public metadata alone
+  does not establish C3 execution or D's memory-order/concurrency requirements.
+- Complete factory/signature/error/conversion/access/loader families, all
+  ConstantDescs canonicalization, arbitrary user/built-in bootstrap shapes,
+  nominal/ldc interoperation, maximal arity, named modules, hidden-class GC and
+  full LIB-007/source-unit/API conformance remain unclaimed. The matrix has
+  explicit canonical-initialization preconditions and excludes pinned 21/25
+  empty-method-descriptor/missing-member-type category differences; errors are
+  not whitelisted or normalized. Original companion Code evidence is not
+  opaque static reachability or dynamic branch coverage. See the
+  [invoke design](design/java-lang-invoke.md#c6-nominal-descriptor-resolution)
+  and [Phase C boundaries](phase-c-invocation.md#c6-selected-nominal-constants).
 
 ## Known Collection Factory Gaps
 
@@ -2789,15 +2760,58 @@ than demanding a concrete exception subtype chosen by the retained List.
 Generated name suffix values, GC/unloading, arbitrary raw InnerClasses reflection fidelity,
 mixed-invalid-input priority, SecurityManager and named modules remain unclaimed.
 
-The compiler-facing projection has 43 exact class-only entries, including the
-genuinely compiled ClassOption enum. The independent stock-overlay verifier
+At that historical C4/C5 exit, the compiler-facing projection has 43 exact
+class-only entries, including the genuinely compiled ClassOption enum.
+The independent stock-overlay verifier
 checks 1,525 Code methods across 38 selected stock classes: 138 generated/
 rewritten and 1,387 byte-identical stock bodies, with eleven intact C5 aliases
 and historical hashes/branch frames preserved. These are metadata inventory
 counts, not passing semantic cases. See the batch exit for fresh C1–C3,
 B1–B8, original 323-fixture and selected compiler-consumer verification.
 
-The next batch is C6 nominal constants, then C7's public class-file library.
-Full Phase C/JVM-003/004/005/API conformance, memory ordering, concurrency,
-named modules and hidden-class GC remain open. No Pro review was produced:
-the consultation failed at the model-picker UI before chat creation.
+## Selected C6 nominal constants and refreshed boundaries
+
+[C6's independent matrix](phase-c-invocation.md#c6-verified-batch-exit) verifies
+64 selected original-javac nominal type, handle, dynamic and VarHandle cases at
+clean implementation `0aa573593`. All 24 native/Node/Chromium Java 21/25 cells
+and 384 mandatory outcomes pass. The eight compilations retain 42 class-file
+artifacts and 248 case-linked Code probes, with separate original payload,
+resource and selected opaque companion proofs. Original-byte inventory is not
+an assertion of opaque static reachability, branch coverage or full LIB-007.
+
+Covariant/erased API bridges, supplied-Lookup resolution, actual runtime
+member/type identities, executable wide invocation/storage and selected
+Constable/canonical round trips are checked. API bootstrap reinvocation remains
+uncached and separate from C4 CP linkage. Hidden MethodType descriptor syntax
+is retained without inventing nominal hidden types; native category exclusions
+and canonical-initialization preconditions are explicit in the batch exit.
+
+The current compiler JAR has 44 exact class-only entries (43 changed stock
+classes plus the genuinely compiled ClassOption enum), with deterministic
+SHA-256 `caa9598e266120414c393b6b03a1158988fe42d12a626a1482685f3d33434daa`.
+The independent verifier inventories 39 stock classes and 1,601 Code bodies:
+141 generated/rewritten and 1,460 retained, with C5/MethodType original-Code
+aliases and historical body hashes/frames intact. These metadata inventories
+are separate from semantic case/artifact counts.
+
+Fresh C1–C6 gates pass 316 selected cases, 120 cells and 1,896 outcomes at the
+same frozen implementation/runtime. Strict builds, 1,200 passing unit/contract
+tests plus one existing optional diagnostic skip (1,201 total, zero failures),
+all 15 B-boundary
+gates and the unchanged original 323 fixtures pass. Selected lock-verified
+Kotlin 2.4.0/Scala 2.13.18 MethodHandle compiler smokes pass in Doppio and match
+native Java 17 on Node (544/387 seconds). The initial unchanged-limit Kotlin
+timeout is retained; its isolated same-source/input/limit rerun passes without
+a waiver or a proven particular cause. String cache/identity, Chromium compiler
+support and full language conformance are not inferred.
+
+The final fail-closed local verification receipt has exit code 0 and SHA-256
+`e153c8877c69d0eb5b36df7e03366a177794ff20f587d79110146a9c71a0e484`;
+the batch exit records its path and independent ledger,
+runtime and unchanged-input hashes. No C6 Pro review was produced: consultation
+failed at the model-picker UI before chat creation.
+
+The next batch is C7's public class-file library. Full Phase C/LIB-007/
+JVM-003/004/005/source-unit/API conformance, maximal arity, memory ordering,
+concurrency, named modules and hidden-class GC remain open; all broader flags
+stay false.
