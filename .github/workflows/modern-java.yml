@@ -558,6 +558,27 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Check phase C public class-file API contracts
+        timeout-minutes: 3
+        run: node --test ci/java_classfile_api_contract_test.mjs ci/classfile_api_metadata_test.cjs
+
+      # C7a compiles unchanged original sources against the final Java 25 API.
+      # Java 21 API absence is explicit applicability, never a skipped Java 25
+      # cell. Every host builds/transforms, retains and executes its own bytes.
+      - name: Run Java public class-file API compatibility
+        id: java_classfile_api
+        timeout-minutes: 40
+        run: node ci/java_classfile_api_test.mjs --browser
+
+      - name: Upload Java public class-file API ledger
+        if: always() && steps.java_classfile_api.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-classfile-api-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Check evolved switch ledger contract
         timeout-minutes: 1
         run: node --test ci/java_pattern_evolution_contract_test.mjs

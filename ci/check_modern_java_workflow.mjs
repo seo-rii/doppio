@@ -34,6 +34,8 @@ const nominalConstantUnitCommand = 'node --test ci/java_methodhandle_nominal_con
   'ci/nominal_constant_runtime_test.cjs ci/nominal_constant_overlays_test.cjs ' +
   'ci/nominal_type_metadata_test.cjs ci/nominal_handle_metadata_test.cjs';
 const nominalConstantRunnerCommand = 'node ci/java_methodhandle_nominal_constant_test.mjs --browser';
+const classFileApiUnitCommand = 'node --test ci/java_classfile_api_contract_test.mjs ci/classfile_api_metadata_test.cjs';
+const classFileApiRunnerCommand = 'node ci/java_classfile_api_test.mjs --browser';
 
 function stripUnquotedComments(text) {
   return text.split('\n').map((line) => {
@@ -989,6 +991,24 @@ for (const [name, fields] of [
     '  if-no-files-found: error',
     '  retention-days: 7',
   ]],
+  ['Check phase C public class-file API contracts', [
+    'timeout-minutes: 3',
+    `run: ${classFileApiUnitCommand}`,
+  ]],
+  ['Run Java public class-file API compatibility', [
+    'id: java_classfile_api',
+    'timeout-minutes: 40',
+    `run: ${classFileApiRunnerCommand}`,
+  ]],
+  ['Upload Java public class-file API ledger', [
+    "if: always() && steps.java_classfile_api.outcome != 'skipped'",
+    'uses: actions/upload-artifact@v7',
+    'with:',
+    '  path: build/java-classfile-api-results.json',
+    '  archive: false',
+    '  if-no-files-found: error',
+    '  retention-days: 7',
+  ]],
   ['Check evolved switch ledger contract', [
     'timeout-minutes: 1',
     'run: node --test ci/java_pattern_evolution_contract_test.mjs',
@@ -1172,6 +1192,9 @@ const runtimeOrder = [
   'Check phase C nominal constant contracts',
   'Run Java nominal constant compatibility',
   'Upload Java nominal constant ledger',
+  'Check phase C public class-file API contracts',
+  'Run Java public class-file API compatibility',
+  'Upload Java public class-file API ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -1211,7 +1234,8 @@ for (const command of [varHandleUnitCommand, varHandleRunnerCommand]) {
 }
 for (const [name, commands] of [['user bootstrap', [bootstrapUnitCommand, bootstrapRunnerCommand]],
   ['hidden class', [hiddenClassUnitCommand, hiddenClassRunnerCommand]],
-  ['nominal constant', [nominalConstantUnitCommand, nominalConstantRunnerCommand]]]) {
+  ['nominal constant', [nominalConstantUnitCommand, nominalConstantRunnerCommand]],
+  ['public class-file API', [classFileApiUnitCommand, classFileApiRunnerCommand]]]) {
   for (const command of commands) if (countLiteral(runtimeJob, `        run: ${command}\n`) !== 1) {
     fail(`Modern Java workflow must execute ${name} command exactly once: ${command}`);
   }
