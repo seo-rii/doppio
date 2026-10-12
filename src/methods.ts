@@ -631,7 +631,7 @@ export function canOverrideMethod(candidate: Method, base: Method): boolean {
 /** Arguments already use JVM word slots, including category-two padding.
  * The ordinary frame entry gate and monitor protocol remain authoritative. */
 function isHiddenFinalAlias(thread: JVMThread, method: Method): boolean {
-  if (method.name.indexOf('doppioHiddenFinalBase$') !== 0) return false;
+  if (typeof method.name !== 'string' || method.name.indexOf('doppioHiddenFinalBase$') !== 0) return false;
   var bootstrap = thread.getBsCl();
   return method.cls === bootstrap.getLoadedClass('Ljava/lang/reflect/Field;') ||
     method.name === 'doppioHiddenFinalBase$unreflectSetter' &&

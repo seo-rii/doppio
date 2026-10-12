@@ -138,3 +138,15 @@ test('a guest declaration with the same alias spelling cannot masquerade as an e
   assert.equal(w.errors.length, 0);
   assert.ok(w.owner.stack[0] instanceof BytecodeStackFrame);
 });
+
+test('ordinary partial VM declaration objects need no alias name or bootstrap lookup to retain dispatch', () => {
+  for (const name of [undefined, null, 17]) {
+    const w = world(), actual = w.fieldClass.getDeclaredMethod('doppioHiddenFinalBase$setInt(Ljava/lang/Object;I)V'),
+      method = Object.create(Object.getPrototypeOf(actual));
+    Object.assign(method, actual, {name});
+    w.owner.getBsCl = () => assert.fail('A non-string method name entered alias authority lookup');
+    assert.equal(invokeVirtualMethod(w.owner, method, w.field, [{}, 1]), true);
+    assert.equal(w.errors.length, 0);
+    assert.equal(w.owner.stack[0].method, method);
+  }
+});
