@@ -118,8 +118,8 @@ test('nominal call-site type is actual final Java class with native accessors, n
 });
 test('verification and writing preserve actual configured context and CP import code paths',()=>{
   assert.ok(calls('DoppioClassFile','verify','([B)Ljava/util/List;').some(item=>item.cp.owner==='java.lang.classfile.DoppioClassFileVerifier'&&
-    item.cp.descriptor==='([BLjava/util/function/Function;)Ljava/util/List;'));
-  assert.ok(calls('DoppioClassFileVerifier','verify','([BLjava/util/function/Function;)Ljava/util/List;')
+    item.cp.descriptor==='([BLjava/util/function/Function;Ljava/lang/classfile/ClassHierarchyResolver;)Ljava/util/List;'));
+  assert.ok(calls('DoppioClassFileVerifier','verify','([BLjava/util/function/Function;Ljava/lang/classfile/ClassHierarchyResolver;)Ljava/util/List;')
     .some(item=>item.cp.owner==='java.lang.classfile.DoppioClassReader'&&item.cp.name==='parse'));
   assert.ok(calls('DoppioBufWriter','writeIndex','(Ljava/lang/classfile/constantpool/PoolEntry;)V')
     .some(item=>item.cp.name==='importEntry'));
