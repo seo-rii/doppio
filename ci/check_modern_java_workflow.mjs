@@ -1215,6 +1215,9 @@ const runtimeOrder = [
   'Check phase C public class-file API contracts',
   'Run Java public class-file API compatibility',
   'Upload Java public class-file API ledger',
+  'Check phase C class-file control-flow contracts',
+  'Run Java class-file control-flow compatibility',
+  'Upload Java class-file control-flow ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -1255,7 +1258,8 @@ for (const command of [varHandleUnitCommand, varHandleRunnerCommand]) {
 for (const [name, commands] of [['user bootstrap', [bootstrapUnitCommand, bootstrapRunnerCommand]],
   ['hidden class', [hiddenClassUnitCommand, hiddenClassRunnerCommand]],
   ['nominal constant', [nominalConstantUnitCommand, nominalConstantRunnerCommand]],
-  ['public class-file API', [classFileApiUnitCommand, classFileApiRunnerCommand]]]) {
+  ['public class-file API', [classFileApiUnitCommand, classFileApiRunnerCommand]],
+  ['class-file control-flow', [classFileControlFlowUnitCommand, classFileControlFlowRunnerCommand]]]) {
   for (const command of commands) if (countLiteral(runtimeJob, `        run: ${command}\n`) !== 1) {
     fail(`Modern Java workflow must execute ${name} command exactly once: ${command}`);
   }
