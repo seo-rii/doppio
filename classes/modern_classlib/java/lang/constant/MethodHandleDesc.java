@@ -48,6 +48,8 @@ public interface MethodHandleDesc extends ConstantDesc {
 
   MethodTypeDesc invocationType();
 
+  MethodHandle resolveConstantDesc(MethodHandles.Lookup lookup) throws ReflectiveOperationException;
+
   boolean equals(Object obj);
 }
 
@@ -64,9 +66,9 @@ final class AsTypeMethodHandleDesc implements MethodHandleDesc {
     return invocationType;
   }
 
-  public Object resolveConstantDesc(MethodHandles.Lookup lookup) throws ReflectiveOperationException {
+  public MethodHandle resolveConstantDesc(MethodHandles.Lookup lookup) throws ReflectiveOperationException {
     Objects.requireNonNull(lookup);
-    MethodHandle handle = (MethodHandle) underlying.resolveConstantDesc(lookup);
+    MethodHandle handle = underlying.resolveConstantDesc(lookup);
     MethodType type = (MethodType) invocationType.resolveConstantDesc(lookup);
     return handle.asType(type);
   }

@@ -1,5 +1,6 @@
 package java.lang.constant;
 
+import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.Objects;
@@ -80,10 +81,20 @@ final class DirectMethodHandleDescImpl implements DirectMethodHandleDesc {
   DirectMethodHandleDescImpl(Kind kind, ClassDesc owner, String methodName, String lookupDescriptor) {
     this.kind = Objects.requireNonNull(kind);
     this.owner = Objects.requireNonNull(owner);
-    this.methodName = Objects.requireNonNull(methodName);
+    this.methodName = kind == Kind.CONSTRUCTOR ? "<init>" : Objects.requireNonNull(methodName);
     this.lookupDescriptor = Objects.requireNonNull(lookupDescriptor);
     if (!owner.isClassOrInterface()) {
       throw new IllegalArgumentException();
+    }
+    if (this.methodName.isEmpty()) {
+      throw new IllegalArgumentException();
+    }
+    for (int i = 0; i < this.methodName.length(); i++) {
+      char ch = this.methodName.charAt(i);
+      if (ch == '.' || ch == ';' || ch == '[' || ch == '/' ||
+          ((ch == '<' || ch == '>') && !"<init>".equals(this.methodName) && !"<clinit>".equals(this.methodName))) {
+        throw new IllegalArgumentException();
+      }
     }
     switch (kind) {
       case GETTER:
@@ -159,7 +170,7 @@ final class DirectMethodHandleDescImpl implements DirectMethodHandleDesc {
     }
   }
 
-  public Object resolveConstantDesc(MethodHandles.Lookup lookup) throws ReflectiveOperationException {
+  public MethodHandle resolveConstantDesc(MethodHandles.Lookup lookup) throws ReflectiveOperationException {
     Objects.requireNonNull(lookup);
     Class<?> ownerClass = (Class<?>) owner.resolveConstantDesc(lookup);
     if (lookupDescriptor.charAt(0) == '(') {
