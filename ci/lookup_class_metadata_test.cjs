@@ -31,13 +31,42 @@ function load(name) {
   return loaded.exports;
 }
 
-const resolveMember = load('natives/java_lang').default()['java/lang/invoke/MethodHandleNatives'][
+const nativeRegistry = load('natives/java_lang').default();
+const resolveMember = nativeRegistry['java/lang/invoke/MethodHandleNatives'][
   'resolve(Ljava/lang/invoke/MemberName;Ljava/lang/Class;)Ljava/lang/invoke/MemberName;'];
 const {ReferenceClassData} = load('ClassData');
 const {Method} = load('methods');
 const {Flags} = load('util');
 const {ThreadStatus, MethodHandleReferenceKind: Kind} = require(path.join(runtime, 'src/enums'));
 const FLAGS = 'java/lang/invoke/MemberName/flags';
+
+test('MethodType string descriptors retain held hidden and hidden-array descriptors without runtime-name guessing', () => {
+  const descriptor = nativeRegistry['java/lang/invoke/MethodType']['toMethodDescriptorString()Ljava/lang/String;'];
+  const bootstrap = {getLoadedClass: () => undefined, initializeClass: () => assert.fail('No initialization'),
+    resolveClass: () => assert.fail('No resolution')};
+  // Real source descriptor construction, controlled Java String allocation.
+  bootstrap.getResolvedClass = name => {
+    assert.equal(name, 'Ljava/lang/String;');
+    return {getConstructor: () => class JavaString {}};
+  };
+  bootstrap.getInitializedClass = (thread, name) => {
+    assert.equal(thread, null); assert.equal(name, '[C');
+    return {getConstructor: () => class CharArray {
+      constructor(thread, size) { this.array = new Array(size); }
+    }};
+  };
+  const mirror = value => ({$cls: {getInternalName: () => value}});
+  const thread = {getBsCl: () => bootstrap};
+  for (const [result, parameters, expected] of [
+    ['V', ['Lscope/Hidden.0xabc;'], '(Lscope/Hidden.0xabc;)V'],
+    ['Lscope/Hidden.0xabc;', ['[Lscope/Hidden.0xdef;', 'J'], '([Lscope/Hidden.0xdef;J)Lscope/Hidden.0xabc;'],
+    ['J', ['I', '[[Ljava/lang/String;'], '(I[[Ljava/lang/String;)J']
+  ]) {
+    const value = descriptor(thread, {'java/lang/invoke/MethodType/rtype': mirror(result),
+      'java/lang/invoke/MethodType/ptypes': {array: parameters.map(mirror)}});
+    assert.equal(value['java/lang/String/value'].array.map(c => String.fromCharCode(c)).join(''), expected);
+  }
+});
 
 // Controlled class-lifecycle metadata exercises the complete native registry,
 // refreshMemberNameMethodTarget, and the actual Method bridge generator. These

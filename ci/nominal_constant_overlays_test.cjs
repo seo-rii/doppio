@@ -13,6 +13,7 @@ const artifact = path.join(root, 'build/modern-bootstrap-overlay/modern-bootstra
 const classlib = path.join(root, 'classes/modern_classlib/out');
 const lookup = 'Ljava/lang/invoke/MethodHandles$Lookup;', optional = 'Ljava/util/Optional;';
 const prefix = 'java/lang/invoke/', constable = 'java/lang/constant/Constable';
+const descriptorAlias = '$doppio$nominal$toMethodDescriptorString';
 let readStructureLayout, decodeCoreCode;
 function transformer() {
   const filename = path.join(runtime, 'src/ClassLoader.js');
@@ -75,7 +76,7 @@ function compiledVarHandleDesc() {
 }
 
 for (const type of ['MethodHandle', 'MethodType']) {
-  test('stock ' + type + ' CP, flags, fields and every original member retain exact bytes', () => {
+  test('stock ' + type + ' CP, flags, fields and original member bodies retain exact bytes', () => {
     const unit = units.get(type), {bytes, layout, original, stockLayout} = unit;
     const cpEnd = stockLayout.pool.filter(Boolean).at(-1).end;
     assert.deepEqual(bytes.subarray(10, cpEnd), original.subarray(10, cpEnd));
@@ -85,6 +86,12 @@ for (const type of ['MethodHandle', 'MethodType']) {
     assert.deepEqual(bytes.subarray(layout.fields.countOffset, layout.fields.end),
       original.subarray(stockLayout.fields.countOffset, stockLayout.fields.end));
     for (const entry of stockLayout.methods.entries) {
+      if (type === 'MethodType' && entry.name === 'toMethodDescriptorString' && entry.descriptor === '()Ljava/lang/String;') {
+        const retained = method(unit, descriptorAlias, entry.descriptor);
+        assert.equal(retained.flags, (entry.flags & ~7) | 2 | 0x1000, 'Only access/name/synthetic change for the stock descriptor alias');
+        assert.deepEqual(bytes.subarray(retained.start + 4, retained.end), original.subarray(entry.start + 4, entry.end));
+        continue;
+      }
       const retained = method(unit, entry.name, entry.descriptor);
       assert.deepEqual(bytes.subarray(retained.start, retained.end), original.subarray(entry.start, entry.end));
     }
@@ -113,7 +120,7 @@ for (const type of ['MethodHandle', 'MethodType']) {
   });
 }
 
-test('parsed MethodType.descriptorString delegates the exact untouched stock descriptor method', () => {
+test('parsed MethodType.descriptorString delegates the identity-aware public descriptor method', () => {
   const unit = units.get('MethodType'), entry = method(unit, 'descriptorString', '()Ljava/lang/String;');
   assert.equal(entry.flags, 1);
   assert.deepEqual(entry.attributes.entries.map(attribute => attribute.name), ['Code']);
@@ -125,10 +132,24 @@ test('parsed MethodType.descriptorString delegates the exact untouched stock des
   assert.deepEqual(instructions.map(instruction => instruction.name), ['aload_0', 'invokevirtual', 'areturn']);
   assert.deepEqual(instructions[1].cp, {index: instructions[1].cp.index, tag: 10, owner: 'java.lang.invoke.MethodType',
     name: 'toMethodDescriptorString', descriptor: '()Ljava/lang/String;'});
-  const old = unit.stockLayout.methods.entries.find(candidate => candidate.name === 'toMethodDescriptorString');
-  const retained = method(unit, old.name, old.descriptor);
-  assert.deepEqual(unit.bytes.subarray(retained.start, retained.end), unit.original.subarray(old.start, old.end));
+  const publicDescriptor = method(unit, 'toMethodDescriptorString', '()Ljava/lang/String;');
+  assert.equal(publicDescriptor.flags, 0x0101, 'public native resolves held Class metadata, not a nominal name heuristic');
+  assert.equal(publicDescriptor.code, undefined);
   assert.equal(unit.stockLayout.methods.entries.filter(candidate => candidate.code).length, 73);
+});
+
+test('parsed MethodType retains complete original descriptor Code under exactly one private synthetic alias', () => {
+  const unit = units.get('MethodType'), descriptor = '()Ljava/lang/String;';
+  const original = unit.stockLayout.methods.entries.find(entry => entry.name === 'toMethodDescriptorString' && entry.descriptor === descriptor);
+  assert.ok(original?.code);
+  const alias = method(unit, descriptorAlias, descriptor);
+  assert.equal(alias.flags, (original.flags & ~7) | 2 | 0x1000);
+  assert.equal(alias.descriptorIndex, original.descriptorIndex);
+  assert.deepEqual(unit.bytes.subarray(alias.start + 4, alias.end), unit.original.subarray(original.start + 4, original.end),
+    'Alias preserves descriptor, complete Code/StackMapTable and every non-Code attribute');
+  assert.deepEqual(unit.bytes.subarray(alias.code.start, alias.code.end), unit.original.subarray(original.code.start, original.code.end));
+  assert.equal(unit.layout.methods.entries.filter(entry => entry.name === descriptorAlias).length, 1);
+  assert.equal(unit.layout.methods.entries.filter(entry => entry.code).length, 75, '73 retained stock bodies plus2 nominal Java delegates');
 });
 
 test('parsed actual Constable interface hierarchy preserves defining-loader identity for both held types', () => {

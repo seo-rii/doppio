@@ -3605,5 +3605,12 @@ export default function (): any {
   // hidden-component rejection, without another lookup or implementation.
   natives['java/lang/invoke/DoppioNominalConstants']['describeClass0(Ljava/lang/Class;)Ljava/util/Optional;'] =
     java_lang_DoppioClass['describeConstable(Ljava/lang/Class;)Ljava/util/Optional;'];
+  natives['java/lang/invoke/MethodType'] = {
+    'toMethodDescriptorString()Ljava/lang/String;': function(thread: JVMThread,
+        javaThis: JVMTypes.java_lang_invoke_MethodType): JVMTypes.java_lang_String {
+      return util.initString(thread.getBsCl(), util.getDescriptorString(
+        javaThis['java/lang/invoke/MethodType/rtype'], javaThis['java/lang/invoke/MethodType/ptypes']));
+    }
+  };
   return natives;
 };

@@ -99,6 +99,8 @@ const isNominalConstantDelegate = (className, name) =>
   ['java/lang/invoke/MethodHandle', 'java/lang/invoke/MethodType'].includes(className) && name === 'describeConstable' ||
   className === 'java/lang/invoke/MethodType' && name === 'descriptorString';
 const hiddenAliases = [];
+const methodTypeDescriptorAlias = '$doppio$nominal$toMethodDescriptorString';
+const nominalDescriptorAliases = [];
 let lookupVirtualOverlay;
 let lookupVirtualAlias;
 
@@ -143,6 +145,17 @@ before(async () => {
     }
     if (className === 'java/lang/invoke/MethodHandle' || className === 'java/lang/invoke/MethodType') {
       for (const old of beforeLayout.methods.entries) {
+        if (className === 'java/lang/invoke/MethodType' && old.name === 'toMethodDescriptorString' && old.descriptor === '()Ljava/lang/String;') {
+          const alias = afterLayout.methods.entries.find(candidate => candidate.name === methodTypeDescriptorAlias && candidate.descriptor === old.descriptor);
+          assert.ok(alias?.code, 'Exactly named private MethodType descriptor alias has real stock Code');
+          assert.equal(alias.flags, (old.flags & ~7) | 2 | 0x1000);
+          assert.deepEqual(overlaid.subarray(alias.start + 4, alias.end), original.subarray(old.start + 4, old.end),
+            'Preserve complete original descriptor body and attributes under the private synthetic alias');
+          const publicDescriptor = afterLayout.methods.entries.find(candidate => candidate.name === old.name && candidate.descriptor === old.descriptor);
+          assert.ok(publicDescriptor && publicDescriptor.flags === 0x0101 && publicDescriptor.code === undefined);
+          nominalDescriptorAliases.push({className, alias, old});
+          continue;
+        }
         const member = afterLayout.methods.entries.find(candidate => candidate.name === old.name &&
           candidate.descriptor === old.descriptor);
         assert.ok(member, 'retain every stock ' + className + ' method');
@@ -163,6 +176,7 @@ before(async () => {
           member.name === 'doppioHiddenFinalBase$unreflectSetter' && other.name === 'unreflectSetter' ||
           className === 'java/lang/reflect/Field' &&
           member.name === 'doppioHiddenFinalBase$' + other.name && hiddenFieldSetters.has(other.name) ||
+          className === 'java/lang/invoke/MethodType' && member.name === methodTypeDescriptorAlias && other.name === 'toMethodDescriptorString' ||
           className === 'java/lang/Class' && member.name === 'doppioHiddenCanonicalNameBase' && other.name === 'getCanonicalName'));
       if (member.name.startsWith('doppioHiddenFinalBase$') || member.name === 'doppioHiddenCanonicalNameBase') {
         assert.ok(old?.code, 'C5 alias has an exact stock declaration');
@@ -224,6 +238,7 @@ test('C6 adds3 nominal delegates and73 untouched MethodType bodies while preserv
   assert.equal(inventory.generated.length, 141);
   assert.equal(inventory.unchanged, 1460);
   assert.equal(inventory.generated.filter(entry => isNominalConstantDelegate(entry.className, entry.member.name)).length, 3);
+  assert.equal(nominalDescriptorAliases.length, 1, 'Only the held-type descriptor native redirects a stock MethodType method');
   assert.equal(inventory.generated.filter(entry => isHiddenClassDelegate(entry.className, entry.member.name)).length, 15);
   assert.equal(hiddenAliases.length, 11);
   assert.equal(hiddenAliases.filter(entry => entry.className === 'java/lang/reflect/Field').length, 9);

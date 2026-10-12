@@ -3286,7 +3286,7 @@ function addJavaLangInvokeNominalOverlays(data: Buffer, methodType: boolean): Bu
     type = methodType ? 'MethodType' : 'MethodHandle',
     describeSignature = utf8('()Ljava/util/Optional<Ljava/lang/constant/' + type + 'Desc;>;'),
     delegate = ref(helper, 'describe' + type, '(Ljava/lang/invoke/' + type + ';)Ljava/util/Optional;'),
-    newMethods: Buffer[] = [];
+    newMethods: Buffer[] = [], originalMethods = Buffer.from(data.slice(table.countOffset + 2, table.endOffset));
   function codeMethod(name: number, descriptor: number, code: Buffer, signature?: number): Buffer {
     return Buffer.concat([u2(0x0001), u2(name), u2(descriptor), u2(signature === undefined ? 1 : 2),
       u2(codeName), u4(12 + code.length), u2(1), u2(1), u4(code.length), code, u2(0), u2(0),
@@ -3299,6 +3299,34 @@ function addJavaLangInvokeNominalOverlays(data: Buffer, methodType: boolean): Bu
       self = cls('java/lang/invoke/MethodType'), descriptorDelegate = ref(self, 'toMethodDescriptorString', '()Ljava/lang/String;');
     newMethods.push(codeMethod(descriptorName, descriptorDescriptor,
       Buffer.concat([Buffer.from([0x2a, 0xb6]), u2(descriptorDelegate), Buffer.from([0xb0])])));
+    // The Java8 implementation derives descriptors by replacing dots in
+    // Class.getName(), which incorrectly nominalizes a hidden-class suffix.
+    // Retain its full stock Code privately, and expose a fixed native that uses
+    // actual held ClassData descriptors instead of guessing from runtime names.
+    var aliasName = utf8('$doppio$nominal$toMethodDescriptorString'), methodOffset = 0, found = false;
+    for (var methodIndex = 0; methodIndex < table.count; methodIndex++) {
+      var start = methodOffset, flags = originalMethods.readUInt16BE(start), nameIndex = originalMethods.readUInt16BE(start + 2),
+        descriptorIndex = originalMethods.readUInt16BE(start + 4), attributeCount = originalMethods.readUInt16BE(start + 6),
+        retainedAttributes: Buffer[] = [];
+      methodOffset += 8;
+      for (var attributeIndex = 0; attributeIndex < attributeCount; attributeIndex++) {
+        var attributeStart = methodOffset, attributeName = originalMethods.readUInt16BE(methodOffset),
+          attributeLength = originalMethods.readUInt32BE(methodOffset + 2);
+        methodOffset += 6 + attributeLength;
+        if (utf8Values[attributeName] !== 'Code') retainedAttributes.push(originalMethods.slice(attributeStart, methodOffset));
+      }
+      if (utf8Values[nameIndex] === 'toMethodDescriptorString' && utf8Values[descriptorIndex] === '()Ljava/lang/String;') {
+        if (found || flags !== 0x0001 || attributeCount === retainedAttributes.length) {
+          throw new Error('Unexpected stock MethodType descriptor method');
+        }
+        found = true;
+        originalMethods.writeUInt16BE(0x1002, start);
+        originalMethods.writeUInt16BE(aliasName, start + 2);
+        newMethods.push(Buffer.concat([u2(0x0101), u2(nameIndex), u2(descriptorIndex), u2(retainedAttributes.length),
+          Buffer.concat(retainedAttributes)]));
+      }
+    }
+    if (!found) throw new Error('Missing stock MethodType descriptor method');
   }
   // When a stock class already declares a generic class signature, keep it in
   // sync with the appended raw interface. Absence needs no invented signature.
@@ -3316,7 +3344,7 @@ function addJavaLangInvokeNominalOverlays(data: Buffer, methodType: boolean): Bu
   return Buffer.concat([data.slice(0, 8), u2(next), data.slice(10, cp.offset), Buffer.concat(constants),
     data.slice(cp.offset, interfaceOffset), u2(interfaceCount + 1), data.slice(interfaceOffset + 2, interfaceEnd), u2(nominalInterface),
     data.slice(interfaceEnd, table.countOffset), u2(table.count + newMethods.length),
-    data.slice(table.countOffset + 2, table.endOffset), Buffer.concat(newMethods), attributes]);
+    originalMethods, Buffer.concat(newMethods), attributes]);
 }
 
 /** C5 delegates append their constants after every retained invoke overlay.
