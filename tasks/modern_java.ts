@@ -5137,6 +5137,7 @@ function modernJava(grunt: IGrunt) {
       'java/lang/invoke/MethodHandles$Lookup$ClassOption.class',
       'java/lang/invoke/MethodHandles$Lookup.class',
       'java/lang/invoke/MethodHandles.class',
+      'java/lang/invoke/MethodType.class',
       'java/lang/ref/Reference.class',
       'java/lang/reflect/AccessibleObject.class',
       'java/lang/reflect/AnnotatedArrayType.class',

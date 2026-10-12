@@ -3262,6 +3262,63 @@ function addJavaLangInvokeMethodHandleModernOverlays(data: Buffer): Buffer {
   ]);
 }
 
+/** Append nominal API delegates without changing any stock member or Code.
+ * The helper projects held metadata, while resolution remains caller-checked. */
+function addJavaLangInvokeNominalOverlays(data: Buffer, methodType: boolean): Buffer {
+  var utf8Values: {[index: number]: string} = {}, cp = constantPoolEnd(data, utf8Values),
+    table = methodsInfo(data, cp.offset), constants: Buffer[] = [], next = cp.count;
+  function utf8(value: string): number { constants.push(utf8Constant(value)); return next++; }
+  function cls(value: string): number {
+    var name = utf8(value), index = next++;
+    constants.push(Buffer.concat([Buffer.from([7]), u2(name)]));
+    return index;
+  }
+  function ref(owner: number, name: string, descriptor: string): number {
+    var nameIndex = utf8(name), descriptorIndex = utf8(descriptor), pair = next++;
+    constants.push(Buffer.concat([Buffer.from([12]), u2(nameIndex), u2(descriptorIndex)]));
+    var index = next++;
+    constants.push(Buffer.concat([Buffer.from([10]), u2(owner), u2(pair)]));
+    return index;
+  }
+  var nominalInterface = cls('java/lang/constant/Constable'), helper = cls('java/lang/invoke/DoppioNominalConstants'),
+    codeName = utf8('Code'), signatureName = utf8('Signature'), describeName = utf8('describeConstable'),
+    describeDescriptor = utf8('()Ljava/util/Optional;'),
+    type = methodType ? 'MethodType' : 'MethodHandle',
+    describeSignature = utf8('()Ljava/util/Optional<Ljava/lang/constant/' + type + 'Desc;>;'),
+    delegate = ref(helper, 'describe' + type, '(Ljava/lang/invoke/' + type + ';)Ljava/util/Optional;'),
+    newMethods: Buffer[] = [];
+  function codeMethod(name: number, descriptor: number, code: Buffer, signature?: number): Buffer {
+    return Buffer.concat([u2(0x0001), u2(name), u2(descriptor), u2(signature === undefined ? 1 : 2),
+      u2(codeName), u4(12 + code.length), u2(1), u2(1), u4(code.length), code, u2(0), u2(0),
+      signature === undefined ? Buffer.alloc(0) : Buffer.concat([u2(signatureName), u4(2), u2(signature)])]);
+  }
+  newMethods.push(codeMethod(describeName, describeDescriptor,
+    Buffer.concat([Buffer.from([0x2a, 0xb8]), u2(delegate), Buffer.from([0xb0])]), describeSignature));
+  if (methodType) {
+    var descriptorName = utf8('descriptorString'), descriptorDescriptor = utf8('()Ljava/lang/String;'),
+      self = cls('java/lang/invoke/MethodType'), descriptorDelegate = ref(self, 'toMethodDescriptorString', '()Ljava/lang/String;');
+    newMethods.push(codeMethod(descriptorName, descriptorDescriptor,
+      Buffer.concat([Buffer.from([0x2a, 0xb6]), u2(descriptorDelegate), Buffer.from([0xb0])])));
+  }
+  // When a stock class already declares a generic class signature, keep it in
+  // sync with the appended raw interface. Absence needs no invented signature.
+  var attributes = Buffer.from(data.slice(table.endOffset)), offset = 2;
+  for (var i = 0; i < attributes.readUInt16BE(0); i++) {
+    var name = attributes.readUInt16BE(offset), length = attributes.readUInt32BE(offset + 2);
+    if (utf8Values[name] === 'Signature' && length === 2) {
+      var originalSignature = utf8Values[attributes.readUInt16BE(offset + 6)];
+      attributes.writeUInt16BE(utf8(originalSignature + 'Ljava/lang/constant/Constable;'), offset + 6);
+    }
+    offset += 6 + length;
+  }
+  var interfaceOffset = cp.offset + 6, interfaceCount = data.readUInt16BE(interfaceOffset),
+    interfaceEnd = interfaceOffset + 2 + interfaceCount * 2;
+  return Buffer.concat([data.slice(0, 8), u2(next), data.slice(10, cp.offset), Buffer.concat(constants),
+    data.slice(cp.offset, interfaceOffset), u2(interfaceCount + 1), data.slice(interfaceOffset + 2, interfaceEnd), u2(nominalInterface),
+    data.slice(interfaceEnd, table.countOffset), u2(table.count + newMethods.length),
+    data.slice(table.countOffset + 2, table.endOffset), Buffer.concat(newMethods), attributes]);
+}
+
 /** C5 delegates append their constants after every retained invoke overlay.
  * Public factories retain real Code, declared checked exceptions and varargs
  * metadata; private VM hooks remain only on the fixed helper class. */
@@ -4066,7 +4123,9 @@ export function applyModernBootstrapOverlays(typeStr: string, data: Buffer): Buf
   }
   if (typeStr === 'Ljava/lang/invoke/MethodHandle;') {
     data = addJavaLangInvokeMethodHandleModernOverlays(data);
+    data = addJavaLangInvokeNominalOverlays(data, false);
   }
+  if (typeStr === 'Ljava/lang/invoke/MethodType;') data = addJavaLangInvokeNominalOverlays(data, true);
   if (typeStr === 'Ljava/lang/invoke/MethodHandleImpl;') {
     data = addJavaLangInvokeSpreadArgumentModernOverlay(data);
   }

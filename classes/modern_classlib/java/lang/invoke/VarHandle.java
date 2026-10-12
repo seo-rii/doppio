@@ -1,7 +1,9 @@
 package java.lang.invoke;
 
 import java.lang.constant.Constable;
-import java.lang.constant.ConstantDesc;
+import java.lang.constant.ClassDesc;
+import java.lang.constant.ConstantDescs;
+import java.lang.constant.DynamicConstantDesc;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -52,7 +54,7 @@ public abstract class VarHandle implements Constable {
     return DoppioVarHandles.accessHandle(this, mode);
   }
 
-  public Optional<? extends ConstantDesc> describeConstable() { return Optional.empty(); }
+  public Optional<VarHandleDesc> describeConstable() { return DoppioVarHandles.describeConstable(this); }
 
   public final String toString() {
     return new StringBuilder("VarHandle[varType=").append(valueType.getName())
@@ -90,6 +92,50 @@ public abstract class VarHandle implements Constable {
   public final native Object getAndBitwiseXor(Object... arguments);
   public final native Object getAndBitwiseXorAcquire(Object... arguments);
   public final native Object getAndBitwiseXorRelease(Object... arguments);
+
+  /** Nominal storage metadata; resolution always uses the caller's lookup. */
+  public static final class VarHandleDesc extends DynamicConstantDesc<VarHandle> {
+    private final int kind;
+    private final ClassDesc owner;
+    private final ClassDesc variableType;
+
+    private VarHandleDesc(int kind, ClassDesc owner, String name, ClassDesc type) {
+      super(kind == 1 ? ConstantDescs.BSM_VARHANDLE_FIELD : kind == 2
+          ? ConstantDescs.BSM_VARHANDLE_STATIC_FIELD : ConstantDescs.BSM_VARHANDLE_ARRAY,
+          name, ConstantDescs.CD_VarHandle, kind == 3
+          ? new java.lang.constant.ConstantDesc[] {owner}
+          : new java.lang.constant.ConstantDesc[] {owner, type});
+      this.kind = kind;
+      this.owner = owner;
+      this.variableType = type;
+    }
+
+    public static VarHandleDesc ofField(ClassDesc declaringClass, String name, ClassDesc fieldType) {
+      return new VarHandleDesc(1, Objects.requireNonNull(declaringClass), Objects.requireNonNull(name), Objects.requireNonNull(fieldType));
+    }
+    public static VarHandleDesc ofStaticField(ClassDesc declaringClass, String name, ClassDesc fieldType) {
+      return new VarHandleDesc(2, Objects.requireNonNull(declaringClass), Objects.requireNonNull(name), Objects.requireNonNull(fieldType));
+    }
+    public static VarHandleDesc ofArray(ClassDesc arrayClass) {
+      Objects.requireNonNull(arrayClass);
+      if (!arrayClass.isArray()) throw new IllegalArgumentException("Not an array descriptor");
+      return new VarHandleDesc(3, arrayClass, ConstantDescs.DEFAULT_NAME, arrayClass.componentType());
+    }
+    public ClassDesc varType() { return variableType; }
+    public VarHandle resolveConstantDesc(MethodHandles.Lookup lookup) throws ReflectiveOperationException {
+      Objects.requireNonNull(lookup);
+      Class<?> declaring = owner.resolveConstantDesc(lookup);
+      if (kind == 3) return MethodHandles.arrayElementVarHandle(declaring);
+      Class<?> type = variableType.resolveConstantDesc(lookup);
+      return kind == 1 ? lookup.findVarHandle(declaring, constantName(), type)
+          : lookup.findStaticVarHandle(declaring, constantName(), type);
+    }
+    public String toString() {
+      if (kind == 3) return "VarHandleDesc[" + owner.displayName() + "[]]";
+      return "VarHandleDesc[" + (kind == 2 ? "static " : "") + owner.displayName() + "." + constantName()
+          + ":" + variableType.displayName() + "]";
+    }
+  }
 
   public enum AccessMode {
     GET("get", 0), SET("set", 1),

@@ -111,6 +111,27 @@ export default function (): any {
   }
 
   class DoppioVarHandles {
+    public static 'nominalKind(Ljava/lang/invoke/VarHandle;)I'(thread: JVMThread, handle: StoredVarHandle): number {
+      if (handle === null || !Object.prototype.hasOwnProperty.call(handle, '$varHandleCapability')) return 0;
+      var capability = handle.$varHandleCapability;
+      if (!capability || !!capability.field === !!capability.arrayClass) return 0;
+      return capability.arrayClass ? 3 : capability.field.accessFlags.isStatic() ? 2 : 1;
+    }
+
+    public static 'nominalOwner(Ljava/lang/invoke/VarHandle;)Ljava/lang/Class;'(
+        thread: JVMThread, handle: StoredVarHandle): JVMTypes.java_lang_Class {
+      if (DoppioVarHandles['nominalKind(Ljava/lang/invoke/VarHandle;)I'](thread, handle) === 0) return null;
+      var capability = handle.$varHandleCapability;
+      return (capability.arrayClass || capability.field.cls).getClassObject(thread);
+    }
+
+    public static 'nominalName(Ljava/lang/invoke/VarHandle;)Ljava/lang/String;'(
+        thread: JVMThread, handle: StoredVarHandle): JVMTypes.java_lang_String {
+      var kind = DoppioVarHandles['nominalKind(Ljava/lang/invoke/VarHandle;)I'](thread, handle);
+      if (kind !== 1 && kind !== 2) return null;
+      return util.initString(thread.getBsCl(), handle.$varHandleCapability.field.name);
+    }
+
     public static 'operationHandle()Ljava/lang/invoke/MethodHandle;'(thread: JVMThread): void {
       internalHandle(thread, 'operate');
     }

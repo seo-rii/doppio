@@ -3,10 +3,33 @@ package java.lang.invoke;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.Objects;
+import java.util.Optional;
+import java.lang.constant.ClassDesc;
 
 /** Bridge from canonical mode types to existing MethodHandle adaptation. */
 public final class DoppioVarHandles {
   private DoppioVarHandles() {}
+
+  static Optional<VarHandle.VarHandleDesc> describeConstable(VarHandle handle) {
+    int kind = nominalKind(handle);
+    if (kind == 0) return Optional.empty();
+    Class<?> owner = nominalOwner(handle);
+    if (owner == null) return Optional.empty();
+    Optional<ClassDesc> ownerDesc = DoppioNominalConstants.describeClass(owner);
+    Optional<ClassDesc> typeDesc = DoppioNominalConstants.describeClass(handle.varType());
+    if (!ownerDesc.isPresent() || !typeDesc.isPresent()) return Optional.empty();
+    if (kind == 3) return Optional.of(VarHandle.VarHandleDesc.ofArray(ownerDesc.get()));
+    String name = nominalName(handle);
+    if (name == null) return Optional.empty();
+    return Optional.of(kind == 1 ? VarHandle.VarHandleDesc.ofField(ownerDesc.get(), name, typeDesc.get())
+        : VarHandle.VarHandleDesc.ofStaticField(ownerDesc.get(), name, typeDesc.get()));
+  }
+
+  // Projection of an already captured VM capability. These fixed getters grant
+  // no new access and never perform name-based lookup or class initialization.
+  private static native int nominalKind(VarHandle handle);
+  private static native Class<?> nominalOwner(VarHandle handle);
+  private static native String nominalName(VarHandle handle);
 
   public static VarHandle findVarHandle(MethodHandles.Lookup lookup, Class<?> owner,
       String name, Class<?> type) throws NoSuchFieldException, IllegalAccessException {

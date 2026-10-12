@@ -46,7 +46,7 @@ const exactClasses = [
   'java/lang/System', 'java/lang/Runtime', 'java/lang/Character', 'java/lang/Math', 'java/lang/StrictMath',
   'java/lang/AbstractStringBuilder', 'java/lang/StringBuilder', 'java/lang/StringBuffer', 'java/lang/String',
   'java/util/regex/Pattern', 'java/util/concurrent/TimeUnit', 'java/time/Duration',
-  'java/lang/invoke/MethodHandles', 'java/lang/invoke/MethodHandle', 'java/lang/invoke/MethodHandleImpl',
+  'java/lang/invoke/MethodHandles', 'java/lang/invoke/MethodHandle', 'java/lang/invoke/MethodHandleImpl', 'java/lang/invoke/MethodType',
   'java/lang/invoke/MethodHandles$Lookup',
   'java/nio/MappedByteBuffer'
 ];
@@ -95,6 +95,9 @@ const isHiddenClassDelegate = (className, name) =>
     ['defineHiddenClass', 'defineHiddenClassWithClassData', 'unreflectSetter'].includes(name) ||
   className === 'java/lang/reflect/Field' && hiddenFieldSetters.has(name) ||
   className === 'java/lang/Class' && name === 'getCanonicalName';
+const isNominalConstantDelegate = (className, name) =>
+  ['java/lang/invoke/MethodHandle', 'java/lang/invoke/MethodType'].includes(className) && name === 'describeConstable' ||
+  className === 'java/lang/invoke/MethodType' && name === 'descriptorString';
 const hiddenAliases = [];
 let lookupVirtualOverlay;
 let lookupVirtualAlias;
@@ -138,13 +141,13 @@ before(async () => {
           'preserve the whole other stock method and all its metadata');
       }
     }
-    if (className === 'java/lang/invoke/MethodHandle') {
+    if (className === 'java/lang/invoke/MethodHandle' || className === 'java/lang/invoke/MethodType') {
       for (const old of beforeLayout.methods.entries) {
         const member = afterLayout.methods.entries.find(candidate => candidate.name === old.name &&
           candidate.descriptor === old.descriptor);
-        assert.ok(member, 'retain every stock MethodHandle method');
+        assert.ok(member, 'retain every stock ' + className + ' method');
         assert.deepEqual(overlaid.subarray(member.start, member.end), original.subarray(old.start, old.end),
-          'preserve the whole stock MethodHandle method and all its metadata');
+          'preserve the whole stock ' + className + ' method and all its metadata');
       }
     }
     for (const member of afterLayout.methods.entries) {
@@ -216,10 +219,11 @@ before(async () => {
   inventory = {selected, generated, all, unchanged};
 });
 
-test('C5 preserves C3 and earlier body hashes, adding15 public delegates and43 untouched stock Field Code attributes', () => {
-  assert.equal(inventory.selected.length, 38);
-  assert.equal(inventory.generated.length, 138);
-  assert.equal(inventory.unchanged, 1387);
+test('C6 adds3 nominal delegates and73 untouched MethodType bodies while preserving C5/C3 and earlier body hashes', () => {
+  assert.equal(inventory.selected.length, 39);
+  assert.equal(inventory.generated.length, 141);
+  assert.equal(inventory.unchanged, 1460);
+  assert.equal(inventory.generated.filter(entry => isNominalConstantDelegate(entry.className, entry.member.name)).length, 3);
   assert.equal(inventory.generated.filter(entry => isHiddenClassDelegate(entry.className, entry.member.name)).length, 15);
   assert.equal(hiddenAliases.length, 11);
   assert.equal(hiddenAliases.filter(entry => entry.className === 'java/lang/reflect/Field').length, 9);
@@ -227,6 +231,7 @@ test('C5 preserves C3 and earlier body hashes, adding15 public delegates and43 u
     [className, member.name, member.descriptor, member.flags, member.code.maxStack, member.code.maxLocals,
       bytes.toString('hex')]);
   const priorIdentity = identity.filter(([className, name, descriptor]) =>
+    !isNominalConstantDelegate(className, name) &&
     !isHiddenClassDelegate(className, name) &&
     !isVarHandleDelegate(className, name, descriptor) &&
     !(className === 'java/lang/invoke/MethodHandles' && name === 'filterArguments' &&
@@ -506,12 +511,12 @@ test('every generated overlay body passes pure decoding and type checking withou
   const {failures, obligations} = verifyAll(inventory.generated);
   assert.deepEqual(failures, []);
   assert.ok(obligations > 0, 'symbolic obligations are retained, not bypassed or claimed discharged');
-  t.diagnostic('138 generated methods checked; ' + obligations + ' metadata obligations remain for linking');
+  t.diagnostic('141 generated methods checked; ' + obligations + ' metadata obligations remain for linking');
 });
 
 test('all original and generated Code methods in transformed bootstrap classes pass pure verification', t => {
-  assert.equal(inventory.all.length, 1525);
+  assert.equal(inventory.all.length, 1601);
   const {failures, obligations} = verifyAll(inventory.all);
   assert.deepEqual(failures, []);
-  t.diagnostic('1525 methods checked; ' + obligations + ' metadata obligations remain for linking');
+  t.diagnostic('1601 methods checked; ' + obligations + ' metadata obligations remain for linking');
 });

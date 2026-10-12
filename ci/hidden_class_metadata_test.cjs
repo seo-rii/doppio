@@ -60,9 +60,10 @@ before(async () => {
   ({decodeCoreCode} = await import('./java_core_bytecode.mjs'));
   const {applyModernBootstrapOverlays} = require(path.join(runtime, 'src/ClassLoader'));
   const entries = execFileSync('unzip', ['-Z1', artifact], {encoding: 'utf8', timeout: 10000}).trim().split('\n');
-  assert.equal(entries.length, 43, 'Exact complete compiler-facing class-only inventory');
+  assert.equal(entries.length, 44, 'Exact complete compiler-facing class-only inventory');
   assert.ok(entries.every(entry => /^[A-Za-z0-9_$/]+\.class$/.test(entry)));
-  assert.equal(new Set(entries).size, 43, 'No duplicate compiler-facing entries');
+  assert.equal(new Set(entries).size, 44, 'No duplicate compiler-facing entries');
+  assert.ok(entries.includes('java/lang/invoke/MethodType.class'), 'C6 compiler-facing nominal MethodType is present');
   for (const name of ['java/lang/invoke/MethodHandles', 'java/lang/invoke/MethodHandles$Lookup',
     'java/lang/reflect/Field', 'java/lang/Class']) {
     const stock = execFileSync('unzip', ['-p', rtJar, name + '.class'], {timeout: 10000}),

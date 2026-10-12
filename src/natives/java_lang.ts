@@ -22,6 +22,7 @@ import {setImmediate} from 'browserfs';
 import {refreshMemberNameMethodTarget} from '../method_handles';
 import {getKnownNestHost, resolveNestHost, registerHiddenNestHost, isVirtualMachineError} from '../ClassAccess';
 import varHandleNatives from './java_lang_invoke';
+import nominalConstantNatives from './java_lang_constant';
 
 export default function (): any {
   var debug = logging.debug;
@@ -3595,5 +3596,14 @@ export default function (): any {
   Object.keys(invokeNatives).forEach((name: string) => {
     natives[name] = invokeNatives[name];
   });
+  var constantNatives = nominalConstantNatives();
+  Object.keys(constantNatives).forEach((name: string) => {
+    natives[name] = constantNatives[name];
+  });
+  // Java9 SDK symbols lack Class.describeConstable. Reuse the exact existing
+  // C5 read-only projection for the nominal Java helper, including hidden and
+  // hidden-component rejection, without another lookup or implementation.
+  natives['java/lang/invoke/DoppioNominalConstants']['describeClass0(Ljava/lang/Class;)Ljava/util/Optional;'] =
+    java_lang_DoppioClass['describeConstable(Ljava/lang/Class;)Ljava/util/Optional;'];
   return natives;
 };

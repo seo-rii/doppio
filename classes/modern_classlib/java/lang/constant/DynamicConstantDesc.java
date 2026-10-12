@@ -2,6 +2,7 @@ package java.lang.constant;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle.VarHandleDesc;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -16,6 +17,10 @@ public abstract class DynamicConstantDesc<T> implements ConstantDesc {
   protected DynamicConstantDesc(DirectMethodHandleDesc bootstrapMethod, String constantName, ClassDesc constantType, ConstantDesc... bootstrapArgs) {
     this.bootstrapMethod = Objects.requireNonNull(bootstrapMethod);
     this.constantName = Objects.requireNonNull(constantName);
+    if (constantName.length() == 0 || constantName.indexOf('.') >= 0 || constantName.indexOf(';') >= 0
+        || constantName.indexOf('[') >= 0 || constantName.indexOf('/') >= 0) {
+      throw new IllegalArgumentException("Invalid constant name");
+    }
     this.constantType = Objects.requireNonNull(constantType);
     this.bootstrapArgs = Objects.requireNonNull(bootstrapArgs).clone();
     for (int i = 0; i < this.bootstrapArgs.length; i++) {
@@ -24,14 +29,35 @@ public abstract class DynamicConstantDesc<T> implements ConstantDesc {
   }
 
   public static <T> ConstantDesc ofCanonical(DirectMethodHandleDesc bootstrapMethod, String constantName, ClassDesc constantType, ConstantDesc[] bootstrapArgs) {
-    if (ConstantDescs.BSM_NULL_CONSTANT.equals(bootstrapMethod)
-        && ConstantDescs.DEFAULT_NAME.equals(constantName)
-        && ConstantDescs.CD_Object.equals(constantType)
-        && bootstrapArgs != null
-        && bootstrapArgs.length == 0) {
-      return ConstantDescs.NULL;
+    DynamicConstantDesc<T> original = ofNamed(bootstrapMethod, constantName, constantType, bootstrapArgs);
+    // Invalid canonical shapes remain ordinary dynamic descriptors. This is a
+    // description transformation, not resolution, and must not perform lookup.
+    try {
+      if (bootstrapArgs.length == 0) {
+        if (ConstantDescs.BSM_NULL_CONSTANT.equals(bootstrapMethod)) return ConstantDescs.NULL;
+        if (ConstantDescs.BSM_PRIMITIVE_CLASS.equals(bootstrapMethod) && ConstantDescs.CD_Class.equals(constantType)) {
+          ClassDesc primitive = ClassDesc.ofDescriptor(constantName);
+          if (primitive.isPrimitive()) return primitive;
+        }
+        if (ConstantDescs.BSM_ENUM_CONSTANT.equals(bootstrapMethod)) return java.lang.Enum$EnumDesc.of(constantType, constantName);
+      }
+      if (ConstantDescs.CD_VarHandle.equals(constantType)) {
+        if (bootstrapArgs.length == 2 && ConstantDescs.BSM_VARHANDLE_FIELD.equals(bootstrapMethod)) {
+          return VarHandleDesc.ofField((ClassDesc) bootstrapArgs[0], constantName, (ClassDesc) bootstrapArgs[1]);
+        }
+        if (bootstrapArgs.length == 2 && ConstantDescs.BSM_VARHANDLE_STATIC_FIELD.equals(bootstrapMethod)) {
+          return VarHandleDesc.ofStaticField((ClassDesc) bootstrapArgs[0], constantName, (ClassDesc) bootstrapArgs[1]);
+        }
+        if (bootstrapArgs.length == 1 && ConstantDescs.BSM_VARHANDLE_ARRAY.equals(bootstrapMethod)) {
+          return VarHandleDesc.ofArray((ClassDesc) bootstrapArgs[0]);
+        }
+      }
+    } catch (IllegalArgumentException invalidShape) {
+      return original;
+    } catch (ClassCastException invalidShape) {
+      return original;
     }
-    return new AnonymousDynamicConstantDesc<T>(bootstrapMethod, constantName, constantType, bootstrapArgs);
+    return original;
   }
 
   public static <T> DynamicConstantDesc<T> ofNamed(DirectMethodHandleDesc bootstrapMethod, String constantName, ClassDesc constantType, ConstantDesc... bootstrapArgs) {
@@ -307,7 +333,27 @@ public abstract class DynamicConstantDesc<T> implements ConstantDesc {
         throw new BootstrapMethodError(e);
       }
     }
-    throw new UnsupportedOperationException();
+    // Nominal API resolution is deliberately independent of CONSTANT_Dynamic
+    // CP-entry linkage: no cache and no VM ldc result conversion. Resolve every
+    // argument in order with the supplied lookup, then use the real varargs
+    // collector and MethodHandle invocation path.
+    try {
+      MethodHandle bootstrap = bootstrapMethod.resolveConstantDesc(lookup);
+      if (bootstrap.type().parameterCount() < 2
+          || !MethodHandles.Lookup.class.isAssignableFrom(bootstrap.type().parameterType(0))) {
+        throw new BootstrapMethodError("Invalid bootstrap method shape");
+      }
+      Object[] arguments = new Object[bootstrapArgs.length + 3];
+      arguments[0] = lookup;
+      arguments[1] = constantName;
+      arguments[2] = constantType.resolveConstantDesc(lookup);
+      for (int i = 0; i < bootstrapArgs.length; i++) arguments[i + 3] = bootstrapArgs[i].resolveConstantDesc(lookup);
+      return (T) bootstrap.invokeWithArguments(arguments);
+    } catch (Error error) {
+      throw error;
+    } catch (Throwable failure) {
+      throw new BootstrapMethodError(failure);
+    }
   }
 
   public final boolean equals(Object obj) {
