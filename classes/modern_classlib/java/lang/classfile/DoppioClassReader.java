@@ -177,6 +177,15 @@ public final class DoppioClassReader {
     return immutable(attributes);
   }
 
+  static List<Attribute<?>> readNestedAttributes(AttributedElement owner, ClassReader reader, int[] cursor, int end) {
+    Objects.requireNonNull(owner); Objects.requireNonNull(cursor);
+    if (!(reader instanceof Input) || cursor.length != 1) throw new IllegalArgumentException("Unsupported nested attribute reader context");
+    Cursor data = new Cursor((Input) reader, cursor[0], end);
+    List<Attribute<?>> attributes = readAttributes(owner, data, false);
+    cursor[0] = data.at;
+    return attributes;
+  }
+
   private static CodeValue readCode(MethodModel method, Input input, Utf8Entry name, int payloadStart, byte[] payload) {
     int end = payloadStart + payload.length;
     Cursor data = new Cursor(input, payloadStart, end);

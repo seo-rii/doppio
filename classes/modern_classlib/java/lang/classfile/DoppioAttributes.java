@@ -87,12 +87,17 @@ public final class DoppioAttributes {
     if (opaqueStability(name.stringValue()) != AttributeStability.UNKNOWN) return null;
     AttributeMapper<?> custom = reader.customAttributes().apply(name);
     if (custom == null) return null;
-    return Objects.requireNonNull(custom.readAttribute(owner, reader, start), "Custom attribute mapper returned null");
+    // Native bound record components expose an attributed Info, but their
+    // custom nested mapper callback deliberately receives no enclosing owner.
+    AttributedElement callbackOwner = owner instanceof RecordComponentInfo ? null : owner;
+    return Objects.requireNonNull(custom.readAttribute(callbackOwner, reader, start), "Custom attribute mapper returned null");
   }
 
   private static Attribute<?> readSelected(AttributedElement owner, ClassReader reader, Utf8Entry name, int start, byte[] payload) {
     Attribute<?> debug = DoppioDebugAttributes.read(owner, reader, name, start, payload);
     if (debug != null) return debug;
+    Attribute<?> metadata = DoppioMetadataAttributes.read(owner, reader, name, start, payload);
+    if (metadata != null) return metadata;
     String key = name.stringValue();
     ConstantPool source = DoppioClassReader.readerPool(reader);
     if ("ConstantValue".equals(key)) {
@@ -100,7 +105,8 @@ public final class DoppioAttributes {
       return new ConstantValue(name, reader.readEntry(start, ConstantValueEntry.class), source, payload);
     }
     if ("Signature".equals(key)) {
-      length(payload, 2); requireOwner(owner instanceof ClassModel || owner instanceof FieldModel || owner instanceof MethodModel, key);
+      length(payload, 2); requireOwner(owner instanceof ClassModel || owner instanceof FieldModel || owner instanceof MethodModel ||
+          owner instanceof RecordComponentInfo, key);
       return new SignatureValue(name, reader.readEntry(start, Utf8Entry.class), source, payload);
     }
     if ("Exceptions".equals(key)) {
@@ -185,11 +191,14 @@ public final class DoppioAttributes {
         "LocalVariableTable".equals(name) || "LocalVariableTypeTable".equals(name);
   }
   static byte[] retainedPayload(Attribute<?> attribute) {
-    return attribute instanceof Base && ((Base<?>) attribute).payload != null ? ((Base<?>) attribute).payload.clone() :
-        DoppioDebugAttributes.retainedPayload(attribute);
+    if (attribute instanceof Base && ((Base<?>) attribute).payload != null) return ((Base<?>) attribute).payload.clone();
+    byte[] debug = DoppioDebugAttributes.retainedPayload(attribute);
+    return debug != null ? debug : DoppioMetadataAttributes.retainedPayload(attribute);
   }
   static ConstantPool sourcePool(Attribute<?> attribute) {
-    return attribute instanceof Base ? ((Base<?>) attribute).pool : DoppioDebugAttributes.sourcePool(attribute);
+    if (attribute instanceof Base) return ((Base<?>) attribute).pool;
+    ConstantPool debug = DoppioDebugAttributes.sourcePool(attribute);
+    return debug != null ? debug : DoppioMetadataAttributes.sourcePool(attribute);
   }
 
   private static void requireOwner(boolean allowed, String name) {

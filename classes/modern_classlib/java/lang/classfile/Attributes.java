@@ -20,6 +20,12 @@ public final class Attributes {
   public static final String NAME_BOOTSTRAP_METHODS = "BootstrapMethods";
   public static final String NAME_DEPRECATED = "Deprecated";
   public static final String NAME_SYNTHETIC = "Synthetic";
+  public static final String NAME_RECORD = "Record";
+  public static final String NAME_PERMITTED_SUBCLASSES = "PermittedSubclasses";
+  public static final String NAME_ENCLOSING_METHOD = "EnclosingMethod";
+  public static final String NAME_METHOD_PARAMETERS = "MethodParameters";
+  public static final String NAME_SOURCE_ID = "SourceID";
+  public static final String NAME_COMPILATION_ID = "CompilationID";
   private Attributes() {}
   public static AttributeMapper<SourceFileAttribute> sourceFile() { return DoppioClassReader.sourceFileMapper(); }
   public static AttributeMapper<CodeAttribute> code() { return DoppioClassReader.codeMapper(); }
@@ -38,4 +44,10 @@ public final class Attributes {
   public static AttributeMapper<BootstrapMethodsAttribute> bootstrapMethods() { return DoppioAttributes.BOOTSTRAPS; }
   public static AttributeMapper<DeprecatedAttribute> deprecated() { return DoppioAttributes.DEPRECATED; }
   public static AttributeMapper<SyntheticAttribute> synthetic() { return DoppioAttributes.SYNTHETIC; }
+  public static AttributeMapper<RecordAttribute> record() { return DoppioMetadataAttributes.recordMapper(); }
+  public static AttributeMapper<PermittedSubclassesAttribute> permittedSubclasses() { return DoppioMetadataAttributes.permittedSubclassesMapper(); }
+  public static AttributeMapper<EnclosingMethodAttribute> enclosingMethod() { return DoppioMetadataAttributes.enclosingMethodMapper(); }
+  public static AttributeMapper<MethodParametersAttribute> methodParameters() { return DoppioMetadataAttributes.methodParametersMapper(); }
+  public static AttributeMapper<SourceIDAttribute> sourceId() { return DoppioMetadataAttributes.sourceIdMapper(); }
+  public static AttributeMapper<CompilationIDAttribute> compilationId() { return DoppioMetadataAttributes.compilationIdMapper(); }
 }
