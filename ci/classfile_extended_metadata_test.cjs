@@ -60,7 +60,7 @@ test('extended attribute models are real public interfaces with exact native ope
     ['InnerClassInfo','outerClass','()Ljava/util/Optional;'],['BootstrapMethodsAttribute','bootstrapMethods','()Ljava/util/List;']
   ])assert.equal(method('attribute/'+owner,name,descriptor).flags,0x401);
 });
-test('selected attribute factories execute actual codecs and omitted signature-tree ABI is not fabricated',()=>{
+test('selected attribute factories execute actual codecs and typed signature trees use genuine native API paths',()=>{
   for(const [owner,descriptor] of [
     ['ConstantValueAttribute','(Ljava/lang/classfile/constantpool/ConstantValueEntry;)Ljava/lang/classfile/attribute/ConstantValueAttribute;'],
     ['SignatureAttribute','(Ljava/lang/classfile/constantpool/Utf8Entry;)Ljava/lang/classfile/attribute/SignatureAttribute;'],
@@ -68,7 +68,15 @@ test('selected attribute factories execute actual codecs and omitted signature-t
     ['NestHostAttribute','(Ljava/lang/classfile/constantpool/ClassEntry;)Ljava/lang/classfile/attribute/NestHostAttribute;'],
     ['NestMembersAttribute','(Ljava/util/List;)Ljava/lang/classfile/attribute/NestMembersAttribute;']
   ])assert.ok(calls('attribute/'+owner,'of',descriptor).some(item=>item.cp.owner==='java.lang.classfile.DoppioAttributes'));
-  assert.ok(!units.get('attribute/SignatureAttribute').layout.methods.entries.some(item=>item.name.startsWith('as')));
+  for(const [name,owner] of [['asClassSignature','ClassSignature'],['asMethodSignature','MethodSignature'],['asTypeSignature','Signature']]) {
+    const tree='Ljava/lang/classfile/'+owner+';',attribute='Ljava/lang/classfile/attribute/SignatureAttribute;';
+    assert.equal(method('attribute/SignatureAttribute',name,'()'+tree).flags,1);
+    assert.ok(calls('attribute/SignatureAttribute',name,'()'+tree).some(item=>
+      item.cp.owner==='java.lang.classfile.'+owner&&item.cp.name==='parseFrom'&&item.cp.descriptor==='(Ljava/lang/String;)'+tree));
+    assert.equal(method('attribute/SignatureAttribute','of','('+tree+')'+attribute).flags,9);
+    assert.ok(calls('attribute/SignatureAttribute','of','('+tree+')'+attribute).some(item=>
+      item.cp.owner==='java.lang.classfile.constantpool.DoppioConstantPool'&&item.cp.name==='temporaryPool'));
+  }
   assert.ok(!units.get('attribute/BootstrapMethodsAttribute').layout.methods.entries.some(item=>item.name==='of'));
 });
 test('custom extension point preserves genuine abstract class and protected mapper constructor',()=>{
