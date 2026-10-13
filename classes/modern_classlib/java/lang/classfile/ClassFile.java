@@ -79,6 +79,10 @@ public interface ClassFile {
   default void buildTo(Path path, ClassDesc name, Consumer<ClassBuilder> handler) throws IOException {
     Files.write(Objects.requireNonNull(path), build(name, handler));
   }
+  default void buildTo(Path path, ClassEntry name, ConstantPoolBuilder pool,
+      Consumer<? super ClassBuilder> handler) throws IOException {
+    Files.write(path, build(name, pool, handler));
+  }
   default byte[] transformClass(ClassModel model, ClassTransform transform) {
     return transformClass(Objects.requireNonNull(model), model.thisClass(), transform);
   }
