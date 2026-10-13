@@ -600,6 +600,13 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
       String name = asInternalName(); return name.startsWith("[") ? ClassDesc.ofDescriptor(name) : ClassDesc.ofInternalName(name);
     }
     public boolean matches(ClassDesc type) { return asSymbol().equals(Objects.requireNonNull(type)); }
+    public boolean equals(Object other) {
+      return this == other || other instanceof ClassValue && name().equals(((ClassValue) other).name());
+    }
+    public int hashCode() {
+      String name = asInternalName();
+      return (7 * 0x13c4b2d1 + (name.startsWith("[") ? name : "L" + name + ";").hashCode()) | 0x40000000;
+    }
   }
   private static final class NameType extends Entry implements NameAndTypeEntry {
     NameType(DoppioConstantPool p, int i, int t, int a, int b, Object v, byte[] r) { super(p, i, t, a, b, v, r); }
