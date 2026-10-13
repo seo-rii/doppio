@@ -26,6 +26,11 @@ public final class Attributes {
   public static final String NAME_METHOD_PARAMETERS = "MethodParameters";
   public static final String NAME_SOURCE_ID = "SourceID";
   public static final String NAME_COMPILATION_ID = "CompilationID";
+  public static final String NAME_ANNOTATION_DEFAULT = "AnnotationDefault";
+  public static final String NAME_RUNTIME_VISIBLE_ANNOTATIONS = "RuntimeVisibleAnnotations";
+  public static final String NAME_RUNTIME_INVISIBLE_ANNOTATIONS = "RuntimeInvisibleAnnotations";
+  public static final String NAME_RUNTIME_VISIBLE_PARAMETER_ANNOTATIONS = "RuntimeVisibleParameterAnnotations";
+  public static final String NAME_RUNTIME_INVISIBLE_PARAMETER_ANNOTATIONS = "RuntimeInvisibleParameterAnnotations";
   private Attributes() {}
   public static AttributeMapper<SourceFileAttribute> sourceFile() { return DoppioClassReader.sourceFileMapper(); }
   public static AttributeMapper<CodeAttribute> code() { return DoppioClassReader.codeMapper(); }
@@ -50,4 +55,9 @@ public final class Attributes {
   public static AttributeMapper<MethodParametersAttribute> methodParameters() { return DoppioMetadataAttributes.methodParametersMapper(); }
   public static AttributeMapper<SourceIDAttribute> sourceId() { return DoppioMetadataAttributes.sourceIdMapper(); }
   public static AttributeMapper<CompilationIDAttribute> compilationId() { return DoppioMetadataAttributes.compilationIdMapper(); }
+  public static AttributeMapper<AnnotationDefaultAttribute> annotationDefault() { return DoppioAnnotationAttributes.annotationDefaultMapper(); }
+  public static AttributeMapper<RuntimeVisibleAnnotationsAttribute> runtimeVisibleAnnotations() { return DoppioAnnotationAttributes.runtimeVisibleAnnotationsMapper(); }
+  public static AttributeMapper<RuntimeInvisibleAnnotationsAttribute> runtimeInvisibleAnnotations() { return DoppioAnnotationAttributes.runtimeInvisibleAnnotationsMapper(); }
+  public static AttributeMapper<RuntimeVisibleParameterAnnotationsAttribute> runtimeVisibleParameterAnnotations() { return DoppioAnnotationAttributes.runtimeVisibleParameterAnnotationsMapper(); }
+  public static AttributeMapper<RuntimeInvisibleParameterAnnotationsAttribute> runtimeInvisibleParameterAnnotations() { return DoppioAnnotationAttributes.runtimeInvisibleParameterAnnotationsMapper(); }
 }

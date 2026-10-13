@@ -98,6 +98,8 @@ public final class DoppioAttributes {
     if (debug != null) return debug;
     Attribute<?> metadata = DoppioMetadataAttributes.read(owner, reader, name, start, payload);
     if (metadata != null) return metadata;
+    Attribute<?> annotation = DoppioAnnotationAttributes.read(owner, reader, name, start, payload);
+    if (annotation != null) return annotation;
     String key = name.stringValue();
     ConstantPool source = DoppioClassReader.readerPool(reader);
     if ("ConstantValue".equals(key)) {
@@ -193,12 +195,16 @@ public final class DoppioAttributes {
   static byte[] retainedPayload(Attribute<?> attribute) {
     if (attribute instanceof Base && ((Base<?>) attribute).payload != null) return ((Base<?>) attribute).payload.clone();
     byte[] debug = DoppioDebugAttributes.retainedPayload(attribute);
-    return debug != null ? debug : DoppioMetadataAttributes.retainedPayload(attribute);
+    if (debug != null) return debug;
+    byte[] metadata = DoppioMetadataAttributes.retainedPayload(attribute);
+    return metadata != null ? metadata : DoppioAnnotationAttributes.retainedPayload(attribute);
   }
   static ConstantPool sourcePool(Attribute<?> attribute) {
     if (attribute instanceof Base) return ((Base<?>) attribute).pool;
     ConstantPool debug = DoppioDebugAttributes.sourcePool(attribute);
-    return debug != null ? debug : DoppioMetadataAttributes.sourcePool(attribute);
+    if (debug != null) return debug;
+    ConstantPool metadata = DoppioMetadataAttributes.sourcePool(attribute);
+    return metadata != null ? metadata : DoppioAnnotationAttributes.sourcePool(attribute);
   }
 
   private static void requireOwner(boolean allowed, String name) {
