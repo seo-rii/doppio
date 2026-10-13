@@ -319,6 +319,17 @@ test('checked CFG reader rejects malformed instruction/frame boundaries includin
     'ClassFileControlFlowReaderRegression$CheckedBounds');
 });
 
-test('actual guest CFG writer rejects foreign identities and documents selected overflow/key boundaries', () => {
-  runDiagnosticMain('ClassFileControlFlowWriterRegression', 'CLASSFILE_CONTROL_FLOW_WRITER_REGRESSION_OK|10');
+test('actual guest CFG writer checks default and explicit short/wide jump policies inside the original cap', () => {
+  runDiagnosticMain('ClassFileControlFlowWriterRegression', 'CLASSFILE_CONTROL_FLOW_WRITER_WIDE_OK|3',
+    'ClassFileControlFlowWriterRegression$Wide');
+});
+
+test('actual guest CFG writer checks all sparse, sorted and duplicate switch boundaries inside the original cap', () => {
+  runDiagnosticMain('ClassFileControlFlowWriterRegression', 'CLASSFILE_CONTROL_FLOW_WRITER_SWITCHES_OK|4',
+    'ClassFileControlFlowWriterRegression$Switches');
+});
+
+test('actual guest CFG writer checks unbound/end/foreign label identities inside the original cap', () => {
+  runDiagnosticMain('ClassFileControlFlowWriterRegression', 'CLASSFILE_CONTROL_FLOW_WRITER_LABELS_OK|3',
+    'ClassFileControlFlowWriterRegression$Labels');
 });

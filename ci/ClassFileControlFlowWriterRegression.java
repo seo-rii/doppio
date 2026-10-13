@@ -209,4 +209,25 @@ public final class ClassFileControlFlowWriterRegression {
     check(completed == 10, "Incomplete writer regression execution");
     System.out.println("CLASSFILE_CONTROL_FLOW_WRITER_REGRESSION_OK|10");
   }
+
+  // Retain all ten checks, with separate genuine Java entry points so each
+  // focused guest process keeps the existing 60-second execution cap.
+  public static final class Wide {
+    public static void main(String[] arguments) {
+      wide(false); check(completed == 3, "Incomplete wide writer profile");
+      System.out.println("CLASSFILE_CONTROL_FLOW_WRITER_WIDE_OK|3");
+    }
+  }
+  public static final class Switches {
+    public static void main(String[] arguments) {
+      switches(false); check(completed == 4, "Incomplete switch writer profile");
+      System.out.println("CLASSFILE_CONTROL_FLOW_WRITER_SWITCHES_OK|4");
+    }
+  }
+  public static final class Labels {
+    public static void main(String[] arguments) {
+      labels(false); check(completed == 3, "Incomplete label writer profile");
+      System.out.println("CLASSFILE_CONTROL_FLOW_WRITER_LABELS_OK|3");
+    }
+  }
 }
