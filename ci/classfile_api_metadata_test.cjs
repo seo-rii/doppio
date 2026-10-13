@@ -184,9 +184,17 @@ test('fresh class reader is independent Java Code with the actual pool decoder c
   const entry = calls('DoppioClassReader', 'parse', '([B)Ljava/lang/classfile/ClassModel;');
   assert.ok(entry.some(value => value.cp.owner === 'java.lang.classfile.DoppioClassReader' && value.cp.name === 'parse' &&
     value.cp.descriptor === '([BLjava/util/function/Function;)Ljava/lang/classfile/ClassModel;'));
-  const invoke = calls('DoppioClassReader', 'parse', '([BLjava/util/function/Function;)Ljava/lang/classfile/ClassModel;');
-  assert.ok(invoke.some(value => value.cp.owner === 'java.lang.classfile.constantpool.DoppioConstantPool' && value.cp.name === 'decode'));
+  const mapped = calls('DoppioClassReader', 'parse', '([BLjava/util/function/Function;)Ljava/lang/classfile/ClassModel;');
+  const configured = '([BLjava/util/function/Function;Ljava/lang/classfile/ClassFile$DebugElementsOption;' +
+    'Ljava/lang/classfile/ClassFile$LineNumbersOption;)Ljava/lang/classfile/ClassModel;';
+  assert.ok(mapped.some(value => value.cp.owner === 'java.lang.classfile.DoppioClassReader' && value.cp.name === 'parse' &&
+    value.cp.descriptor === configured));
+  assert.ok(!mapped.some(value => /DoppioClassFileVerifier|ClassLoader|Doppio\.VM/.test(value.cp.owner)));
+  const invoke = calls('DoppioClassReader', 'parse', configured);
+  assert.ok(invoke.some(value => value.cp.owner === 'java.lang.classfile.constantpool.DoppioConstantPool' && value.cp.name === 'decode' &&
+    value.cp.descriptor === '([B[I)Ljava/lang/classfile/constantpool/DoppioConstantPool;'));
   assert.ok(!invoke.some(value => /DoppioClassFileVerifier|ClassLoader|Doppio\.VM/.test(value.cp.owner)));
+  assert.ok(!invoke.some(value => /^(?:verify|defineClass|defineHiddenClass|initialize|ensureClassInitialized)$/.test(value.cp.name)));
 });
 
 test('actual Code helpers use the true CodeAttribute accessors and defensive original arrays', () => {
