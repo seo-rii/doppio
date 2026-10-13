@@ -117,3 +117,13 @@ test('fresh-source guest executes debug options and legal deferred mapper/reader
   assert.equal(result.stdout.replaceAll('\r\n', '\n'), 'CLASSFILE_DEBUG_READER_REGRESSION_OK|65\n');
   assert.equal(result.stderr, '');
 });
+test('fresh-source guest sorts supplied frames privately and preserves Object-constructor verification types', () => {
+  const diagnostic = path.join(temporary, 'manual-diagnostic'); fs.mkdirSync(diagnostic);
+  checked('javac', ['--release', '9', '--patch-module', 'java.base=' + output + path.delimiter + path.join(root, 'ci'),
+    '-d', diagnostic, path.join(root, 'ci/ClassFileManualFrameRegression.java')]);
+  const result = runClassFileMetadataGuest({root, output, diagnostic, checked,
+    className: 'classes.modern_test.ClassFileManualFrameRegression',
+    requiredPackages: ['java/lang/classfile', 'java/lang/classfile/attribute', 'java/lang/classfile/instruction', 'java/lang/classfile/constantpool']});
+  assert.equal(result.stdout.replaceAll('\r\n', '\n'), 'CLASSFILE_MANUAL_FRAME_REGRESSION_OK|3\n');
+  assert.equal(result.stderr, '');
+});

@@ -983,7 +983,8 @@ final class DoppioBuilders {
   private static List<VerificationTypeInfo> initialFrameLocals(CodeValue code) {
     List<VerificationTypeInfo> locals = new ArrayList<VerificationTypeInfo>();
     if ((code.flags & ClassFile.ACC_STATIC) == 0)
-      locals.add("<init>".equals(code.name.stringValue()) ? SimpleVerificationTypeInfo.UNINITIALIZED_THIS :
+      locals.add("<init>".equals(code.name.stringValue()) &&
+          !"Ljava/lang/Object;".equals(code.owner.className().asSymbol().descriptorString()) ? SimpleVerificationTypeInfo.UNINITIALIZED_THIS :
           ObjectVerificationTypeInfo.of(code.owner.className()));
     MethodTypeDesc descriptor = MethodTypeDesc.ofDescriptor(code.type.stringValue());
     for (int index = 0; index < descriptor.parameterCount(); index++) {
@@ -999,9 +1000,12 @@ final class DoppioBuilders {
   private static byte[] suppliedStackMap(DoppioBufWriter context, List<StackMapFrameInfo> frames) {
     try {
       ByteArrayOutputStream bytes = new ByteArrayOutputStream(); DataOutputStream output = new DataOutputStream(bytes);
-      u2(output, frames.size()); int previous = -1;
+      List<StackMapFrameInfo> ordered = new ArrayList<StackMapFrameInfo>(frames);
+      Collections.sort(ordered, (first, second) -> Integer.compare(context.labelToBci(first.target(), false),
+          context.labelToBci(second.target(), false)));
+      u2(output, ordered.size()); int previous = -1;
       List<VerificationTypeInfo> previousLocals = context.initialLocals();
-      for (StackMapFrameInfo frame : frames) {
+      for (StackMapFrameInfo frame : ordered) {
         int bci = context.labelToBci(frame.target(), false), delta = bci - previous - 1;
         if (delta < 0) throw new IllegalArgumentException("Stack map targets must be ordered and distinct");
         List<VerificationTypeInfo> locals = frame.locals(), stack = frame.stack();
