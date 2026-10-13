@@ -127,6 +127,9 @@ const classFileHierarchyRunnerCommand = 'node ci/java_classfile_hierarchy_test.m
 const classFileInstructionsUnits = ['ci/java_classfile_instructions_contract_test.mjs','ci/classfile_memory_instruction_test.cjs','ci/classfile_instruction_writer_test.cjs','ci/classfile_instruction_frame_policy_test.cjs'];
 const classFileInstructionsUnitCommand = `node --test --test-concurrency=2 ${classFileInstructionsUnits.join(' ')}`;
 const classFileInstructionsRunnerCommand = 'node ci/java_classfile_instructions_test.mjs --browser';
+const classFileDebugUnits = ['ci/java_classfile_debug_contract_test.mjs','ci/classfile_debug_instruction_test.cjs','ci/classfile_debug_reader_test.cjs'];
+const classFileDebugUnitCommand = `node --test --test-concurrency=2 ${classFileDebugUnits.join(' ')}`;
+const classFileDebugRunnerCommand = 'node ci/java_classfile_debug_test.mjs --browser';
 const partialMultianewarrayUnitCommand = 'node --test ci/partial_multianewarray_regression_test.cjs';
 const memberGates = [
   {name: 'member resolution', units: memberResolutionUnits, unitCommand: memberResolutionUnitCommand,
@@ -185,6 +188,9 @@ const memberGates = [
   {name: 'class-file instructions', units: classFileInstructionsUnits, unitCommand: classFileInstructionsUnitCommand,
     runnerCommand: classFileInstructionsRunnerCommand, stepId: 'java_classfile_instructions',
     ledger: 'build/java-classfile-instructions-results.json', timeout: 40},
+  {name: 'class-file debug', units: classFileDebugUnits, unitCommand: classFileDebugUnitCommand,
+    runnerCommand: classFileDebugRunnerCommand, stepId: 'java_classfile_debug',
+    ledger: 'build/java-classfile-debug-results.json', timeout: 40},
 ];
 const packageScripts = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).scripts;
 for (const [name, command] of [['ci:classfile-api:test', classFileApiUnitCommand], ['ci:classfile-api', classFileApiRunnerCommand]]) {
@@ -204,6 +210,9 @@ for (const [name, command] of [['ci:classfile-instructions:test', classFileInstr
 }
 if (packageScripts['ci:partial-multianewarray:test'] !== partialMultianewarrayUnitCommand)
   throw new Error('Partial multidimensional allocation must retain its exact native/guest regression command.');
+for (const [name, command] of [['ci:classfile-debug:test', classFileDebugUnitCommand], ['ci:classfile-debug', classFileDebugRunnerCommand]]) {
+  if (packageScripts[name] !== command) throw new Error(`Package script ${name} must retain the exact C7d3 gate command.`);
+}
 for (const [name, command] of [
   ['ci:java-initialization:test', initializationUnitCommand],
   ['ci:bytecode-verification:test', verificationUnitCommand],
@@ -963,6 +972,9 @@ for (const gate of [
   {name: 'class-file instructions', contractName: 'Check phase C class-file instructions contracts', runName: 'Run Java class-file instructions compatibility',
     uploadName: 'Upload Java class-file instructions ledger', unitCommand: classFileInstructionsUnitCommand, runnerCommand: classFileInstructionsRunnerCommand,
     stepId: 'java_classfile_instructions', ledgerBase: 'java-classfile-instructions'},
+  {name: 'class-file debug', contractName: 'Check phase C class-file debug contracts', runName: 'Run Java class-file debug compatibility',
+    uploadName: 'Upload Java class-file debug ledger', unitCommand: classFileDebugUnitCommand, runnerCommand: classFileDebugRunnerCommand,
+    stepId: 'java_classfile_debug', ledgerBase: 'java-classfile-debug'},
 ]) {
   for (const replacement of ['echo selected contracts checked', gate.runnerCommand.replace(' --browser', ' --diagnostic'),
     ...['--case selected', '--group selected', '--fixture selected', '--host node', '--guest node', '--skip-native',

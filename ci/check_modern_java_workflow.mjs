@@ -44,6 +44,8 @@ const classFileHierarchyUnitCommand = 'node --test ci/java_classfile_hierarchy_c
 const classFileHierarchyRunnerCommand = 'node ci/java_classfile_hierarchy_test.mjs --browser';
 const classFileInstructionsUnitCommand = 'node --test --test-concurrency=2 ci/java_classfile_instructions_contract_test.mjs ci/classfile_memory_instruction_test.cjs ci/classfile_instruction_writer_test.cjs ci/classfile_instruction_frame_policy_test.cjs';
 const classFileInstructionsRunnerCommand = 'node ci/java_classfile_instructions_test.mjs --browser';
+const classFileDebugUnitCommand = 'node --test --test-concurrency=2 ci/java_classfile_debug_contract_test.mjs ci/classfile_debug_instruction_test.cjs ci/classfile_debug_reader_test.cjs';
+const classFileDebugRunnerCommand = 'node ci/java_classfile_debug_test.mjs --browser';
 const partialMultianewarrayUnitCommand = 'node --test ci/partial_multianewarray_regression_test.cjs';
 
 function stripUnquotedComments(text) {
@@ -1094,6 +1096,24 @@ for (const [name, fields] of [
     '  if-no-files-found: error',
     '  retention-days: 7',
   ]],
+  ['Check phase C class-file debug contracts', [
+    'timeout-minutes: 3',
+    `run: ${classFileDebugUnitCommand}`,
+  ]],
+  ['Run Java class-file debug compatibility', [
+    'id: java_classfile_debug',
+    'timeout-minutes: 40',
+    `run: ${classFileDebugRunnerCommand}`,
+  ]],
+  ['Upload Java class-file debug ledger', [
+    "if: always() && steps.java_classfile_debug.outcome != 'skipped'",
+    'uses: actions/upload-artifact@v7',
+    'with:',
+    '  path: build/java-classfile-debug-results.json',
+    '  archive: false',
+    '  if-no-files-found: error',
+    '  retention-days: 7',
+  ]],
   ['Check evolved switch ledger contract', [
     'timeout-minutes: 1',
     'run: node --test ci/java_pattern_evolution_contract_test.mjs',
@@ -1293,6 +1313,9 @@ const runtimeOrder = [
   'Check phase C class-file instructions contracts',
   'Run Java class-file instructions compatibility',
   'Upload Java class-file instructions ledger',
+  'Check phase C class-file debug contracts',
+  'Run Java class-file debug compatibility',
+  'Upload Java class-file debug ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -1338,6 +1361,7 @@ for (const [name, commands] of [['user bootstrap', [bootstrapUnitCommand, bootst
   ['class-file extended', [classFileExtendedUnitCommand, classFileExtendedRunnerCommand]],
   ['class-file hierarchy', [classFileHierarchyUnitCommand, classFileHierarchyRunnerCommand]],
   ['class-file instructions', [classFileInstructionsUnitCommand, classFileInstructionsRunnerCommand]],
+  ['class-file debug', [classFileDebugUnitCommand, classFileDebugRunnerCommand]],
   ['partial multidimensional allocation', [partialMultianewarrayUnitCommand]]]) {
   for (const command of commands) if (countLiteral(runtimeJob, `        run: ${command}\n`) !== 1) {
     fail(`Modern Java workflow must execute ${name} command exactly once: ${command}`);

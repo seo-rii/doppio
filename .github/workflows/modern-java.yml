@@ -661,6 +661,25 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Check phase C class-file debug contracts
+        timeout-minutes: 3
+        run: node --test --test-concurrency=2 ci/java_classfile_debug_contract_test.mjs ci/classfile_debug_instruction_test.cjs ci/classfile_debug_reader_test.cjs
+
+      # C7d3 genuine debug relocation, mapper lifecycle and explicit frames.
+      - name: Run Java class-file debug compatibility
+        id: java_classfile_debug
+        timeout-minutes: 40
+        run: node ci/java_classfile_debug_test.mjs --browser
+
+      - name: Upload Java class-file debug ledger
+        if: always() && steps.java_classfile_debug.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-classfile-debug-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Check evolved switch ledger contract
         timeout-minutes: 1
         run: node --test ci/java_pattern_evolution_contract_test.mjs
