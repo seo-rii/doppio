@@ -5,10 +5,10 @@ Phase C owns `JVM-003`, `JVM-004`, `JVM-005` and `LIB-007` from the
 B1–B8 loading, verification, linking and language foundation; that foundation
 does not establish general method-handle, bootstrap or module conformance.
 This is an ordered batch plan, not a single feature, effort estimate or new
-support level. The selected C1–C6 batches and C7a–C7d3 public class-file
+support level. The selected C1–C6 batches and C7a–C7d4 public class-file
 pipeline, control-flow/stack-map, attributes/bootstrap/fresh-pool, hierarchy
-and modern instruction/frame-policy/debug relocation expansions are verified.
-C7d4–C7d5 retain the remaining public ABI and structural verifier work.
+and modern instruction/frame-policy/debug relocation/declaration expansions are verified.
+C7d5 retains structural verification, legacy applicability and final ABI reconciliation.
 Selected exits do not complete
 Phase C or any full owner/API contract.
 
@@ -22,7 +22,7 @@ Phase C or any full owner/API contract.
 | C4: user bootstrap linkage | `JVM-004`: general `invokedynamic` and `CONSTANT_Dynamic` paths | Genuine native-checked inputs with user bootstrap handles, nested arguments, adaptation/access, success/failure caching and specified error/cause identities. Independently prove bootstrap metadata and lexical call-site identity. Retain lambda, concat, record and compiler bootstrap consumers. Depends on B4 and C1/C2; VarHandle bootstrap forms also depend on C3. |
 | C5: hidden classes | `JVM-005`: definition, class data, lookup privileges and reflective restrictions | Select definition/initialization, malformed bytes, privilege failures, nestmate options, runtime names/descriptors, class-data access and discovery/non-discovery cases. Preserve class/loader identity rather than comparing implementation-generated name suffixes. Depends on B2–B4 and C1; named-module cases require G. |
 | C6: nominal constants | `LIB-007`: class/method/handle/dynamic/VarHandle descriptors and resolution | Verified finite 64-case original-javac 21/25 matrix: descriptors, caller-Lookup resolution, executable round trips, ordered user bootstraps and selected exact failures. Metadata-only VarHandle descriptors do not discharge C3; C6's API reinvocation is not C4 CP-entry caching. Hidden-class restrictions depend on C5. Full nominal/API/access/loader conformance remains unclaimed. |
-| C7: public class-file library | `LIB-007`: Java 25 `java.lang.classfile` and its public subpackages | C7a–C7d3's selected public pipeline, CFG/frames, attributes/bootstrap/fresh-pool, hierarchy, modern instruction/frame policies and debug relocation pass on native Java 25, Node and Chromium: 144 cases/54 cells/432 outcomes. C7d4–C7d5 retain remaining attributes/public ABI and structural verifier/legacy profiles. VM-internal parsing and the test decoder are not this public API. Depends on B2/B3, C4 and C6. |
+| C7: public class-file library | `LIB-007`: Java 25 `java.lang.classfile` and its public subpackages | C7a–C7d4's selected pipeline, CFG/frames, attributes/fresh-pool, hierarchy, instruction/debug/declaration profiles pass on native Java 25, Node and Chromium: 176 cases/66 cells/528 outcomes. C7d4 compares all217 nonlegacy native public types; C7d5 retains structural verifier/legacy profiles and final reconciliation. Native sealing and full API/JVM conformance remain separate. VM-internal parsing and the test decoder are not this public API. Depends on B2/B3, C4 and C6. |
 
 This ordering keeps invocation/adaptation foundations before their bootstrap
 and descriptor consumers. C3's executable access and D's memory-model work have
@@ -1185,7 +1185,7 @@ Full Java SE/JVM/source-unit conformance is separate from closing this worklist.
 | C7d1 | Explicit hierarchy resolvers, reference/array joins and native constant-instruction factories/covariance | Verified below |
 | C7d2 | Modern instruction models/aliases, stack/array/type/monitor flow, long jumps and dead-code/frame policies | Verified below; 209 modern opcode entries in 24 families, four discontinued entries tracked separately |
 | C7d3 | Debug/label attributes and actual relocation, legal deferred mapper/reader lifecycle and supplied frames | Verified below; native forbids owner attribute traversal inside the mapper read callback |
-| C7d4 | Signature trees, annotation/record/module attributes and remaining public builder/transform/ABI topology | Pending; inventory must remain explicit |
+| C7d4 | Signature trees, annotation/record/module attributes and remaining public builder/transform/ABI topology | Verified below; all217 nonlegacy native public type declarations match, three legacy types deferred and native195-type sealing independently unproved |
 | C7d5 | Structural verifier/legacy applicability and final aggregate regression/ABI reconciliation | Pending; no broad completion flag is inferred from a finite subgate |
 
 ## C7d1 verified hierarchy and constant ABI profile
@@ -1415,7 +1415,7 @@ ledger `build/java-classfile-debug-results.json`.
 
 C7d3 is closed, not C7, Phase C or full LIB-007/Java SE/JVM conformance. All17
 broader completion flags remain false. C1–C6/B gates, retained323 and compiler
-consumers were not rerun in this profile. C7d4 retains complete signature trees,
+consumers were not rerun in this profile. At that exit, C7d4 retained complete signature trees,
 declaration/parameter/type annotations, record/other/module metadata and public
 builder/transform topology. The pinned SDK inventory has220 public types:
 150 current facades have matching direct nominal parents, while70 types and45
@@ -1424,3 +1424,96 @@ real dependencies; native sealing on195 types is a separate source/classfile/
 reflection axis, not proved by target9 facades or parent equality. C7d5 retains
 structural verifier/legacy applicability and final aggregate reconciliation,
 including malformed debug coordinates/slots and invokespecial constraints.
+
+## C7d4 verified declarations, metadata and nominal ABI profile
+
+At clean implementation `5024a0337247e0a54269609daf50182bbeb6e69b`, complete
+class/method signature trees, declaration/parameter/default annotations, all22
+type-annotation target kinds and paths, record/other metadata and six module
+attribute families use actual public models and recursive wire codecs. NEW_POOL
+imports semantic CP references; Code type targets rebase real final labels.
+Shared-pool bound type/module packets preserve native raw-copy behavior, while
+new-pool reconstruction observes the native mutable ModuleHashInfo array view.
+Unbound type targets preserve native lower16bits65535 and are not silently
+removed by dead-label policy. Explicit unbound type attributes remain under
+DROP_UNSTABLE; original bound policy is applied before reconstruction.
+
+ModuleDesc/PackageDesc and CP19/20 have actual native nominal topology,
+lazy raw-name validation, semantic import and retained shared-source ownership.
+The separately approved UTF/numeric and ClassEntry equality/hash corrections
+have dedicated native/fresh-source tests. ClassEntry uses descriptor-content
+hashing; CP19/20 retain native child-index-dependent hashing. The newly
+implemented permitted-subclass nominal factory now creates genuine temporary
+entries rather than writable-pool lookalikes.
+
+Scoped block/catch/if combinators isolate nested local cursors and real labels.
+Stateful transform factories resolve per traversal before callbacks, including
+native downstream-first factory/start and upstream-first end ordering. Reused
+and nested transforms do not share traversal state. ClassEntry/pool buildTo and
+all four module build/file APIs write actual owned files, preserve explicit
+superclass metadata and native failure ordering; implicit module superclass is0.
+
+The fixed original32-case declarations catalogue passes12 native25/Node/Chromium
+cells and96 outcomes. Each host independently emits32 arrays:28 defined/invoked
+from those same bytes and four never defined (annotation-default interface,
+sealed copy and two module-info outputs). Two API-only cases emit no array and
+two cases emit two. Independent recursive proofs bind110 output methods/107 Code
+bodies,91 callbacks,15 lifecycle and seven compiler-resource routes. Four genuine
+javac25 groups have32 compiler rows/29 unique classes; --release25 -g -parameters
+and empty source/classpath roots are retained, without source adapters or header
+rewriting. Actual CAST/NEW/INSTANCEOF BCIs and both local/resource range edges
+move in the original relocation caller; catch0->1 is explicitly caller-written.
+
+Binary comparison against the untouched locked SDK25 jmod matches direct
+parents, declared public descriptors/bridges/varargs/static/abstract flags,
+fields and constant bits for all217 nonlegacy public types out of native220.
+Three DiscontinuedInstruction types remain C7d5 work. Native sealing on195 types
+is separately inventoried: naturally target9 facades do not establish sealed
+source/classfile/reflection parity. The four exact boxed-covariance sources use
+genuine source9/target9 compilation against the real SDK; all other classlib
+sources retain --release9. No synthetic SDK type or rewritten class header is
+used to force the ABI.
+
+Native/fresh semantic profiles pass unchanged: signature127, annotation224,
+scalar CP93, annotation attributes86, type models367, type attributes225,
+record/other metadata57, scoped builders19, stateful transforms31, file output7,
+module pool291, module attributes/file output170 and ClassEntry281 checks.
+Strict CLI/browser builds, ES5 checking, the full workflow mutation suite,
+all443 C7 unit tests across30 files and3 separate VM tests pass with zero failure,
+cancellation or skip. The full unit inventory runs with serial file scheduling;
+no case selector, per-process timeout change or fixture waiver is used. Final
+replay validates all seven official ledgers at the same clean implementation
+and runtime: aggregate176 cases/66 execution cells/528 outcomes, including96
+independently produced declarations artifacts.
+
+Final consumer exit0:
+`/home/seorii/logs/doppio-c7d-step4-verified-close-kfCJA2/verification-summary.json`,
+SHA-256 `bc82bfed4073c21baa869c2dce972d4880991327e0dce46e2f851e9fa0930ef2`;
+runtime SHA-256
+`932cc68e801ad8e3423f3a789d782d15728942fea9dd45d22798a545893399e0`.
+All eleven producer receipts bind that exact clean implementation and runtime;
+the consumer checks full process termination, exits, unit summaries and each
+official ledger. Earlier failures are preserved: the obsolete Signature-tree
+absence assertion produced443 tests/442 passes at
+`/home/seorii/logs/doppio-c7d-step4-frozen-units-KMusf8/`, including the seven
+then-passed ledgers. The corrected exact six-method test passes with the native
+tree profile. The later three unchanged60s unit timeouts are retained at
+`/home/seorii/logs/doppio-c7d-step4-reconciled-units-Pj0Gpw/`; two instruction-host
+timeouts are at
+`/home/seorii/logs/doppio-c7d-step4-reconciled-instructions-40JKh9/failed-ledger.json`.
+The same instruction gate passes alone and the complete443-unit inventory passes
+with serial scheduling, retaining the original individual caps.
+
+Reproduce the new gate with `yarn ci:classfile-declarations:test` and
+`yarn ci:classfile-declarations`. Mandatory runner:
+`node ci/java_classfile_declarations_test.mjs --browser`; ledger:
+`build/java-classfile-declarations-results.json`.
+
+C7d4 is closed, not C7, Phase C or full LIB-007/Java SE/JVM conformance.
+All18 new-gate broader completion flags remain false, including the separate
+sealing axis; older17-flag inventories are unchanged. Named-module runtime
+resolution/access and full inference verification are not inferred from module
+metadata or generated-class execution. C1–C6/B gates, retained323 and compiler
+consumers were not rerun in this profile. C7d5 retains selected malformed debug
+coordinates/slots, invokespecial constraints, the three discontinued types/four
+legacy opcodes and final aggregate/ABI reconciliation.
