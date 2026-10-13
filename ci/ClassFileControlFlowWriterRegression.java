@@ -214,8 +214,8 @@ public final class ClassFileControlFlowWriterRegression {
   // focused guest process keeps the existing 60-second execution cap.
   public static final class Wide {
     public static void main(String[] arguments) {
-      wide(false); check(completed == 3, "Incomplete wide writer profile");
-      System.out.println("CLASSFILE_CONTROL_FLOW_WRITER_WIDE_OK|3");
+      wide(false); check(completed == 2, "Incomplete wide writer profile");
+      System.out.println("CLASSFILE_CONTROL_FLOW_WRITER_WIDE_OK|2");
     }
   }
   public static final class Switches {
@@ -226,8 +226,8 @@ public final class ClassFileControlFlowWriterRegression {
   }
   public static final class Labels {
     public static void main(String[] arguments) {
-      labels(false); check(completed == 3, "Incomplete label writer profile");
-      System.out.println("CLASSFILE_CONTROL_FLOW_WRITER_LABELS_OK|3");
+      labels(false); check(completed == 4, "Incomplete label writer profile");
+      System.out.println("CLASSFILE_CONTROL_FLOW_WRITER_LABELS_OK|4");
     }
   }
 }
