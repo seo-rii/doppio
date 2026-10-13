@@ -344,6 +344,9 @@ export function createClassFileHarness({groups, requiredInventory, harnessUrl}) 
       'ci/ClassFileBlockBuilderRegression.java', 'ci/classfile_block_builder_test.cjs',
       'ci/ClassFileStatefulTransformRegression.java', 'ci/classfile_stateful_transform_test.cjs',
       'ci/ClassFileOutputRegression.java', 'ci/classfile_output_test.cjs', 'ci/classfile_public_abi_test.cjs',
+      'ci/ClassFileModulePoolRegression.java', 'ci/classfile_module_pool_test.cjs',
+      'ci/ClassFileModuleAttributeRegression.java', 'ci/classfile_module_attributes_test.cjs',
+      'ci/ClassFileClassEntryRegression.java', 'ci/classfile_class_entry_test.cjs',
       'ci/PartialMultianewarrayRegression.java', 'ci/partial_multianewarray_regression_test.cjs',
       'ci/java_compatibility_toolchains.lock.json', 'build/java-compatibility-toolchains/toolchains.json',
       'package.json', 'yarn.lock', '.github/workflows/modern-java.yml'].map(relative => path.join(repoRoot, relative)), process.execPath])].sort();
