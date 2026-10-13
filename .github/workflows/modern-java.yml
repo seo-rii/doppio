@@ -699,6 +699,25 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Check phase C class-file structural contracts
+        timeout-minutes: 5
+        run: node --test --test-concurrency=2 ci/java_classfile_structural_contract_test.mjs ci/classfile_legacy_test.cjs ci/classfile_special_invoke_test.cjs ci/classfile_structural_debug_test.cjs
+
+      # C7d5 selected structural verifier, legacy applicability and invokespecial.
+      - name: Run Java public class-file structural compatibility
+        id: java_classfile_structural
+        timeout-minutes: 40
+        run: node ci/java_classfile_structural_test.mjs --browser
+
+      - name: Upload Java public class-file structural ledger
+        if: always() && steps.java_classfile_structural.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-classfile-structural-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Check evolved switch ledger contract
         timeout-minutes: 1
         run: node --test ci/java_pattern_evolution_contract_test.mjs

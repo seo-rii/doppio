@@ -137,6 +137,10 @@ const classFileDeclarationsUnits = ['ci/java_classfile_declarations_contract_tes
   'ci/classfile_module_pool_test.cjs','ci/classfile_module_attributes_test.cjs','ci/classfile_class_entry_test.cjs','ci/classfile_public_abi_test.cjs'];
 const classFileDeclarationsUnitCommand = `node --test --test-concurrency=2 ${classFileDeclarationsUnits.join(' ')}`;
 const classFileDeclarationsRunnerCommand = 'node ci/java_classfile_declarations_test.mjs --browser';
+const classFileStructuralUnits = ['ci/java_classfile_structural_contract_test.mjs','ci/classfile_legacy_test.cjs',
+  'ci/classfile_special_invoke_test.cjs','ci/classfile_structural_debug_test.cjs'];
+const classFileStructuralUnitCommand = `node --test --test-concurrency=2 ${classFileStructuralUnits.join(' ')}`;
+const classFileStructuralRunnerCommand = 'node ci/java_classfile_structural_test.mjs --browser';
 const partialMultianewarrayUnitCommand = 'node --test ci/partial_multianewarray_regression_test.cjs';
 const memberGates = [
   {name: 'member resolution', units: memberResolutionUnits, unitCommand: memberResolutionUnitCommand,
@@ -201,6 +205,9 @@ const memberGates = [
   {name: 'class-file declarations', units: classFileDeclarationsUnits, unitCommand: classFileDeclarationsUnitCommand,
     runnerCommand: classFileDeclarationsRunnerCommand, stepId: 'java_classfile_declarations',
     ledger: 'build/java-classfile-declarations-results.json', timeout: 40},
+  {name: 'class-file structural', units: classFileStructuralUnits, unitCommand: classFileStructuralUnitCommand,
+    runnerCommand: classFileStructuralRunnerCommand, stepId: 'java_classfile_structural',
+    ledger: 'build/java-classfile-structural-results.json', timeout: 40},
 ];
 const packageScripts = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).scripts;
 for (const [name, command] of [['ci:classfile-api:test', classFileApiUnitCommand], ['ci:classfile-api', classFileApiRunnerCommand]]) {
@@ -225,6 +232,9 @@ for (const [name, command] of [['ci:classfile-debug:test', classFileDebugUnitCom
 }
 for (const [name, command] of [['ci:classfile-declarations:test', classFileDeclarationsUnitCommand], ['ci:classfile-declarations', classFileDeclarationsRunnerCommand]]) {
   if (packageScripts[name] !== command) throw new Error(`Package script ${name} must retain the exact C7d4 gate command.`);
+}
+for (const [name, command] of [['ci:classfile-structural:test', classFileStructuralUnitCommand], ['ci:classfile-structural', classFileStructuralRunnerCommand]]) {
+  if (packageScripts[name] !== command) throw new Error(`Package script ${name} must retain the exact C7d5 gate command.`);
 }
 for (const [name, command] of [
   ['ci:java-initialization:test', initializationUnitCommand],
@@ -473,6 +483,9 @@ for (const name of [
   'Check phase C nominal constant contracts',
   'Run Java nominal constant compatibility',
   'Upload Java nominal constant ledger',
+  'Check phase C class-file structural contracts',
+  'Run Java public class-file structural compatibility',
+  'Upload Java public class-file structural ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -991,6 +1004,9 @@ for (const gate of [
   {name: 'class-file declarations', contractName: 'Check phase C class-file declarations contracts', runName: 'Run Java class-file declarations compatibility',
     uploadName: 'Upload Java class-file declarations ledger', unitCommand: classFileDeclarationsUnitCommand, runnerCommand: classFileDeclarationsRunnerCommand,
     stepId: 'java_classfile_declarations', ledgerBase: 'java-classfile-declarations', unitTimeout: 5},
+  {name: 'class-file structural', contractName: 'Check phase C class-file structural contracts', runName: 'Run Java public class-file structural compatibility',
+    uploadName: 'Upload Java public class-file structural ledger', unitCommand: classFileStructuralUnitCommand, runnerCommand: classFileStructuralRunnerCommand,
+    stepId: 'java_classfile_structural', ledgerBase: 'java-classfile-structural', unitTimeout: 5},
 ]) {
   for (const replacement of ['echo selected contracts checked', gate.runnerCommand.replace(' --browser', ' --diagnostic'),
     ...['--case selected', '--group selected', '--fixture selected', '--host node', '--guest node', '--skip-native',
@@ -1033,7 +1049,8 @@ for (const gate of [
   }
   const condition = `if: always() && steps.${gate.stepId}.outcome != 'skipped'`, ledger = `path: build/${gate.ledgerBase}-results.json`;
   for (const other of ['java-methodhandle-core', 'java-methodhandle-collection', 'java-methodhandle-varhandle',
-    'java-methodhandle-bootstrap', 'java-methodhandle-hidden-class', 'java-methodhandle-nominal-constant', 'java-classfile-api', 'java-classfile-controlflow', 'java-classfile-extended', 'java-classfile-hierarchy', 'java-classfile-instructions']) if (other !== gate.ledgerBase) {
+    'java-methodhandle-bootstrap', 'java-methodhandle-hidden-class', 'java-methodhandle-nominal-constant', 'java-classfile-api', 'java-classfile-controlflow', 'java-classfile-extended', 'java-classfile-hierarchy', 'java-classfile-instructions',
+    'java-classfile-debug', 'java-classfile-declarations', 'java-classfile-structural']) if (other !== gate.ledgerBase) {
     expectCheckerFailure(`cross-wired ${gate.name} ledger to ${other}`,
       {workflow: replaceRequired(realWorkflow, ledger, `path: build/${other}-results.json`)},
       'exact bounded, fail-closed baseline command or artifact contract');
@@ -1252,6 +1269,10 @@ for (const [firstName, secondName] of [
   ['Check phase C nominal constant contracts', 'Run Java nominal constant compatibility'],
   ['Run Java nominal constant compatibility', 'Upload Java nominal constant ledger'],
   ['Upload Java nominal constant ledger', 'Check evolved switch ledger contract'],
+  ['Upload Java class-file declarations ledger', 'Check phase C class-file structural contracts'],
+  ['Check phase C class-file structural contracts', 'Run Java public class-file structural compatibility'],
+  ['Run Java public class-file structural compatibility', 'Upload Java public class-file structural ledger'],
+  ['Upload Java public class-file structural ledger', 'Check evolved switch ledger contract'],
 ]) {
   expectCheckerFailure(
     `member resolution/access dependency reversed: ${firstName} before ${secondName}`,

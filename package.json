@@ -164,6 +164,8 @@
     "ci:classfile-debug": "node ci/java_classfile_debug_test.mjs --browser",
     "ci:classfile-declarations:test": "node --test --test-concurrency=2 ci/java_classfile_declarations_contract_test.mjs ci/classfile_signature_tree_test.cjs ci/classfile_annotation_test.cjs ci/classfile_annotation_constant_pool_test.cjs ci/classfile_annotation_attributes_test.cjs ci/classfile_type_annotation_test.cjs ci/classfile_type_annotation_attributes_test.cjs ci/classfile_metadata_attributes_test.cjs ci/classfile_block_builder_test.cjs ci/classfile_stateful_transform_test.cjs ci/classfile_output_test.cjs ci/classfile_module_pool_test.cjs ci/classfile_module_attributes_test.cjs ci/classfile_class_entry_test.cjs ci/classfile_public_abi_test.cjs",
     "ci:classfile-declarations": "node ci/java_classfile_declarations_test.mjs --browser",
+    "ci:classfile-structural:test": "node --test --test-concurrency=2 ci/java_classfile_structural_contract_test.mjs ci/classfile_legacy_test.cjs ci/classfile_special_invoke_test.cjs ci/classfile_structural_debug_test.cjs",
+    "ci:classfile-structural": "node ci/java_classfile_structural_test.mjs --browser",
     "ci:partial-multianewarray:test": "node --test ci/partial_multianewarray_regression_test.cjs",
     "ci:java25-main": "node ci/java25_main_test.mjs --browser",
     "ci:java-uncaught-exit": "node ci/java_uncaught_exit_test.mjs --browser",

@@ -48,6 +48,8 @@ const classFileDebugUnitCommand = 'node --test --test-concurrency=2 ci/java_clas
 const classFileDebugRunnerCommand = 'node ci/java_classfile_debug_test.mjs --browser';
 const classFileDeclarationsUnitCommand = 'node --test --test-concurrency=2 ci/java_classfile_declarations_contract_test.mjs ci/classfile_signature_tree_test.cjs ci/classfile_annotation_test.cjs ci/classfile_annotation_constant_pool_test.cjs ci/classfile_annotation_attributes_test.cjs ci/classfile_type_annotation_test.cjs ci/classfile_type_annotation_attributes_test.cjs ci/classfile_metadata_attributes_test.cjs ci/classfile_block_builder_test.cjs ci/classfile_stateful_transform_test.cjs ci/classfile_output_test.cjs ci/classfile_module_pool_test.cjs ci/classfile_module_attributes_test.cjs ci/classfile_class_entry_test.cjs ci/classfile_public_abi_test.cjs';
 const classFileDeclarationsRunnerCommand = 'node ci/java_classfile_declarations_test.mjs --browser';
+const classFileStructuralUnitCommand = 'node --test --test-concurrency=2 ci/java_classfile_structural_contract_test.mjs ci/classfile_legacy_test.cjs ci/classfile_special_invoke_test.cjs ci/classfile_structural_debug_test.cjs';
+const classFileStructuralRunnerCommand = 'node ci/java_classfile_structural_test.mjs --browser';
 const partialMultianewarrayUnitCommand = 'node --test ci/partial_multianewarray_regression_test.cjs';
 
 function stripUnquotedComments(text) {
@@ -1134,6 +1136,24 @@ for (const [name, fields] of [
     '  if-no-files-found: error',
     '  retention-days: 7',
   ]],
+  ['Check phase C class-file structural contracts', [
+    'timeout-minutes: 5',
+    `run: ${classFileStructuralUnitCommand}`,
+  ]],
+  ['Run Java public class-file structural compatibility', [
+    'id: java_classfile_structural',
+    'timeout-minutes: 40',
+    `run: ${classFileStructuralRunnerCommand}`,
+  ]],
+  ['Upload Java public class-file structural ledger', [
+    "if: always() && steps.java_classfile_structural.outcome != 'skipped'",
+    'uses: actions/upload-artifact@v7',
+    'with:',
+    '  path: build/java-classfile-structural-results.json',
+    '  archive: false',
+    '  if-no-files-found: error',
+    '  retention-days: 7',
+  ]],
   ['Check evolved switch ledger contract', [
     'timeout-minutes: 1',
     'run: node --test ci/java_pattern_evolution_contract_test.mjs',
@@ -1339,6 +1359,9 @@ const runtimeOrder = [
   'Check phase C class-file declarations contracts',
   'Run Java class-file declarations compatibility',
   'Upload Java class-file declarations ledger',
+  'Check phase C class-file structural contracts',
+  'Run Java public class-file structural compatibility',
+  'Upload Java public class-file structural ledger',
   'Check evolved switch ledger contract',
   'Run evolved enum and sealed switch compatibility',
   'Upload evolved switch compatibility ledger',
@@ -1386,6 +1409,7 @@ for (const [name, commands] of [['user bootstrap', [bootstrapUnitCommand, bootst
   ['class-file instructions', [classFileInstructionsUnitCommand, classFileInstructionsRunnerCommand]],
   ['class-file debug', [classFileDebugUnitCommand, classFileDebugRunnerCommand]],
   ['class-file declarations', [classFileDeclarationsUnitCommand, classFileDeclarationsRunnerCommand]],
+  ['class-file structural', [classFileStructuralUnitCommand, classFileStructuralRunnerCommand]],
   ['partial multidimensional allocation', [partialMultianewarrayUnitCommand]]]) {
   for (const command of commands) if (countLiteral(runtimeJob, `        run: ${command}\n`) !== 1) {
     fail(`Modern Java workflow must execute ${name} command exactly once: ${command}`);
