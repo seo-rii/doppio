@@ -111,9 +111,10 @@ final class DoppioBuilders {
   }
 
   static CodeBuilder transforming(CodeBuilder parent, CodeTransform transform, Consumer<CodeBuilder> handler) {
-    Objects.requireNonNull(transform).atStart(parent);
-    handler.accept(new ForwardCode(parent, transform));
-    transform.atEnd(parent);
+    DoppioStatefulTransforms.Resolved<CodeElement> resolved = DoppioStatefulTransforms.resolve(transform, parent);
+    resolved.start.run();
+    handler.accept(new ForwardCode(parent, (ignored, element) -> resolved.consumer.accept(element)));
+    resolved.end.run();
     return parent;
   }
 
@@ -744,9 +745,10 @@ final class DoppioBuilders {
         throw new IllegalArgumentException("Code transformation requires its own model");
       if (source != null && source != model) throw new IllegalArgumentException("Cannot mix source Code label owners");
       source = (CodeModel) model;
-      Objects.requireNonNull(transform).atStart(this);
-      model.forEach(element -> transform.accept(this, element));
-      transform.atEnd(this);
+      DoppioStatefulTransforms.Resolved<CodeElement> resolved = DoppioStatefulTransforms.resolve(Objects.requireNonNull(transform), this);
+      resolved.start.run();
+      model.forEach(resolved.consumer);
+      resolved.end.run();
       return this;
     }
     public Label newLabel() { return new OwnedLabel(this); }

@@ -3,9 +3,11 @@ package java.lang.classfile;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 public interface MethodTransform extends ClassFileTransform<MethodTransform, MethodElement, MethodBuilder> {
   MethodTransform ACCEPT_ALL = (builder, element) -> builder.with(element);
+  static MethodTransform ofStateful(Supplier<MethodTransform> supplier) { return DoppioStatefulTransforms.methodFactory(supplier); }
   static MethodTransform dropping(Predicate<MethodElement> predicate) {
     Objects.requireNonNull(predicate);
     return (builder, element) -> { if (!predicate.test(element)) builder.with(element); };
@@ -25,11 +27,6 @@ public interface MethodTransform extends ClassFileTransform<MethodTransform, Met
     };
   }
   default MethodTransform andThen(MethodTransform next) {
-    Objects.requireNonNull(next); MethodTransform first = this;
-    return new MethodTransform() {
-      public void atStart(MethodBuilder builder) { next.atStart(builder); first.atStart(DoppioBuilders.forward(builder, next)); }
-      public void accept(MethodBuilder builder, MethodElement element) { first.accept(DoppioBuilders.forward(builder, next), element); }
-      public void atEnd(MethodBuilder builder) { first.atEnd(DoppioBuilders.forward(builder, next)); next.atEnd(builder); }
-    };
+    return DoppioStatefulTransforms.chain(this, next);
   }
 }

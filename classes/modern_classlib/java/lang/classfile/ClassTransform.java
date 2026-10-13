@@ -3,9 +3,11 @@ package java.lang.classfile;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 public interface ClassTransform extends ClassFileTransform<ClassTransform, ClassElement, ClassBuilder> {
   ClassTransform ACCEPT_ALL = (builder, element) -> builder.with(element);
+  static ClassTransform ofStateful(Supplier<ClassTransform> supplier) { return DoppioStatefulTransforms.classFactory(supplier); }
   static ClassTransform dropping(Predicate<ClassElement> predicate) {
     Objects.requireNonNull(predicate);
     return (builder, element) -> { if (!predicate.test(element)) builder.with(element); };
@@ -38,16 +40,6 @@ public interface ClassTransform extends ClassFileTransform<ClassTransform, Class
     };
   }
   default ClassTransform andThen(ClassTransform next) {
-    Objects.requireNonNull(next);
-    ClassTransform first = this;
-    return new ClassTransform() {
-      public void atStart(ClassBuilder builder) {
-        next.atStart(builder); first.atStart(DoppioBuilders.forward(builder, next));
-      }
-      public void accept(ClassBuilder builder, ClassElement element) { first.accept(DoppioBuilders.forward(builder, next), element); }
-      public void atEnd(ClassBuilder builder) {
-        first.atEnd(DoppioBuilders.forward(builder, next)); next.atEnd(builder);
-      }
-    };
+    return DoppioStatefulTransforms.chain(this, next);
   }
 }

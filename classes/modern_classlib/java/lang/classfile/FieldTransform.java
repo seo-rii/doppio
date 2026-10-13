@@ -3,9 +3,11 @@ package java.lang.classfile;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 public interface FieldTransform extends ClassFileTransform<FieldTransform, FieldElement, FieldBuilder> {
   FieldTransform ACCEPT_ALL = (builder, element) -> builder.with(element);
+  static FieldTransform ofStateful(Supplier<FieldTransform> supplier) { return DoppioStatefulTransforms.fieldFactory(supplier); }
   static FieldTransform dropping(Predicate<FieldElement> predicate) {
     Objects.requireNonNull(predicate);
     return (builder, element) -> { if (!predicate.test(element)) builder.with(element); };
@@ -18,11 +20,6 @@ public interface FieldTransform extends ClassFileTransform<FieldTransform, Field
     };
   }
   default FieldTransform andThen(FieldTransform next) {
-    Objects.requireNonNull(next); FieldTransform first = this;
-    return new FieldTransform() {
-      public void atStart(FieldBuilder builder) { next.atStart(builder); first.atStart(DoppioBuilders.forward(builder, next)); }
-      public void accept(FieldBuilder builder, FieldElement element) { first.accept(DoppioBuilders.forward(builder, next), element); }
-      public void atEnd(FieldBuilder builder) { first.atEnd(DoppioBuilders.forward(builder, next)); next.atEnd(builder); }
-    };
+    return DoppioStatefulTransforms.chain(this, next);
   }
 }

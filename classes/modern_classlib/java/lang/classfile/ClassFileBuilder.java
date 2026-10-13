@@ -13,9 +13,10 @@ public interface ClassFileBuilder<E extends ClassFileElement, B extends ClassFil
     Objects.requireNonNull(model);
     Objects.requireNonNull(transform);
     B self = (B) this;
-    transform.atStart(self);
-    model.forEach(element -> transform.accept(self, element));
-    transform.atEnd(self);
+    DoppioStatefulTransforms.Resolved<E> resolved = DoppioStatefulTransforms.resolve(transform, self);
+    resolved.start.run();
+    model.forEach(resolved.consumer);
+    resolved.end.run();
     return self;
   }
 }
