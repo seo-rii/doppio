@@ -185,7 +185,7 @@ test('input digest closure is unique and binds every original source/corpus/proo
   const files=gate.classFileInputPaths();assert.equal(new Set(files).size,files.length);assert.deepEqual(files,files.slice().sort());
   for(const group of gate.classFileGroups)for(const relative of [group.source,...group.additionalSources])assert.ok(files.includes(path.join(root,relative)));
   for(const relative of ['ci/java_classfile_instructions_contract_test.mjs','ci/java_classfile_instructions_bytecode.mjs','ci/classfile_instruction_arrays_cases.mjs','ci/classfile_instruction_arithmetic_cases.mjs','ci/classfile_instruction_members_cases.mjs','ci/classfile_instruction_frames_cases.mjs',
-    'ci/ClassFileInstructionFlowRegression.java','ci/ClassFileMemoryInstructionRegression.java','ci/classfile_memory_instruction_test.cjs','ci/ClassFileInstructionWriterRegression.java','ci/classfile_instruction_writer_test.cjs','ci/classfile_instruction_frame_policy_test.cjs','ci/compile_classfile_metadata.cjs'])assert.ok(files.includes(path.join(root,relative)));
+    'ci/ClassFileInstructionFlowRegression.java','ci/ClassFileMemoryInstructionRegression.java','ci/classfile_memory_instruction_test.cjs','ci/ClassFileInstructionWriterRegression.java','ci/classfile_instruction_writer_test.cjs','ci/classfile_instruction_frame_policy_test.cjs','ci/PartialMultianewarrayRegression.java','ci/partial_multianewarray_regression_test.cjs','ci/compile_classfile_metadata.cjs'])assert.ok(files.includes(path.join(root,relative)));
 });
 test('strict CLI accepts exactly one explicit mode and rejects selectors/waivers before execution',()=>{
   for(const mode of ['--browser','--native-only','--diagnostic'])assert.equal(gate.parseClassFileMode([mode]),mode.slice(2));

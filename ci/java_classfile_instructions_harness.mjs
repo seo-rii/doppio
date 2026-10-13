@@ -320,6 +320,7 @@ export function createClassFileHarness({groups, requiredInventory, harnessUrl}) 
       'ci/ClassFileMemoryInstructionRegression.java', 'ci/classfile_memory_instruction_test.cjs',
       'ci/ClassFileInstructionWriterRegression.java', 'ci/classfile_instruction_writer_test.cjs',
       'ci/classfile_instruction_frame_policy_test.cjs',
+      'ci/PartialMultianewarrayRegression.java', 'ci/partial_multianewarray_regression_test.cjs',
       'ci/java_compatibility_toolchains.lock.json', 'build/java-compatibility-toolchains/toolchains.json',
       'package.json', 'yarn.lock', '.github/workflows/modern-java.yml'].map(relative => path.join(repoRoot, relative)), process.execPath])].sort();
   }
