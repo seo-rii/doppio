@@ -102,6 +102,8 @@ public final class DoppioAttributes {
     if (annotation != null) return annotation;
     Attribute<?> typeAnnotation = DoppioTypeAnnotationAttributes.read(owner, reader, name, start, payload);
     if (typeAnnotation != null) return typeAnnotation;
+    Attribute<?> module = DoppioModuleAttributes.read(owner, reader, name, start, payload);
+    if (module != null) return module;
     String key = name.stringValue();
     ConstantPool source = DoppioClassReader.readerPool(reader);
     if ("ConstantValue".equals(key)) {
@@ -203,7 +205,9 @@ public final class DoppioAttributes {
     byte[] metadata = DoppioMetadataAttributes.retainedPayload(attribute);
     if (metadata != null) return metadata;
     byte[] annotation = DoppioAnnotationAttributes.retainedPayload(attribute);
-    return annotation != null ? annotation : DoppioTypeAnnotationAttributes.retainedPayload(attribute);
+    if (annotation != null) return annotation;
+    byte[] typeAnnotation = DoppioTypeAnnotationAttributes.retainedPayload(attribute);
+    return typeAnnotation != null ? typeAnnotation : DoppioModuleAttributes.retainedPayload(attribute);
   }
   static ConstantPool sourcePool(Attribute<?> attribute) {
     if (attribute instanceof Base) return ((Base<?>) attribute).pool;
@@ -212,7 +216,9 @@ public final class DoppioAttributes {
     ConstantPool metadata = DoppioMetadataAttributes.sourcePool(attribute);
     if (metadata != null) return metadata;
     ConstantPool annotation = DoppioAnnotationAttributes.sourcePool(attribute);
-    return annotation != null ? annotation : DoppioTypeAnnotationAttributes.sourcePool(attribute);
+    if (annotation != null) return annotation;
+    ConstantPool typeAnnotation = DoppioTypeAnnotationAttributes.sourcePool(attribute);
+    return typeAnnotation != null ? typeAnnotation : DoppioModuleAttributes.sourcePool(attribute);
   }
 
   private static void requireOwner(boolean allowed, String name) {

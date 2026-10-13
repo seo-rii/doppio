@@ -33,6 +33,12 @@ public final class Attributes {
   public static final String NAME_RUNTIME_INVISIBLE_PARAMETER_ANNOTATIONS = "RuntimeInvisibleParameterAnnotations";
   public static final String NAME_RUNTIME_VISIBLE_TYPE_ANNOTATIONS = "RuntimeVisibleTypeAnnotations";
   public static final String NAME_RUNTIME_INVISIBLE_TYPE_ANNOTATIONS = "RuntimeInvisibleTypeAnnotations";
+  public static final String NAME_MODULE = "Module";
+  public static final String NAME_MODULE_PACKAGES = "ModulePackages";
+  public static final String NAME_MODULE_MAIN_CLASS = "ModuleMainClass";
+  public static final String NAME_MODULE_TARGET = "ModuleTarget";
+  public static final String NAME_MODULE_RESOLUTION = "ModuleResolution";
+  public static final String NAME_MODULE_HASHES = "ModuleHashes";
   private Attributes() {}
   public static AttributeMapper<SourceFileAttribute> sourceFile() { return DoppioClassReader.sourceFileMapper(); }
   public static AttributeMapper<CodeAttribute> code() { return DoppioClassReader.codeMapper(); }
@@ -64,4 +70,10 @@ public final class Attributes {
   public static AttributeMapper<RuntimeInvisibleParameterAnnotationsAttribute> runtimeInvisibleParameterAnnotations() { return DoppioAnnotationAttributes.runtimeInvisibleParameterAnnotationsMapper(); }
   public static AttributeMapper<RuntimeVisibleTypeAnnotationsAttribute> runtimeVisibleTypeAnnotations() { return DoppioTypeAnnotationAttributes.runtimeVisibleTypeAnnotationsMapper(); }
   public static AttributeMapper<RuntimeInvisibleTypeAnnotationsAttribute> runtimeInvisibleTypeAnnotations() { return DoppioTypeAnnotationAttributes.runtimeInvisibleTypeAnnotationsMapper(); }
+  public static AttributeMapper<ModuleAttribute> module() { return DoppioModuleAttributes.moduleMapper(); }
+  public static AttributeMapper<ModulePackagesAttribute> modulePackages() { return DoppioModuleAttributes.modulePackagesMapper(); }
+  public static AttributeMapper<ModuleMainClassAttribute> moduleMainClass() { return DoppioModuleAttributes.moduleMainClassMapper(); }
+  public static AttributeMapper<ModuleTargetAttribute> moduleTarget() { return DoppioModuleAttributes.moduleTargetMapper(); }
+  public static AttributeMapper<ModuleResolutionAttribute> moduleResolution() { return DoppioModuleAttributes.moduleResolutionMapper(); }
+  public static AttributeMapper<ModuleHashesAttribute> moduleHashes() { return DoppioModuleAttributes.moduleHashesMapper(); }
 }
