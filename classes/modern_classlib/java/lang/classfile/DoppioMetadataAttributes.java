@@ -137,7 +137,10 @@ public final class DoppioMetadataAttributes {
     return new PermittedValue(name("PermittedSubclasses"), subclasses, null, null);
   }
   public static PermittedSubclassesAttribute permittedSubclassSymbols(List<ClassDesc> subclasses) {
-    return permittedSubclasses(DoppioAttributes.classEntries(subclasses));
+    List<ClassEntry> entries = new ArrayList<ClassEntry>();
+    ConstantPoolBuilder pool = DoppioConstantPool.temporaryPool();
+    for (ClassDesc subclass : Objects.requireNonNull(subclasses)) entries.add(pool.classEntry(subclass));
+    return permittedSubclasses(entries);
   }
   public static EnclosingMethodAttribute enclosingMethod(ClassEntry owner, Optional<NameAndTypeEntry> method) {
     return new EnclosingValue(name("EnclosingMethod"), owner, method.orElse(null), null, null);
