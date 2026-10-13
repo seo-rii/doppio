@@ -5,10 +5,11 @@ Phase C owns `JVM-003`, `JVM-004`, `JVM-005` and `LIB-007` from the
 B1–B8 loading, verification, linking and language foundation; that foundation
 does not establish general method-handle, bootstrap or module conformance.
 This is an ordered batch plan, not a single feature, effort estimate or new
-support level. The selected C1–C6 batches and C7a–C7c public class-file
-pipeline, control-flow/stack-map and extended-attribute/bootstrap/fresh-pool
-expansions are verified. C7d retains hierarchy/general-verifier/API work;
-unselected CFG/frame families remain open. Selected exits do not complete
+support level. The selected C1–C6 batches and C7a–C7d2 public class-file
+pipeline, control-flow/stack-map, attributes/bootstrap/fresh-pool, hierarchy
+and modern instruction/frame-policy expansions are verified. C7d3–C7d5
+retain debug relocation, remaining public ABI and structural verifier work.
+Selected exits do not complete
 Phase C or any full owner/API contract.
 
 ## Batches and dependencies
@@ -21,7 +22,7 @@ Phase C or any full owner/API contract.
 | C4: user bootstrap linkage | `JVM-004`: general `invokedynamic` and `CONSTANT_Dynamic` paths | Genuine native-checked inputs with user bootstrap handles, nested arguments, adaptation/access, success/failure caching and specified error/cause identities. Independently prove bootstrap metadata and lexical call-site identity. Retain lambda, concat, record and compiler bootstrap consumers. Depends on B4 and C1/C2; VarHandle bootstrap forms also depend on C3. |
 | C5: hidden classes | `JVM-005`: definition, class data, lookup privileges and reflective restrictions | Select definition/initialization, malformed bytes, privilege failures, nestmate options, runtime names/descriptors, class-data access and discovery/non-discovery cases. Preserve class/loader identity rather than comparing implementation-generated name suffixes. Depends on B2–B4 and C1; named-module cases require G. |
 | C6: nominal constants | `LIB-007`: class/method/handle/dynamic/VarHandle descriptors and resolution | Verified finite 64-case original-javac 21/25 matrix: descriptors, caller-Lookup resolution, executable round trips, ordered user bootstraps and selected exact failures. Metadata-only VarHandle descriptors do not discharge C3; C6's API reinvocation is not C4 CP-entry caching. Hidden-class restrictions depend on C5. Full nominal/API/access/loader conformance remains unclaimed. |
-| C7: public class-file library | `LIB-007`: Java 25 `java.lang.classfile` and its public subpackages | C7a–C7c's selected public pipeline, CFG/frames and extended/custom attributes/bootstrap/fresh-pool remapping pass on native Java 25, Node and Chromium: 72 cases/27 cells/216 outcomes. C7d retains hierarchy/resolvers and general verifier/API breadth; unselected attributes/CFG families also remain open. VM-internal parsing and the test decoder are not this public API. Depends on B2/B3, C4 and C6. |
+| C7: public class-file library | `LIB-007`: Java 25 `java.lang.classfile` and its public subpackages | C7a–C7d2's selected public pipeline, CFG/frames, attributes/bootstrap/fresh-pool, hierarchy and modern instruction/frame policies pass on native Java 25, Node and Chromium: 120 cases/45 cells/360 outcomes. C7d3–C7d5 retain debug relocation, remaining attributes/public ABI and structural verifier/legacy profiles. VM-internal parsing and the test decoder are not this public API. Depends on B2/B3, C4 and C6. |
 
 This ordering keeps invocation/adaptation foundations before their bootstrap
 and descriptor consumers. C3's executable access and D's memory-model work have
@@ -1182,7 +1183,7 @@ Full Java SE/JVM/source-unit conformance is separate from closing this worklist.
 | Order | Remaining profile | Current status |
 | --- | --- | --- |
 | C7d1 | Explicit hierarchy resolvers, reference/array joins and native constant-instruction factories/covariance | Verified below |
-| C7d2 | Modern instruction models/aliases, stack/array/type/monitor flow, long jumps and dead-code/frame policies | In progress; 209 modern opcode entries in 24 families, four discontinued entries tracked separately |
+| C7d2 | Modern instruction models/aliases, stack/array/type/monitor flow, long jumps and dead-code/frame policies | Verified below; 209 modern opcode entries in 24 families, four discontinued entries tracked separately |
 | C7d3 | Debug/label attributes and actual relocation, mapper reader lifecycle/reentrancy | Pending |
 | C7d4 | Signature trees, annotation/record/module attributes and remaining public builder/transform/ABI topology | Pending; inventory must remain explicit |
 | C7d5 | Structural verifier/legacy applicability and final aggregate regression/ABI reconciliation | Pending; no broad completion flag is inferred from a finite subgate |
@@ -1240,10 +1241,11 @@ This receipt explicitly binds the test-only HEAD delta rather than pretending
 all producers used one HEAD. C7d2–C7d5 remain open; all17 initial-gate broader
 flags, including c7Complete/c7dComplete, are false.
 
-### C7d2 implementation and frozen verification status (2026-10-13)
+### Historical C7d2 pre-approval failure (2026-10-13)
 
-Implementation is committed locally on `modern`; this profile is **not closed**
-and has not been pushed while its mandatory host gate fails.
+The following records the pre-approval failure. At that point implementation
+was committed locally on `modern`, but the profile was not closed or pushed.
+The approved correction and successful exit below supersede that status.
 
 - Seven typed memory instruction families, 73 CodeBuilder methods, genuine
   unbound nominal constant-pool entries, complete modern opcode family
@@ -1277,8 +1279,63 @@ and has not been pushed while its mandatory host gate fails.
   `/home/seorii/logs/doppio-c7d-step2-frozen-build-0p5bjP/run.log` and
   `/home/seorii/logs/doppio-c7d-step2-frozen-workflow-SqTjav/run.log`.
 
-Fixing the discovered VM execution defect requires approval to expand this
-LIB-007 library work into the VM implementation. Until then C7d2 remains open,
-C7d3–C7d5 implementation has not started, all17 broader completion flags remain
-false, and no final aggregate receipt is claimed. C7a–C7d1 host gates, C1–C6/B
-gates, retained323 and compiler consumers have not been rerun in this profile.
+At that point fixing the VM defect required approval to expand the LIB-007
+work into VM execution. C7d2 stayed open, with C7d3–C7d5 not started and all17
+broader flags false. The earlier C7 host gates had not yet been rerun;
+C1–C6/B gates, retained323 and compiler consumers were also not rerun.
+
+### C7d2 approved correction and verified exit (2026-10-13)
+
+The user approved the partial-array VM correction and continuation through
+C7d3–C7d5. At clean implementation
+`33ed0c564c4928c8df7f0a6e66ca47131724f243`:
+
+- Array constructors normalize a one-element `multianewarray` dimensions
+  vector before either allocation branch. The existing scalar branch leaves
+  unallocated reference components null and gives rank-one primitive arrays
+  the correct scalar length. Full allocations and negative/zero controls
+  remain covered, without changing original caller recipes or expected bytes.
+- The genuine Java25 allocation regression passes all3 tests:82 native and82
+  guest checks. It independently decodes actual allocation operands and runs
+  the identical native-generated class bytes in the VM; this separate regression
+  does not substitute for the original gate's host-produced output artifacts.
+  Before/after generated-class SHA-256 is unchanged:
+  `e8031c46a22c01298ee2ae100ed6fce74bd96fae1e0535ab73810439a0792ca7`.
+- All32 original instruction cases pass all12 native25/Node/Chromium cells
+  and96 outcomes. Each host independently produces32 artifacts:31 valid
+  outputs defined/invoked there and one explicitly invalid output never defined.
+  All96 complete returned-array proofs and97 original named method proofs replay.
+- Decoded non-finite and negative-zero proof numbers use explicit lossless
+  JSON values. Original bytes and digests still bind their exact bits; NaN is
+  never substituted with null. The earlier persisted-receipt failure remains
+  preserved. All10 older CFG writer checks are required in three actual Java
+  entry profiles with unchanged60s limits and verified completion counts2/4/4.
+- Strict CLI/browser builds, ES5 checking, full workflow checker/mutations,
+  all310 C7 unit tests and the separate3 VM tests pass, with no failure,
+  cancellation or skip. The unchanged C7a32/C7b16/C7c24/C7d1-16 gates also
+  pass on the same committed sources and runtime. Together with C7d2-32,
+  the aggregate is120 cases/45 execution cells/360 outcomes.
+
+Final consumer exit0:
+`/home/seorii/logs/doppio-c7d-step2-verified-close-jX067l/verification-summary.json`,
+SHA-256 `2e66b134966b453ca0e9cdfe3f05bd467c10afe3f33f653ff15cb4c7b3e2722e`;
+runtime SHA-256
+`4c1aa23df772257a20b7cd50bef4b3ae3c06af0367f661cc3f52a5c7eba31f8c`.
+All nine producer receipts require that exact clean HEAD and runtime; the
+consumer checks their actual exit status, termination, unit summaries and
+all five official ledgers. Earlier failures are retained, including the
+307-unit305-pass/2-fail run at
+`/home/seorii/logs/doppio-c7d-step2-approved-frozen-units-YA7ygt/run.log`
+and the first consumer's incorrect per-gate distribution at
+`/home/seorii/logs/doppio-c7d-step2-final-close-jFCd3j/run.log`.
+
+Reproduce with `yarn ci:classfile-instructions:test`,
+`yarn ci:classfile-instructions` and `yarn ci:partial-multianewarray:test`.
+The mandatory instruction runner is
+`node ci/java_classfile_instructions_test.mjs --browser`, ledger
+`build/java-classfile-instructions-results.json`.
+
+C7d2 is closed, not C7, Phase C or full LIB-007/Java SE/JVM conformance.
+C7d3–C7d5 remain ordered pending exits, and all17 broader completion flags
+remain false. C1–C6/B gates, retained323 and compiler consumers were not
+rerun in this profile.
