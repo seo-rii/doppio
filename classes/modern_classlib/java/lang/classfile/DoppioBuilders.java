@@ -446,7 +446,8 @@ final class DoppioBuilders {
     public DoppioConstantPool pool() { return pool; }
     public ClassFile.StackMapsOption stackMaps() { return stackMaps; }
     public ClassEntry className() { return name; }
-    public ClassEntry superclass() { return superclass; }
+    boolean explicitSuperclass;
+    public ClassEntry superclass() { return (flags & ClassFile.ACC_MODULE) != 0 && !explicitSuperclass ? null : superclass; }
     public List<ClassEntry> interfaces() { return interfaces; }
     public int majorVersion() { return major; }
     public int classFlags() { return flags; }
@@ -464,7 +465,9 @@ final class DoppioBuilders {
       if (element instanceof AccessFlags) flags = ((AccessFlags) element).flagsMask();
       else if (element instanceof ClassFileVersion) {
         major = ((ClassFileVersion) element).majorVersion(); minor = ((ClassFileVersion) element).minorVersion();
-      } else if (element instanceof Superclass) superclass = ((Superclass) element).superclassEntry();
+      } else if (element instanceof Superclass) {
+        superclass = ((Superclass) element).superclassEntry(); explicitSuperclass = true;
+      }
       else if (element instanceof Interfaces) interfaces = immutable(((Interfaces) element).interfaces());
       else if (element instanceof FieldModel) fields.add((FieldModel) element);
       else if (element instanceof MethodModel) methods.add((MethodModel) element);
@@ -496,7 +499,8 @@ final class DoppioBuilders {
       try {
         ByteArrayOutputStream body = new ByteArrayOutputStream(); DataOutputStream output = new DataOutputStream(body);
         u2(output, flags); u2(output, name.index());
-        u2(output, superclass == null ? 0 : pool.classEntry(pool.utf8Entry(superclass.name().stringValue())).index());
+        ClassEntry emittedSuperclass = superclass();
+        u2(output, emittedSuperclass == null ? 0 : pool.classEntry(pool.utf8Entry(emittedSuperclass.name().stringValue())).index());
         u2(output, interfaces.size());
         for (ClassEntry entry : interfaces) u2(output, pool.classEntry(pool.utf8Entry(entry.name().stringValue())).index());
         u2(output, fields.size());

@@ -3,6 +3,7 @@ package java.lang.classfile;
 import java.lang.classfile.constantpool.ClassEntry;
 import java.lang.classfile.constantpool.ConstantPoolBuilder;
 import java.lang.classfile.constantpool.Utf8Entry;
+import java.lang.classfile.attribute.ModuleAttribute;
 import java.lang.constant.ClassDesc;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -82,6 +83,23 @@ public interface ClassFile {
   default void buildTo(Path path, ClassEntry name, ConstantPoolBuilder pool,
       Consumer<? super ClassBuilder> handler) throws IOException {
     Files.write(path, build(name, pool, handler));
+  }
+  default byte[] buildModule(ModuleAttribute moduleAttribute) {
+    return buildModule(moduleAttribute, builder -> {});
+  }
+  default byte[] buildModule(ModuleAttribute moduleAttribute, Consumer<? super ClassBuilder> handler) {
+    return build(ClassDesc.of("module-info"), builder -> {
+      builder.withFlags(ACC_MODULE);
+      builder.with(moduleAttribute);
+      handler.accept(builder);
+    });
+  }
+  default void buildModuleTo(Path path, ModuleAttribute moduleAttribute) throws IOException {
+    buildModuleTo(path, moduleAttribute, builder -> {});
+  }
+  default void buildModuleTo(Path path, ModuleAttribute moduleAttribute,
+      Consumer<? super ClassBuilder> handler) throws IOException {
+    Files.write(path, buildModule(moduleAttribute, handler));
   }
   default byte[] transformClass(ClassModel model, ClassTransform transform) {
     return transformClass(Objects.requireNonNull(model), model.thisClass(), transform);
