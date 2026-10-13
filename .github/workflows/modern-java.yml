@@ -718,6 +718,25 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Check phase C public class-file verifier contracts
+        timeout-minutes: 5
+        run: node --test --test-concurrency=1 ci/java_classfile_verifier_contract_test.mjs ci/classfile_verifier_phase_test.cjs
+
+      # C7e1 public-library phase policy; no target class definition as a verdict.
+      - name: Run Java public class-file verifier compatibility
+        id: java_classfile_verifier
+        timeout-minutes: 40
+        run: node ci/java_classfile_verifier_test.mjs --browser
+
+      - name: Upload Java public class-file verifier ledger
+        if: always() && steps.java_classfile_verifier.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/java-classfile-verifier-results.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Check evolved switch ledger contract
         timeout-minutes: 1
         run: node --test ci/java_pattern_evolution_contract_test.mjs

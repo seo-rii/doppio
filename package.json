@@ -166,6 +166,8 @@
     "ci:classfile-declarations": "node ci/java_classfile_declarations_test.mjs --browser",
     "ci:classfile-structural:test": "node --test --test-concurrency=2 ci/java_classfile_structural_contract_test.mjs ci/classfile_legacy_test.cjs ci/classfile_special_invoke_test.cjs ci/classfile_structural_debug_test.cjs",
     "ci:classfile-structural": "node ci/java_classfile_structural_test.mjs --browser",
+    "ci:classfile-verifier:test": "node --test --test-concurrency=1 ci/java_classfile_verifier_contract_test.mjs ci/classfile_verifier_phase_test.cjs",
+    "ci:classfile-verifier": "node ci/java_classfile_verifier_test.mjs --browser",
     "ci:partial-multianewarray:test": "node --test ci/partial_multianewarray_regression_test.cjs",
     "ci:java25-main": "node ci/java25_main_test.mjs --browser",
     "ci:java-uncaught-exit": "node ci/java_uncaught_exit_test.mjs --browser",
