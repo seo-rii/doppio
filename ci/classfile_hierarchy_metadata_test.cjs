@@ -66,10 +66,28 @@ test('resolver option exposes the exact native getter and guarded factory',()=>{
     .some(item=>item.cp.owner==='java.util.Objects'&&item.cp.name==='requireNonNull'));
 });
 test('configured resolver reaches byte/model verification without a VM definition verdict',()=>{
-  for(const [parameters,target] of [['([B)','([BLjava/util/function/Function;'+resolver+')Ljava/util/List;'],
-    ['(Ljava/lang/classfile/ClassModel;)','(Ljava/lang/classfile/ClassModel;'+resolver+')Ljava/util/List;']])
-    assert.ok(calls('DoppioClassFile','verify',parameters+'Ljava/util/List;').some(item=>
-      item.cp.owner==='java.lang.classfile.DoppioClassFileVerifier'&&item.cp.descriptor===target));
+  const target='(Ljava/lang/classfile/ClassModel;'+resolver+')Ljava/util/List;';
+  for(const parameters of ['([B)','(Ljava/lang/classfile/ClassModel;)']){
+    const body=instructions('DoppioClassFile',method('DoppioClassFile','verify',parameters+'Ljava/util/List;'));
+    const verifierCalls=body.filter(item=>item.cp?.owner==='java.lang.classfile.DoppioClassFileVerifier'&&item.cp.name==='verify');
+    assert.equal(verifierCalls.length,1,'Exactly one model verifier dispatch');
+    assert.equal(verifierCalls[0].cp.descriptor,target,'Byte and model entry points share the configured model overload');
+    assert.equal(verifierCalls[0].name,'invokestatic');
+    const at=body.indexOf(verifierCalls[0]),field=body[at-1];
+    assert.equal(body[at-2].name,'aload_0','Resolver is read from this configured instance');
+    assert.equal(field.name,'getfield');
+    assert.deepEqual(field.cp,{index:field.cp.index,tag:9,owner:'java.lang.classfile.DoppioClassFile',name:'hierarchyResolver',descriptor:resolver});
+    assert.ok(!body.some(item=>item.cp?.owner==='java.lang.classfile.DoppioClassFileVerifier'&&
+      item.cp.name==='verify'&&item.cp.descriptor.startsWith('([B')),'No obsolete direct byte-verifier route');
+    if(parameters==='([B)'){
+      const parses=body.filter(item=>item.cp?.owner==='java.lang.classfile.DoppioClassFile'&&item.cp.name==='parse');
+      assert.equal(parses.length,1,'Byte verification uses the configured instance parser');
+      assert.equal(parses[0].name,'invokevirtual');
+      assert.equal(parses[0].cp.descriptor,'([B)Ljava/lang/classfile/ClassModel;');
+      const parsed=body.indexOf(parses[0]);assert.equal(parsed,at-3,'Parsed model flows directly into model verification');
+      assert.equal(body[parsed-2].name,'aload_0');assert.equal(body[parsed-1].name,'aload_1');
+    }else assert.ok(!body.some(item=>item.cp?.name==='parse'),'Existing models are not reparsed');
+  }
   for(const entry of units.get('DoppioClassFileVerifier').layout.methods.entries.filter(item=>item.code))
     assert.ok(!instructions('DoppioClassFileVerifier',entry).some(item=>item.cp&&
       /^(?:defineClass|defineHiddenClass|initialize|ensureClassInitialized)$/.test(item.cp.name)));

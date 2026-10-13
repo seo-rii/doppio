@@ -125,8 +125,28 @@ test('nominal call-site type is actual final Java class with native accessors, n
     assert.ok(method('../constant/DynamicCallSiteDesc',name,descriptor).code);
 });
 test('verification and writing preserve actual configured context and CP import code paths',()=>{
-  assert.ok(calls('DoppioClassFile','verify','([B)Ljava/util/List;').some(item=>item.cp.owner==='java.lang.classfile.DoppioClassFileVerifier'&&
-    item.cp.descriptor==='([BLjava/util/function/Function;Ljava/lang/classfile/ClassHierarchyResolver;)Ljava/util/List;'));
+  const byteVerification=calls('DoppioClassFile','verify','([B)Ljava/util/List;'),
+    parseIndex=byteVerification.findIndex(item=>item.cp.owner==='java.lang.classfile.DoppioClassFile'&&
+      item.cp.name==='parse'&&item.cp.descriptor==='([B)Ljava/lang/classfile/ClassModel;'),
+    verifyIndex=byteVerification.findIndex(item=>item.cp.owner==='java.lang.classfile.DoppioClassFileVerifier'&&
+      item.cp.name==='verify'&&item.cp.descriptor===
+      '(Ljava/lang/classfile/ClassModel;Ljava/lang/classfile/ClassHierarchyResolver;)Ljava/util/List;');
+  assert.ok(parseIndex>=0&&verifyIndex>parseIndex,'Byte verification first uses this configured ClassFile parser');
+  assert.ok(!byteVerification.some(item=>item.cp.owner==='java.lang.classfile.DoppioClassFileVerifier'&&
+    item.cp.name==='verify'&&item.cp.descriptor.startsWith('([B')),'No unconfigured byte-verifier shortcut');
+  const parseDescriptor='([B)Ljava/lang/classfile/ClassModel;',
+    configuredParse='([BLjava/util/function/Function;Ljava/lang/classfile/ClassFile$DebugElementsOption;'+
+      'Ljava/lang/classfile/ClassFile$LineNumbersOption;)Ljava/lang/classfile/ClassModel;';
+  assert.ok(calls('DoppioClassFile','parse',parseDescriptor).some(item=>
+    item.cp.owner==='java.lang.classfile.DoppioClassReader'&&item.cp.name==='parse'&&item.cp.descriptor===configuredParse));
+  const unit=units.get('DoppioClassFile'),parse=method('DoppioClassFile','parse',parseDescriptor),
+    parseBody=decodeCoreCode(unit.bytes.subarray(parse.code.instructionsOffset,parse.code.instructionsOffset+parse.code.codeLength),
+      unit.layout.pool,unit.bytes);
+  assert.deepEqual(parseBody.filter(item=>item.name==='getfield'&&item.cp.owner==='java.lang.classfile.DoppioClassFile')
+    .map(item=>[item.cp.name,item.cp.descriptor]),[
+      ['customAttributes','Ljava/util/function/Function;'],
+      ['debugElements','Ljava/lang/classfile/ClassFile$DebugElementsOption;'],
+      ['lineNumbers','Ljava/lang/classfile/ClassFile$LineNumbersOption;']]);
   assert.ok(calls('DoppioClassFileVerifier','verify','([BLjava/util/function/Function;Ljava/lang/classfile/ClassHierarchyResolver;)Ljava/util/List;')
     .some(item=>item.cp.owner==='java.lang.classfile.DoppioClassReader'&&item.cp.name==='parse'));
   assert.ok(calls('DoppioBufWriter','writeIndex','(Ljava/lang/classfile/constantpool/PoolEntry;)V')
