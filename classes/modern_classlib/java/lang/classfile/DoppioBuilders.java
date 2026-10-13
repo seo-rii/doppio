@@ -448,7 +448,10 @@ final class DoppioBuilders {
     public ClassFile.StackMapsOption stackMaps() { return stackMaps; }
     public ClassEntry className() { return name; }
     boolean explicitSuperclass;
-    public ClassEntry superclass() { return (flags & ClassFile.ACC_MODULE) != 0 && !explicitSuperclass ? null : superclass; }
+    public ClassEntry superclass() {
+      return !explicitSuperclass && ((flags & ClassFile.ACC_MODULE) != 0 || "java/lang/Object".equals(name.asInternalName()))
+          ? null : superclass;
+    }
     public List<ClassEntry> interfaces() { return interfaces; }
     public int majorVersion() { return major; }
     public int classFlags() { return flags; }
