@@ -1,6 +1,8 @@
 package java.lang.classfile;
 
 import java.lang.classfile.attribute.CodeAttribute;
+import java.lang.classfile.attribute.LocalVariableInfo;
+import java.lang.classfile.attribute.LocalVariableTableAttribute;
 import java.lang.classfile.attribute.StackMapFrameInfo;
 import java.lang.classfile.attribute.StackMapFrameInfo.VerificationTypeInfo;
 import java.lang.classfile.attribute.StackMapFrameInfo.ObjectVerificationTypeInfo;
@@ -53,6 +55,26 @@ final class DoppioClassFileVerifier {
       for (FieldModel field : model.fields()) {
         if ("V".equals(field.fieldTypeSymbol().descriptorString())) throw new VerifyError("Void field descriptor");
       }
+      // Native parser verification traverses Code before its bytecode verifier.
+      // This inflates only the configured debug/line families, while raw tables
+      // remain available when traversal is dropped.
+      boolean[] discontinued = { false };
+      for (MethodModel method : model.methods()) if (method.code().isPresent()) {
+        method.code().get().forEach(element -> {
+          if (element instanceof Instruction) {
+            Opcode.Kind kind = ((Instruction) element).opcode().kind();
+            if (kind == Opcode.Kind.DISCONTINUED_JSR || kind == Opcode.Kind.DISCONTINUED_RET)
+              discontinued[0] = true;
+          }
+        });
+      }
+      String ownerDescriptor = owner.descriptorString();
+      boolean inferenceEligible = !"Ljava/lang/Object;".equals(ownerDescriptor) &&
+          !"Ljava/lang/Class;".equals(ownerDescriptor) && !"Ljava/lang/String;".equals(ownerDescriptor) &&
+          !"Ljava/lang/Throwable;".equals(ownerDescriptor);
+      if (inferenceEligible && (model.majorVersion() < 50 || model.majorVersion() == 50 && discontinued[0]))
+        return error("Inference verification is not supported");
+      if (discontinued[0]) return error("Bad instruction: discontinued jsr/ret");
       for (MethodModel method : model.methods()) {
         try { verifyMethod(model, method, resolver); }
         catch (VerifyError failed) { errors.add(failed); }
@@ -78,6 +100,17 @@ final class DoppioClassFileVerifier {
     if (!(code instanceof CodeAttribute)) throw new UnsupportedOperationException("Unbound Code verification");
     CodeAttribute bound = (CodeAttribute) code;
     byte[] bytes = DoppioClassReader.codeBytes(code);
+    // Native bytecode verification checks the first LVT only. LVTT/CRT/LNT
+    // retain their separate range-only traversal and permissive value rules.
+    java.util.Optional<LocalVariableTableAttribute> debugLocals = code.findAttribute(Attributes.localVariableTable());
+    if (debugLocals.isPresent()) for (LocalVariableInfo local : debugLocals.get().localVariables()) {
+      if (!DoppioClassReader.isInstructionBoundary(code, local.startPc()))
+        throw new VerifyError("Illegal local variable table start_pc " + local.startPc());
+      long end = (long) local.startPc() + local.length();
+      if (end != bytes.length && (end < 0 || end >= bytes.length ||
+          !DoppioClassReader.isInstructionBoundary(code, (int) end)))
+        throw new VerifyError("Illegal local variable table length " + local.length());
+    }
     List<int[]> handlers = new ArrayList<>();
     for (java.lang.classfile.instruction.ExceptionCatch handler : code.exceptionHandlers()) {
       handlers.add(new int[] { bound.labelToBci(handler.tryStart()), bound.labelToBci(handler.tryEnd()),
@@ -99,10 +132,10 @@ final class DoppioClassFileVerifier {
     }
     List<ClassDesc> interfaces = new ArrayList<>();
     for (ClassEntry implemented : model.interfaces()) interfaces.add(implemented.asSymbol());
-    DoppioCodeFlow.analyze(model.thisClass().asSymbol(), model.superclass().isPresent() ? model.superclass().get().asSymbol() : null,
+    DoppioCodeFlow.analyzeForVerification(model.thisClass().asSymbol(), model.superclass().isPresent() ? model.superclass().get().asSymbol() : null,
         interfaces, model.constantPool(), name, type, flags, bytes,
         DoppioClassReader.maxStack(code), DoppioClassReader.maxLocals(code), handlers, frames, model.majorVersion() >= 50,
-        resolver, model.flags().flagsMask());
+        resolver, model.flags().flagsMask(), model.majorVersion());
   }
 
   private static List<DoppioCodeFlow.Value> verificationEntries(ClassModel model, MethodModel method,

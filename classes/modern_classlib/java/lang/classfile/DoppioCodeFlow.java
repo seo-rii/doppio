@@ -110,7 +110,18 @@ final class DoppioCodeFlow {
       ClassHierarchyResolver resolver, int ownerClassFlags, ClassFile.DeadCodeOption deadCode) {
     Analysis analysis = new Analysis(owner, superclass, interfaces, pool, methodName, type,
         flags, code, maxStack, maxLocals, handlers, declaredFrames, requireStackMaps,
-        resolver, ownerClassFlags, deadCode);
+        resolver, ownerClassFlags, deadCode, false, 0);
+    return analysis.run();
+  }
+
+  static Result analyzeForVerification(ClassDesc owner, ClassDesc superclass, List<ClassDesc> interfaces,
+      ConstantPool pool, String methodName, MethodTypeDesc type, int flags,
+      byte[] code, int maxStack, int maxLocals, List<int[]> handlers,
+      Map<Integer, Frame> declaredFrames, boolean requireStackMaps,
+      ClassHierarchyResolver resolver, int ownerClassFlags, int majorVersion) {
+    Analysis analysis = new Analysis(owner, superclass, interfaces, pool, methodName, type,
+        flags, code, maxStack, maxLocals, handlers, declaredFrames, requireStackMaps,
+        resolver, ownerClassFlags, null, true, majorVersion);
     return analysis.run();
   }
 
@@ -161,6 +172,8 @@ final class DoppioCodeFlow {
     final List<int[]> handlers;
     final Map<Integer, Frame> declared;
     final boolean requireStackMaps;
+    final boolean verification;
+    final int majorVersion;
     final ClassFile.DeadCodeOption deadCode;
     final Map<Integer, Instruction> instructions = new LinkedHashMap<>();
     final TreeSet<Integer> frameTargets = new TreeSet<>();
@@ -175,13 +188,14 @@ final class DoppioCodeFlow {
         ConstantPool pool, String name, MethodTypeDesc type, int flags, byte[] code,
         int maxStack, int maxLocals, List<int[]> handlers, Map<Integer, Frame> declared,
         boolean requireStackMaps, ClassHierarchyResolver resolver, int ownerClassFlags,
-        ClassFile.DeadCodeOption deadCode) {
+        ClassFile.DeadCodeOption deadCode, boolean verification, int majorVersion) {
       this.owner = owner; this.superclass = superclass; this.interfaces = interfaces;
       this.pool = pool; this.type = type; this.code = code;
       this.hierarchy = new DoppioClassHierarchy(resolver, owner, superclass, ownerClassFlags);
       this.maxStack = maxStack; this.maxLocals = maxLocals; this.handlers = handlers;
       this.declared = declared;
       this.requireStackMaps = requireStackMaps; this.deadCode = deadCode;
+      this.verification = verification; this.majorVersion = majorVersion;
       if (code.length == 0 || code.length > 65535 || maxStack < 0 || maxStack > 65535 ||
           maxLocals < 0 || maxLocals > 65535) throw new VerifyError("Invalid Code limits");
       decode();
@@ -683,6 +697,8 @@ final class DoppioCodeFlow {
       MemberRefEntry method = pool.entryByIndex(index, MemberRefEntry.class);
       if (method.tag() != 10 && method.tag() != 11) throw new VerifyError("Invalid method reference");
       if (opcode == 182 && method.tag() != 10 || opcode == 185 && method.tag() != 11) throw new VerifyError("Invocation reference kind mismatch");
+      if (verification && opcode == 183 && method.tag() == 11 && majorVersion < 52)
+        throw new VerifyError("Interface invokespecial is not supported before class-file version 52");
       MethodTypeDesc signature = MethodTypeDesc.ofDescriptor(method.nameAndType().type().stringValue());
       if (opcode == 185) {
         int slots = 1;
@@ -699,7 +715,23 @@ final class DoppioCodeFlow {
         state.initialized(receiver);
       } else {
         if ("<clinit>".equals(name)) throw new VerifyError("Illegal class initializer invocation");
-        if (opcode != 184) assign(state.pop('A'), methodOwner);
+        if (opcode == 183) {
+          if (verification) {
+            String current = owner.descriptorString();
+            boolean direct = current.equals(methodOwner) ||
+                superclass != null && superclass.descriptorString().equals(methodOwner);
+            for (ClassDesc implemented : interfaces) if (implemented.descriptorString().equals(methodOwner)) direct = true;
+            if (!direct) {
+              if (!hierarchy.assignable(current, methodOwner))
+                throw new VerifyError("Invokespecial current class is not assignable to the reference class");
+              if (method.tag() == 11) throw new VerifyError("Invokespecial interface reference is not a direct superinterface");
+            }
+            assign(state.pop('A'), current);
+          } else {
+            // Native frame generation consumes this slot without verifier owner/receiver checks.
+            state.pop();
+          }
+        } else if (opcode != 184) assign(state.pop('A'), methodOwner);
         String result = signature.returnType().descriptorString(); if (!"V".equals(result)) state.push(value(result));
       }
     }

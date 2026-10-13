@@ -4,6 +4,7 @@ import java.lang.classfile.constantpool.ClassEntry;
 import java.lang.classfile.constantpool.ConstantPoolBuilder;
 import java.lang.classfile.constantpool.DoppioConstantPool;
 import java.lang.classfile.constantpool.Utf8Entry;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -102,7 +103,9 @@ final class DoppioClassFile implements ClassFile {
   }
 
   public List<VerifyError> verify(byte[] bytes) {
-    return DoppioClassFileVerifier.verify(Objects.requireNonNull(bytes), customAttributes, hierarchyResolver);
+    Objects.requireNonNull(bytes);
+    try { return DoppioClassFileVerifier.verify(parse(bytes), hierarchyResolver); }
+    catch (IllegalArgumentException malformed) { return Collections.singletonList(new VerifyError(malformed.getMessage())); }
   }
 
   public List<VerifyError> verify(ClassModel model) {
