@@ -108,30 +108,36 @@ public final class ClassFileRemapRegression {
       }
     };
   }
-  private static void debugBoundaries(boolean nativeOracle) {
+  private static void debugBoundaries() {
     for(String name:List.of("LocalVariableTable","LocalVariableTypeTable")) {
       AttributeMapper<DebugTable> mapper=debugMapper(name);
       String descriptor=name.equals("LocalVariableTable")?"Ljava/util/List;":"Ljava/util/List<Ljava/lang/String;>;";
-      byte[] bytes=ClassFile.of().build(ClassDesc.of("classes.modern_test.RemapDebug"),b->
+      byte[] bytes=ClassFile.of().build(ClassDesc.of("classes.modern_test.RemapDebug"),b-> {
+          for(int i=0;i<300;i++)b.constantPool().stringEntry("debug-unused-"+i);
           b.withMethodBody("value",MethodTypeDesc.of(CD_List,CD_List),9,c-> {
             c.with(new DebugTable(mapper,c.constantPool().utf8Entry("value"),c.constantPool().utf8Entry(descriptor)));
             c.aload(0).areturn();
-          }));
+          });
+      });
       ClassModel model=ClassFile.of().parse(bytes);
       for(ClassFile.AttributesProcessingOption policy:ClassFile.AttributesProcessingOption.values()) {
         ClassFile api=ClassFile.of(ClassFile.ConstantPoolSharingOption.NEW_POOL,policy);
-        if(nativeOracle) {
-          ClassModel fresh=api.parse(api.transformClass(model,ClassTransform.ACCEPT_ALL));
-          boolean retained=false;
-          for(Attribute<?> attribute:fresh.methods().get(0).code().get().attributes())
-            if(attribute.attributeName().stringValue().equals(name))retained=true;
-          check(retained&&api.verify(fresh).isEmpty(),"native remaps bound "+name+" under "+policy);
+        ClassModel fresh=api.parse(api.transformClass(model,ClassTransform.ACCEPT_ALL));
+        CodeModel code=fresh.methods().get(0).code().get();
+        boolean retained=false;
+        if(name.equals("LocalVariableTable")) {
+          LocalVariableTableAttribute table=code.findAttribute(Attributes.localVariableTable()).get();
+          LocalVariableInfo local=table.localVariables().get(0);
+          retained=table.localVariables().size()==1&&local.startPc()==0&&local.length()==2&&local.slot()==0&&
+              local.name().stringValue().equals("value")&&local.type().stringValue().equals(descriptor);
         }else{
-          try { api.transformClass(model,ClassTransform.ACCEPT_ALL);throw new AssertionError("silently omitted "+name); }
-          catch(UnsupportedOperationException expected) {
-            check(expected.getMessage().contains(name),"explicit unselected debug-table boundary under "+policy);
-          }
+          LocalVariableTypeTableAttribute table=code.findAttribute(Attributes.localVariableTypeTable()).get();
+          LocalVariableTypeInfo local=table.localVariableTypes().get(0);
+          retained=table.localVariableTypes().size()==1&&local.startPc()==0&&local.length()==2&&local.slot()==0&&
+              local.name().stringValue().equals("value")&&local.signature().stringValue().equals(descriptor);
         }
+        check(retained&&fresh.constantPool().size()<model.constantPool().size()&&api.verify(fresh).isEmpty(),
+            "typed fresh-pool debug relocation preserves scope and UTF operands under "+name+"/"+policy);
       }
     }
   }
@@ -192,7 +198,7 @@ public final class ClassFileRemapRegression {
       try { freshApi.transformClass(api.parse(opaque),ClassTransform.ACCEPT_ALL);throw new AssertionError("unsafe raw CP copying accepted"); }
       catch(UnsupportedOperationException expected) { check(expected.getClass()==UnsupportedOperationException.class,"explicit opaque remap boundary"); }
     }
-    debugBoundaries(nativeOracle);
+    debugBoundaries();
     if(completed!=23)throw new AssertionError("Incomplete remap diagnostics: "+completed);
     System.out.println("CLASSFILE_REMAP_REGRESSION_OK|23");
   }
