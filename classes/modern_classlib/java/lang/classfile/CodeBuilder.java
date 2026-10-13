@@ -7,6 +7,7 @@ import java.lang.classfile.constantpool.InterfaceMethodRefEntry;
 import java.lang.classfile.constantpool.LoadableConstantEntry;
 import java.lang.classfile.constantpool.MemberRefEntry;
 import java.lang.classfile.constantpool.MethodRefEntry;
+import java.lang.classfile.constantpool.Utf8Entry;
 import java.lang.classfile.instruction.ArrayLoadInstruction;
 import java.lang.classfile.instruction.ArrayStoreInstruction;
 import java.lang.classfile.instruction.DoppioMemoryInstructions;
@@ -22,6 +23,10 @@ import java.lang.classfile.instruction.NewReferenceArrayInstruction;
 import java.lang.classfile.instruction.NewMultiArrayInstruction;
 import java.lang.classfile.instruction.TypeCheckInstruction;
 import java.lang.classfile.instruction.MonitorInstruction;
+import java.lang.classfile.instruction.CharacterRange;
+import java.lang.classfile.instruction.LineNumber;
+import java.lang.classfile.instruction.LocalVariable;
+import java.lang.classfile.instruction.LocalVariableType;
 import java.lang.classfile.instruction.NopInstruction;
 import java.lang.classfile.instruction.SwitchCase;
 import java.lang.classfile.instruction.TableSwitchInstruction;
@@ -53,6 +58,22 @@ public interface CodeBuilder extends ClassFileBuilder<CodeElement, CodeBuilder> 
   default CodeBuilder nop() { return with(NopInstruction.of()); }
   default Label newBoundLabel() { Label label = newLabel(); labelBinding(label); return label; }
   default CodeBuilder labelBinding(Label label) { return with(DoppioClassReader.labelTarget(label)); }
+  default CodeBuilder lineNumber(int line) { return with(LineNumber.of(line)); }
+  default CodeBuilder characterRange(Label start, Label end, int rangeStart, int rangeEnd, int flags) {
+    return with(CharacterRange.of(start, end, rangeStart, rangeEnd, flags));
+  }
+  default CodeBuilder localVariable(int slot, Utf8Entry name, Utf8Entry descriptor, Label start, Label end) {
+    return with(LocalVariable.of(slot, name, descriptor, start, end));
+  }
+  default CodeBuilder localVariable(int slot, String name, ClassDesc descriptor, Label start, Label end) {
+    return localVariable(slot, constantPool().utf8Entry(name), constantPool().utf8Entry(descriptor), start, end);
+  }
+  default CodeBuilder localVariableType(int slot, Utf8Entry name, Utf8Entry signature, Label start, Label end) {
+    return with(LocalVariableType.of(slot, name, signature, start, end));
+  }
+  default CodeBuilder localVariableType(int slot, String name, Signature signature, Label start, Label end) {
+    return localVariableType(slot, constantPool().utf8Entry(name), constantPool().utf8Entry(signature.signatureString()), start, end);
+  }
   default CodeBuilder branch(Opcode opcode, Label label) { return with(BranchInstruction.of(opcode, label)); }
   default CodeBuilder goto_(Label label) { return branch(Opcode.GOTO, label); }
   default CodeBuilder goto_w(Label label) { return branch(Opcode.GOTO_W, label); }
