@@ -80,7 +80,7 @@ function runClassFileMetadataGuest({root, output, diagnostic, className, checked
   timeout = 60000, requiredPackages = ['java/lang/classfile']}) {
   assert.ok(path.isAbsolute(output) && path.isAbsolute(diagnostic));
   assert.ok(requiredPackages.length > 0);
-  assert.ok(requiredPackages.every(name => name === 'java/lang/classfile' || name.startsWith('java/lang/classfile/')));
+  assert.ok(requiredPackages.every(name => name === 'java/lang/constant' || name === 'java/lang/classfile' || name.startsWith('java/lang/classfile/')));
   const options = {runtime: path.join(root, 'build/release-cli'), output, diagnostic, className, requiredPackages};
   const script = `
     'use strict';
