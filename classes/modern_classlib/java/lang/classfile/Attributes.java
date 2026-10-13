@@ -6,6 +6,11 @@ public final class Attributes {
   public static final String NAME_CODE = "Code";
   public static final String NAME_SOURCE_FILE = "SourceFile";
   public static final String NAME_STACK_MAP_TABLE = "StackMapTable";
+  public static final String NAME_LINE_NUMBER_TABLE = "LineNumberTable";
+  public static final String NAME_LOCAL_VARIABLE_TABLE = "LocalVariableTable";
+  public static final String NAME_LOCAL_VARIABLE_TYPE_TABLE = "LocalVariableTypeTable";
+  public static final String NAME_CHARACTER_RANGE_TABLE = "CharacterRangeTable";
+  public static final String NAME_SOURCE_DEBUG_EXTENSION = "SourceDebugExtension";
   public static final String NAME_CONSTANT_VALUE = "ConstantValue";
   public static final String NAME_SIGNATURE = "Signature";
   public static final String NAME_EXCEPTIONS = "Exceptions";
@@ -19,6 +24,11 @@ public final class Attributes {
   public static AttributeMapper<SourceFileAttribute> sourceFile() { return DoppioClassReader.sourceFileMapper(); }
   public static AttributeMapper<CodeAttribute> code() { return DoppioClassReader.codeMapper(); }
   public static AttributeMapper<StackMapTableAttribute> stackMapTable() { return DoppioClassReader.stackMapTableMapper(); }
+  public static AttributeMapper<LineNumberTableAttribute> lineNumberTable() { return DoppioDebugAttributes.lineNumberTableMapper(); }
+  public static AttributeMapper<LocalVariableTableAttribute> localVariableTable() { return DoppioDebugAttributes.localVariableTableMapper(); }
+  public static AttributeMapper<LocalVariableTypeTableAttribute> localVariableTypeTable() { return DoppioDebugAttributes.localVariableTypeTableMapper(); }
+  public static AttributeMapper<CharacterRangeTableAttribute> characterRangeTable() { return DoppioDebugAttributes.characterRangeTableMapper(); }
+  public static AttributeMapper<SourceDebugExtensionAttribute> sourceDebugExtension() { return DoppioDebugAttributes.sourceDebugExtensionMapper(); }
   public static AttributeMapper<ConstantValueAttribute> constantValue() { return DoppioAttributes.CONSTANT_VALUE; }
   public static AttributeMapper<SignatureAttribute> signature() { return DoppioAttributes.SIGNATURE; }
   public static AttributeMapper<ExceptionsAttribute> exceptions() { return DoppioAttributes.EXCEPTIONS; }

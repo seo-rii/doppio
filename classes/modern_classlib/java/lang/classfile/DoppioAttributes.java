@@ -91,6 +91,8 @@ public final class DoppioAttributes {
   }
 
   private static Attribute<?> readSelected(AttributedElement owner, ClassReader reader, Utf8Entry name, int start, byte[] payload) {
+    Attribute<?> debug = DoppioDebugAttributes.read(owner, reader, name, start, payload);
+    if (debug != null) return debug;
     String key = name.stringValue();
     ConstantPool source = DoppioClassReader.readerPool(reader);
     if ("ConstantValue".equals(key)) {
@@ -183,10 +185,11 @@ public final class DoppioAttributes {
         "LocalVariableTable".equals(name) || "LocalVariableTypeTable".equals(name);
   }
   static byte[] retainedPayload(Attribute<?> attribute) {
-    return attribute instanceof Base && ((Base<?>) attribute).payload != null ? ((Base<?>) attribute).payload.clone() : null;
+    return attribute instanceof Base && ((Base<?>) attribute).payload != null ? ((Base<?>) attribute).payload.clone() :
+        DoppioDebugAttributes.retainedPayload(attribute);
   }
   static ConstantPool sourcePool(Attribute<?> attribute) {
-    return attribute instanceof Base ? ((Base<?>) attribute).pool : null;
+    return attribute instanceof Base ? ((Base<?>) attribute).pool : DoppioDebugAttributes.sourcePool(attribute);
   }
 
   private static void requireOwner(boolean allowed, String name) {

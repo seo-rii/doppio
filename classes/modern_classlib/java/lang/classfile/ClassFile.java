@@ -37,6 +37,8 @@ public interface ClassFile {
   enum DeadCodeOption implements Option { PATCH_DEAD_CODE, KEEP_DEAD_CODE }
   enum DeadLabelsOption implements Option { FAIL_ON_DEAD_LABELS, DROP_DEAD_LABELS }
   enum ShortJumpsOption implements Option { FIX_SHORT_JUMPS, FAIL_ON_SHORT_JUMPS }
+  enum DebugElementsOption implements Option { PASS_DEBUG, DROP_DEBUG }
+  enum LineNumbersOption implements Option { PASS_LINE_NUMBERS, DROP_LINE_NUMBERS }
   enum AttributesProcessingOption implements Option {
     PASS_ALL_ATTRIBUTES, DROP_UNKNOWN_ATTRIBUTES, DROP_UNSTABLE_ATTRIBUTES
   }

@@ -5,6 +5,14 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.lang.classfile.attribute.CodeAttribute;
 import java.lang.classfile.attribute.SourceFileAttribute;
+import java.lang.classfile.attribute.LineNumberTableAttribute;
+import java.lang.classfile.attribute.LineNumberInfo;
+import java.lang.classfile.attribute.LocalVariableTableAttribute;
+import java.lang.classfile.attribute.LocalVariableInfo;
+import java.lang.classfile.attribute.LocalVariableTypeTableAttribute;
+import java.lang.classfile.attribute.LocalVariableTypeInfo;
+import java.lang.classfile.attribute.CharacterRangeTableAttribute;
+import java.lang.classfile.attribute.CharacterRangeInfo;
 import java.lang.classfile.attribute.StackMapTableAttribute;
 import java.lang.classfile.attribute.StackMapFrameInfo;
 import java.lang.classfile.attribute.StackMapFrameInfo.VerificationTypeInfo;
@@ -46,8 +54,15 @@ public final class DoppioClassReader {
   }
 
   public static ClassModel parse(byte[] bytes, Function<Utf8Entry, AttributeMapper<?>> customAttributes) {
+    return parse(bytes, customAttributes, ClassFile.DebugElementsOption.PASS_DEBUG,
+        ClassFile.LineNumbersOption.PASS_LINE_NUMBERS);
+  }
+
+  public static ClassModel parse(byte[] bytes, Function<Utf8Entry, AttributeMapper<?>> customAttributes,
+      ClassFile.DebugElementsOption debugElements, ClassFile.LineNumbersOption lineNumbers) {
     byte[] retained = Objects.requireNonNull(bytes).clone();
-    Input input = new Input(retained, Objects.requireNonNull(customAttributes));
+    Input input = new Input(retained, Objects.requireNonNull(customAttributes),
+        Objects.requireNonNull(debugElements), Objects.requireNonNull(lineNumbers));
     require(retained, 0, 8);
     if (input.readInt(0) != ClassFile.MAGIC_NUMBER) throw new IllegalArgumentException("Invalid class-file magic");
     int minor = input.readU2(4), major = input.readU2(6);
@@ -169,7 +184,8 @@ public final class DoppioClassReader {
     if (length == 0 || length > 65535) throw new IllegalArgumentException("Invalid Code length");
     byte[] code = data.bytes(length);
     int count = data.u2();
-    CodeValue result = new CodeValue(method, input.pool, name, maxStack, maxLocals, code, payload);
+    CodeValue result = new CodeValue(method, input.pool, name, maxStack, maxLocals, code, payload,
+        input.debugElements, input.lineNumbers);
     List<ExceptionCatch> handlers = new ArrayList<ExceptionCatch>();
     for (int index = 0; index < count; index++) {
       int start = data.u2(), stop = data.u2(), handler = data.u2(), catchIndex = data.u2();
@@ -387,11 +403,7 @@ public final class DoppioClassReader {
         reader.readBytes(at, reader.readInt(at - 4)));
     }
     public void writeAttribute(BufWriter writer, StackMapTableAttribute attribute) {
-      if (!(attribute instanceof StackMapValue) || ((StackMapValue) attribute).payload == null)
-        throw new UnsupportedOperationException("Explicit stack map serialization requires a Code label context");
-      if (!writer.canWriteDirect(sourcePool(attribute))) throw new IllegalArgumentException("Stack map copy requires original pool");
-      byte[] payload = attributePayload(attribute);
-      writer.writeIndex(attribute.attributeName()); writer.writeInt(payload.length); writer.writeBytes(payload);
+      DoppioBuilders.writeStackMapAttribute(writer, attribute);
     }
   };
   public static AttributeMapper<StackMapTableAttribute> stackMapTableMapper() { return STACK_MAP_MAPPER; }
@@ -537,8 +549,7 @@ public final class DoppioClassReader {
     return new InvokeValue(opcode, method, opcode == Opcode.INVOKEINTERFACE ? count : 0);
   }
   public static LineNumber lineNumber(int line) {
-    if (line < 0 || line > 65535) throw new IllegalArgumentException("Line number exceeds u2");
-    return new LineValue(line);
+    return DoppioDebugInstructions.lineNumber(line);
   }
   public static ExceptionCatch exceptionCatch(Label handler, Label start, Label end, Optional<ClassEntry> catchType) {
     return new CatchValue(Objects.requireNonNull(handler), Objects.requireNonNull(start),
@@ -549,6 +560,30 @@ public final class DoppioClassReader {
     byte[] bytes = code.code;
     List<CodeElement> elements = new ArrayList<CodeElement>();
     for (ExceptionCatch handler : code.handlers) elements.add(handler);
+    int[] lines = code.lineNumbers == ClassFile.LineNumbersOption.PASS_LINE_NUMBERS ? new int[bytes.length + 1] : null;
+    for (Attribute<?> attribute : code.attributes) {
+      if (lines != null && attribute instanceof LineNumberTableAttribute) {
+        for (LineNumberInfo line : ((LineNumberTableAttribute) attribute).lineNumbers()) {
+          if (line.startPc() < 0 || line.startPc() > bytes.length)
+            throw new IllegalArgumentException("Line number start_pc out of range");
+          lines[line.startPc()] = line.lineNumber();
+        }
+      }
+      if (code.debugElements != ClassFile.DebugElementsOption.PASS_DEBUG) continue;
+      if (attribute instanceof CharacterRangeTableAttribute) {
+        for (CharacterRangeInfo range : ((CharacterRangeTableAttribute) attribute).characterRangeTable())
+          elements.add(CharacterRange.of(code.debugLabel(range.startPc()), code.debugLabel(range.endPc() + 1),
+              range.characterRangeStart(), range.characterRangeEnd(), range.flags()));
+      } else if (attribute instanceof LocalVariableTableAttribute) {
+        for (LocalVariableInfo local : ((LocalVariableTableAttribute) attribute).localVariables())
+          elements.add(LocalVariable.of(local.slot(), local.name(), local.type(), code.debugLabel(local.startPc()),
+              code.debugLabel(local.startPc() + local.length())));
+      } else if (attribute instanceof LocalVariableTypeTableAttribute) {
+        for (LocalVariableTypeInfo local : ((LocalVariableTypeTableAttribute) attribute).localVariableTypes())
+          elements.add(LocalVariableType.of(local.slot(), local.name(), local.signature(), code.debugLabel(local.startPc()),
+              code.debugLabel(local.startPc() + local.length())));
+      }
+    }
     for (Attribute<?> attribute : code.attributes) if (attribute instanceof CodeElement &&
         !"LineNumberTable".equals(attribute.attributeName().stringValue()) &&
         !"LocalVariableTable".equals(attribute.attributeName().stringValue()) &&
@@ -557,13 +592,7 @@ public final class DoppioClassReader {
     int cursor = 0;
     while (cursor < bytes.length) {
       if (code.labels[cursor] != null) elements.add(labelTarget(code.labels[cursor]));
-      for (Attribute<?> attribute : code.attributes) if ("LineNumberTable".equals(attribute.attributeName().stringValue())) {
-        byte[] lines = attributePayload(attribute);
-        int count = u2(lines, 0);
-        if (lines.length != 2 + count * 4) throw new IllegalArgumentException("Invalid LineNumberTable");
-        for (int index = 0; index < count; index++) if (u2(lines, 2 + index * 4) == cursor)
-          elements.add(lineNumber(u2(lines, 4 + index * 4)));
-      }
+      if (lines != null && lines[cursor] != 0) elements.add(lineNumber(lines[cursor]));
       int start = cursor, bytecode = bytes[cursor++] & 255;
       Opcode opcode;
       if (bytecode == 196) {
@@ -647,6 +676,7 @@ public final class DoppioClassReader {
       cursor = start + size;
     }
     if (code.labels[bytes.length] != null) elements.add(labelTarget(code.labels[bytes.length]));
+    if (lines != null && lines[bytes.length] != 0) elements.add(lineNumber(lines[bytes.length]));
     return immutable(elements);
   }
 
@@ -753,10 +783,14 @@ public final class DoppioClassReader {
   private static final class Input implements ClassReader {
     final byte[] bytes;
     final Function<Utf8Entry, AttributeMapper<?>> customAttributes;
+    final ClassFile.DebugElementsOption debugElements;
+    final ClassFile.LineNumbersOption lineNumbers;
     DoppioConstantPool pool;
     ClassValue model;
-    Input(byte[] bytes, Function<Utf8Entry, AttributeMapper<?>> customAttributes) {
+    Input(byte[] bytes, Function<Utf8Entry, AttributeMapper<?>> customAttributes,
+        ClassFile.DebugElementsOption debugElements, ClassFile.LineNumbersOption lineNumbers) {
       this.bytes = bytes; this.customAttributes = customAttributes;
+      this.debugElements = debugElements; this.lineNumbers = lineNumbers;
     }
     public Function<Utf8Entry, AttributeMapper<?>> customAttributes() { return customAttributes; }
     public int flags() { return model.flags.flagsMask(); }
@@ -979,19 +1013,27 @@ public final class DoppioClassReader {
     final byte[] code, payload;
     final BoundLabel[] labels;
     final int[] sizes;
+    final ClassFile.DebugElementsOption debugElements;
+    final ClassFile.LineNumbersOption lineNumbers;
     List<ExceptionCatch> handlers = Collections.emptyList();
     List<Attribute<?>> attributes = Collections.emptyList();
     List<CodeElement> elements;
-    CodeValue(MethodModel parent, DoppioConstantPool pool, Utf8Entry name, int stack, int locals, byte[] code, byte[] payload) {
+    CodeValue(MethodModel parent, DoppioConstantPool pool, Utf8Entry name, int stack, int locals, byte[] code, byte[] payload,
+        ClassFile.DebugElementsOption debugElements, ClassFile.LineNumbersOption lineNumbers) {
       this.parent = parent; this.pool = pool; this.name = name; this.stack = stack; this.locals = locals;
       this.code = code.clone(); this.payload = payload.clone();
       this.labels = new BoundLabel[code.length + 1];
       this.sizes = instructionSizes(this.code);
+      this.debugElements = debugElements; this.lineNumbers = lineNumbers;
       discoverLabels();
     }
     BoundLabel label(int offset) {
       if (labels[offset] == null) labels[offset] = new BoundLabel(this, offset);
       return labels[offset];
+    }
+    BoundLabel debugLabel(int offset) {
+      if (offset < 0 || offset > code.length) throw new IllegalArgumentException("Debug label offset out of range");
+      return label(offset);
     }
     BoundLabel checkedLabel(int offset, boolean allowEnd) {
       if (offset < 0 || offset > code.length || offset == code.length && !allowEnd ||
@@ -1055,11 +1097,6 @@ public final class DoppioClassReader {
     public Label tryStart() { return start; }
     public Label tryEnd() { return end; }
     public Optional<ClassEntry> catchType() { return type; }
-  }
-  private static final class LineValue implements LineNumber {
-    final int line;
-    LineValue(int line) { this.line = line; }
-    public int line() { return line; }
   }
   private static class InstructionValue implements Instruction {
     final Opcode opcode;

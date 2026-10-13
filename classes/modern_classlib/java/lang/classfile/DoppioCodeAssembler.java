@@ -20,6 +20,10 @@ import java.lang.classfile.instruction.IncrementInstruction;
 import java.lang.classfile.instruction.InvokeInstruction;
 import java.lang.classfile.instruction.InvokeDynamicInstruction;
 import java.lang.classfile.instruction.LabelTarget;
+import java.lang.classfile.instruction.LineNumber;
+import java.lang.classfile.instruction.LocalVariable;
+import java.lang.classfile.instruction.LocalVariableType;
+import java.lang.classfile.instruction.CharacterRange;
 import java.lang.classfile.instruction.LoadInstruction;
 import java.lang.classfile.instruction.LookupSwitchInstruction;
 import java.lang.classfile.instruction.NewObjectInstruction;
@@ -55,10 +59,14 @@ final class DoppioCodeAssembler {
     final boolean controlFlow;
     final List<int[]> handlers;
     final IdentityHashMap<Label, Integer> labels;
+    final List<int[]> lineNumbers;
+    final boolean lineNumberTable;
     Result(byte[] bytes, int stack, int locals, boolean controlFlow, List<int[]> handlers,
-        IdentityHashMap<Label, Integer> labels) {
+        IdentityHashMap<Label, Integer> labels, List<int[]> lineNumbers, boolean lineNumberTable) {
       this.bytes = bytes; this.maxStack = stack; this.maxLocals = locals;
       this.controlFlow = controlFlow; this.handlers = handlers; this.labels = labels;
+      this.lineNumbers = lineNumbers;
+      this.lineNumberTable = lineNumberTable;
     }
   }
 
@@ -80,6 +88,7 @@ final class DoppioCodeAssembler {
       positions.put(start, Integer.valueOf(0));
       List<Entry> entries = new ArrayList<Entry>();
       List<ExceptionCatch> catches = new ArrayList<ExceptionCatch>();
+      List<int[]> lines = new ArrayList<int[]>();
       int locals = allocatedLocals, stack = 0, maximum = 0;
       boolean controlFlow = false;
       for (CodeElement element : elements) {
@@ -89,6 +98,10 @@ final class DoppioCodeAssembler {
           positions.put(label, Integer.valueOf(entries.size()));
         } else if (element instanceof ExceptionCatch) {
           catches.add((ExceptionCatch) element); controlFlow = true;
+        } else if (element instanceof LineNumber) {
+          lines.add(new int[] {entries.size(), ((LineNumber) element).line()});
+        } else if (element instanceof LocalVariable || element instanceof LocalVariableType || element instanceof CharacterRange) {
+          // Zero-width debug ranges are resolved against the final labels.
         } else if (element instanceof Instruction) {
           Instruction instruction = (Instruction) element;
           byte[] bytes = null;
@@ -212,7 +225,21 @@ final class DoppioCodeAssembler {
       if (result.length != bci) throw new IllegalArgumentException("Inconsistent Code layout");
       if (controlFlow) maximum = flowMaximum(entries, labels, handlers, bci);
       if (maximum > 65535) throw new IllegalArgumentException("Code operand-stack limit exceeded");
-      return new Result(result, maximum, locals, controlFlow, Collections.unmodifiableList(handlers), labels);
+      List<int[]> finalLines = new ArrayList<int[]>();
+      int lineBci = -1, currentLine = 0, writtenLine = -1;
+      for (int[] line : lines) {
+        int at = line[0] == entries.size() ? bci : entries.get(line[0]).bci;
+        if (at != lineBci && currentLine != line[1]) {
+          if (lineBci >= 0 && currentLine != writtenLine) {
+            finalLines.add(new int[] {lineBci, currentLine}); writtenLine = currentLine;
+          }
+          lineBci = at;
+        }
+        currentLine = line[1];
+      }
+      if (lineBci >= 0 && currentLine != writtenLine) finalLines.add(new int[] {lineBci, currentLine});
+      return new Result(result, maximum, locals, controlFlow, Collections.unmodifiableList(handlers), labels,
+          Collections.unmodifiableList(finalLines), !lines.isEmpty());
     } catch (IOException error) { throw new IllegalArgumentException("Code serialization failed", error); }
   }
 

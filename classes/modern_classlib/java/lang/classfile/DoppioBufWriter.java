@@ -3,14 +3,37 @@ package java.lang.classfile;
 import java.lang.classfile.constantpool.*;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Collections;
+import java.lang.classfile.attribute.StackMapFrameInfo.VerificationTypeInfo;
 
 /** Real byte buffer used by public custom mappers and selected typed attribute codecs. */
 public final class DoppioBufWriter implements BufWriter {
   private final DoppioConstantPool pool;
+  private final IdentityHashMap<Label, Integer> codeLabels;
+  private final int codeLength;
+  private final List<VerificationTypeInfo> initialLocals;
   private byte[] bytes = new byte[64];
   private int size;
 
-  public DoppioBufWriter(DoppioConstantPool pool) { this.pool = Objects.requireNonNull(pool); }
+  public DoppioBufWriter(DoppioConstantPool pool) { this(pool, null, 0, Collections.<VerificationTypeInfo>emptyList()); }
+  DoppioBufWriter(DoppioConstantPool pool, IdentityHashMap<Label, Integer> codeLabels, int codeLength) {
+    this(pool, codeLabels, codeLength, Collections.<VerificationTypeInfo>emptyList());
+  }
+  DoppioBufWriter(DoppioConstantPool pool, IdentityHashMap<Label, Integer> codeLabels, int codeLength,
+      List<VerificationTypeInfo> initialLocals) {
+    this.pool = Objects.requireNonNull(pool); this.codeLabels = codeLabels; this.codeLength = codeLength;
+    this.initialLocals = Objects.requireNonNull(initialLocals);
+  }
+  boolean hasCodeLabels() { return codeLabels != null; }
+  List<VerificationTypeInfo> initialLocals() { return initialLocals; }
+  int labelToBci(Label label, boolean allowEnd) {
+    Integer bci = codeLabels == null ? null : codeLabels.get(Objects.requireNonNull(label));
+    if (bci == null || bci.intValue() < 0 || bci.intValue() > codeLength || !allowEnd && bci.intValue() == codeLength)
+      throw new IllegalArgumentException("Unbound, foreign or invalid Code label");
+    return bci.intValue();
+  }
   public ConstantPoolBuilder constantPool() { return pool; }
   public boolean canWriteDirect(ConstantPool source) {
     return pool.canWriteDirect(source instanceof ClassReader ? DoppioClassReader.readerPool((ClassReader) source) : source);

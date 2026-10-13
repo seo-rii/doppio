@@ -6,6 +6,11 @@ import java.io.IOException;
 import java.lang.classfile.attribute.CodeAttribute;
 import java.lang.classfile.attribute.SourceFileAttribute;
 import java.lang.classfile.attribute.StackMapTableAttribute;
+import java.lang.classfile.attribute.StackMapFrameInfo;
+import java.lang.classfile.attribute.StackMapFrameInfo.VerificationTypeInfo;
+import java.lang.classfile.attribute.StackMapFrameInfo.ObjectVerificationTypeInfo;
+import java.lang.classfile.attribute.StackMapFrameInfo.UninitializedVerificationTypeInfo;
+import java.lang.classfile.attribute.StackMapFrameInfo.SimpleVerificationTypeInfo;
 import java.lang.classfile.attribute.BootstrapMethodsAttribute;
 import java.lang.classfile.constantpool.ClassEntry;
 import java.lang.classfile.constantpool.ConstantPool;
@@ -17,6 +22,10 @@ import java.lang.classfile.instruction.ConstantInstruction;
 import java.lang.classfile.instruction.BranchInstruction;
 import java.lang.classfile.instruction.ExceptionCatch;
 import java.lang.classfile.instruction.LabelTarget;
+import java.lang.classfile.instruction.LineNumber;
+import java.lang.classfile.instruction.LocalVariable;
+import java.lang.classfile.instruction.LocalVariableType;
+import java.lang.classfile.instruction.CharacterRange;
 import java.lang.classfile.instruction.LookupSwitchInstruction;
 import java.lang.classfile.instruction.SwitchCase;
 import java.lang.classfile.instruction.TableSwitchInstruction;
@@ -80,9 +89,10 @@ final class DoppioBuilders {
   static byte[] build(ClassEntry name, DoppioConstantPool pool, Consumer<? super ClassBuilder> handler,
       ClassFile.StackMapsOption stackMaps, ClassFile.AttributesProcessingOption attributesProcessing,
       ClassHierarchyResolver hierarchyResolver, ClassFile.DeadCodeOption deadCode,
-      ClassFile.DeadLabelsOption deadLabels, ClassFile.ShortJumpsOption shortJumps) {
+      ClassFile.DeadLabelsOption deadLabels, ClassFile.ShortJumpsOption shortJumps,
+      ClassFile.DebugElementsOption debugElements, ClassFile.LineNumbersOption lineNumbers) {
     ClassSink builder = new ClassSink(name, pool, stackMaps, attributesProcessing, false, hierarchyResolver,
-        deadCode, deadLabels, shortJumps);
+        deadCode, deadLabels, shortJumps, debugElements, lineNumbers);
     handler.accept(builder);
     return builder.bytes();
   }
@@ -90,9 +100,10 @@ final class DoppioBuilders {
   static byte[] transform(ClassModel model, ClassEntry name, DoppioConstantPool pool, ClassTransform transform,
       ClassFile.StackMapsOption stackMaps, ClassFile.AttributesProcessingOption attributesProcessing, boolean remapBound,
       ClassHierarchyResolver hierarchyResolver, ClassFile.DeadCodeOption deadCode,
-      ClassFile.DeadLabelsOption deadLabels, ClassFile.ShortJumpsOption shortJumps) {
+      ClassFile.DeadLabelsOption deadLabels, ClassFile.ShortJumpsOption shortJumps,
+      ClassFile.DebugElementsOption debugElements, ClassFile.LineNumbersOption lineNumbers) {
     ClassSink builder = new ClassSink(name, pool, stackMaps, attributesProcessing, remapBound, hierarchyResolver,
-        deadCode, deadLabels, shortJumps);
+        deadCode, deadLabels, shortJumps, debugElements, lineNumbers);
     builder.transform(model, transform);
     return builder.bytes();
   }
@@ -117,6 +128,8 @@ final class DoppioBuilders {
     ClassFile.DeadCodeOption deadCode();
     ClassFile.DeadLabelsOption deadLabels();
     ClassFile.ShortJumpsOption shortJumps();
+    ClassFile.DebugElementsOption debugElements();
+    ClassFile.LineNumbersOption lineNumbers();
     ClassFile.AttributesProcessingOption attributesProcessing();
     boolean remapBound();
   }
@@ -169,6 +182,8 @@ final class DoppioBuilders {
     public ClassFile.DeadCodeOption deadCode() { return context.deadCode(); }
     public ClassFile.DeadLabelsOption deadLabels() { return context.deadLabels(); }
     public ClassFile.ShortJumpsOption shortJumps() { return context.shortJumps(); }
+    public ClassFile.DebugElementsOption debugElements() { return context.debugElements(); }
+    public ClassFile.LineNumbersOption lineNumbers() { return context.lineNumbers(); }
     public ClassFile.AttributesProcessingOption attributesProcessing() { return context.attributesProcessing(); }
     public boolean remapBound() { return context.remapBound(); }
     public ConstantPoolBuilder constantPool() { return pool(); }
@@ -261,6 +276,8 @@ final class DoppioBuilders {
     final ClassFile.DeadCodeOption deadCode;
     final ClassFile.DeadLabelsOption deadLabels;
     final ClassFile.ShortJumpsOption shortJumps;
+    final ClassFile.DebugElementsOption debugElements;
+    final ClassFile.LineNumbersOption lineNumbers;
     int flags = ClassFile.ACC_SUPER;
     int major = 69, minor = 0;
     ClassEntry superclass;
@@ -270,13 +287,16 @@ final class DoppioBuilders {
     final List<Attribute<?>> attributes = new ArrayList<Attribute<?>>();
     ClassSink(ClassEntry name, DoppioConstantPool pool, ClassFile.StackMapsOption stackMaps,
         ClassFile.AttributesProcessingOption attributesProcessing, boolean remapBound, ClassHierarchyResolver hierarchyResolver,
-        ClassFile.DeadCodeOption deadCode, ClassFile.DeadLabelsOption deadLabels, ClassFile.ShortJumpsOption shortJumps) {
+        ClassFile.DeadCodeOption deadCode, ClassFile.DeadLabelsOption deadLabels, ClassFile.ShortJumpsOption shortJumps,
+        ClassFile.DebugElementsOption debugElements, ClassFile.LineNumbersOption lineNumbers) {
       this.pool = Objects.requireNonNull(pool); this.stackMaps = Objects.requireNonNull(stackMaps);
       this.attributesProcessing = Objects.requireNonNull(attributesProcessing); this.remapBound = remapBound;
       this.hierarchyResolver = Objects.requireNonNull(hierarchyResolver);
       this.deadCode = Objects.requireNonNull(deadCode);
       this.deadLabels = Objects.requireNonNull(deadLabels);
       this.shortJumps = Objects.requireNonNull(shortJumps);
+      this.debugElements = Objects.requireNonNull(debugElements);
+      this.lineNumbers = Objects.requireNonNull(lineNumbers);
       this.name = pool.classEntry(pool.utf8Entry(Objects.requireNonNull(name).name().stringValue()));
       this.superclass = pool.classEntry(ClassDesc.of("java.lang.Object"));
     }
@@ -291,6 +311,8 @@ final class DoppioBuilders {
     public ClassFile.DeadCodeOption deadCode() { return deadCode; }
     public ClassFile.DeadLabelsOption deadLabels() { return deadLabels; }
     public ClassFile.ShortJumpsOption shortJumps() { return shortJumps; }
+    public ClassFile.DebugElementsOption debugElements() { return debugElements; }
+    public ClassFile.LineNumbersOption lineNumbers() { return lineNumbers; }
     public ClassFile.AttributesProcessingOption attributesProcessing() { return attributesProcessing; }
     public boolean remapBound() { return remapBound; }
     public ConstantPoolBuilder constantPool() { return pool; }
@@ -503,8 +525,11 @@ final class DoppioBuilders {
         elements.add(element); return this;
       }
       if (element instanceof StackMapTableAttribute) {
-        if (source == null) throw new UnsupportedOperationException("Manual stack-map attributes are outside the selected builder");
-        return this; // Rewriting regenerates frames rather than retaining stale offsets.
+        List<StackMapFrameInfo> frames = new ArrayList<StackMapFrameInfo>();
+        for (StackMapFrameInfo frame : ((StackMapTableAttribute) element).entries())
+          frames.add(StackMapFrameInfo.of(label(frame.target()), frameTypes(frame.locals()), frameTypes(frame.stack())));
+        addAttribute(attributes, StackMapTableAttribute.of(frames));
+        return this;
       }
       if (element instanceof Attribute) {
         Attribute<?> attribute = (Attribute<?>) element;
@@ -512,6 +537,24 @@ final class DoppioBuilders {
         return this;
       }
       if (element instanceof LabelTarget) element = DoppioClassReader.labelTarget(label(((LabelTarget) element).label()));
+      else if (element instanceof LineNumber) {
+        // Line-number options govern parsing, not explicitly supplied lines.
+      } else if (element instanceof LocalVariable) {
+        if (owner.debugElements() == ClassFile.DebugElementsOption.DROP_DEBUG) return this;
+        LocalVariable variable = (LocalVariable) element;
+        element = LocalVariable.of(variable.slot(), variable.name(), variable.type(),
+            label(variable.startScope()), label(variable.endScope()));
+      } else if (element instanceof LocalVariableType) {
+        if (owner.debugElements() == ClassFile.DebugElementsOption.DROP_DEBUG) return this;
+        LocalVariableType variable = (LocalVariableType) element;
+        element = LocalVariableType.of(variable.slot(), variable.name(), variable.signature(),
+            label(variable.startScope()), label(variable.endScope()));
+      } else if (element instanceof CharacterRange) {
+        if (owner.debugElements() == ClassFile.DebugElementsOption.DROP_DEBUG) return this;
+        CharacterRange range = (CharacterRange) element;
+        element = CharacterRange.of(label(range.startScope()), label(range.endScope()),
+            range.characterRangeStart(), range.characterRangeEnd(), range.flags());
+      }
       else if (element instanceof BranchInstruction) {
         BranchInstruction branch = (BranchInstruction) element;
         element = BranchInstruction.of(branch.opcode(), label(branch.target()));
@@ -529,6 +572,15 @@ final class DoppioBuilders {
         throw new UnsupportedOperationException("Unselected offset-dependent Code element");
       }
       elements.add(element); return this;
+    }
+    private List<VerificationTypeInfo> frameTypes(List<VerificationTypeInfo> types) {
+      List<VerificationTypeInfo> mapped = new ArrayList<VerificationTypeInfo>();
+      for (VerificationTypeInfo type : types) {
+        if (type instanceof UninitializedVerificationTypeInfo)
+          type = UninitializedVerificationTypeInfo.of(label(((UninitializedVerificationTypeInfo) type).newTarget()));
+        mapped.add(type);
+      }
+      return mapped;
     }
     private Label label(Label value) {
       Objects.requireNonNull(value);
@@ -677,14 +729,8 @@ final class DoppioBuilders {
           ((original.get().flags().flagsMask() ^ value.flags.flagsMask()) & ClassFile.ACC_STATIC) != 0)
         throw new IllegalArgumentException("Bound Code cannot be copied into a different method descriptor/staticness");
       if (owner.remapBound()) {
-        // These bound tables carry both CP indexes and bytecode offsets. The selected
-        // reader does not yet expose their label-based elements; never silently lose
-        // them when rebuilding Code for a fresh pool.
-        for (Attribute<?> attribute : selectedAttributes(value.code.attributes(), owner.attributesProcessing())) {
-          String name = attribute.attributeName().stringValue();
-          if ("LocalVariableTable".equals(name) || "LocalVariableTypeTable".equals(name))
-            throw new UnsupportedOperationException("Fresh-pool Code remapping does not support " + name);
-        }
+        // Debug tables are traversed as label-based pseudo instructions and
+        // rebuilt only after CP import, branch widening and switch padding.
         CodeSink sink = new CodeSink(owner, value.name, value.type, value.flags.flagsMask());
         sink.transform(value.code, CodeTransform.ACCEPT_ALL);
         value = new MethodValue(pool, value.name, value.type, value.flags.flagsMask(), sink.value(), methodAttributes(value));
@@ -737,8 +783,11 @@ final class DoppioBuilders {
         u2(value, handler[0]); u2(value, handler[1]); u2(value, handler[2]); u2(value, handler[3]);
       }
       List<Attribute<?>> selected = selectedAttributes(code.attributes, policy);
-      u2(value, selected.size() + (encoded.stackMap == null ? 0 : 1));
+      selected.removeIf(nested -> nested instanceof StackMapTableAttribute);
+      List<byte[]> debug = debugTables(code, encoded);
+      u2(value, selected.size() + debug.size() + (encoded.stackMap == null ? 0 : 1));
       for (Attribute<?> nested : selected) writeAttribute(value, pool, nested, policy);
+      for (byte[] table : debug) value.write(table);
       if (encoded.stackMap != null) {
         u2(value, pool.utf8Entry("StackMapTable").index());
         value.writeInt(encoded.stackMap.length); value.write(encoded.stackMap);
@@ -762,8 +811,9 @@ final class DoppioBuilders {
         writeAttributes(value, pool, code.attributes(), policy); value.flush(); payload = bytes.toByteArray();
       }
     } else if (attribute instanceof StackMapTableAttribute) {
-      requireSharedPool(pool, DoppioClassReader.sourcePool(attribute));
-      payload = DoppioClassReader.attributePayload(attribute);
+      DoppioBufWriter writer = new DoppioBufWriter(pool);
+      writeStackMapAttribute(writer, (StackMapTableAttribute) attribute);
+      output.write(writer.bytes()); return;
     } else {
       DoppioBufWriter writer = new DoppioBufWriter(pool);
       DoppioAttributes.write(writer, attribute);
@@ -800,10 +850,70 @@ final class DoppioBuilders {
     final List<int[]> handlers;
     final IdentityHashMap<Label, Integer> labels;
     final byte[] stackMap;
+    final List<int[]> lineNumbers;
+    final boolean lineNumberTable;
     EncodedCode(DoppioCodeAssembler.Result result, byte[] bytes, int maxStack, List<int[]> handlers, byte[] stackMap) {
       this.bytes = bytes; this.maxStack = maxStack; this.maxLocals = result.maxLocals;
       this.handlers = handlers; this.labels = result.labels; this.stackMap = stackMap;
+      this.lineNumbers = result.lineNumbers; this.lineNumberTable = result.lineNumberTable;
     }
+  }
+
+  private static List<byte[]> debugTables(CodeValue code, EncodedCode encoded) {
+    List<byte[]> tables = new ArrayList<byte[]>();
+    DoppioBufWriter characters = new DoppioBufWriter(code.pool), variables = new DoppioBufWriter(code.pool),
+        variableTypes = new DoppioBufWriter(code.pool);
+    int characterCount = 0, variableCount = 0, variableTypeCount = 0;
+    boolean hasCharacters = false, hasVariables = false, hasVariableTypes = false;
+    for (CodeElement element : code.elements) {
+      if (element instanceof CharacterRange) {
+        hasCharacters = true; CharacterRange range = (CharacterRange) element;
+        int[] scope = debugScope(code, encoded, range.startScope(), range.endScope());
+        if (scope == null) continue;
+        characters.writeU2(scope[0]); characters.writeU2(scope[1] - 1);
+        characters.writeInt(range.characterRangeStart()); characters.writeInt(range.characterRangeEnd());
+        characters.writeU2(range.flags()); characterCount++;
+      } else if (element instanceof LocalVariable) {
+        hasVariables = true; LocalVariable variable = (LocalVariable) element;
+        int[] scope = debugScope(code, encoded, variable.startScope(), variable.endScope());
+        if (scope == null) continue;
+        variables.writeU2(scope[0]); variables.writeU2(scope[1] - scope[0]);
+        variables.writeIndex(variable.name()); variables.writeIndex(variable.type());
+        variables.writeU2(variable.slot()); variableCount++;
+      } else if (element instanceof LocalVariableType) {
+        hasVariableTypes = true; LocalVariableType variable = (LocalVariableType) element;
+        int[] scope = debugScope(code, encoded, variable.startScope(), variable.endScope());
+        if (scope == null) continue;
+        variableTypes.writeU2(scope[0]); variableTypes.writeU2(scope[1] - scope[0]);
+        variableTypes.writeIndex(variable.name()); variableTypes.writeIndex(variable.signature());
+        variableTypes.writeU2(variable.slot()); variableTypeCount++;
+      }
+    }
+    if (hasCharacters) tables.add(debugTable(code.pool, "CharacterRangeTable", characterCount, characters));
+    if (hasVariables) tables.add(debugTable(code.pool, "LocalVariableTable", variableCount, variables));
+    if (hasVariableTypes) tables.add(debugTable(code.pool, "LocalVariableTypeTable", variableTypeCount, variableTypes));
+    if (encoded.lineNumberTable) {
+      DoppioBufWriter lines = new DoppioBufWriter(code.pool);
+      for (int[] line : encoded.lineNumbers) { lines.writeU2(line[0]); lines.writeU2(line[1]); }
+      tables.add(debugTable(code.pool, "LineNumberTable", encoded.lineNumbers.size(), lines));
+    }
+    return tables;
+  }
+
+  private static int[] debugScope(CodeValue code, EncodedCode encoded, Label start, Label end) {
+    Integer from = encoded.labels.get(start), to = encoded.labels.get(end);
+    if (from == null || to == null) {
+      if (code.owner.deadLabels() == ClassFile.DeadLabelsOption.DROP_DEAD_LABELS) return null;
+      throw new IllegalArgumentException("Unbound debug scope label");
+    }
+    return new int[] {from.intValue(), to.intValue()};
+  }
+
+  private static byte[] debugTable(DoppioConstantPool pool, String name, int count, DoppioBufWriter body) {
+    if (count > 65535) throw new IllegalArgumentException("Debug table entry limit exceeded");
+    DoppioBufWriter table = new DoppioBufWriter(pool);
+    table.writeIndex(pool.utf8Entry(name)); table.writeInt(body.size() + 2);
+    table.writeU2(count); table.writeBytes(body.bytes()); return table.bytes();
   }
 
   private static EncodedCode encodeCode(CodeValue code) {
@@ -812,7 +922,14 @@ final class DoppioBuilders {
     ClassFile.StackMapsOption option = code.owner.stackMaps();
     boolean generate = option == ClassFile.StackMapsOption.GENERATE_STACK_MAPS ||
       option == ClassFile.StackMapsOption.STACK_MAPS_WHEN_REQUIRED && code.owner.majorVersion() >= 50 && result.controlFlow;
-    if (!generate) return new EncodedCode(result, result.bytes, result.maxStack, result.handlers, null);
+    if (!generate) {
+      byte[] supplied = null;
+      for (Attribute<?> attribute : code.attributes) if (attribute instanceof StackMapTableAttribute) {
+        DoppioBufWriter writer = new DoppioBufWriter(code.pool, result.labels, result.bytes.length, initialFrameLocals(code));
+        supplied = suppliedStackMap(writer, ((StackMapTableAttribute) attribute).entries());
+      }
+      return new EncodedCode(result, result.bytes, result.maxStack, result.handlers, supplied);
+    }
     List<ClassDesc> interfaces = new ArrayList<ClassDesc>();
     for (ClassEntry entry : code.owner.interfaces()) interfaces.add(entry.asSymbol());
     DoppioCodeFlow.Result analyzed = DoppioCodeFlow.analyze(code.owner.className().asSymbol(),
@@ -845,6 +962,94 @@ final class DoppioBuilders {
       }
       output.flush(); return bytes.toByteArray();
     } catch (IOException error) { throw new IllegalArgumentException("Stack-map serialization failed", error); }
+  }
+
+  static void writeStackMapAttribute(BufWriter target, StackMapTableAttribute attribute) {
+    Objects.requireNonNull(target); Objects.requireNonNull(attribute);
+    byte[] payload;
+    if (target instanceof DoppioBufWriter && ((DoppioBufWriter) target).hasCodeLabels())
+      payload = suppliedStackMap((DoppioBufWriter) target, attribute.entries());
+    else {
+      try { payload = DoppioClassReader.attributePayload(attribute); }
+      catch (IllegalArgumentException error) {
+        throw new UnsupportedOperationException("Explicit stack map serialization requires a Code label context", error);
+      }
+      if (!target.canWriteDirect(DoppioClassReader.sourcePool(attribute)))
+        throw new IllegalArgumentException("Stack map copy requires original pool");
+    }
+    target.writeIndex(attribute.attributeName()); target.writeInt(payload.length); target.writeBytes(payload);
+  }
+
+  private static List<VerificationTypeInfo> initialFrameLocals(CodeValue code) {
+    List<VerificationTypeInfo> locals = new ArrayList<VerificationTypeInfo>();
+    if ((code.flags & ClassFile.ACC_STATIC) == 0)
+      locals.add("<init>".equals(code.name.stringValue()) ? SimpleVerificationTypeInfo.UNINITIALIZED_THIS :
+          ObjectVerificationTypeInfo.of(code.owner.className()));
+    MethodTypeDesc descriptor = MethodTypeDesc.ofDescriptor(code.type.stringValue());
+    for (int index = 0; index < descriptor.parameterCount(); index++) {
+      ClassDesc type = descriptor.parameterType(index);
+      char kind = type.descriptorString().charAt(0);
+      locals.add(kind == 'J' ? SimpleVerificationTypeInfo.LONG : kind == 'D' ? SimpleVerificationTypeInfo.DOUBLE :
+          kind == 'F' ? SimpleVerificationTypeInfo.FLOAT : kind == 'L' || kind == '[' ?
+          ObjectVerificationTypeInfo.of(type) : SimpleVerificationTypeInfo.INTEGER);
+    }
+    return locals;
+  }
+
+  private static byte[] suppliedStackMap(DoppioBufWriter context, List<StackMapFrameInfo> frames) {
+    try {
+      ByteArrayOutputStream bytes = new ByteArrayOutputStream(); DataOutputStream output = new DataOutputStream(bytes);
+      u2(output, frames.size()); int previous = -1;
+      List<VerificationTypeInfo> previousLocals = context.initialLocals();
+      for (StackMapFrameInfo frame : frames) {
+        int bci = context.labelToBci(frame.target(), false), delta = bci - previous - 1;
+        if (delta < 0) throw new IllegalArgumentException("Stack map targets must be ordered and distinct");
+        List<VerificationTypeInfo> locals = frame.locals(), stack = frame.stack();
+        int shared = 0, limit = Math.min(locals.size(), previousLocals.size());
+        while (shared < limit && sameFrameType(context, locals.get(shared), previousLocals.get(shared))) shared++;
+        int change = locals.size() - previousLocals.size();
+        if (shared == locals.size() && change == 0 && stack.isEmpty()) {
+          if (delta <= 63) output.writeByte(delta);
+          else { output.writeByte(251); u2(output, delta); }
+        } else if (shared == locals.size() && change == 0 && stack.size() == 1) {
+          if (delta <= 63) output.writeByte(64 + delta);
+          else { output.writeByte(247); u2(output, delta); }
+          suppliedFrameType(output, context, stack.get(0));
+        } else if (stack.isEmpty() && shared == limit && change != 0 && change >= -3 && change <= 3) {
+          output.writeByte(251 + change); u2(output, delta);
+          if (change > 0) for (int index = previousLocals.size(); index < locals.size(); index++)
+            suppliedFrameType(output, context, locals.get(index));
+        } else {
+          output.writeByte(255); u2(output, delta); u2(output, locals.size());
+          for (VerificationTypeInfo type : locals) suppliedFrameType(output, context, type);
+          u2(output, stack.size()); for (VerificationTypeInfo type : stack) suppliedFrameType(output, context, type);
+        }
+        previous = bci; previousLocals = locals;
+      }
+      output.flush(); return bytes.toByteArray();
+    } catch (IOException error) { throw new IllegalArgumentException("Explicit stack-map serialization failed", error); }
+  }
+
+  private static boolean sameFrameType(DoppioBufWriter context, VerificationTypeInfo first, VerificationTypeInfo second) {
+    if (first.tag() != second.tag()) return false;
+    if (first instanceof ObjectVerificationTypeInfo && second instanceof ObjectVerificationTypeInfo)
+      return ((ObjectVerificationTypeInfo) first).className().name().stringValue().equals(
+          ((ObjectVerificationTypeInfo) second).className().name().stringValue());
+    if (first instanceof UninitializedVerificationTypeInfo && second instanceof UninitializedVerificationTypeInfo)
+      return context.labelToBci(((UninitializedVerificationTypeInfo) first).newTarget(), false) ==
+          context.labelToBci(((UninitializedVerificationTypeInfo) second).newTarget(), false);
+    return first.tag() >= 0 && first.tag() <= 6;
+  }
+
+  private static void suppliedFrameType(DataOutputStream output, DoppioBufWriter context, VerificationTypeInfo type)
+      throws IOException {
+    if (type instanceof ObjectVerificationTypeInfo) {
+      output.writeByte(7);
+      u2(output, ((DoppioConstantPool) context.constantPool()).importEntry(((ObjectVerificationTypeInfo) type).className()).index());
+    } else if (type instanceof UninitializedVerificationTypeInfo) {
+      output.writeByte(8); u2(output, context.labelToBci(((UninitializedVerificationTypeInfo) type).newTarget(), false));
+    } else if (type.tag() >= 0 && type.tag() <= 6) output.writeByte(type.tag());
+    else throw new IllegalArgumentException("Invalid verification-type entry");
   }
 
   private static void verificationType(DataOutputStream output, DoppioConstantPool pool, DoppioCodeFlow.Value value)
