@@ -100,6 +100,8 @@ public final class DoppioAttributes {
     if (metadata != null) return metadata;
     Attribute<?> annotation = DoppioAnnotationAttributes.read(owner, reader, name, start, payload);
     if (annotation != null) return annotation;
+    Attribute<?> typeAnnotation = DoppioTypeAnnotationAttributes.read(owner, reader, name, start, payload);
+    if (typeAnnotation != null) return typeAnnotation;
     String key = name.stringValue();
     ConstantPool source = DoppioClassReader.readerPool(reader);
     if ("ConstantValue".equals(key)) {
@@ -159,6 +161,8 @@ public final class DoppioAttributes {
     Objects.requireNonNull(value); Objects.requireNonNull(option);
     // Native custom mappers create unbound elements and are retained even for UNKNOWN/UNSTABLE stability.
     if (value instanceof CustomAttribute) return true;
+    if (DoppioTypeAnnotationAttributes.isTypeAnnotationAttribute(value) &&
+        DoppioTypeAnnotationAttributes.sourcePool(value) == null) return true;
     AttributeStability stability = Objects.requireNonNull(value.attributeMapper().stability());
     if (option == ClassFile.AttributesProcessingOption.DROP_UNKNOWN_ATTRIBUTES) return stability != AttributeStability.UNKNOWN;
     if (option == ClassFile.AttributesProcessingOption.DROP_UNSTABLE_ATTRIBUTES)
@@ -197,14 +201,18 @@ public final class DoppioAttributes {
     byte[] debug = DoppioDebugAttributes.retainedPayload(attribute);
     if (debug != null) return debug;
     byte[] metadata = DoppioMetadataAttributes.retainedPayload(attribute);
-    return metadata != null ? metadata : DoppioAnnotationAttributes.retainedPayload(attribute);
+    if (metadata != null) return metadata;
+    byte[] annotation = DoppioAnnotationAttributes.retainedPayload(attribute);
+    return annotation != null ? annotation : DoppioTypeAnnotationAttributes.retainedPayload(attribute);
   }
   static ConstantPool sourcePool(Attribute<?> attribute) {
     if (attribute instanceof Base) return ((Base<?>) attribute).pool;
     ConstantPool debug = DoppioDebugAttributes.sourcePool(attribute);
     if (debug != null) return debug;
     ConstantPool metadata = DoppioMetadataAttributes.sourcePool(attribute);
-    return metadata != null ? metadata : DoppioAnnotationAttributes.sourcePool(attribute);
+    if (metadata != null) return metadata;
+    ConstantPool annotation = DoppioAnnotationAttributes.sourcePool(attribute);
+    return annotation != null ? annotation : DoppioTypeAnnotationAttributes.sourcePool(attribute);
   }
 
   private static void requireOwner(boolean allowed, String name) {

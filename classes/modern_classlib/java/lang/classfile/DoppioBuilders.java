@@ -676,7 +676,13 @@ final class DoppioBuilders {
       }
       if (element instanceof Attribute) {
         Attribute<?> attribute = (Attribute<?>) element;
-        if (DoppioAttributes.shouldWrite(attribute, owner.attributesProcessing())) addAttribute(attributes, attribute);
+        if (DoppioAttributes.shouldWrite(attribute, owner.attributesProcessing())) {
+          ConstantPool sourcePool = DoppioTypeAnnotationAttributes.sourcePool(attribute);
+          // The native shared-pool bound path copies its original target packet.
+          // A new pool or an explicit unbound attribute resolves final Code labels.
+          addAttribute(attributes, sourcePool != null && pool.canWriteDirect(sourcePool) ? attribute :
+              DoppioTypeAnnotationAttributes.remapCodeAttribute(attribute, this::annotationLabel));
+        }
         return this;
       }
       if (element instanceof LabelTarget) element = DoppioClassReader.labelTarget(label(((LabelTarget) element).label()));
@@ -730,6 +736,18 @@ final class DoppioBuilders {
       if (value instanceof OwnedLabel && ((OwnedLabel) value).owner == this) return value;
       if (source == null) throw new IllegalStateException("Foreign Code label context");
       ((CodeAttribute) source).labelToBci(value); // Identity, not equivalent BCI or byte arrays.
+      Label mapped = originalLabels.get(value);
+      if (mapped == null) { mapped = new OwnedLabel(this); originalLabels.put(value, mapped); }
+      return mapped;
+    }
+    private Label annotationLabel(Label value) {
+      Objects.requireNonNull(value);
+      if (value instanceof OwnedLabel) {
+        if (((OwnedLabel) value).owner != this) throw new IllegalStateException("Foreign Code label context");
+        return value;
+      }
+      if (!DoppioClassReader.isBoundLabel(value)) throw new IllegalStateException("Foreign Code label context");
+      // Native parsed labels outside the selected source have no destination BCI.
       Label mapped = originalLabels.get(value);
       if (mapped == null) { mapped = new OwnedLabel(this); originalLabels.put(value, mapped); }
       return mapped;
@@ -930,7 +948,19 @@ final class DoppioBuilders {
       selected.removeIf(nested -> nested instanceof StackMapTableAttribute);
       List<byte[]> debug = debugTables(code, encoded);
       u2(value, selected.size() + debug.size() + (encoded.stackMap == null ? 0 : 1));
-      for (Attribute<?> nested : selected) writeAttribute(value, pool, nested, policy);
+      for (Attribute<?> nested : selected) {
+        if (DoppioTypeAnnotationAttributes.isTypeAnnotationAttribute(nested)) {
+          byte[] retained = DoppioTypeAnnotationAttributes.retainedPayload(nested);
+          ConstantPool sourcePool = DoppioTypeAnnotationAttributes.sourcePool(nested);
+          if (retained != null && sourcePool != null && pool.canWriteDirect(sourcePool)) {
+            u2(value, pool.utf8Entry(nested.attributeName().stringValue()).index());
+            value.writeInt(retained.length); value.write(retained);
+          } else {
+            DoppioBufWriter writer = new DoppioBufWriter(pool, encoded.labels, encoded.bytes.length);
+            DoppioAttributes.write(writer, nested); value.write(writer.bytes());
+          }
+        } else writeAttribute(value, pool, nested, policy);
+      }
       for (byte[] table : debug) value.write(table);
       if (encoded.stackMap != null) {
         u2(value, pool.utf8Entry("StackMapTable").index());

@@ -186,6 +186,13 @@ public final class DoppioClassReader {
     return attributes;
   }
 
+  static boolean isBoundLabel(Label label) { return label instanceof BoundLabel; }
+  static Label annotationLabel(AttributedElement owner, int bci) {
+    if (!(owner instanceof CodeValue))
+      throw new IllegalArgumentException("TypeAnnotation Code target outside of Code attribute");
+    return ((CodeValue) owner).debugLabel(bci);
+  }
+
   private static CodeValue readCode(MethodModel method, Input input, Utf8Entry name, int payloadStart, byte[] payload) {
     int end = payloadStart + payload.length;
     Cursor data = new Cursor(input, payloadStart, end);
@@ -594,6 +601,8 @@ public final class DoppioClassReader {
       }
     }
     for (Attribute<?> attribute : code.attributes) if (attribute instanceof CodeElement &&
+        (code.debugElements == ClassFile.DebugElementsOption.PASS_DEBUG ||
+            !DoppioTypeAnnotationAttributes.isTypeAnnotationAttribute(attribute)) &&
         !"LineNumberTable".equals(attribute.attributeName().stringValue()) &&
         !"LocalVariableTable".equals(attribute.attributeName().stringValue()) &&
         !"LocalVariableTypeTable".equals(attribute.attributeName().stringValue()) &&

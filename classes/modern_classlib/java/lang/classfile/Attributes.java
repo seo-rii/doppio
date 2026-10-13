@@ -31,6 +31,8 @@ public final class Attributes {
   public static final String NAME_RUNTIME_INVISIBLE_ANNOTATIONS = "RuntimeInvisibleAnnotations";
   public static final String NAME_RUNTIME_VISIBLE_PARAMETER_ANNOTATIONS = "RuntimeVisibleParameterAnnotations";
   public static final String NAME_RUNTIME_INVISIBLE_PARAMETER_ANNOTATIONS = "RuntimeInvisibleParameterAnnotations";
+  public static final String NAME_RUNTIME_VISIBLE_TYPE_ANNOTATIONS = "RuntimeVisibleTypeAnnotations";
+  public static final String NAME_RUNTIME_INVISIBLE_TYPE_ANNOTATIONS = "RuntimeInvisibleTypeAnnotations";
   private Attributes() {}
   public static AttributeMapper<SourceFileAttribute> sourceFile() { return DoppioClassReader.sourceFileMapper(); }
   public static AttributeMapper<CodeAttribute> code() { return DoppioClassReader.codeMapper(); }
@@ -60,4 +62,6 @@ public final class Attributes {
   public static AttributeMapper<RuntimeInvisibleAnnotationsAttribute> runtimeInvisibleAnnotations() { return DoppioAnnotationAttributes.runtimeInvisibleAnnotationsMapper(); }
   public static AttributeMapper<RuntimeVisibleParameterAnnotationsAttribute> runtimeVisibleParameterAnnotations() { return DoppioAnnotationAttributes.runtimeVisibleParameterAnnotationsMapper(); }
   public static AttributeMapper<RuntimeInvisibleParameterAnnotationsAttribute> runtimeInvisibleParameterAnnotations() { return DoppioAnnotationAttributes.runtimeInvisibleParameterAnnotationsMapper(); }
+  public static AttributeMapper<RuntimeVisibleTypeAnnotationsAttribute> runtimeVisibleTypeAnnotations() { return DoppioTypeAnnotationAttributes.runtimeVisibleTypeAnnotationsMapper(); }
+  public static AttributeMapper<RuntimeInvisibleTypeAnnotationsAttribute> runtimeInvisibleTypeAnnotations() { return DoppioTypeAnnotationAttributes.runtimeInvisibleTypeAnnotationsMapper(); }
 }

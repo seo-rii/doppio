@@ -27,6 +27,12 @@ public final class DoppioBufWriter implements BufWriter {
     this.initialLocals = Objects.requireNonNull(initialLocals);
   }
   boolean hasCodeLabels() { return codeLabels != null; }
+  int annotationLabelToBci(Label label) {
+    Integer bci = codeLabels == null ? null : codeLabels.get(Objects.requireNonNull(label));
+    // Native type-annotation payloads retain the lower16 bits of an unbound -1,
+    // independently of the strict branch, frame and debug-label policies.
+    return bci == null ? -1 : bci.intValue();
+  }
   List<VerificationTypeInfo> initialLocals() { return initialLocals; }
   int labelToBci(Label label, boolean allowEnd) {
     Integer bci = codeLabels == null ? null : codeLabels.get(Objects.requireNonNull(label));
