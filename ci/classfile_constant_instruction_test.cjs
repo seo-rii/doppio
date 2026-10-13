@@ -132,11 +132,12 @@ test('source compiler uses exactly the boxed-covariance files then retains the r
   const [extract, narrow, normal] = receipt.operations;
   assert.equal(extract.command, 'jar'); assert.equal(narrow.command, 'javac'); assert.equal(normal.command, 'javac');
   assert.deepEqual(narrow.arguments.slice(0, 7), ['-J-Dfile.encoding=UTF8', '-source', '9', '-target', '9', '-implicit:none', '--patch-module']);
-  assert.deepEqual(narrow.arguments.slice(-2).map(file => path.relative(classlib, file).split(path.sep).join('/')),
-    ['java/lang/classfile/instruction/ConstantInstruction.java', 'java/lang/classfile/instruction/DoppioConstantInstructions.java']);
+  assert.deepEqual(narrow.arguments.slice(-4).map(file => path.relative(classlib, file).split(path.sep).join('/')),
+    ['java/lang/classfile/instruction/ConstantInstruction.java', 'java/lang/classfile/instruction/DoppioConstantInstructions.java',
+      'java/lang/classfile/AnnotationValue.java', 'java/lang/classfile/DoppioAnnotations.java']);
   assert.deepEqual(normal.arguments.slice(0, 4), ['-J-Dfile.encoding=UTF8', '--release', '9', '--patch-module']);
   assert.equal(normal.arguments[4].split(path.delimiter)[0], 'java.base=' + output);
-  assert.ok(narrow.arguments.slice(-2).every(file => !normal.arguments.includes(file)));
+  assert.ok(narrow.arguments.slice(-4).every(file => !normal.arguments.includes(file)));
   assert.equal(receipt.inputs.length, receipt.sourceHashes.length);
 });
 

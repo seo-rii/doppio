@@ -8,7 +8,8 @@ const path = require('node:path');
 const special = new Set(['java/lang/System$Logger.java', 'java/lang/System$DoppioLogger.java',
   'sun/invoke/util/VerifyAccess.java']);
 const covarianceSources = ['java/lang/classfile/instruction/ConstantInstruction.java',
-  'java/lang/classfile/instruction/DoppioConstantInstructions.java'];
+  'java/lang/classfile/instruction/DoppioConstantInstructions.java',
+  'java/lang/classfile/AnnotationValue.java', 'java/lang/classfile/DoppioAnnotations.java'];
 const supportEntries = ['java/nio/file/FileTreeIterator.class', 'java/nio/file/FileTreeWalker.class',
   'java/nio/file/FileTreeWalker$1.class', 'java/nio/file/FileTreeWalker$DirectoryNode.class',
   'java/nio/file/FileTreeWalker$Event.class', 'java/nio/file/FileTreeWalker$EventType.class'];
@@ -28,7 +29,7 @@ function sourceFiles(directory) {
 }
 
 /** Genuine source compilation with the same two phases as production.
- * Only the exact covariance declarations see system boxed-constant types.
+ * Only these four exact covariance declarations see system boxed/String nominal types.
  * Every remaining classlib source retains the release-9 API compilation floor.
  */
 function compileClassFileMetadata({root, classlib, output, support, inputs, checked}) {
@@ -60,6 +61,13 @@ function compileClassFileMetadata({root, classlib, output, support, inputs, chec
     const bytes = fs.readFileSync(filename);
     assert.equal(bytes.readUInt32BE(0), 0xcafebabe);
     assert.equal(bytes.readUInt16BE(6), 53, 'Naturally target-9 bytecode, not a rewritten class header');
+  }
+  for (const relative of ['AnnotationValue', 'AnnotationValue$OfConstant', 'AnnotationValue$OfString', 'DoppioAnnotations']) {
+    const filename = path.join(output, 'java/lang/classfile', relative + '.class');
+    const stat = fs.lstatSync(filename); assert.ok(stat.isFile() && !stat.isSymbolicLink());
+    const bytes = fs.readFileSync(filename);
+    assert.equal(bytes.readUInt32BE(0), 0xcafebabe);
+    assert.equal(bytes.readUInt16BE(6), 53, 'Natural annotation covariance target9 output');
   }
   return {inputs, sourceHashes, runtimeHash, operations};
 }

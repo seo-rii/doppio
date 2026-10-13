@@ -4970,7 +4970,9 @@ function modernJava(grunt: IGrunt) {
       }),
       covariantInputFiles = inputFiles.filter(function(src: string): boolean {
         return src === srcDir + '/java/lang/classfile/instruction/ConstantInstruction.java' ||
-          src === srcDir + '/java/lang/classfile/instruction/DoppioConstantInstructions.java';
+          src === srcDir + '/java/lang/classfile/instruction/DoppioConstantInstructions.java' ||
+          src === srcDir + '/java/lang/classfile/AnnotationValue.java' ||
+          src === srcDir + '/java/lang/classfile/DoppioAnnotations.java';
       }),
       normalInputFiles = inputFiles.filter(function(src: string): boolean {
         return specialInputFiles.indexOf(src) === -1 && covariantInputFiles.indexOf(src) === -1;
@@ -5031,12 +5033,12 @@ function modernJava(grunt: IGrunt) {
           });
       });
     }
-    // Integer has been nominal since Java12. These two real Java9-language
-    // sources need the host's boxed covariance to emit their genuine Integer /
-    // ConstantDesc bridges; every other normal source still uses --release9.
+    // These four exact Java9-language declarations need the host's nominal
+    // boxed/String covariance for genuine Integer/ConstantDesc and Constable
+    // bridges. Every other normal source still uses --release9.
     // Compile first so a clean output tree supplies the ABI to the second pass.
-    if (covariantInputFiles.length !== 2) {
-      grunt.fail.fatal('Expected exactly two covariant constant-instruction sources.');
+    if (covariantInputFiles.length !== 4) {
+      grunt.fail.fatal('Expected exactly four covariant constant-instruction/annotation sources.');
       return;
     }
     child_process.exec(shellEscape(grunt.config('build.javac')) +
