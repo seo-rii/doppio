@@ -578,7 +578,22 @@ public final class DoppioClassReader {
       Objects.requireNonNull(end), Objects.requireNonNull(catchType));
   }
 
+  /** Verification has no observable consumer effect for an operandless raw NOP. */
+  static void forEachForVerification(CodeModel model, Consumer<? super CodeElement> consumer) {
+    Objects.requireNonNull(model); Objects.requireNonNull(consumer);
+    if (!(model instanceof CodeValue)) { model.forEach(consumer); return; }
+    CodeValue code = (CodeValue) model;
+    List<CodeElement> elements = code.elements;
+    if (elements == null) elements = instructions(code, true);
+    // Never publish the temporary compact list as the public element cache.
+    for (CodeElement element : elements) consumer.accept(element);
+  }
+
   private static List<CodeElement> instructions(CodeValue code) {
+    return instructions(code, false);
+  }
+
+  private static List<CodeElement> instructions(CodeValue code, boolean verificationOnly) {
     byte[] bytes = code.code;
     List<CodeElement> elements = new ArrayList<CodeElement>();
     for (ExceptionCatch handler : code.handlers) elements.add(handler);
@@ -625,6 +640,7 @@ public final class DoppioClassReader {
       }
       opcode = opcode(bytecode);
       int size = code.sizes[start];
+      if (verificationOnly && opcode == Opcode.NOP) { cursor = start + size; continue; }
       Instruction instruction;
       switch (opcode.kind()) {
         case CONSTANT:

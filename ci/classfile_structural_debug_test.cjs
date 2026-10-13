@@ -21,7 +21,7 @@ before(async () => {
   output = path.join(temporary, 'compiled'); const support = path.join(temporary, 'support');
   fs.mkdirSync(output); fs.mkdirSync(support);
   compileClassFileMetadata({root, classlib: path.join(root, 'classes/modern_classlib'), output, support, checked});
-  for (const name of ['DoppioClassFile', 'DoppioClassFileVerifier', 'DoppioClassReader', 'DoppioCodeFlow']) {
+  for (const name of ['DoppioClassFile', 'DoppioClassFileVerifier', 'DoppioClassReader', 'DoppioClassReader$CodeValue', 'DoppioCodeFlow']) {
     const filename = path.join(output, prefix, name + '.class'), bytes = fs.readFileSync(filename);
     assert.equal(bytes.readUInt16BE(6), 53, 'Natural release9/target9 facade output, not rewritten headers');
     units.set(name, {bytes, layout: readStructureLayout(bytes)});
@@ -83,4 +83,40 @@ test('fresh-source guest replays all92 selected debug checks,21 own arrays and3 
   }
   assert.deepEqual(lines.filter(value => !value.startsWith('CASE|') && !value.startsWith('CF_ARTIFACT|')),
     ['CLASSFILE_STRUCTURAL_DEBUG_OK|92|artifacts=21', 'CLASSFILE_STRUCTURAL_DEBUG_REGRESSION_OK|8']);
+});
+test('verification-only raw NOP compaction preserves full public traversal and53 native-confirmed controls', () => {
+  const seam = instructions('DoppioClassReader', method('DoppioClassReader', 'forEachForVerification',
+    '(Ljava/lang/classfile/CodeModel;Ljava/util/function/Consumer;)V'));
+  assert.ok(seam.some(value => value.cp?.owner === 'java.lang.classfile.CodeModel' && value.cp.name === 'forEach'));
+  assert.ok(!seam.some(value => value.name === 'putfield' && value.cp?.name === 'elements'),
+    'The temporary compact list is never published as the public element cache');
+  const full = instructions('DoppioClassReader$CodeValue', method('DoppioClassReader$CodeValue', 'forEach', '(Ljava/util/function/Consumer;)V'));
+  const fullDescriptor = '(Ljava/lang/classfile/DoppioClassReader$CodeValue;)Ljava/util/List;';
+  const routes = full.filter(value => value.cp?.owner === 'java.lang.classfile.DoppioClassReader' && value.cp.descriptor === fullDescriptor);
+  assert.equal(routes.length, 1);
+  if (routes[0].cp.name !== 'instructions') {
+    const bridge = method('DoppioClassReader', routes[0].cp.name, fullDescriptor);
+    assert.equal(bridge.flags & 0x1008, 0x1008, 'Genuine target9 private-access compiler bridge');
+    assert.ok(instructions('DoppioClassReader', bridge).some(value => value.cp?.owner === 'java.lang.classfile.DoppioClassReader' &&
+      value.cp.name === 'instructions' && value.cp.descriptor === fullDescriptor));
+  }
+  const factories = instructions('DoppioClassReader', method('DoppioClassReader', 'instructions',
+    '(Ljava/lang/classfile/DoppioClassReader$CodeValue;Z)Ljava/util/List;'));
+  assert.ok(factories.some(value => value.cp?.owner === 'java.lang.classfile.TypeKind' && value.cp.name === 'fromNewarrayCode'));
+  assert.ok(factories.some(value => value.cp?.name === 'entryByIndex' && value.cp.descriptor.includes('Ljava/lang/Class;')));
+  const verifier = instructions('DoppioClassFileVerifier', method('DoppioClassFileVerifier', 'verify',
+    '(Ljava/lang/classfile/ClassModel;Ljava/lang/classfile/ClassHierarchyResolver;)Ljava/util/List;'));
+  assert.ok(verifier.some(value => value.cp?.owner === 'java.lang.classfile.DoppioClassReader' && value.cp.name === 'forEachForVerification'));
+  const diagnostic = path.join(temporary, 'traversal-probe'); fs.mkdirSync(diagnostic);
+  checked('javac', ['--release', '9', '--patch-module', 'java.base=' + output + path.delimiter + path.join(root, 'ci') +
+    path.delimiter + path.join(root, 'classes/modern_fixture'), '-d', diagnostic,
+    path.join(root, 'classes/modern_fixture/classfile/ClassFileSupport.java'),
+    path.join(root, 'classes/modern_fixture/ClassFileStructuralDebugFinal.java'),
+    path.join(root, 'ci/ClassFileStructuralDebugRegression.java')]);
+  const result = runClassFileMetadataGuest({root, output, diagnostic, checked,
+    className: 'classes.modern_test.ClassFileStructuralDebugRegression$TraversalProbe',
+    requiredPackages: ['java/lang/classfile', 'java/lang/classfile/attribute', 'java/lang/classfile/instruction',
+      'java/lang/classfile/constantpool', 'java/lang/constant']});
+  assert.equal(result.stdout.replaceAll('\r\n', '\n'), 'CLASSFILE_VERIFIER_TRAVERSAL_OK|53\n');
+  assert.equal(result.stderr, '');
 });

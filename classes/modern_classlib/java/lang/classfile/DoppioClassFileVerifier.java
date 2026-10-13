@@ -60,7 +60,7 @@ final class DoppioClassFileVerifier {
       // remain available when traversal is dropped.
       boolean[] discontinued = { false };
       for (MethodModel method : model.methods()) if (method.code().isPresent()) {
-        method.code().get().forEach(element -> {
+        DoppioClassReader.forEachForVerification(method.code().get(), element -> {
           if (element instanceof Instruction) {
             Opcode.Kind kind = ((Instruction) element).opcode().kind();
             if (kind == Opcode.Kind.DISCONTINUED_JSR || kind == Opcode.Kind.DISCONTINUED_RET)
