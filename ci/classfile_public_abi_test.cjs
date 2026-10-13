@@ -50,7 +50,7 @@ function publicFields(value) {
       flags:field.flags & (1 | 8 | 16 | 64 | 128 | 4096 | 16384), constant:constant(value, field)}))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
-function selected() { return [...native].filter(([name]) => !legacy.has(name)); }
+function selected() { return [...native]; }
 before(async () => {
   ({readStructureLayout} = await import('./java_class_structure_test.mjs'));
   const {validateToolchains} = await import('./run_java_compatibility.mjs');
@@ -84,11 +84,11 @@ after(() => {
   finally { if (temporary) fs.rmSync(temporary, {recursive:true, force:true}); }
 });
 test('actual locked SDK has exactly 220 exported-package public types and three named legacy types', () => {
-  assert.equal(native.size, 220); assert.equal(selected().length, 217);
+  assert.equal(native.size, 220); assert.equal(selected().length, 220);
   for (const name of legacy) assert.ok(native.has(name), 'Actual legacy public ABI: ' + name);
   assert.equal([...native.values()].filter(value => value.layout.attributes.entries.some(item => item.name === 'PermittedSubclasses')).length, 195);
 });
-test('every nonlegacy public type has a real naturally target9 facade class, not a changed native header', () => {
+test('every public type including discontinued models has a real naturally target9 facade class, not a changed native header', () => {
   for (const [name, actual] of selected()) {
     const own = facade.get(name); assert.ok(own, 'Missing public facade ' + name);
     assert.equal(actual.bytes.readUInt16BE(6), 69);
@@ -97,7 +97,7 @@ test('every nonlegacy public type has a real naturally target9 facade class, not
       actual.layout.flags & (1 | 16 | 512 | 1024 | 8192 | 16384), 'Native public type shape: ' + name);
   }
 });
-test('all 217 selected native direct superclass and ordered interface contracts match', () => {
+test('all 220 native direct superclass and ordered interface contracts match', () => {
   for (const [name, actual] of selected()) assert.deepEqual(parents(facade.get(name)), parents(actual), name);
 });
 test('all selected declared public method descriptors, bridges, varargs and abstract/static contracts match', () => {

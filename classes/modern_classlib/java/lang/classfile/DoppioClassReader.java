@@ -316,6 +316,12 @@ public final class DoppioClassReader {
     if (!(Objects.requireNonNull(model) instanceof CodeAttribute)) throw new IllegalArgumentException("No real Code attribute");
     return ((CodeAttribute) model).codeArray().clone();
   }
+  static boolean isInstructionBoundary(CodeModel model, int bci) {
+    if (!(Objects.requireNonNull(model) instanceof CodeValue))
+      throw new UnsupportedOperationException("Unbound Code instruction boundaries");
+    CodeValue code = (CodeValue) model;
+    return bci >= 0 && bci < code.code.length && code.sizes[bci] != 0;
+  }
   public static int maxStack(CodeModel model) {
     if (!(Objects.requireNonNull(model) instanceof CodeAttribute)) throw new IllegalArgumentException("No real Code attribute");
     return ((CodeAttribute) model).maxStack();
@@ -656,6 +662,12 @@ public final class DoppioClassReader {
         case CONVERT: instruction = convert(opcode); break;
         case BRANCH:
           instruction = branch(opcode, code.checkedLabel(branchTarget(bytes, start, opcode), false)); break;
+        case DISCONTINUED_JSR:
+          instruction = DiscontinuedInstruction.JsrInstruction.of(opcode,
+              code.checkedLabel(branchTarget(bytes, start, opcode), false)); break;
+        case DISCONTINUED_RET:
+          instruction = DiscontinuedInstruction.RetInstruction.of(opcode,
+              opcode.isWide() ? u2(bytes, cursor) : bytes[cursor] & 255); break;
         case TABLE_SWITCH: {
           int operands = switchOperands(bytes, start), low = i4(bytes, operands + 4), high = i4(bytes, operands + 8);
           Label defaultTarget = code.checkedLabel(relativeTarget(start, i4(bytes, operands)), false);
@@ -741,7 +753,8 @@ public final class DoppioClassReader {
     return operands;
   }
   private static int branchTarget(byte[] bytes, int start, Opcode opcode) {
-    return relativeTarget(start, opcode == Opcode.GOTO_W ? i4(bytes, start + 1) : (short) u2(bytes, start + 1));
+    return relativeTarget(start, opcode == Opcode.GOTO_W || opcode == Opcode.JSR_W ?
+        i4(bytes, start + 1) : (short) u2(bytes, start + 1));
   }
   private static int relativeTarget(int start, int offset) {
     long target = (long) start + offset;
@@ -1064,7 +1077,8 @@ public final class DoppioClassReader {
         int bytecode = code[start] & 255;
         if (bytecode == 196) bytecode = 196 << 8 | code[start + 1] & 255;
         Opcode opcode = DoppioClassReader.opcode(bytecode);
-        if (opcode.kind() == Opcode.Kind.BRANCH) checkedLabel(branchTarget(code, start, opcode), false);
+        if (opcode.kind() == Opcode.Kind.BRANCH || opcode.kind() == Opcode.Kind.DISCONTINUED_JSR)
+          checkedLabel(branchTarget(code, start, opcode), false);
         else if (opcode == Opcode.TABLESWITCH || opcode == Opcode.LOOKUPSWITCH) {
           int operands = switchOperands(code, start);
           checkedLabel(relativeTarget(start, i4(code, operands)), false);

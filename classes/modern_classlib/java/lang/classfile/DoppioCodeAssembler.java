@@ -10,6 +10,8 @@ import java.lang.classfile.constantpool.FieldRefEntry;
 import java.lang.classfile.constantpool.InvokeDynamicEntry;
 import java.lang.classfile.constantpool.MemberRefEntry;
 import java.lang.classfile.instruction.BranchInstruction;
+import java.lang.classfile.instruction.DiscontinuedInstruction.JsrInstruction;
+import java.lang.classfile.instruction.DiscontinuedInstruction.RetInstruction;
 import java.lang.classfile.instruction.ArrayLoadInstruction;
 import java.lang.classfile.instruction.ArrayStoreInstruction;
 import java.lang.classfile.instruction.ConstantInstruction;
@@ -45,6 +47,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 
@@ -56,15 +59,16 @@ final class DoppioCodeAssembler {
   static final class Result {
     final byte[] bytes;
     final int maxStack, maxLocals;
-    final boolean controlFlow;
+    final boolean controlFlow, legacySubroutines;
     final List<int[]> handlers;
     final IdentityHashMap<Label, Integer> labels;
     final List<int[]> lineNumbers;
     final boolean lineNumberTable;
-    Result(byte[] bytes, int stack, int locals, boolean controlFlow, List<int[]> handlers,
+    Result(byte[] bytes, int stack, int locals, boolean controlFlow, boolean legacySubroutines, List<int[]> handlers,
         IdentityHashMap<Label, Integer> labels, List<int[]> lineNumbers, boolean lineNumberTable) {
       this.bytes = bytes; this.maxStack = stack; this.maxLocals = locals;
-      this.controlFlow = controlFlow; this.handlers = handlers; this.labels = labels;
+      this.controlFlow = controlFlow; this.legacySubroutines = legacySubroutines;
+      this.handlers = handlers; this.labels = labels;
       this.lineNumbers = lineNumbers;
       this.lineNumberTable = lineNumberTable;
     }
@@ -90,7 +94,7 @@ final class DoppioCodeAssembler {
       List<ExceptionCatch> catches = new ArrayList<ExceptionCatch>();
       List<int[]> lines = new ArrayList<int[]>();
       int locals = allocatedLocals, stack = 0, maximum = 0;
-      boolean controlFlow = false;
+      boolean controlFlow = false, legacySubroutines = false;
       for (CodeElement element : elements) {
         if (element instanceof LabelTarget) {
           Label label = ((LabelTarget) element).label();
@@ -110,6 +114,8 @@ final class DoppioCodeAssembler {
             if (!(opcode >= 153 && opcode <= 167 || opcode == 198 || opcode == 199 || opcode == 200))
               throw new UnsupportedOperationException("Unselected branch opcode");
             controlFlow = true;
+          } else if (instruction instanceof JsrInstruction) {
+            legacySubroutines = true; controlFlow = true;
           } else if (instruction instanceof TableSwitchInstruction) {
             TableSwitchInstruction table = (TableSwitchInstruction) instruction;
             long count = (long) table.highValue() - (long) table.lowValue() + 1;
@@ -130,6 +136,9 @@ final class DoppioCodeAssembler {
               locals = Math.max(locals, localLimit(store.slot(), store.typeKind().slotSize()));
             } else if (instruction instanceof IncrementInstruction) {
               locals = Math.max(locals, localLimit(((IncrementInstruction) instruction).slot(), 1));
+            } else if (instruction instanceof RetInstruction) {
+              legacySubroutines = true; controlFlow = true;
+              locals = Math.max(locals, localLimit(((RetInstruction) instruction).slot(), 1));
             }
           }
           if (!entries.isEmpty()) {
@@ -149,10 +158,12 @@ final class DoppioCodeAssembler {
       do {
         bci = layout(entries, positions, labels);
         changed = false;
-        for (Entry entry : entries) if (entry.instruction instanceof BranchInstruction) {
+        for (Entry entry : entries) if (entry.instruction instanceof BranchInstruction || entry.instruction instanceof JsrInstruction) {
           int opcode = entry.instruction.opcode().bytecode();
-          int distance = target(labels, ((BranchInstruction) entry.instruction).target(), bci, false) - entry.bci;
-          if (opcode != 200 && !entry.widened && (distance < Short.MIN_VALUE || distance > Short.MAX_VALUE)) {
+          Label destination = entry.instruction instanceof JsrInstruction ? ((JsrInstruction) entry.instruction).target() :
+              ((BranchInstruction) entry.instruction).target();
+          int distance = target(labels, destination, bci, false) - entry.bci;
+          if (opcode != 200 && opcode != 201 && !entry.widened && (distance < Short.MIN_VALUE || distance > Short.MAX_VALUE)) {
             if (shortJumps == ClassFile.ShortJumpsOption.FAIL_ON_SHORT_JUMPS)
               throw new IllegalArgumentException("Short branch overflow");
             entry.widened = true;
@@ -174,6 +185,10 @@ final class DoppioCodeAssembler {
           } else if (opcode == 200 || entry.widened) {
             output.writeByte(200); output.writeInt(distance);
           } else { output.writeByte(opcode); output.writeShort(distance); }
+        } else if (instruction instanceof JsrInstruction) {
+          int distance = target(labels, ((JsrInstruction) instruction).target(), bci, false) - entry.bci;
+          if (instruction.opcode() == Opcode.JSR_W || entry.widened) {output.writeByte(201); output.writeInt(distance);}
+          else {output.writeByte(168); output.writeShort(distance);}
         } else if (instruction instanceof TableSwitchInstruction) {
           TableSwitchInstruction table = (TableSwitchInstruction) instruction;
           output.writeByte(170); pad(output, entry.bci);
@@ -223,7 +238,8 @@ final class DoppioCodeAssembler {
       output.flush();
       byte[] result = bytes.toByteArray();
       if (result.length != bci) throw new IllegalArgumentException("Inconsistent Code layout");
-      if (controlFlow) maximum = flowMaximum(entries, labels, handlers, bci);
+      if (legacySubroutines) maximum = legacyMaximum(entries, labels, handlers, bci);
+      else if (controlFlow) maximum = flowMaximum(entries, labels, handlers, bci);
       if (maximum > 65535) throw new IllegalArgumentException("Code operand-stack limit exceeded");
       List<int[]> finalLines = new ArrayList<int[]>();
       int lineBci = -1, currentLine = 0, writtenLine = -1;
@@ -238,7 +254,7 @@ final class DoppioCodeAssembler {
         currentLine = line[1];
       }
       if (lineBci >= 0 && currentLine != writtenLine) finalLines.add(new int[] {lineBci, currentLine});
-      return new Result(result, maximum, locals, controlFlow, Collections.unmodifiableList(handlers), labels,
+      return new Result(result, maximum, locals, controlFlow, legacySubroutines, Collections.unmodifiableList(handlers), labels,
           Collections.unmodifiableList(finalLines), !lines.isEmpty());
     } catch (IOException error) { throw new IllegalArgumentException("Code serialization failed", error); }
   }
@@ -254,6 +270,8 @@ final class DoppioCodeAssembler {
       if (instruction instanceof BranchInstruction)
         entry.size = instruction.opcode() == Opcode.GOTO_W || entry.widened && instruction.opcode() == Opcode.GOTO ? 5 :
             entry.widened ? 8 : 3;
+      else if (instruction instanceof JsrInstruction)
+        entry.size = instruction.opcode() == Opcode.JSR_W || entry.widened ? 5 : 3;
       else if (instruction instanceof TableSwitchInstruction) {
         TableSwitchInstruction table = (TableSwitchInstruction) instruction;
         entry.size = 1 + padding(length) + 12 + 4 * (int) ((long) table.highValue() - table.lowValue() + 1);
@@ -274,6 +292,52 @@ final class DoppioCodeAssembler {
     if (opcode >= 153 && opcode <= 166) return opcode + ((opcode - 153) % 2 == 0 ? 1 : -1);
     if (opcode == 198 || opcode == 199) return opcode == 198 ? 199 : 198;
     throw new IllegalArgumentException("No inverse conditional branch");
+  }
+
+  /** Native old-major conservative slot counter, not return-address type inference. */
+  private static int legacyMaximum(List<Entry> entries, IdentityHashMap<Label, Integer> labels,
+      List<int[]> handlers, int length) {
+    HashMap<Integer, Integer> indexes = new HashMap<Integer, Integer>();
+    HashSet<Integer> visited = new HashSet<Integer>();
+    List<int[]> queue = new ArrayList<int[]>();
+    for (int index = 0; index < entries.size(); index++) indexes.put(entries.get(index).bci, index);
+    for (int[] handler : handlers) queue.add(new int[] {handler[2], 1});
+    queue.add(new int[] {0, 0});
+    int maximum = handlers.isEmpty() ? 0 : 1, returns = 0;
+    for (int cursor = 0; cursor < queue.size(); cursor++) {
+      int[] destination = queue.get(cursor);
+      if (visited.contains(destination[0])) continue;
+      Integer first = indexes.get(destination[0]);
+      if (first == null) throw new IllegalArgumentException("Legacy counter target is not an instruction boundary");
+      int height = destination[1];
+      for (int index = first; index < entries.size(); index++) {
+        Entry entry = entries.get(index); Instruction instruction = entry.instruction;
+        visited.add(entry.bci);
+        height += delta(instruction); maximum = Math.max(maximum, height);
+        if (instruction instanceof JsrInstruction) {
+          queue.add(new int[] {target(labels, ((JsrInstruction) instruction).target(), length, false), height});
+          height--; // Continuation excludes the return-address slot pushed at the target.
+        } else if (instruction instanceof RetInstruction) {
+          returns++; break;
+        } else if (instruction instanceof BranchInstruction) {
+          queue.add(new int[] {target(labels, ((BranchInstruction) instruction).target(), length, false), height});
+          if (instruction.opcode() == Opcode.GOTO || instruction.opcode() == Opcode.GOTO_W) break;
+        } else if (instruction instanceof TableSwitchInstruction) {
+          TableSwitchInstruction table = (TableSwitchInstruction) instruction;
+          queue.add(new int[] {target(labels, table.defaultTarget(), length, false), height});
+          for (SwitchCase value : table.cases()) queue.add(new int[] {target(labels, value.target(), length, false), height});
+          break;
+        } else if (instruction instanceof LookupSwitchInstruction) {
+          LookupSwitchInstruction lookup = (LookupSwitchInstruction) instruction;
+          queue.add(new int[] {target(labels, lookup.defaultTarget(), length, false), height});
+          for (SwitchCase value : lookup.cases()) queue.add(new int[] {target(labels, value.target(), length, false), height});
+          break;
+        } else if (instruction instanceof ReturnInstruction || instruction instanceof ThrowInstruction) break;
+      }
+    }
+    long corrected = (long) maximum * (returns + 1L);
+    if (corrected > 65535) throw new IllegalArgumentException("Code operand-stack limit exceeded");
+    return (int) corrected;
   }
 
   /** Slot heights only: DROP_STACK_MAPS must not become implicit typed verification. */
@@ -396,6 +460,12 @@ final class DoppioCodeAssembler {
       LoadInstruction load = (LoadInstruction) instruction; local(output, load.typeKind(), load.slot(), true);
     } else if (instruction instanceof StoreInstruction) {
       StoreInstruction store = (StoreInstruction) instruction; local(output, store.typeKind(), store.slot(), false);
+    } else if (instruction instanceof RetInstruction) {
+      RetInstruction ret = (RetInstruction) instruction;
+      localLimit(ret.slot(), 1);
+      if (ret.opcode() == Opcode.RET) {output.writeByte(169); output.writeByte(ret.slot());}
+      else if (ret.opcode() == Opcode.RET_W) {output.writeByte(196); output.writeByte(169); u2(output, ret.slot());}
+      else throw new IllegalArgumentException("Invalid subroutine return opcode");
     } else if (instruction instanceof IncrementInstruction) {
       IncrementInstruction increment = (IncrementInstruction) instruction;
       localLimit(increment.slot(), 1);
@@ -515,6 +585,7 @@ final class DoppioCodeAssembler {
     if (instruction instanceof ReturnInstruction) return opcode == 177 ? 0 : opcode == 173 || opcode == 175 ? -2 : -1;
     if (instruction instanceof ThrowInstruction) return -1;
     if (instruction instanceof NewObjectInstruction) return 1;
+    if (instruction instanceof JsrInstruction) return 1;
     if (instruction instanceof BranchInstruction) return opcode >= 159 && opcode <= 166 ? -2 : opcode == 167 || opcode == 200 ? 0 : -1;
     if (instruction instanceof TableSwitchInstruction || instruction instanceof LookupSwitchInstruction) return -1;
     return 0;

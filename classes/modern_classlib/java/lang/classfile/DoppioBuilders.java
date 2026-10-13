@@ -20,6 +20,7 @@ import java.lang.classfile.constantpool.LoadableConstantEntry;
 import java.lang.classfile.constantpool.Utf8Entry;
 import java.lang.classfile.instruction.ConstantInstruction;
 import java.lang.classfile.instruction.BranchInstruction;
+import java.lang.classfile.instruction.DiscontinuedInstruction.JsrInstruction;
 import java.lang.classfile.instruction.ExceptionCatch;
 import java.lang.classfile.instruction.LabelTarget;
 import java.lang.classfile.instruction.LineNumber;
@@ -711,6 +712,9 @@ final class DoppioBuilders {
       else if (element instanceof BranchInstruction) {
         BranchInstruction branch = (BranchInstruction) element;
         element = BranchInstruction.of(branch.opcode(), label(branch.target()));
+      } else if (element instanceof JsrInstruction) {
+        JsrInstruction jump = (JsrInstruction) element;
+        element = JsrInstruction.of(jump.opcode(), label(jump.target()));
       } else if (element instanceof TableSwitchInstruction) {
         TableSwitchInstruction instruction = (TableSwitchInstruction) element;
         element = TableSwitchInstruction.of(instruction.lowValue(), instruction.highValue(),
@@ -1100,6 +1104,12 @@ final class DoppioBuilders {
     ClassFile.StackMapsOption option = code.owner.stackMaps();
     boolean generate = option == ClassFile.StackMapsOption.GENERATE_STACK_MAPS ||
       option == ClassFile.StackMapsOption.STACK_MAPS_WHEN_REQUIRED && code.owner.majorVersion() >= 50 && result.controlFlow;
+    if (result.legacySubroutines) {
+      // Native major50 defaults fall back to counters; explicit generation does not.
+      if (option == ClassFile.StackMapsOption.STACK_MAPS_WHEN_REQUIRED && code.owner.majorVersion() <= 50) generate = false;
+      if (generate) throw new IllegalArgumentException(
+          "Instructions jsr, jsr_w, or ret must not appear in the class file version >= 51.0");
+    }
     if (!generate) {
       byte[] supplied = null;
       for (Attribute<?> attribute : code.attributes) if (attribute instanceof StackMapTableAttribute) {
