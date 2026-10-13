@@ -638,6 +638,10 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Check partial multidimensional array allocation
+        timeout-minutes: 3
+        run: node --test ci/partial_multianewarray_regression_test.cjs
+
       - name: Check phase C class-file instructions contracts
         timeout-minutes: 3
         run: node --test --test-concurrency=2 ci/java_classfile_instructions_contract_test.mjs ci/classfile_memory_instruction_test.cjs ci/classfile_instruction_writer_test.cjs ci/classfile_instruction_frame_policy_test.cjs

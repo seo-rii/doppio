@@ -127,6 +127,7 @@ const classFileHierarchyRunnerCommand = 'node ci/java_classfile_hierarchy_test.m
 const classFileInstructionsUnits = ['ci/java_classfile_instructions_contract_test.mjs','ci/classfile_memory_instruction_test.cjs','ci/classfile_instruction_writer_test.cjs','ci/classfile_instruction_frame_policy_test.cjs'];
 const classFileInstructionsUnitCommand = `node --test --test-concurrency=2 ${classFileInstructionsUnits.join(' ')}`;
 const classFileInstructionsRunnerCommand = 'node ci/java_classfile_instructions_test.mjs --browser';
+const partialMultianewarrayUnitCommand = 'node --test ci/partial_multianewarray_regression_test.cjs';
 const memberGates = [
   {name: 'member resolution', units: memberResolutionUnits, unitCommand: memberResolutionUnitCommand,
     runnerCommand: memberResolutionRunnerCommand, stepId: 'java_member_resolution',
@@ -201,6 +202,8 @@ for (const [name, command] of [['ci:classfile-hierarchy:test', classFileHierarch
 for (const [name, command] of [['ci:classfile-instructions:test', classFileInstructionsUnitCommand], ['ci:classfile-instructions', classFileInstructionsRunnerCommand]]) {
   if (packageScripts[name] !== command) throw new Error(`Package script ${name} must retain the exact C7d2 gate command.`);
 }
+if (packageScripts['ci:partial-multianewarray:test'] !== partialMultianewarrayUnitCommand)
+  throw new Error('Partial multidimensional allocation must retain its exact native/guest regression command.');
 for (const [name, command] of [
   ['ci:java-initialization:test', initializationUnitCommand],
   ['ci:bytecode-verification:test', verificationUnitCommand],
@@ -3443,5 +3446,22 @@ crypto.Hash.prototype.digest = function (...args) {
 } finally {
   fs.rmSync(artifactRoot, { recursive: true, force: true });
 }
+
+const partialAllocationBlock = realWorkflow.match(
+  /      - name: Check partial multidimensional array allocation\n[\s\S]*?(?=      - name:|$)/)?.[0];
+if (!partialAllocationBlock) throw new Error('Missing partial multidimensional allocation regression step.');
+for (const replacement of ['echo allocation checked', partialMultianewarrayUnitCommand + ' --test-name-pattern=selected',
+  partialMultianewarrayUnitCommand + '; exit 0', 'DOPPIO_VERIFY_SOURCE=1 ' + partialMultianewarrayUnitCommand])
+  expectCheckerFailure('partial allocation regression command substitution: ' + replacement,
+    {workflow:replaceRequired(realWorkflow, `run: ${partialMultianewarrayUnitCommand}\n`, `run: ${replacement}\n`)},
+    'exact bounded, fail-closed baseline command or artifact contract');
+expectCheckerFailure('unbounded partial allocation regression',
+  {workflow:replaceRequired(realWorkflow, partialAllocationBlock,
+    partialAllocationBlock.replace('timeout-minutes: 3', 'timeout-minutes: 1000'))},
+  'exact bounded, fail-closed baseline command or artifact contract');
+expectCheckerFailure('duplicate partial allocation regression command',
+  {workflow:replaceRequired(realWorkflow, partialAllocationBlock,
+    partialAllocationBlock + partialAllocationBlock.replace('Check partial multidimensional array allocation', 'Duplicate allocation regression'))},
+  'execute partial multidimensional allocation command exactly once');
 
 console.log('Modern Java workflow checker and runtime artifact tests passed.');
