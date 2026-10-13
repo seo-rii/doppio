@@ -51,37 +51,35 @@ final class DoppioClassFileVerifier {
     List<VerifyError> errors = new ArrayList<>();
     try {
       ClassDesc owner = model.thisClass().asSymbol();
-      if (!owner.isClassOrInterface()) throw new VerifyError("Invalid class name");
-      for (FieldModel field : model.fields()) {
-        if ("V".equals(field.fieldTypeSymbol().descriptorString())) throw new VerifyError("Void field descriptor");
-      }
+      if (!owner.isClassOrInterface()) return error("Invalid class name");
+      errors.addAll(DoppioClassFileParserVerifier.verify(model));
       // Native parser verification traverses Code before its bytecode verifier.
       // This inflates only the configured debug/line families, while raw tables
       // remain available when traversal is dropped.
-      boolean[] discontinued = { false };
       for (MethodModel method : model.methods()) if (method.code().isPresent()) {
-        DoppioClassReader.forEachForVerification(method.code().get(), element -> {
-          if (element instanceof Instruction) {
-            Opcode.Kind kind = ((Instruction) element).opcode().kind();
-            if (kind == Opcode.Kind.DISCONTINUED_JSR || kind == Opcode.Kind.DISCONTINUED_RET)
-              discontinued[0] = true;
-          }
-        });
+        DoppioClassReader.forEachForVerification(method.code().get(), element -> { });
       }
       String ownerDescriptor = owner.descriptorString();
       boolean inferenceEligible = !"Ljava/lang/Object;".equals(ownerDescriptor) &&
           !"Ljava/lang/Class;".equals(ownerDescriptor) && !"Ljava/lang/String;".equals(ownerDescriptor) &&
           !"Ljava/lang/Throwable;".equals(ownerDescriptor);
-      if (inferenceEligible && (model.majorVersion() < 50 || model.majorVersion() == 50 && discontinued[0]))
-        return error("Inference verification is not supported");
-      if (discontinued[0]) return error("Bad instruction: discontinued jsr/ret");
-      for (MethodModel method : model.methods()) {
-        try { verifyMethod(model, method, resolver); }
-        catch (VerifyError failed) { errors.add(failed); }
-        catch (IllegalArgumentException malformed) { errors.add(new VerifyError(malformed.getMessage())); }
+      if (inferenceEligible) {
+        if (model.majorVersion() < 50) errors.add(new VerifyError("Inference verification is not supported"));
+        else {
+          List<VerifyError> bytecodeErrors = new ArrayList<>();
+          for (MethodModel method : model.methods()) {
+            if ((method.flags().flagsMask() & (ClassFile.ACC_NATIVE | ClassFile.ACC_ABSTRACT | ClassFile.ACC_BRIDGE)) != 0) continue;
+            try {
+              verifyMethod(model, method, resolver);
+            } catch (VerifyError failed) { bytecodeErrors.add(failed); }
+              catch (Error | Exception failed) { bytecodeErrors.add(new VerifyError(failed.toString())); }
+          }
+          if (model.majorVersion() == 50 && !bytecodeErrors.isEmpty())
+            errors.add(new VerifyError("Inference verification is not supported"));
+          else errors.addAll(bytecodeErrors);
+        }
       }
-    } catch (VerifyError failed) { errors.add(failed); }
-      catch (IllegalArgumentException malformed) { errors.add(new VerifyError(malformed.getMessage())); }
+    } catch (IllegalArgumentException malformed) { return error(malformed.getMessage()); }
     return Collections.unmodifiableList(errors);
   }
 
@@ -130,6 +128,10 @@ final class DoppioClassFileVerifier {
         if (frames.put(bci, new DoppioCodeFlow.Frame(bci, locals, stack)) != null) throw new VerifyError("Duplicate stack-map target");
       }
     }
+    // Bytecode rejection follows preliminary LVT and frame checks. A bridge
+    // still traverses Code in the parser phase, but never reaches this phase.
+    if (DoppioClassReader.hasDiscontinuedForVerification(code))
+      throw new VerifyError("Bad instruction: discontinued jsr/ret");
     List<ClassDesc> interfaces = new ArrayList<>();
     for (ClassEntry implemented : model.interfaces()) interfaces.add(implemented.asSymbol());
     DoppioCodeFlow.analyzeForVerification(model.thisClass().asSymbol(), model.superclass().isPresent() ? model.superclass().get().asSymbol() : null,

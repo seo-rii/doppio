@@ -322,6 +322,14 @@ public final class DoppioClassReader {
     CodeValue code = (CodeValue) model;
     return bci >= 0 && bci < code.code.length && code.sizes[bci] != 0;
   }
+  /** Reuse the opcode marker collected by the required parser traversal. */
+  static boolean hasDiscontinuedForVerification(CodeModel model) {
+    if (!(Objects.requireNonNull(model) instanceof CodeValue))
+      throw new UnsupportedOperationException("Unbound Code instruction boundaries");
+    CodeValue code = (CodeValue) model;
+    if (!code.instructionsDecoded) throw new IllegalStateException("Code verification traversal is required");
+    return code.hasDiscontinuedInstructions;
+  }
   public static int maxStack(CodeModel model) {
     if (!(Objects.requireNonNull(model) instanceof CodeAttribute)) throw new IllegalArgumentException("No real Code attribute");
     return ((CodeAttribute) model).maxStack();
@@ -633,14 +641,14 @@ public final class DoppioClassReader {
       if (code.labels[cursor] != null) elements.add(labelTarget(code.labels[cursor]));
       if (lines != null && lines[cursor] != 0) elements.add(lineNumber(lines[cursor]));
       int start = cursor, bytecode = bytes[cursor++] & 255;
+      int size = code.sizes[start];
+      if (verificationOnly && bytecode == 0) { cursor = start + size; continue; }
       Opcode opcode;
       if (bytecode == 196) {
         require(bytes, cursor, 3);
         bytecode = 196 << 8 | bytes[cursor++] & 255;
       }
       opcode = opcode(bytecode);
-      int size = code.sizes[start];
-      if (verificationOnly && opcode == Opcode.NOP) { cursor = start + size; continue; }
       Instruction instruction;
       switch (opcode.kind()) {
         case CONSTANT:
@@ -679,9 +687,11 @@ public final class DoppioClassReader {
         case BRANCH:
           instruction = branch(opcode, code.checkedLabel(branchTarget(bytes, start, opcode), false)); break;
         case DISCONTINUED_JSR:
+          code.hasDiscontinuedInstructions = true;
           instruction = DiscontinuedInstruction.JsrInstruction.of(opcode,
               code.checkedLabel(branchTarget(bytes, start, opcode), false)); break;
         case DISCONTINUED_RET:
+          code.hasDiscontinuedInstructions = true;
           instruction = DiscontinuedInstruction.RetInstruction.of(opcode,
               opcode.isWide() ? u2(bytes, cursor) : bytes[cursor] & 255); break;
         case TABLE_SWITCH: {
@@ -723,7 +733,9 @@ public final class DoppioClassReader {
     }
     if (code.labels[bytes.length] != null) elements.add(labelTarget(code.labels[bytes.length]));
     if (lines != null && lines[bytes.length] != 0) elements.add(lineNumber(lines[bytes.length]));
-    return immutable(elements);
+    List<CodeElement> result = immutable(elements);
+    code.instructionsDecoded = true;
+    return result;
   }
 
   private static int[] instructionSizes(byte[] bytes) {
@@ -1065,6 +1077,7 @@ public final class DoppioClassReader {
     List<ExceptionCatch> handlers = Collections.emptyList();
     List<Attribute<?>> attributes = Collections.emptyList();
     List<CodeElement> elements;
+    boolean instructionsDecoded, hasDiscontinuedInstructions;
     CodeValue(MethodModel parent, DoppioConstantPool pool, Utf8Entry name, int stack, int locals, byte[] code, byte[] payload,
         ClassFile.DebugElementsOption debugElements, ClassFile.LineNumbersOption lineNumbers) {
       this.parent = parent; this.pool = pool; this.name = name; this.stack = stack; this.locals = locals;
