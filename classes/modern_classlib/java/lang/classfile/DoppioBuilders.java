@@ -37,8 +37,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.IdentityHashMap;
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /** Internal element sinks and selected control-flow class-file serialization. */
@@ -106,6 +108,146 @@ final class DoppioBuilders {
         deadCode, deadLabels, shortJumps, debugElements, lineNumbers);
     builder.transform(model, transform);
     return builder.bytes();
+  }
+
+  static CodeBuilder transforming(CodeBuilder parent, CodeTransform transform, Consumer<CodeBuilder> handler) {
+    Objects.requireNonNull(transform).atStart(parent);
+    handler.accept(new ForwardCode(parent, transform));
+    transform.atEnd(parent);
+    return parent;
+  }
+
+  static CodeBuilder block(CodeBuilder parent, Consumer<CodeBuilder.BlockCodeBuilder> handler) {
+    Label exit = parent.newLabel();
+    BlockCode child = new BlockCode(parent, exit);
+    child.begin(); handler.accept(child); child.finish();
+    return parent.labelBinding(exit);
+  }
+
+  static CodeBuilder ifThen(CodeBuilder parent, Opcode opcode, Consumer<CodeBuilder.BlockCodeBuilder> handler) {
+    Opcode opposite = oppositeConditional(opcode);
+    Label exit = parent.newLabel();
+    BlockCode child = new BlockCode(parent, exit);
+    parent.branch(opposite, child.endLabel());
+    child.begin(); handler.accept(child); child.finish();
+    return parent.labelBinding(exit);
+  }
+
+  static CodeBuilder ifThenElse(CodeBuilder parent, Opcode opcode,
+      Consumer<CodeBuilder.BlockCodeBuilder> thenHandler, Consumer<CodeBuilder.BlockCodeBuilder> elseHandler) {
+    Opcode opposite = oppositeConditional(opcode);
+    Label exit = parent.newLabel();
+    BlockCode yes = new BlockCode(parent, exit), no = new BlockCode(parent, exit);
+    parent.branch(opposite, no.startLabel());
+    yes.begin(); thenHandler.accept(yes);
+    if (yes.reachable) yes.goto_(exit);
+    yes.finish(); no.begin(); elseHandler.accept(no); no.finish();
+    return parent.labelBinding(exit);
+  }
+
+  static CodeBuilder trying(CodeBuilder parent, Consumer<CodeBuilder.BlockCodeBuilder> tryHandler,
+      Consumer<CodeBuilder.CatchBuilder> catchesHandler) {
+    Label exit = parent.newLabel();
+    BlockCode body = new BlockCode(parent, exit);
+    body.begin(); tryHandler.accept(body); body.finish();
+    if (!body.hasInstructions) throw new IllegalArgumentException("The body of the try block is empty");
+    CatchBlocks catches = new CatchBlocks(parent, body, exit);
+    catchesHandler.accept(catches); catches.finish();
+    return parent;
+  }
+
+  private static Opcode oppositeConditional(Opcode opcode) {
+    int value = opcode.bytecode();
+    if (value >= 153 && value <= 166) return DoppioClassReader.opcode(value + ((value - 153) % 2 == 0 ? 1 : -1));
+    if (value == 198 || value == 199) return value == 198 ? Opcode.IFNONNULL : Opcode.IFNULL;
+    throw new IllegalArgumentException("Illegal conditional branch opcode: " + opcode);
+  }
+
+  private static CodeSink terminalCode(CodeBuilder builder) {
+    if (builder instanceof CodeSink) return (CodeSink) builder;
+    if (builder instanceof ForwardCode) return terminalCode(((ForwardCode) builder).target);
+    if (builder instanceof BlockCode) return terminalCode(((BlockCode) builder).parent);
+    throw new IllegalArgumentException("Unsupported foreign Code builder context");
+  }
+
+  /** A lexical scope owns its local cursor without consuming its parent's slots. */
+  private static final class BlockCode implements CodeBuilder.BlockCodeBuilder {
+    final CodeBuilder parent;
+    final CodeSink terminal;
+    final Label start, end, exit;
+    boolean reachable = true, hasInstructions;
+    int localCursor, terminalCursor;
+    BlockCode(CodeBuilder parent, Label exit) {
+      this.parent = parent; this.terminal = terminalCode(parent);
+      this.start = parent.newLabel(); this.end = parent.newLabel(); this.exit = Objects.requireNonNull(exit);
+    }
+    void begin() {
+      localCursor = parent instanceof BlockCode ? ((BlockCode) parent).localCursor : terminal.nextLocal;
+      terminalCursor = terminal.nextLocal;
+      parent.labelBinding(start);
+    }
+    void finish() {
+      parent.labelBinding(end);
+      if (terminalCursor != terminal.nextLocal)
+        throw new IllegalStateException("Interference in local variable slot management");
+    }
+    public ConstantPoolBuilder constantPool() { return parent.constantPool(); }
+    public CodeBuilder with(CodeElement element) {
+      parent.with(Objects.requireNonNull(element));
+      hasInstructions |= element instanceof Instruction;
+      if (!reachable) {
+        if (element instanceof LabelTarget) reachable = true;
+      } else if (element instanceof Instruction) {
+        Opcode opcode = ((Instruction) element).opcode();
+        if (opcode == Opcode.GOTO || opcode == Opcode.GOTO_W || opcode == Opcode.ATHROW ||
+            opcode == Opcode.TABLESWITCH || opcode == Opcode.LOOKUPSWITCH || opcode.kind() == Opcode.Kind.RETURN)
+          reachable = false;
+      }
+      return this;
+    }
+    public Label newLabel() { return parent.newLabel(); }
+    public Label startLabel() { return start; }
+    public Label endLabel() { return end; }
+    public Label breakLabel() { return exit; }
+    public int receiverSlot() { return parent.receiverSlot(); }
+    public int parameterSlot(int parameter) { return parent.parameterSlot(parameter); }
+    public int allocateLocal(TypeKind kind) {
+      int slot = localCursor; localCursor += kind.slotSize(); return slot;
+    }
+  }
+
+  private static final class CatchBlocks implements CodeBuilder.CatchBuilder {
+    final CodeBuilder parent;
+    final BlockCode body;
+    final Label exit;
+    final Set<ClassDesc> types = new HashSet<ClassDesc>();
+    BlockCode current;
+    CatchBlocks(CodeBuilder parent, BlockCode body, Label exit) { this.parent = parent; this.body = body; this.exit = exit; }
+    public CodeBuilder.CatchBuilder catching(ClassDesc type, Consumer<CodeBuilder.BlockCodeBuilder> handler) {
+      return catchingMulti(type == null ? Collections.<ClassDesc>emptyList() : Collections.singletonList(type), handler);
+    }
+    public CodeBuilder.CatchBuilder catchingMulti(List<ClassDesc> caught, Consumer<CodeBuilder.BlockCodeBuilder> handler) {
+      Objects.requireNonNull(caught); Objects.requireNonNull(handler);
+      if (current == null && body.reachable) parent.goto_(exit);
+      for (ClassDesc type : caught)
+        if (!types.add(type)) throw new IllegalArgumentException("Existing catch block catches exception of type: " + type);
+      if (current != null) {
+        current.finish();
+        if (current.reachable) parent.goto_(exit);
+      }
+      current = new BlockCode(parent, exit);
+      if (caught.isEmpty()) current.exceptionCatchAll(body.startLabel(), body.endLabel(), current.startLabel());
+      else for (ClassDesc type : caught) current.exceptionCatch(body.startLabel(), body.endLabel(), current.startLabel(), type);
+      current.begin(); handler.accept(current);
+      return this;
+    }
+    public void catchingAll(Consumer<CodeBuilder.BlockCodeBuilder> handler) {
+      catchingMulti(Collections.<ClassDesc>emptyList(), handler);
+    }
+    void finish() {
+      if (current != null) current.finish();
+      parent.labelBinding(exit);
+    }
   }
 
   private interface Context {

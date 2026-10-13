@@ -46,6 +46,7 @@ import java.lang.constant.MethodTypeDesc;
 import java.util.Objects;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 /** Selected instruction and label-based control-flow builders. */
 public interface CodeBuilder extends ClassFileBuilder<CodeElement, CodeBuilder> {
@@ -55,6 +56,31 @@ public interface CodeBuilder extends ClassFileBuilder<CodeElement, CodeBuilder> 
   int receiverSlot();
   int parameterSlot(int parameter);
   int allocateLocal(TypeKind kind);
+  interface BlockCodeBuilder extends CodeBuilder {
+    Label breakLabel();
+  }
+  interface CatchBuilder {
+    CatchBuilder catching(ClassDesc type, Consumer<BlockCodeBuilder> handler);
+    CatchBuilder catchingMulti(List<ClassDesc> types, Consumer<BlockCodeBuilder> handler);
+    void catchingAll(Consumer<BlockCodeBuilder> handler);
+  }
+  default CodeBuilder transforming(CodeTransform transform, Consumer<CodeBuilder> handler) {
+    return DoppioBuilders.transforming(this, transform, handler);
+  }
+  default CodeBuilder block(Consumer<BlockCodeBuilder> handler) { return DoppioBuilders.block(this, handler); }
+  default CodeBuilder ifThen(Consumer<BlockCodeBuilder> handler) { return ifThen(Opcode.IFNE, handler); }
+  default CodeBuilder ifThen(Opcode opcode, Consumer<BlockCodeBuilder> handler) {
+    return DoppioBuilders.ifThen(this, opcode, handler);
+  }
+  default CodeBuilder ifThenElse(Consumer<BlockCodeBuilder> thenHandler, Consumer<BlockCodeBuilder> elseHandler) {
+    return ifThenElse(Opcode.IFNE, thenHandler, elseHandler);
+  }
+  default CodeBuilder ifThenElse(Opcode opcode, Consumer<BlockCodeBuilder> thenHandler, Consumer<BlockCodeBuilder> elseHandler) {
+    return DoppioBuilders.ifThenElse(this, opcode, thenHandler, elseHandler);
+  }
+  default CodeBuilder trying(Consumer<BlockCodeBuilder> tryHandler, Consumer<CatchBuilder> catchesHandler) {
+    return DoppioBuilders.trying(this, tryHandler, catchesHandler);
+  }
   default CodeBuilder nop() { return with(NopInstruction.of()); }
   default Label newBoundLabel() { Label label = newLabel(); labelBinding(label); return label; }
   default CodeBuilder labelBinding(Label label) { return with(DoppioClassReader.labelTarget(label)); }
