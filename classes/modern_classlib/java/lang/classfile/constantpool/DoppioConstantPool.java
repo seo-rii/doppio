@@ -15,6 +15,8 @@ import java.lang.constant.DynamicCallSiteDesc;
 import java.lang.constant.DynamicConstantDesc;
 import java.lang.constant.MethodHandleDesc;
 import java.lang.constant.MethodTypeDesc;
+import java.lang.constant.ModuleDesc;
+import java.lang.constant.PackageDesc;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -108,8 +110,15 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
       throw new IllegalArgumentException("A retained source pool is required for direct copy");
     DoppioConstantPool original = (DoppioConstantPool) source;
     DoppioConstantPool copy = new DoppioConstantPool(original);
-    for (Entry entry : original.entries) if (entry != null)
-      copy.append(entry.tag, entry.first, entry.second, entry.value, entry.raw.clone(), false);
+    for (Entry entry : original.entries) if (entry != null) {
+      if (entry.tag == 19 || entry.tag == 20) {
+        // Native shared pools reuse these retained module/package values and
+        // their semantic children; new-pool import still rebuilds both indexes.
+        copy.entries.add(entry);
+        String key = key(entry.tag, entry.first, entry.second, entry.value);
+        if (!copy.interned.containsKey(key)) copy.interned.put(key, entry);
+      } else copy.append(entry.tag, entry.first, entry.second, entry.value, entry.raw.clone(), false);
+    }
     for (BootstrapMethodEntry method : original.bootstraps) {
       MethodHandleEntry handle = copy.entryByIndex(method.bootstrapMethod().index(), MethodHandleEntry.class);
       List<LoadableConstantEntry> arguments = new ArrayList<LoadableConstantEntry>();
@@ -240,6 +249,16 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
     if (value.startsWith("[")) ClassDesc.ofDescriptor(value);
     else ClassDesc.ofInternalName(value);
     return (ClassEntry) intern(7, utf8Entry(value).index(), 0, null);
+  }
+  public ModuleEntry moduleEntry(Utf8Entry name) {
+    Objects.requireNonNull(name);
+    if (temporary) return (ModuleEntry) temporaryEntry(19, -2, name, null, null);
+    return (ModuleEntry) intern(19, utf8Entry(name.stringValue()).index(), 0, null);
+  }
+  public PackageEntry packageEntry(Utf8Entry name) {
+    Objects.requireNonNull(name);
+    if (temporary) return (PackageEntry) temporaryEntry(20, -2, name, null, null);
+    return (PackageEntry) intern(20, utf8Entry(name.stringValue()).index(), 0, null);
   }
   public NameAndTypeEntry nameAndTypeEntry(Utf8Entry name, Utf8Entry type) {
     if (temporary) return (NameAndTypeEntry) temporaryEntry(12, -3,
@@ -402,6 +421,8 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
           value = intern(15, handle.kind(), importEntry(handle.reference(), state).index(), null); break;
         }
         case 16: value = methodTypeEntry(((MethodTypeEntry) source).descriptor()); break;
+        case 19: value = moduleEntry(((ModuleEntry) source).name()); break;
+        case 20: value = packageEntry(((PackageEntry) source).name()); break;
         case 17: case 18: {
           DynamicConstantPoolEntry dynamic = (DynamicConstantPoolEntry) source;
           value = dynamic(source.tag(), dynamic.bootstrap(), dynamic.nameAndType(), state); break;
@@ -495,6 +516,8 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
       case 16: entry = new MethodTypeValue(this, index, tag, first, second, value, raw); break;
       case 17: entry = new ConstantDynamicValue(this, index, tag, first, second, value, raw); break;
       case 18: entry = new InvokeDynamicValue(this, index, tag, first, second, value, raw); break;
+      case 19: entry = new ModuleValue(this, index, tag, first, second, value, raw); break;
+      case 20: entry = new PackageValue(this, index, tag, first, second, value, raw); break;
       default: entry = new Entry(this, index, tag, first, second, value, raw);
     }
     return entry;
@@ -612,6 +635,28 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
     NameType(DoppioConstantPool p, int i, int t, int a, int b, Object v, byte[] r) { super(p, i, t, a, b, v, r); }
     public Utf8Entry name() { return firstReference(Utf8Entry.class); }
     public Utf8Entry type() { return secondReference(Utf8Entry.class); }
+  }
+  private static final class ModuleValue extends Entry implements ModuleEntry {
+    ModuleValue(DoppioConstantPool p, int i, int t, int a, int b, Object v, byte[] r) { super(p, i, t, a, b, v, r); }
+    public Utf8Entry name() { return firstReference(Utf8Entry.class); }
+    public ModuleDesc asSymbol() { return ModuleDesc.of(name().stringValue()); }
+    public boolean matches(ModuleDesc descriptor) { return name().equalsString(descriptor.name()); }
+    public boolean equals(Object other) {
+      return this == other || other instanceof ModuleValue && name().equals(((ModuleValue) other).name());
+    }
+    public int hashCode() { return (19 * 0x13c4b2d1 + name().index()) | 0x40000000; }
+    public String toString() { return "19 " + name(); }
+  }
+  private static final class PackageValue extends Entry implements PackageEntry {
+    PackageValue(DoppioConstantPool p, int i, int t, int a, int b, Object v, byte[] r) { super(p, i, t, a, b, v, r); }
+    public Utf8Entry name() { return firstReference(Utf8Entry.class); }
+    public PackageDesc asSymbol() { return PackageDesc.ofInternalName(name().stringValue()); }
+    public boolean matches(PackageDesc descriptor) { return name().equalsString(descriptor.internalName()); }
+    public boolean equals(Object other) {
+      return this == other || other instanceof PackageEntry && name().equals(((PackageEntry) other).name());
+    }
+    public int hashCode() { return (20 * 0x13c4b2d1 + name().index()) | 0x40000000; }
+    public String toString() { return "20 " + name(); }
   }
   private static class Member extends Entry implements MemberRefEntry {
     Member(DoppioConstantPool p, int i, int t, int a, int b, Object v, byte[] r) { super(p, i, t, a, b, v, r); }

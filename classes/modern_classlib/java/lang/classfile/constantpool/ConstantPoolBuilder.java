@@ -8,12 +8,14 @@ import java.lang.constant.DirectMethodHandleDesc;
 import java.lang.constant.DynamicCallSiteDesc;
 import java.lang.constant.DynamicConstantDesc;
 import java.lang.constant.MethodTypeDesc;
+import java.lang.constant.ModuleDesc;
+import java.lang.constant.PackageDesc;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
-/** Selected factories; nominal module and package families remain unselected. */
+/** Checked factories for the selected typed constant-pool families. */
 public interface ConstantPoolBuilder extends ConstantPool {
   static ConstantPoolBuilder of() { return new DoppioConstantPool(); }
   static ConstantPoolBuilder of(ClassModel model) { return DoppioConstantPool.copyOf(Objects.requireNonNull(model).constantPool()); }
@@ -28,6 +30,10 @@ public interface ConstantPoolBuilder extends ConstantPool {
     String descriptor = type.descriptorString();
     return classEntry(utf8Entry(type.isArray() ? descriptor : descriptor.substring(1, descriptor.length() - 1)));
   }
+  PackageEntry packageEntry(Utf8Entry name);
+  default PackageEntry packageEntry(PackageDesc descriptor) { return packageEntry(utf8Entry(descriptor.internalName())); }
+  ModuleEntry moduleEntry(Utf8Entry name);
+  default ModuleEntry moduleEntry(ModuleDesc descriptor) { return moduleEntry(utf8Entry(descriptor.name())); }
   NameAndTypeEntry nameAndTypeEntry(Utf8Entry name, Utf8Entry type);
   default NameAndTypeEntry nameAndTypeEntry(String name, ClassDesc type) { return nameAndTypeEntry(utf8Entry(name), utf8Entry(type)); }
   default NameAndTypeEntry nameAndTypeEntry(String name, MethodTypeDesc type) { return nameAndTypeEntry(utf8Entry(name), utf8Entry(type)); }
