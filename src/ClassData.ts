@@ -882,6 +882,14 @@ export class ArrayClassData<T> extends ClassData {
     outputStream.write(`extendClass(${jsClassName}, superCls.getConstructor(thread));
   function ${jsClassName}(thread, lengths) {\n`);
     this.superClass.outputInjectedFields(outputStream);
+    // multianewarray supplies a dimensions vector, including for a single
+    // allocated dimension. At that boundary the remaining components must
+    // keep their default values, rather than recurse with an absent length.
+    // Normalize before both branches so rank-one primitive arrays also use
+    // a scalar length, not TypedArray's iterable-elements constructor.
+    outputStream.write(`    if (typeof lengths !== 'number' && lengths.length === 1) {
+      lengths = lengths[0];
+    }\n`);
     // Initialize array.
     if (this.componentClassName[0] !== '[') {
       // Array elements are a non-array type.
