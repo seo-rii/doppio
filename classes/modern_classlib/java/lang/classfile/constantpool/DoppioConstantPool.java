@@ -587,6 +587,10 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
     public CharSequence subSequence(int start, int end) { return stringValue().subSequence(start, end); }
     public ConstantDesc constantValue() { return (ConstantDesc) (Object) stringValue(); }
     public String toString() { return stringValue(); }
+    public boolean equals(Object other) {
+      return this == other || other instanceof Utf && stringValue().equals(((Utf) other).stringValue());
+    }
+    public int hashCode() { return stringValue().hashCode() | 0x40000000; }
   }
   private static final class ClassValue extends Entry implements ClassEntry {
     ClassValue(DoppioConstantPool p, int i, int t, int a, int b, Object v, byte[] r) { super(p, i, t, a, b, v, r); }
@@ -620,21 +624,37 @@ public final class DoppioConstantPool implements ConstantPoolBuilder {
     IntValue(DoppioConstantPool p, int i, int t, int a, int b, Object v, byte[] r) { super(p, i, t, a, b, v, r); }
     public int intValue() { return ((Integer) value).intValue(); }
     public ConstantDesc constantValue() { return (ConstantDesc) value; }
+    public boolean equals(Object other) {
+      return this == other || other instanceof IntValue && intValue() == ((IntValue) other).intValue();
+    }
+    public int hashCode() { return (3 * 0x13c4b2d1 + Integer.hashCode(intValue())) | 0x40000000; }
   }
   private static final class FloatValue extends Entry implements FloatEntry {
     FloatValue(DoppioConstantPool p, int i, int t, int a, int b, Object v, byte[] r) { super(p, i, t, a, b, v, r); }
     public float floatValue() { return ((Float) value).floatValue(); }
     public ConstantDesc constantValue() { return (ConstantDesc) value; }
+    public boolean equals(Object other) {
+      return this == other || other instanceof FloatValue && floatValue() == ((FloatValue) other).floatValue();
+    }
+    public int hashCode() { return (4 * 0x13c4b2d1 + Float.hashCode(floatValue())) | 0x40000000; }
   }
   private static final class LongValue extends Entry implements LongEntry {
     LongValue(DoppioConstantPool p, int i, int t, int a, int b, Object v, byte[] r) { super(p, i, t, a, b, v, r); }
     public long longValue() { return ((Long) value).longValue(); }
     public ConstantDesc constantValue() { return (ConstantDesc) value; }
+    public boolean equals(Object other) {
+      return this == other || other instanceof LongValue && longValue() == ((LongValue) other).longValue();
+    }
+    public int hashCode() { return (5 * 0x13c4b2d1 + Long.hashCode(longValue())) | 0x40000000; }
   }
   private static final class DoubleValue extends Entry implements DoubleEntry {
     DoubleValue(DoppioConstantPool p, int i, int t, int a, int b, Object v, byte[] r) { super(p, i, t, a, b, v, r); }
     public double doubleValue() { return ((Double) value).doubleValue(); }
     public ConstantDesc constantValue() { return (ConstantDesc) value; }
+    public boolean equals(Object other) {
+      return this == other || other instanceof DoubleValue && doubleValue() == ((DoubleValue) other).doubleValue();
+    }
+    public int hashCode() { return (6 * 0x13c4b2d1 + Double.hashCode(doubleValue())) | 0x40000000; }
   }
   private static final class StringValue extends Entry implements StringEntry {
     StringValue(DoppioConstantPool p, int i, int t, int a, int b, Object v, byte[] r) { super(p, i, t, a, b, v, r); }
