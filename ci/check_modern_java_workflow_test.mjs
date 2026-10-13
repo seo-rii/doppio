@@ -130,6 +130,13 @@ const classFileInstructionsRunnerCommand = 'node ci/java_classfile_instructions_
 const classFileDebugUnits = ['ci/java_classfile_debug_contract_test.mjs','ci/classfile_debug_instruction_test.cjs','ci/classfile_debug_reader_test.cjs'];
 const classFileDebugUnitCommand = `node --test --test-concurrency=2 ${classFileDebugUnits.join(' ')}`;
 const classFileDebugRunnerCommand = 'node ci/java_classfile_debug_test.mjs --browser';
+const classFileDeclarationsUnits = ['ci/java_classfile_declarations_contract_test.mjs','ci/classfile_signature_tree_test.cjs',
+  'ci/classfile_annotation_test.cjs','ci/classfile_annotation_constant_pool_test.cjs','ci/classfile_annotation_attributes_test.cjs',
+  'ci/classfile_type_annotation_test.cjs','ci/classfile_type_annotation_attributes_test.cjs','ci/classfile_metadata_attributes_test.cjs',
+  'ci/classfile_block_builder_test.cjs','ci/classfile_stateful_transform_test.cjs','ci/classfile_output_test.cjs',
+  'ci/classfile_module_pool_test.cjs','ci/classfile_module_attributes_test.cjs','ci/classfile_class_entry_test.cjs','ci/classfile_public_abi_test.cjs'];
+const classFileDeclarationsUnitCommand = `node --test --test-concurrency=2 ${classFileDeclarationsUnits.join(' ')}`;
+const classFileDeclarationsRunnerCommand = 'node ci/java_classfile_declarations_test.mjs --browser';
 const partialMultianewarrayUnitCommand = 'node --test ci/partial_multianewarray_regression_test.cjs';
 const memberGates = [
   {name: 'member resolution', units: memberResolutionUnits, unitCommand: memberResolutionUnitCommand,
@@ -191,6 +198,9 @@ const memberGates = [
   {name: 'class-file debug', units: classFileDebugUnits, unitCommand: classFileDebugUnitCommand,
     runnerCommand: classFileDebugRunnerCommand, stepId: 'java_classfile_debug',
     ledger: 'build/java-classfile-debug-results.json', timeout: 40},
+  {name: 'class-file declarations', units: classFileDeclarationsUnits, unitCommand: classFileDeclarationsUnitCommand,
+    runnerCommand: classFileDeclarationsRunnerCommand, stepId: 'java_classfile_declarations',
+    ledger: 'build/java-classfile-declarations-results.json', timeout: 40},
 ];
 const packageScripts = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).scripts;
 for (const [name, command] of [['ci:classfile-api:test', classFileApiUnitCommand], ['ci:classfile-api', classFileApiRunnerCommand]]) {
@@ -212,6 +222,9 @@ if (packageScripts['ci:partial-multianewarray:test'] !== partialMultianewarrayUn
   throw new Error('Partial multidimensional allocation must retain its exact native/guest regression command.');
 for (const [name, command] of [['ci:classfile-debug:test', classFileDebugUnitCommand], ['ci:classfile-debug', classFileDebugRunnerCommand]]) {
   if (packageScripts[name] !== command) throw new Error(`Package script ${name} must retain the exact C7d3 gate command.`);
+}
+for (const [name, command] of [['ci:classfile-declarations:test', classFileDeclarationsUnitCommand], ['ci:classfile-declarations', classFileDeclarationsRunnerCommand]]) {
+  if (packageScripts[name] !== command) throw new Error(`Package script ${name} must retain the exact C7d4 gate command.`);
 }
 for (const [name, command] of [
   ['ci:java-initialization:test', initializationUnitCommand],
@@ -975,6 +988,9 @@ for (const gate of [
   {name: 'class-file debug', contractName: 'Check phase C class-file debug contracts', runName: 'Run Java class-file debug compatibility',
     uploadName: 'Upload Java class-file debug ledger', unitCommand: classFileDebugUnitCommand, runnerCommand: classFileDebugRunnerCommand,
     stepId: 'java_classfile_debug', ledgerBase: 'java-classfile-debug'},
+  {name: 'class-file declarations', contractName: 'Check phase C class-file declarations contracts', runName: 'Run Java class-file declarations compatibility',
+    uploadName: 'Upload Java class-file declarations ledger', unitCommand: classFileDeclarationsUnitCommand, runnerCommand: classFileDeclarationsRunnerCommand,
+    stepId: 'java_classfile_declarations', ledgerBase: 'java-classfile-declarations', unitTimeout: 5},
 ]) {
   for (const replacement of ['echo selected contracts checked', gate.runnerCommand.replace(' --browser', ' --diagnostic'),
     ...['--case selected', '--group selected', '--fixture selected', '--host node', '--guest node', '--skip-native',
@@ -1007,7 +1023,7 @@ for (const gate of [
       {workflow: replaceRequired(realWorkflow, block, block + block.replace(`- name: ${name}\n`, '- name: Duplicate phase C command\n'))},
       `execute ${gate.name} command exactly once`);
   }
-  for (const [name, minutes, command] of [[gate.contractName, 3, gate.unitCommand], [gate.runName, 40, gate.runnerCommand]]) {
+  for (const [name, minutes, command] of [[gate.contractName, gate.unitTimeout || 3, gate.unitCommand], [gate.runName, 40, gate.runnerCommand]]) {
     for (const replacement of ['timeout-minutes: 0', 'timeout-minutes: 1000', `timeout-minutes: "${minutes}"`,
       `timeout-minutes: \${{ ${minutes} }}`, `timeout-minutes: ${minutes}\n        timeout-minutes: ${minutes}`, `"timeout-minutes": ${minutes}`]) {
       expectCheckerFailure(`unbounded or ambiguous ${name} timeout: ${replacement}`,
