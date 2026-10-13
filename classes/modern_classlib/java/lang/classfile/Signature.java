@@ -63,4 +63,16 @@ public interface Signature {
       return DoppioSignatures.bounded(wildcard, bound);
     }
   }
+
+  interface TypeParam {
+    String identifier();
+    Optional<RefTypeSig> classBound();
+    List<RefTypeSig> interfaceBounds();
+    static TypeParam of(String identifier, RefTypeSig classBound, RefTypeSig... interfaceBounds) {
+      return DoppioSignatures.parameter(identifier, classBound, interfaceBounds);
+    }
+    static TypeParam of(String identifier, Optional<RefTypeSig> classBound, RefTypeSig... interfaceBounds) {
+      return DoppioSignatures.parameter(identifier, classBound, interfaceBounds);
+    }
+  }
 }

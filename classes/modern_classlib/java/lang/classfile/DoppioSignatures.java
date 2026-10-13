@@ -1,6 +1,7 @@
 package java.lang.classfile;
 
 import java.lang.constant.ClassDesc;
+import java.lang.constant.MethodTypeDesc;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -13,8 +14,10 @@ import java.lang.classfile.Signature.ClassTypeSig;
 import java.lang.classfile.Signature.RefTypeSig;
 import java.lang.classfile.Signature.TypeArg;
 import java.lang.classfile.Signature.TypeVarSig;
+import java.lang.classfile.Signature.ThrowableSig;
+import java.lang.classfile.Signature.TypeParam;
 
-/** Typed immutable signature values and a recursive field-signature parser. */
+/** Typed immutable field, class and method signature trees and recursive parsers. */
 final class DoppioSignatures {
   private DoppioSignatures() { }
 
@@ -63,6 +66,35 @@ final class DoppioSignatures {
     return new BoundedValue(Objects.requireNonNull(wildcard), Objects.requireNonNull(bound));
   }
 
+  private static <T> List<T> copyList(List<T> values) {
+    List<T> copy = new ArrayList<T>(Objects.requireNonNull(values));
+    for (T value : copy) Objects.requireNonNull(value);
+    return Collections.unmodifiableList(copy);
+  }
+  private static <T> List<T> copyArray(T[] values) { return copyList(Arrays.asList(Objects.requireNonNull(values).clone())); }
+
+  static TypeParam parameter(String identifier, RefTypeSig bound, RefTypeSig[] interfaces) {
+    return new ParameterValue(Objects.requireNonNull(identifier), Optional.ofNullable(bound), copyArray(interfaces));
+  }
+  static TypeParam parameter(String identifier, Optional<RefTypeSig> bound, RefTypeSig[] interfaces) {
+    return new ParameterValue(Objects.requireNonNull(identifier), Objects.requireNonNull(bound), copyArray(interfaces));
+  }
+  static ClassSignature classSignature(List<TypeParam> parameters, ClassTypeSig superclass, ClassTypeSig[] interfaces) {
+    return new ClassSignatureValue(copyList(parameters), Objects.requireNonNull(superclass), copyArray(interfaces));
+  }
+  static MethodSignature methodSignature(List<TypeParam> parameters, List<ThrowableSig> exceptions,
+      Signature result, Signature[] arguments) {
+    return new MethodSignatureValue(copyList(parameters), copyList(exceptions), Objects.requireNonNull(result), copyArray(arguments));
+  }
+  static MethodSignature methodSignature(MethodTypeDesc descriptor) {
+    Objects.requireNonNull(descriptor);
+    Signature result = of(descriptor.returnType());
+    List<Signature> arguments = new ArrayList<Signature>();
+    for (ClassDesc parameter : descriptor.parameterList()) arguments.add(of(parameter));
+    return new MethodSignatureValue(copyList(Collections.<TypeParam>emptyList()),
+      copyList(Collections.<ThrowableSig>emptyList()), result, Collections.unmodifiableList(arguments));
+  }
+
   static Signature parse(String value) {
     Parser parser = new Parser(Objects.requireNonNull(value));
     try {
@@ -72,10 +104,59 @@ final class DoppioSignatures {
     throw new IllegalArgumentException("Not a valid type signature: " + value);
   }
 
+  static ClassSignature parseClass(String value) {
+    Parser parser = new Parser(Objects.requireNonNull(value));
+    try {
+      List<TypeParam> parameters = parser.parameters();
+      ClassTypeSig superclass = parser.classType();
+      List<ClassTypeSig> interfaces = new ArrayList<ClassTypeSig>();
+      while (parser.position < value.length()) interfaces.add(parser.classType());
+      return new ClassSignatureValue(parameters, superclass, Collections.unmodifiableList(interfaces));
+    } catch (IndexOutOfBoundsException truncated) {
+      throw new IllegalArgumentException("Not a valid class signature: " + value);
+    }
+  }
+
+  static MethodSignature parseMethod(String value) {
+    Parser parser = new Parser(Objects.requireNonNull(value));
+    try {
+      List<TypeParam> parameters = parser.parameters();
+      parser.require('(');
+      List<Signature> arguments = new ArrayList<Signature>();
+      while (!parser.consume(')')) arguments.add(parser.type());
+      Signature result = parser.type();
+      List<ThrowableSig> exceptions = new ArrayList<ThrowableSig>();
+      while (parser.position < value.length()) {
+        parser.require('^');
+        RefTypeSig exception = parser.reference();
+        if (!(exception instanceof ThrowableSig))
+          throw new IllegalArgumentException("Not a valid throwable signature " + exception.signatureString() + " in: " + value);
+        exceptions.add((ThrowableSig) exception);
+      }
+      return new MethodSignatureValue(parameters, Collections.unmodifiableList(exceptions), result, Collections.unmodifiableList(arguments));
+    } catch (IndexOutOfBoundsException truncated) {
+      throw new IllegalArgumentException("Not a valid method signature: " + value);
+    }
+  }
+
   private static final class Parser {
     final String input;
     int position;
     Parser(String input) { this.input = input; }
+
+    List<TypeParam> parameters() {
+      if (!consume('<')) return copyList(Collections.<TypeParam>emptyList());
+      List<TypeParam> values = new ArrayList<TypeParam>();
+      do {
+        String name = identifier();
+        require(':');
+        RefTypeSig bound = input.charAt(position) == ':' ? null : reference();
+        List<RefTypeSig> interfaces = new ArrayList<RefTypeSig>();
+        while (consume(':')) interfaces.add(reference());
+        values.add(new ParameterValue(name, Optional.ofNullable(bound), Collections.unmodifiableList(interfaces)));
+      } while (!consume('>'));
+      return Collections.unmodifiableList(values);
+    }
 
     Signature type() {
       char token = input.charAt(position++);
@@ -111,7 +192,7 @@ final class DoppioSignatures {
         }
         ClassTypeSig result = DoppioSignatures.classType(outer, name, arguments.toArray(new TypeArg[0]));
         if (consume(';')) return result;
-        require('.');
+        if (!consume('.')) throw unexpected(". or ;");
         outer = result;
       }
     }
@@ -222,6 +303,91 @@ final class DoppioSignatures {
   }
 
   private enum UnboundedValue implements TypeArg.Unbounded { INSTANCE }
+
+  private static StringBuilder parameterPrefix(List<TypeParam> parameters) {
+    StringBuilder result = new StringBuilder();
+    if (!parameters.isEmpty()) {
+      result.append('<');
+      for (TypeParam parameter : parameters) {
+        result.append(parameter.identifier()).append(':');
+        if (parameter.classBound().isPresent()) result.append(parameter.classBound().get().signatureString());
+        for (RefTypeSig bound : parameter.interfaceBounds()) result.append(':').append(bound.signatureString());
+      }
+      result.append('>');
+    }
+    return result;
+  }
+
+  private static final class ParameterValue implements TypeParam {
+    final String identifier;
+    final Optional<RefTypeSig> bound;
+    final List<RefTypeSig> interfaces;
+    ParameterValue(String identifier, Optional<RefTypeSig> bound, List<RefTypeSig> interfaces) {
+      this.identifier = identifier; this.bound = bound; this.interfaces = interfaces;
+    }
+    public String identifier() { return identifier; }
+    public Optional<RefTypeSig> classBound() { return bound; }
+    public List<RefTypeSig> interfaceBounds() { return interfaces; }
+    public boolean equals(Object other) {
+      if (!(other instanceof ParameterValue)) return false;
+      ParameterValue value = (ParameterValue) other;
+      return identifier.equals(value.identifier) && bound.equals(value.bound) && interfaces.equals(value.interfaces);
+    }
+    public int hashCode() { return (identifier.hashCode() * 31 + bound.hashCode()) * 31 + interfaces.hashCode(); }
+    public String toString() { return "TypeParamImpl[identifier=" + identifier + ", classBound=" + bound + ", interfaceBounds=" + interfaces + "]"; }
+  }
+
+  private static final class ClassSignatureValue implements ClassSignature {
+    final List<TypeParam> parameters;
+    final ClassTypeSig superclass;
+    final List<ClassTypeSig> interfaces;
+    ClassSignatureValue(List<TypeParam> parameters, ClassTypeSig superclass, List<ClassTypeSig> interfaces) {
+      this.parameters = parameters; this.superclass = superclass; this.interfaces = interfaces;
+    }
+    public List<TypeParam> typeParameters() { return parameters; }
+    public ClassTypeSig superclassSignature() { return superclass; }
+    public List<ClassTypeSig> superinterfaceSignatures() { return interfaces; }
+    public String signatureString() {
+      StringBuilder result = parameterPrefix(parameters).append(superclass.signatureString());
+      for (ClassTypeSig type : interfaces) result.append(type.signatureString());
+      return result.toString();
+    }
+    public boolean equals(Object other) {
+      if (!(other instanceof ClassSignatureValue)) return false;
+      ClassSignatureValue value = (ClassSignatureValue) other;
+      return parameters.equals(value.parameters) && superclass.equals(value.superclass) && interfaces.equals(value.interfaces);
+    }
+    public int hashCode() { return (parameters.hashCode() * 31 + superclass.hashCode()) * 31 + interfaces.hashCode(); }
+    public String toString() { return "ClassSignatureImpl[typeParameters=" + parameters + ", superclassSignature=" + superclass + ", superinterfaceSignatures=" + interfaces + "]"; }
+  }
+
+  private static final class MethodSignatureValue implements MethodSignature {
+    final List<TypeParam> parameters;
+    final List<ThrowableSig> exceptions;
+    final Signature result;
+    final List<Signature> arguments;
+    MethodSignatureValue(List<TypeParam> parameters, List<ThrowableSig> exceptions, Signature result, List<Signature> arguments) {
+      this.parameters = parameters; this.exceptions = exceptions; this.result = result; this.arguments = arguments;
+    }
+    public List<TypeParam> typeParameters() { return parameters; }
+    public List<ThrowableSig> throwableSignatures() { return exceptions; }
+    public Signature result() { return result; }
+    public List<Signature> arguments() { return arguments; }
+    public String signatureString() {
+      StringBuilder value = parameterPrefix(parameters).append('(');
+      for (Signature argument : arguments) value.append(argument.signatureString());
+      value.append(')').append(result.signatureString());
+      for (ThrowableSig exception : exceptions) value.append('^').append(exception.signatureString());
+      return value.toString();
+    }
+    public boolean equals(Object other) {
+      if (!(other instanceof MethodSignatureValue)) return false;
+      MethodSignatureValue value = (MethodSignatureValue) other;
+      return parameters.equals(value.parameters) && exceptions.equals(value.exceptions) && result.equals(value.result) && arguments.equals(value.arguments);
+    }
+    public int hashCode() { return ((parameters.hashCode() * 31 + exceptions.hashCode()) * 31 + result.hashCode()) * 31 + arguments.hashCode(); }
+    public String toString() { return "MethodSignatureImpl[typeParameters=" + parameters + ", throwableSignatures=" + exceptions + ", result=" + result + ", arguments=" + arguments + "]"; }
+  }
 
   private static final class BoundedValue implements TypeArg.Bounded {
     final WildcardIndicator wildcard;
