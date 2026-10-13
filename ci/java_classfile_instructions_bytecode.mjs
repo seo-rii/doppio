@@ -5,6 +5,17 @@ import path from 'node:path';
 import {readStructureLayout} from './java_class_structure_test.mjs';
 import {decodeCoreCode,proveCoreGroup} from './java_core_bytecode.mjs';
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex'),prefix='classes.modern_test.',support=prefix+'ClassFileSupport';
+// JSON otherwise turns NaN/infinities into null and negative zero into zero.
+// Preserve these decoded values explicitly; original class bytes and their
+// hashes continue to bind the exact floating-point bit patterns.
+export function canonicalClassFileProof(value) {
+  if (typeof value === 'number' && (!Number.isFinite(value) || Object.is(value, -0)))
+    return {numericValue: Object.is(value, -0) ? '-0' : String(value)};
+  if (Array.isArray(value)) return value.map(canonicalClassFileProof);
+  if (value && typeof value === 'object')
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, canonicalClassFileProof(item)]));
+  return value;
+}
 const freeze=value=>{if(value&&typeof value==='object'&&!Object.isFrozen(value)){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
 const cb=(name,descriptor,bootstrap=true)=>({name,descriptor,flags:10,bootstrap}),builder='(Ljava/lang/classfile/ClassBuilder;)V',codeBuilder='(Ljava/lang/classfile/CodeBuilder;)V';
 const input=(name,marker,builders,codes,additional=[])=>({source:'classes/modern_fixture/'+name+'.java',mainClass:prefix+name,completionMarker:marker,
@@ -336,9 +347,9 @@ function inputProof(group, classes) {
       codeSha256: method.codeSha256, matches, opaqueCallbackStaticReachabilityProven: false};
   })}));
   const returnedArrayRoutes = group.cases.flatMap(entry => classFileArtifactContracts[entry.id].map(contract => returnedArrayRoute(entry, group, classes, contract)));
-  return {schemaVersion: 1, group: group.id, classes, caseProofs, callbackProofs, codecProofs, caseCallbackProofs, resourceProof, returnedArrayRoutes,
+  return canonicalClassFileProof({schemaVersion: 1, group: group.id, classes, caseProofs, callbackProofs, codecProofs, caseCallbackProofs, resourceProof, returnedArrayRoutes,
     compilerBytesTransformed: false, generatedArtifactsAreCompilerInputs: false, dynamicBranchCoverageProven: false,
-    opaqueCallbackStaticReachabilityProven: false, fullSourceUnitConformanceProven: false, fullPublicClassFileApiConformanceProven: false};
+    opaqueCallbackStaticReachabilityProven: false, fullSourceUnitConformanceProven: false, fullPublicClassFileApiConformanceProven: false});
 }
 
 export function proveClassFileInputGroup(group, directory, classFiles) {

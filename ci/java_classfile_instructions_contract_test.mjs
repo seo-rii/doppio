@@ -10,10 +10,18 @@ import * as gate from './java_classfile_instructions_test.mjs';
 import * as earlier from './java_classfile_api_test.mjs';
 import * as flow from './java_classfile_controlflow_test.mjs';
 import * as extended from './java_classfile_extended_test.mjs';
-import {classFileInputContracts,classFileArtifactContracts,inspectClassFileArtifactBytes,assertClassFileInputProofs,proveClassFileArtifact} from './java_classfile_instructions_bytecode.mjs';
+import {classFileInputContracts,classFileArtifactContracts,inspectClassFileArtifactBytes,assertClassFileInputProofs,proveClassFileArtifact,canonicalClassFileProof} from './java_classfile_instructions_bytecode.mjs';
 import {readStructureLayout} from './java_class_structure_test.mjs';
 import {coreOpcodeNames} from './java_core_bytecode.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),clone=value=>structuredClone(value),sha=value=>crypto.createHash('sha256').update(value).digest('hex');
+
+test('decoded non-finite and signed-zero proof values survive exact JSON replay without null substitution',()=>{
+  const proof=canonicalClassFileProof({constants:[NaN,Infinity,-Infinity,-0,0,1.25,null,'NaN'],nested:{tag:4,value:NaN}});
+  assert.deepEqual(proof,{constants:[{numericValue:'NaN'},{numericValue:'Infinity'},{numericValue:'-Infinity'},{numericValue:'-0'},0,1.25,null,'NaN'],nested:{tag:4,value:{numericValue:'NaN'}}});
+  assert.deepEqual(JSON.parse(JSON.stringify(proof)),proof);
+  assert.deepEqual(canonicalClassFileProof(proof),proof);
+  assert.notDeepEqual(proof,JSON.parse(JSON.stringify({constants:[NaN,Infinity,-Infinity,-0,0,1.25,null,'NaN'],nested:{tag:4,value:NaN}})));
+});
 
 test('initial C7d2 fixes four literal eight-case original groups and twelve mandatory host cells',()=>{
   assert.equal(gate.validateClassFileGroups(),32);assert.deepEqual(gate.classFileGroups.map(x=>x.id),['classfile-instruction-arrays','classfile-instruction-arithmetic','classfile-instruction-members','classfile-instruction-frames']);
