@@ -157,7 +157,8 @@ The full set of configuration options to DoppioJVM are as follows:
   classpath: string[],
   // Paths where native JVM methods are located in the BrowserFS file system,
   // e.g. [/sys/natives, /path/to/my/natives]
-  // Defaults to [].
+  // Defaults to []. Explicit paths must be readable; loading errors fail boot.
+  // Later paths override earlier paths. Files within each path load in lexical order.
   nativeClasspath: string[],
 
   /** UNCOMMON OPTIONS **/

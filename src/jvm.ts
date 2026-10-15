@@ -799,48 +799,35 @@ class JVM {
    * Currently a hack around our
    * @todo Make neater with async stuff.
    */
-  private initializeNatives(doneCb: () => void): void {
-    const registeredModules = JVM.getNativeMethodModules();
-    for (let i = 0; i < registeredModules.length; i++) {
-      this.registerNatives(registeredModules[i]());
-    }
-    var nextDir = () => {
-      if (i === this.nativeClasspath.length) {
-        // Next phase: Load up the files.
-        let count: number = processFiles.length;
-        if (count === 0) {
-          return doneCb();
-        }
-        processFiles.forEach((file: string) => {
-          fs.readFile(file, (err: any, data: NodeBuffer) => {
-            if (!err) {
-              this.registerNatives(this.evalNativeModule(data.toString()));
-            }
-            if (--count === 0) {
-              doneCb();
-            }
-          });
-        });
-      } else {
-        var dir = this.nativeClasspath[i++];
-        fs.readdir(dir, (err: any, files: string[]) => {
-          if (err) {
-            return doneCb();
-          }
-
-          var j: number, file: string;
-          for (j = 0; j < files.length; j++) {
-            file = files[j];
-            if (file.substring(file.length - 3, file.length) === '.js') {
-              processFiles.push(path.join(dir, file));
-            }
-          }
-          nextDir();
-        });
+  private initializeNatives(doneCb: (err?: any) => void): void {
+    try {
+      const registeredModules = JVM.getNativeMethodModules();
+      for (let i = 0; i < registeredModules.length; i++) {
+        this.registerNatives(registeredModules[i]());
       }
-    }, i: number = 0, processFiles: string[] = [];
-
-    nextDir();
+    } catch (err) {
+      return doneCb(err);
+    }
+    // Explicit native paths are required inputs. Later paths override earlier
+    // paths; files within a path register in lexical order, independent of I/O.
+    asyncForEach(this.nativeClasspath, (dir, nextDir) => {
+      fs.readdir(dir, (err: any, files: string[]) => {
+        if (err) return nextDir(err);
+        const modules = files.filter(file => file.slice(-3) === '.js').sort();
+        asyncForEach(modules, (file, nextFile) => {
+          const filename = path.join(dir, file);
+          fs.readFile(filename, (readErr: any, data: NodeBuffer) => {
+            if (readErr) return nextFile(readErr);
+            try {
+              this.registerNatives(this.evalNativeModule(data.toString()));
+            } catch (moduleErr) {
+              return nextFile(new Error(`Unable to load native module ${filename}: ${moduleErr}`));
+            }
+            nextFile();
+          });
+        }, nextDir);
+      });
+    }, doneCb);
   }
 
   /**

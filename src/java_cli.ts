@@ -227,9 +227,9 @@ export default function java(args: string[], opts: JVMCLIOptions,
   }
 
   // User-supplied native classpath.
-  let nativeClasspath = standard.stringOption('native-classpath', null);
+  let nativeClasspath = nonStandard.stringOption('native-classpath', null);
   if (nativeClasspath) {
-    opts.nativeClasspath = opts.nativeClasspath.concat(nativeClasspath.split(':'));
+    opts.nativeClasspath = (opts.nativeClasspath || []).concat(nativeClasspath.split(':'));
   }
 
   // Construct the JVM.
