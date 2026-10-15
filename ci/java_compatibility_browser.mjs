@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import {trackFoundationProcess} from './runtime_foundation_processes.mjs';
 
 const require = createRequire(import.meta.url);
 const adapterPath = fileURLToPath(import.meta.url);
@@ -192,13 +193,36 @@ export function browserCookies({ repoRoot = defaultRepoRoot, baseUrl, environmen
 }
 
 export async function createBrowserSession({ repoRoot = defaultRepoRoot,
-  runtimePath = 'build/release/doppio.js' } = {}) {
+  runtimePath = 'build/release/doppio.js', signal } = {}) {
+  signal?.throwIfAborted();
   repoRoot = fs.realpathSync(repoRoot);
   const assets = await createAssetServer({ repoRoot, runtimePath });
-  let browser;
+  let browser, browserServer, closePromise;
+  const closeResources = () => {
+    if (!closePromise) closePromise = (async () => {
+      signal?.removeEventListener('abort', abort);
+      try {
+        if (browser) await browser.close();
+      } finally {
+        try { if (browserServer) await browserServer.close(); } finally { await assets.close(); }
+      }
+    })();
+    return closePromise;
+  };
+  const abort = () => {
+    // A launch has its own bounded timeout. If it is still pending, the check
+    // immediately after launch closes the server before connecting or executing.
+    if (browserServer) void closeResources().catch(() => {});
+  };
+  signal?.addEventListener('abort', abort, {once: true});
   try {
+    signal?.throwIfAborted();
     const executablePath = process.env.DOPPIO_CHROMIUM_EXECUTABLE || chromium.executablePath();
-    browser = await chromium.launch({ executablePath, headless: true });
+    browserServer = await chromium.launchServer({executablePath, headless: true, timeout: 30_000});
+    trackFoundationProcess(browserServer.process());
+    signal?.throwIfAborted();
+    browser = await chromium.connect(browserServer.wsEndpoint(), {timeout: 30_000});
+    signal?.throwIfAborted();
     const cookies = browserCookies({ repoRoot, baseUrl: assets.baseUrl });
     const provenance = { ...assets.provenance, node: process.version,
       playwright: require('playwright/package.json').version, chromium: browser.version(),
@@ -218,6 +242,7 @@ export async function createBrowserSession({ repoRoot = defaultRepoRoot,
       },
       async execute({ classesPath, mainClass, jarPath, arguments: programArguments = [], timeoutMs,
         standardInput = '', maxOutputBytes = outputLimitBytes }) {
+        signal?.throwIfAborted();
         requireCondition(!closed && !active, 'Browser sessions require one active execution at a time.');
         requireCondition(((typeof mainClass === 'string' && mainClass.length > 0 && jarPath === undefined) ||
           (mainClass === undefined && typeof jarPath === 'string' && jarPath.startsWith('/classes/') &&
@@ -344,13 +369,12 @@ export async function createBrowserSession({ repoRoot = defaultRepoRoot,
         return record;
       },
       async close() {
-        if (closed) return;
         closed = true;
-        try { await browser.close(); } finally { await assets.close(); }
+        return closeResources();
       },
     };
   } catch (error) {
-    try { if (browser) await browser.close(); } finally { await assets.close(); }
+    await closeResources();
     throw error;
   }
 }

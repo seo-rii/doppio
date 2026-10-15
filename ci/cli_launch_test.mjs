@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {runCommand} from './run_java_compatibility.mjs';
 import {createBrowserSession} from './java_compatibility_browser.mjs';
+import {createFoundationCancellation} from './runtime_foundation_processes.mjs';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const flags = process.argv.slice(2);
@@ -51,6 +52,7 @@ const sources = {
 };
 for (const [name, contents] of Object.entries(sources)) fs.writeFileSync(path.join(work, name), contents);
 const ledger = {schemaVersion: 1, scope: 'CLI argument, assertion and native module launch regressions',
+  runId: process.env.DOPPIO_FOUNDATIONS_RUN_ID || null,
   node: process.version, startedAt: new Date().toISOString(), status: 'running',
   sources: Object.entries(sources).map(([name, value]) => ({name,
     sha256: crypto.createHash('sha256').update(value).digest('hex')})), cases: []};
@@ -73,8 +75,9 @@ if (selected) assert.ok(selected.length > 0 && selected.every(id => inventory.in
 ledger.selected = selected || inventory;
 ledger.omitted = inventory.filter(id => selected && !selected.includes(id));
 const included = id => selected === null || selected.includes(id);
+const cancellation = createFoundationCancellation();
 const command = (executable, args) => runCommand(executable, args,
-  {cwd: repoRoot, timeoutMs: 30_000, maxOutputBytes: 1024 * 1024});
+  {cwd: repoRoot, timeoutMs: 30_000, maxOutputBytes: 1024 * 1024, signal: cancellation.signal});
 function completed(record, code = 0) {
   assert.equal(record.timedOut, false, 'Execution must finish within the original budget');
   assert.equal(record.signal, null);
@@ -127,7 +130,7 @@ try {
     assert.match(missing.stderr, /ENOENT/);
   }
   if (flags.includes('--browser') && included('chromium-application-arguments')) {
-    browser = await createBrowserSession({repoRoot});
+    browser = await createBrowserSession({repoRoot, signal: cancellation.signal});
     ledger.browserProvenance = browser.provenance;
     const execution = await browser.execute({classesPath: classes, mainClass: 'cli.Probe',
       arguments: ['args', ...rawArguments], timeoutMs: 30_000});
@@ -148,9 +151,16 @@ try {
   ledger.error = error.stack;
   throw error;
 } finally {
-  await browser?.close();
-  ledger.finishedAt = new Date().toISOString();
-  fs.writeFileSync(path.join(repoRoot, 'build/cli-foundations-results.json'),
-    JSON.stringify(ledger, null, 2) + '\n', {mode: 0o600});
-  fs.rmSync(work, {recursive: true, force: true});
+  try {
+    await browser?.close();
+  } finally {
+    cancellation.dispose();
+    ledger.finishedAt = new Date().toISOString();
+    try {
+      fs.writeFileSync(path.join(repoRoot, 'build/cli-foundations-results.json'),
+        JSON.stringify(ledger, null, 2) + '\n', {mode: 0o600});
+    } finally {
+      fs.rmSync(work, {recursive: true, force: true});
+    }
+  }
 }

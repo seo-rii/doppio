@@ -587,7 +587,7 @@ for (const [name, fields] of [
   ]],
   ['Run CLI and JAR foundation compatibility', [
     'id: runtime_foundations',
-    'timeout-minutes: 105',
+    'timeout-minutes: 115',
     'run: yarn ci:foundations',
   ]],
   ['Upload runtime foundation results', [

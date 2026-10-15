@@ -623,7 +623,7 @@ for (const name of foundationStepNames) {
     ['run: yarn ci:foundations:test', 'run: echo foundation contracts checked'],
   ] : name === foundationStepNames[1] ? [
     ['id: runtime_foundations', 'id: foundations_without_ledger_gate'],
-    ['timeout-minutes: 105', 'timeout-minutes: 150'],
+    ['timeout-minutes: 115', 'timeout-minutes: 150'],
     ['run: yarn ci:foundations', 'run: node ci/cli_launch_test.mjs'],
     ['run: yarn ci:foundations', 'run: yarn ci:foundations || true'],
   ] : [

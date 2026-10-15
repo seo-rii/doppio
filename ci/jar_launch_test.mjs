@@ -7,6 +7,7 @@ import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import {runCommand, validateToolchains} from './run_java_compatibility.mjs';
 import {treeDigest} from './prepare_java_compatibility_toolchains.mjs';
+import {createFoundationCancellation} from './runtime_foundation_processes.mjs';
 
 const filename = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(filename), '..');
@@ -83,9 +84,13 @@ function assertExecution(record, entry, label) {
 
 export async function runJarTests({browser = false, caseIds = []} = {}) {
   const ledger = {schemaVersion: 1, scope: ledgerScope, status: 'running', startedAt: new Date().toISOString(),
+    runId: process.env.DOPPIO_FOUNDATIONS_RUN_ID || null,
     hosts: ['native', 'cli-jit', 'api-jit', 'api-int', ...(browser ? ['chromium'] : [])],
     node: process.version, normalization: 'CRLF to LF only',
     compilations: [], packaging: [], cases: [], invalidPaths: []};
+  const cancellation = createFoundationCancellation();
+  const command = (executable, args, options) => runCommand(executable, args,
+    {...options, signal: cancellation.signal});
   let temporaryRoot;
   let session;
   try {
@@ -99,7 +104,7 @@ export async function runJarTests({browser = false, caseIds = []} = {}) {
     const java17 = tool => process.env.JAVA_HOME ? path.join(process.env.JAVA_HOME, 'bin', tool) : tool;
     const java25 = tool => path.join(jdk25.home, 'bin', tool);
     temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'doppio-jar-launch-한글 '));
-    const native17Version = await runCommand(java17('java'), ['-version'], {cwd: temporaryRoot, timeoutMs});
+    const native17Version = await command(java17('java'), ['-version'], {cwd: temporaryRoot, timeoutMs});
     ledger.toolchains = {java17: native17Version, java25: {...jdk25, treeSha256: expectedJdkDigest}};
     assert.equal(native17Version.exitCode, 0, 'The Java 17 native oracle must start.');
     assert.match(native17Version.stderr + native17Version.stdout, /version "17\./,
@@ -157,7 +162,7 @@ export async function runJarTests({browser = false, caseIds = []} = {}) {
       [java25('javac'), classes25, [path.join(repoRoot, 'classes/modern_fixture/Java25InstanceMain.java'),
         path.join(repoRoot, 'classes/modern_fixture/Java25CompactMain.java')], 25],
     ]) {
-      const result = await runCommand(tool, ['--release', String(release), '-encoding', 'UTF-8',
+      const result = await command(tool, ['--release', String(release), '-encoding', 'UTF-8',
         '-proc:none', '-d', classes, ...sources], {cwd: temporaryRoot, timeoutMs: 60_000});
       ledger.compilations.push({release, execution: result});
       assertExecution(result, {exitCode: 0, stdout: ''}, `compile Java ${release} JAR fixtures`);
@@ -222,13 +227,13 @@ export async function runJarTests({browser = false, caseIds = []} = {}) {
           `Manifest-Version: 1.0\r\nMain-Class: ${entry.mainClass}\r\n\r\n`);
         args.push('-C', manifestRoot, 'META-INF/MANIFEST.MF');
       }
-      const packed = await runCommand(java17('jar'), args, {cwd: temporaryRoot, timeoutMs: 30_000});
+      const packed = await command(java17('jar'), args, {cwd: temporaryRoot, timeoutMs: 30_000});
       ledger.packaging.push({id: entry.id, execution: packed});
       assertExecution(packed, {exitCode: 0, stdout: ''}, `pack ${entry.id}`);
     }
     if (browser) {
       const {createBrowserSession} = await import('./java_compatibility_browser.mjs');
-      session = await createBrowserSession({repoRoot});
+      session = await createBrowserSession({repoRoot, signal: cancellation.signal});
       ledger.browser = session.provenance;
     }
     const runner = path.join(runtimeRoot, 'console/runner.js');
@@ -242,7 +247,7 @@ export async function runJarTests({browser = false, caseIds = []} = {}) {
           nativeError: (entry.nativeError || entry.error)?.source || null},
         status: 'running', execution: {}};
       ledger.cases.push(record);
-      const native = await runCommand(entry.release === 25 ? java25('java') : java17('java'),
+      const native = await command(entry.release === 25 ? java25('java') : java17('java'),
         ['-jar', entry.jarPath, ...programArguments], {cwd: temporaryRoot, timeoutMs});
       record.execution.native = native;
       assertExecution(native, {...entry, error: entry.nativeError || entry.error}, `native ${entry.id}`);
@@ -255,7 +260,7 @@ export async function runJarTests({browser = false, caseIds = []} = {}) {
           const args = host === 'cli-jit' ? [runner, '-jar', entry.jarPath, ...programArguments] :
             [filename, '--api-run', runtimeRoot, entry.jarPath, host === 'api-int' ? 'int' : 'jit',
               JSON.stringify(programArguments)];
-          result = await runCommand(process.execPath, ['--no-deprecation', ...args], {cwd: temporaryRoot, timeoutMs});
+          result = await command(process.execPath, ['--no-deprecation', ...args], {cwd: temporaryRoot, timeoutMs});
         }
         record.execution[host] = result;
         assertExecution(result, entry, `${host} ${entry.id}`);
@@ -269,7 +274,7 @@ export async function runJarTests({browser = false, caseIds = []} = {}) {
     for (const jarPath of ['', path.join(archives, 'absent.jar')]) {
       for (const args of [[runner, '-jar', jarPath],
         [filename, '--api-run', runtimeRoot, jarPath, 'jit', '[]']]) {
-        const result = await runCommand(process.execPath, ['--no-deprecation', ...args],
+        const result = await command(process.execPath, ['--no-deprecation', ...args],
           {cwd: temporaryRoot, timeoutMs});
         ledger.invalidPaths.push({path: jarPath, execution: result});
         assert.equal(result.timedOut, false, 'Empty/missing JAR path must not hang.');
@@ -294,6 +299,7 @@ export async function runJarTests({browser = false, caseIds = []} = {}) {
     try {
       if (session) await session.close();
     } finally {
+      cancellation.dispose();
       if (temporaryRoot) fs.rmSync(temporaryRoot, {recursive: true, force: true});
       ledger.notRunCases = (ledger.selectedCases || []).filter(id => !ledger.cases.some(record => record.id === id));
       for (const record of ledger.cases) {

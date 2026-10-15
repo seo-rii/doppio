@@ -183,7 +183,7 @@
     "ci:check-scala-modern-source-guards": "node ci/check_scala_modern_source_guards.mjs",
     "ci:check-scala-modern-source-guards:test": "node ci/check_scala_modern_source_guards_test.mjs",
     "ci:check-package-artifact": "node ci/package_artifact_smoke.mjs",
-    "ci:foundations:test": "node --test --test-concurrency=2 ci/modern_classfile_generator_test.cjs ci/heap_allocation_test.cjs ci/cli_foundations_test.cjs ci/native_module_loading_test.cjs ci/jar_manifest_test.cjs",
+    "ci:foundations:test": "node --test --test-concurrency=2 ci/modern_classfile_generator_test.cjs ci/heap_allocation_test.cjs ci/cli_foundations_test.cjs ci/native_module_loading_test.cjs ci/jar_manifest_test.cjs ci/runtime_foundations_test.mjs",
     "ci:foundations": "node ci/runtime_foundations.mjs",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "typecheck:bootstrap": "tsc --noEmit --ignoreConfig --noImplicitAny --noImplicitThis false --strict false --strictNullChecks false --strictPropertyInitialization false --useUnknownInCatchVariables false --module commonjs --target ES2015 --skipLibCheck types/legacy-globals.d.ts tasks/*.ts Grunttasks.ts",
