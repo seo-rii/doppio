@@ -11,7 +11,7 @@ function shellEscape(str: string): string {
 
 function modernJava(grunt: IGrunt) {
   function generateSimpleClass(className: string, majorVersion: number, mainOutput?: string): Buffer {
-    var bytes: number[] = [];
+    var bytes: number[] = [], nextConstant = 1;
 
     function u1(value: number): void {
       bytes.push(value & 0xff);
@@ -25,39 +25,44 @@ function modernJava(grunt: IGrunt) {
       bytes.push((value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff);
     }
 
-    function utf8(value: string): void {
+    function utf8(value: string): number {
       var buf = Buffer.from(value, 'utf8');
       u1(1);
       u2(buf.length);
       for (var i = 0; i < buf.length; i++) {
         u1(buf[i]);
       }
+      return nextConstant++;
     }
 
-    function cls(nameIndex: number): void {
+    function cls(nameIndex: number): number {
       u1(7);
       u2(nameIndex);
+      return nextConstant++;
     }
 
-    function nameAndType(nameIndex: number, descriptorIndex: number): void {
+    function nameAndType(nameIndex: number, descriptorIndex: number): number {
       u1(12);
       u2(nameIndex);
       u2(descriptorIndex);
+      return nextConstant++;
     }
 
-    function ref(tag: number, classIndex: number, nameAndTypeIndex: number): void {
+    function ref(tag: number, classIndex: number, nameAndTypeIndex: number): number {
       u1(tag);
       u2(classIndex);
       u2(nameAndTypeIndex);
+      return nextConstant++;
     }
 
-    function str(stringIndex: number): void {
+    function str(stringIndex: number): number {
       u1(8);
       u2(stringIndex);
+      return nextConstant++;
     }
 
     function codeAttr(code: number[], maxStack: number, maxLocals: number): void {
-      u2(7);
+      u2(codeName);
       u4(12 + code.length);
       u2(maxStack);
       u2(maxLocals);
@@ -67,58 +72,57 @@ function modernJava(grunt: IGrunt) {
       u2(0);
     }
 
+    // Keep symbolic references to every pool entry used by class metadata or
+    // bytecode. Inserting a constant must not silently rename a constructor.
+    var thisClass = cls(utf8(className)),
+      objectClass = cls(utf8('java/lang/Object')),
+      constructorName = utf8('<init>'),
+      constructorDescriptor = utf8('()V'),
+      codeName = utf8('Code'),
+      objectConstructor = ref(10, objectClass, nameAndType(constructorName, constructorDescriptor)),
+      mainName: number, mainDescriptor: number, systemOut: number,
+      println: number, outputString: number;
+    if (mainOutput !== undefined) {
+      mainName = utf8('main');
+      mainDescriptor = utf8('([Ljava/lang/String;)V');
+      var systemClass = cls(utf8('java/lang/System')),
+        outName = utf8('out'),
+        outDescriptor = utf8('Ljava/io/PrintStream;'),
+        printStreamClass = cls(utf8('java/io/PrintStream')),
+        printlnName = utf8('println'),
+        printlnDescriptor = utf8('(Ljava/lang/String;)V');
+      systemOut = ref(9, systemClass, nameAndType(outName, outDescriptor));
+      println = ref(10, printStreamClass, nameAndType(printlnName, printlnDescriptor));
+      outputString = str(utf8(mainOutput));
+    }
+    var constantPool = bytes;
+    bytes = [];
     u4(0xcafebabe);
     u2(0);
     u2(majorVersion);
-    u2(mainOutput === undefined ? 10 : 26);
-    cls(2);
-    utf8(className);
-    cls(4);
-    utf8('java/lang/Object');
-    utf8('<init>');
-    utf8('()V');
-    utf8('Code');
-    ref(10, 3, 9);
-    nameAndType(5, 6);
-    if (mainOutput !== undefined) {
-      utf8('main');
-      utf8('([Ljava/lang/String;)V');
-      cls(13);
-      utf8('java/lang/System');
-      ref(9, 12, 15);
-      nameAndType(16, 17);
-      utf8('out');
-      utf8('Ljava/io/PrintStream;');
-      cls(19);
-      utf8('java/io/PrintStream');
-      ref(10, 18, 21);
-      nameAndType(22, 23);
-      utf8('println');
-      utf8('(Ljava/lang/String;)V');
-      str(25);
-      utf8(mainOutput);
-    }
+    u2(nextConstant);
+    constantPool.forEach(u1);
 
     u2(0x0021);
-    u2(1);
-    u2(3);
+    u2(thisClass);
+    u2(objectClass);
     u2(0);
     u2(0);
     u2(mainOutput === undefined ? 1 : 2);
     u2(0x0001);
-    u2(4);
-    u2(6);
+    u2(constructorName);
+    u2(constructorDescriptor);
     u2(1);
-    codeAttr([0x2a, 0xb7, 0x00, 0x08, 0xb1], 1, 1);
+    codeAttr([0x2a, 0xb7, objectConstructor >>> 8, objectConstructor & 0xff, 0xb1], 1, 1);
     if (mainOutput !== undefined) {
       u2(0x0009);
-      u2(10);
-      u2(11);
+      u2(mainName);
+      u2(mainDescriptor);
       u2(1);
       codeAttr([
-        0xb2, 0x00, 0x0e,
-        0x12, 0x18,
-        0xb6, 0x00, 0x14,
+        0xb2, systemOut >>> 8, systemOut & 0xff,
+        0x13, outputString >>> 8, outputString & 0xff,
+        0xb6, println >>> 8, println & 0xff,
         0xb1
       ], 2, 1);
     }
