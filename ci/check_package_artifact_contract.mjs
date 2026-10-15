@@ -92,6 +92,10 @@ export function checkPackageArtifactContract(sources) {
     'docs/support.md': sources.supportSource
   };
   const packagedPaths = new Set(['README.md', 'LICENSE', 'package.json', ...manifest.files]);
+  // bin and dist are directory entries, so their descendants belong to the
+  // package contract too. Generated dist files need not exist before prepack;
+  // the installed-consumer check separately verifies every actual target.
+  const packagedDirectories = ['bin/', 'dist/'];
   for (const filename of packagedPaths) {
     let directory = path.dirname(filename);
     while (directory !== '.') {
@@ -101,7 +105,10 @@ export function checkPackageArtifactContract(sources) {
   }
   validatePackagedRelativeLinks(repoRoot, Object.keys(documentation), {
     readFile: (filename) => documentation[path.relative(repoRoot, filename).split(path.sep).join('/')],
-    exists: (filename) => packagedPaths.has(path.relative(repoRoot, filename).split(path.sep).join('/'))
+    exists: (filename) => {
+      const relative = path.relative(repoRoot, filename).split(path.sep).join('/');
+      return packagedPaths.has(relative) || packagedDirectories.some(directory => relative.startsWith(directory));
+    }
   });
   assert.equal(manifest.scripts.prepack, 'node ./prepack.cjs');
   assert.equal(manifest.scripts.install, 'node ./install.js');

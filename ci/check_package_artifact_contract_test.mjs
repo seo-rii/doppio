@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import path from 'node:path';
+import {validatePackagedRelativeLinks} from './package_documentation_links.mjs';
 import {
   checkPackageArtifactContract,
   readPackageArtifactContract
@@ -7,6 +9,12 @@ import {
 const baseline = readPackageArtifactContract();
 let rejectedCases = 0;
 checkPackageArtifactContract(baseline);
+for (const target of ['bin/doppio', 'bin/doppioh', 'dist/release/doppio.js', 'dist/release-cli/src/doppiojvm.js']) {
+  checkPackageArtifactContract({...baseline,
+    readmeSource: `${baseline.readmeSource}\n[Packaged descendant](${target})\n`,
+    supportSource: `${baseline.supportSource}\n[Packaged descendant](../${target})\n`
+  });
+}
 
 function replaced(source, from, to) {
   assert.ok(source.includes(from), `fixture replacement did not match: ${from}`);
@@ -104,6 +112,14 @@ for (const [field, filename] of [
     [field]: `${baseline[field]}\n[unpackaged fixture](classes/NotPackaged.java)\n`
   });
 }
+for (const target of ['bin-other/doppio', 'dist-old/release/doppio.js', 'dist/../ci/not-packaged.mjs']) {
+  rejects(`directory membership respects path boundaries: ${target}`, {
+    readmeSource: `${baseline.readmeSource}\n[Outside directory allowlist](${target})\n`
+  });
+}
+assert.throws(() => validatePackagedRelativeLinks(path.resolve(import.meta.dirname, '..'), ['README.md'], {
+  readFile: () => '[Missing installed descendant](bin/does-not-exist-package-contract-fixture)'
+}), /broken packaged relative link/, 'installed-consumer validation still rejects absent directory descendants');
 assert.throws(() => checkPackageArtifactContract({
   ...baseline,
   modernDocsSource: `${baseline.modernDocsSource}\n[first](../classes/First.java)\n[second](../ci/second.mjs)\n`
