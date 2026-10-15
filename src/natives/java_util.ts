@@ -87,7 +87,7 @@ export default function (): any {
   }
   function GetMultiReleaseVersions(zipfs: TZipFS): number[] {
     try {
-      let manifest = zipfs.getCentralDirectoryEntry('/META-INF/MANIFEST.MF').getData().toString('utf8');
+      let manifest = zipfs.getCentralDirectoryEntry('/META-INF/MANIFEST.MF').getData();
       if (!manifestHasMultiReleaseTrue(manifest)) {
         return [];
       }
