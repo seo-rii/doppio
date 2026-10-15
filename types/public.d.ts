@@ -1,5 +1,11 @@
 export as namespace Doppio;
 
+export interface AssertionDirective {
+  enabled: boolean;
+  scope: 'default' | 'system' | 'package' | 'class';
+  target?: string;
+}
+
 export interface JVMOptions {
   doppioHomePath: string;
   classpath?: string[];
@@ -9,6 +15,7 @@ export interface JVMOptions {
   enableSystemAssertions?: boolean;
   enableAssertions?: boolean | string[];
   disableAssertions?: string[];
+  assertionDirectives?: AssertionDirective[];
   properties?: Record<string, string>;
   tmpDir?: string;
   responsiveness?: number | (() => number);

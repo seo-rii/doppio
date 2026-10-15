@@ -734,10 +734,9 @@ export default function (): any {
     }
 
     public static 'desiredAssertionStatus0(Ljava/lang/Class;)Z'(thread: JVMThread, arg0: JVMTypes.java_lang_Class): boolean {
-      if (arg0.$cls.getLoader().getLoaderObject() === null) {
-        return thread.getJVM().areSystemAssertionsEnabled();
-      }
-      return false;
+      if (!(arg0.$cls instanceof ReferenceClassData)) return false;
+      return thread.getJVM().isAssertionEnabled(arg0.$cls.getExternalName(),
+        arg0.$cls.getLoader().getLoaderObject() === null);
     }
 
   }
@@ -1097,7 +1096,6 @@ export default function (): any {
       let jvm = thread.getJVM(), bsCl = thread.getBsCl();
       thread.import('Ljava/lang/AssertionStatusDirectives;', (asd: typeof JVMTypes.java_lang_AssertionStatusDirectives) => {
         let directives = new asd();
-        let enabledAssertions = jvm.getEnabledAssertions();
         // The classes for which assertions are to be enabled or disabled.
         let classes: string[] = [],
           // A parallel array to classes, indicating whether each class
@@ -1108,35 +1106,24 @@ export default function (): any {
           // A parallel array to packages, indicating whether each
           // package-tree is to have assertions enabled or disabled.
           packageEnabled: number[] = [],
-          deflt: boolean = false,
-          processAssertions = (enabled: number) => {
-            return (name: string): void => {
-              let dotIndex = name.indexOf('...');
-              if (dotIndex === -1) {
-                classes.push(name);
-                classEnabled.push(enabled);
-              } else {
-                packages.push(name.slice(0, dotIndex));
-                packageEnabled.push(enabled);
-              }
-            };
-          };
-
-        jvm.getDisabledAssertions().forEach(processAssertions(0));
-
-        if (typeof(enabledAssertions) === 'boolean') {
-          deflt = <boolean> enabledAssertions;
-        } else if (Array.isArray(enabledAssertions)) {
-          enabledAssertions.forEach(processAssertions(1));
-        } else {
-          return thread.throwNewException('Ljava/lang/InternalError;', `Expected enableAssertions option to be a boolean or an array of strings.`);
-        }
+          deflt: boolean = false;
+        jvm.getAssertionDirectives().forEach(directive => {
+          if (directive.scope === 'default') {
+            deflt = directive.enabled;
+          } else if (directive.scope === 'class') {
+            classes.push(directive.target);
+            classEnabled.push(directive.enabled ? 1 : 0);
+          } else if (directive.scope === 'package') {
+            packages.push(directive.target);
+            packageEnabled.push(directive.enabled ? 1 : 0);
+          }
+        });
 
         directives['java/lang/AssertionStatusDirectives/classes'] = util.newArrayFromData<JVMTypes.java_lang_String>(thread, bsCl, '[Ljava/lang/String;', classes.map((cls) => util.initString(bsCl, cls)));
         directives['java/lang/AssertionStatusDirectives/classEnabled'] = util.newArrayFromData<number>(thread, bsCl, '[Z', classEnabled);
-        directives['java/lang/AssertionStatusDirectives/packages'] = util.newArrayFromData<JVMTypes.java_lang_String>(thread, bsCl, '[Ljava/lang/String;', packages.map((pkg) => util.initString(bsCl, pkg)));
+        directives['java/lang/AssertionStatusDirectives/packages'] = util.newArrayFromData<JVMTypes.java_lang_String>(thread, bsCl, '[Ljava/lang/String;', packages.map((pkg) => pkg === '' ? null : util.initString(bsCl, pkg)));
         directives['java/lang/AssertionStatusDirectives/packageEnabled'] = util.newArrayFromData<number>(thread, bsCl, '[Z', packageEnabled);
-        directives['java/lang/AssertionStatusDirectives/deflt'] = (<boolean> enabledAssertions) ? 1 : 0;
+        directives['java/lang/AssertionStatusDirectives/deflt'] = deflt ? 1 : 0;
 
         thread.asyncReturn(directives);
       });

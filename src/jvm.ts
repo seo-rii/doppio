@@ -12,7 +12,8 @@ import {ThreadStatus, JVMStatus} from './enums';
 import gLong from './gLong';
 import Heap from './heap';
 import assert from './assert';
-import {JVMOptions} from './interfaces';
+import {AssertionDirective, JVMOptions} from './interfaces';
+import {assertionDefault, assertionDirectives, assertionStatus} from './assertions';
 import {validateResponsiveness} from './responsiveness';
 import * as JVMTypes from '../includes/JVMTypes';
 import Parker from './parker';
@@ -79,9 +80,9 @@ class JVM {
   // The initial JVM thread used to kick off execution.
   private firstThread: JVMThread = null;
   private responsiveness: number | (() => number) = null;
-  private enableSystemAssertions: boolean = false;
   private enabledAssertions: boolean | string[] = false;
   private disabledAssertions: string[] = [];
+  private assertionDirectives: AssertionDirective[] = [];
   private printJITCompilation: boolean = false;
   private systemClassLoader: ClassLoader = null;
   private nextRef: number = 0;
@@ -177,9 +178,6 @@ class JVM {
     }
 
     this.nativeClasspath = opts.nativeClasspath;
-    if (opts.enableSystemAssertions) {
-      this.enableSystemAssertions = opts.enableSystemAssertions;
-    }
     if (opts.enableAssertions) {
       this.enabledAssertions = opts.enableAssertions;
     }
@@ -187,6 +185,7 @@ class JVM {
       this.disabledAssertions = opts.disableAssertions;
     }
 
+    this.assertionDirectives = assertionDirectives(opts);
     this.responsiveness = typeof opts.responsiveness === 'function' ?
       opts.responsiveness : validateResponsiveness(opts.responsiveness);
 
@@ -291,7 +290,7 @@ class JVM {
 
           // Initialize assertion data.
           // TODO: Is there a better way to force this? :|
-          let defaultAssertionStatus = this.enabledAssertions === true ? 1 : 0;
+          let defaultAssertionStatus = assertionDefault(this.assertionDirectives, false) ? 1 : 0;
           rv['java/lang/ClassLoader/setDefaultAssertionStatus(Z)V'](firstThread, [defaultAssertionStatus], next);
         }
       });
@@ -781,7 +780,15 @@ class JVM {
    * Returns `true` if system assertions are enabled, false otherwise.
    */
   public areSystemAssertionsEnabled(): boolean {
-    return this.enableSystemAssertions;
+    return assertionDefault(this.assertionDirectives, true);
+  }
+
+  public getAssertionDirectives(): AssertionDirective[] {
+    return this.assertionDirectives.slice(0);
+  }
+
+  public isAssertionEnabled(className: string, systemClass: boolean): boolean {
+    return assertionStatus(this.assertionDirectives, className, systemClass);
   }
 
   /**

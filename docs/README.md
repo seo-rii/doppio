@@ -173,6 +173,13 @@ The full set of configuration options to DoppioJVM are as follows:
   // Disable assertions on specific classes / packages
   // (see http://docs.oracle.com/javase/7/docs/technotes/guides/language/assert.html for syntax)
   disableAssertions?: string[],
+  // Optional ordered overrides, applied after the legacy assertion options.
+  // More specific classes/packages take priority; repeated targets use the last value.
+  assertionDirectives?: {
+    enabled: boolean,
+    scope: 'default' | 'system' | 'package' | 'class',
+    target?: string
+  }[],
   // True if assertions are enabled in system classes, false otherwise.
   // (equivalent to -esa command line option)
   enableSystemAssertions?: boolean,

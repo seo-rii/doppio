@@ -178,24 +178,21 @@ export default function java(args: string[], opts: JVMCLIOptions,
     })(doneCb);
   }
 
-  if (standard.flag('enablesystemassertions', false)) {
-    opts.enableSystemAssertions = true;
-  }
-
-  if (standard.flag('disablesystemassertions', false)) {
-    opts.enableSystemAssertions = false;
-  }
-
-  if (standard.flag('enableassertions', false)) {
-    opts.enableAssertions = true;
-  } else if (standard.stringOption('enableassertions', null)) {
-    opts.enableAssertions = standard.stringOption('enableassertions', null).split(':');
-  }
-
-  if (standard.stringOption('disableassertions', null)) {
-    opts.disableAssertions = standard.stringOption('disableassertions', null).split(':');
-  }
-  // NOTE: Boolean form of -disableassertions is a NOP.
+  opts.assertionDirectives = (opts.assertionDirectives || []).slice(0);
+  standard.orderedOptions().forEach(option => {
+    const enabled = option.name === 'enableassertions' || option.name === 'enablesystemassertions';
+    if (option.name === 'enablesystemassertions' || option.name === 'disablesystemassertions') {
+      opts.assertionDirectives.push({enabled, scope: 'system'});
+    } else if (option.name === 'enableassertions' || option.name === 'disableassertions') {
+      if (typeof option.value === 'boolean') {
+        opts.assertionDirectives.push({enabled, scope: 'default'});
+      } else {
+        const isPackage = option.value.slice(-3) === '...';
+        opts.assertionDirectives.push({enabled, scope: isPackage ? 'package' : 'class',
+          target: isPackage ? option.value.slice(0, -3) : option.value});
+      }
+    }
+  });
 
   // Bootstrap classpath items.
   let bscl = nonStandard.stringOption('bootclasspath', null);

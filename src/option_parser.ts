@@ -48,18 +48,30 @@ export interface RawPrefixParseResult {
   [optionName: string]: boolean | string | {[name: string]: string}
 }
 
+export interface ParsedOption {
+  // Canonical name, even when an alias was used.
+  name: string;
+  // MAP_SYNTAX retains the individual key=value operand here.
+  value: boolean | string;
+}
+
 // Usage.
 
 export class PrefixParseResult {
   private _result: RawPrefixParseResult;
   private _unparsedArgs: string[];
-  constructor(result: RawPrefixParseResult, unparsedArgs: string[] = []) {
+  constructor(result: RawPrefixParseResult, unparsedArgs: string[] = [],
+              private _orderedOptions: ParsedOption[] = []) {
     this._result = result;
     this._unparsedArgs = unparsedArgs;
   }
 
   public unparsedArgs(): string[] {
     return this._unparsedArgs;
+  }
+
+  public orderedOptions(): ParsedOption[] {
+    return this._orderedOptions.slice(0);
   }
 
   public flag(name: string, defaultVal: boolean): boolean {
@@ -141,11 +153,14 @@ export class OptionParser {
    */
   public parse(argv: string[]): ParseResult {
     let result: {[name: string]: RawPrefixParseResult} = {},
+      orderedOptions: {[name: string]: ParsedOption[]} = {},
       ptr: number = 0,
       len: number;
 
-    this._prefixes.forEach((prefix) => result[prefix] = {});
-
+    this._prefixes.forEach((prefix) => {
+      result[prefix] = {};
+      orderedOptions[prefix] = [];
+    });
     len = argv.length;
 
     while (ptr < len) {
@@ -208,6 +223,12 @@ export class OptionParser {
           throw new Error(`Unrecognized option: -${arg}`);
         }
 
+        const value = result[opt.prefix][opt.name];
+        orderedOptions[opt.prefix].push({
+          name: opt.name,
+          value: typeof value === 'object' ? arg.slice(opt.name.length) : value
+        });
+
         if (opt.stopParsing) {
           ptr++;
           break;
@@ -224,7 +245,7 @@ export class OptionParser {
     let unparsedArgs = argv.slice(ptr),
       rv: ParseResult = {};
     Object.keys(result).forEach((prefix) => {
-      rv[prefix] = new PrefixParseResult(result[prefix], unparsedArgs);
+      rv[prefix] = new PrefixParseResult(result[prefix], unparsedArgs, orderedOptions[prefix]);
     });
     return rv;
   }
