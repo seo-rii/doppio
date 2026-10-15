@@ -420,6 +420,9 @@ if (completeResult.status !== 0) {
 }
 
 for (const name of [
+  'Check runtime foundation contracts',
+  'Run CLI and JAR foundation compatibility',
+  'Upload runtime foundation results',
   'Check Java compatibility baseline tooling',
   'Check phase A inventory and evidence contracts',
   'Build Java compatibility browser runtime',
@@ -605,6 +608,60 @@ for (const [original, replacement] of [
     { workflow: replaceRequired(realWorkflow, original, replacement) },
     'exact bounded, fail-closed baseline command or artifact contract'
   );
+}
+
+// Foundation commands and evidence are part of the same fail-closed runtime gate.
+const foundationStepNames = ['Check runtime foundation contracts',
+  'Run CLI and JAR foundation compatibility', 'Upload runtime foundation results'];
+for (const name of foundationStepNames) {
+  const block = realWorkflow.match(new RegExp(
+    String.raw`      - name: ${name}\n[\s\S]*?(?=      - name:|$)`))?.[0];
+  if (!block) throw new Error(`Missing foundation fixture step: ${name}`);
+  const changes = name === foundationStepNames[0] ? [
+    ['timeout-minutes: 3', 'timeout-minutes: 30'],
+    ['run: yarn ci:foundations:test', 'run: yarn ci:foundations:test || true'],
+    ['run: yarn ci:foundations:test', 'run: echo foundation contracts checked'],
+  ] : name === foundationStepNames[1] ? [
+    ['id: runtime_foundations', 'id: foundations_without_ledger_gate'],
+    ['timeout-minutes: 105', 'timeout-minutes: 150'],
+    ['run: yarn ci:foundations', 'run: node ci/cli_launch_test.mjs'],
+    ['run: yarn ci:foundations', 'run: yarn ci:foundations || true'],
+  ] : [
+    ["if: always() && steps.runtime_foundations.outcome != 'skipped'", 'if: success()'],
+    ['uses: actions/upload-artifact@v7', 'uses: actions/upload-artifact@v6'],
+    ['build/cli-foundations-results.json', 'build/missing-cli-foundations.json'],
+    ['build/jar-foundations-results.json', 'build/missing-jar-foundations.json'],
+    ['build/runtime-foundations-summary.json', 'build/missing-foundations-summary.json'],
+    ['if-no-files-found: error', 'if-no-files-found: warn'],
+    ['retention-days: 7', 'retention-days: 1'],
+  ];
+  for (const [before, after] of changes) {
+    expectCheckerFailure(`changed ${name}: ${before}`, {
+      workflow: replaceRequired(realWorkflow, block, replaceRequired(block, before, after)),
+    }, 'exact bounded, fail-closed baseline command or artifact contract');
+  }
+  if (name !== foundationStepNames[2]) {
+    expectCheckerFailure(`conditional ${name}`, {
+      workflow: replaceRequired(realWorkflow, block, block.replace(
+        `      - name: ${name}\n`, `      - name: ${name}\n        if: success()\n`)),
+    }, 'exact bounded, fail-closed baseline command or artifact contract');
+    expectCheckerFailure(`duplicate ${name} command`, {
+      workflow: replaceRequired(realWorkflow, block,
+        block + block.replace(name, `${name} duplicate`)),
+    }, 'execute runtime foundation command exactly once');
+  }
+  expectCheckerFailure(`duplicate ${name} step`, {
+    workflow: replaceRequired(realWorkflow, block, block + block.replace(/run: .+/, 'run: echo duplicate')),
+  }, `contain the ${name} step exactly once`);
+}
+for (const [first, second] of [
+  ['Check runtime foundation contracts', 'Bundle deterministic compiler runtime inputs'],
+  ['Prepare pinned Java compatibility toolchains', 'Run CLI and JAR foundation compatibility'],
+  ['Run CLI and JAR foundation compatibility', 'Upload runtime foundation results'],
+]) {
+  expectCheckerFailure(`reordered foundation steps: ${first} and ${second}`, {
+    workflow: swapAdjacentSteps(realWorkflow, first, second),
+  }, 'runtime gates and artifact publication must remain in dependency order');
 }
 
 for (const omitted of verificationUnits) {

@@ -581,6 +581,26 @@ if (!/grunt\s+--stack\s+test-modern-java-runtime\b/.test(modernRuntimeStep)) {
 }
 
 for (const [name, fields] of [
+  ['Check runtime foundation contracts', [
+    'timeout-minutes: 3',
+    'run: yarn ci:foundations:test',
+  ]],
+  ['Run CLI and JAR foundation compatibility', [
+    'id: runtime_foundations',
+    'timeout-minutes: 105',
+    'run: yarn ci:foundations',
+  ]],
+  ['Upload runtime foundation results', [
+    "if: always() && steps.runtime_foundations.outcome != 'skipped'",
+    'uses: actions/upload-artifact@v7',
+    'with:',
+    '  path: |',
+    '    build/cli-foundations-results.json',
+    '    build/jar-foundations-results.json',
+    '    build/runtime-foundations-summary.json',
+    '  if-no-files-found: error',
+    '  retention-days: 7',
+  ]],
   ['Check Java compatibility baseline tooling', [
     'timeout-minutes: 3',
     'run: node --test ci/prepare_java_compatibility_toolchains_test.mjs ci/run_java_compatibility_test.mjs ci/java_compatibility_browser_test.mjs',
@@ -1284,12 +1304,15 @@ const runtimeOrder = [
   'Build release CLI runner',
   'Build Java compatibility browser runtime',
   'Verify compiler bootstrap overlay',
+  'Check runtime foundation contracts',
   'Bundle deterministic compiler runtime inputs',
   'Check Mesa fixture scheduling',
   'Check Wait fixture scheduling',
   'Run Java 17 legacy compatibility tests',
   'Run modern Java compatibility tests',
   'Prepare pinned Java compatibility toolchains',
+  'Run CLI and JAR foundation compatibility',
+  'Upload runtime foundation results',
   'Verify complete phase A requirements inventory',
   'Upload phase A requirements inventory',
   'Run genuine Java 21 and 25 seed fixtures',
@@ -1434,7 +1457,8 @@ for (const [name, commands] of [['user bootstrap', [bootstrapUnitCommand, bootst
   ['class-file declarations', [classFileDeclarationsUnitCommand, classFileDeclarationsRunnerCommand]],
   ['class-file structural', [classFileStructuralUnitCommand, classFileStructuralRunnerCommand]],
   ['public class-file verifier', [classFileVerifierUnitCommand, classFileVerifierRunnerCommand]],
-  ['partial multidimensional allocation', [partialMultianewarrayUnitCommand]]]) {
+  ['partial multidimensional allocation', [partialMultianewarrayUnitCommand]],
+  ['runtime foundation', ['yarn ci:foundations:test', 'yarn ci:foundations']]]) {
   for (const command of commands) if (countLiteral(runtimeJob, `        run: ${command}\n`) !== 1) {
     fail(`Modern Java workflow must execute ${name} command exactly once: ${command}`);
   }

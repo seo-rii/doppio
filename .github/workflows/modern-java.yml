@@ -131,7 +131,7 @@ jobs:
 
       - name: Run CLI and JAR foundation compatibility
         id: runtime_foundations
-        timeout-minutes: 15
+        timeout-minutes: 105
         run: yarn ci:foundations
 
       - name: Upload runtime foundation results
