@@ -5,6 +5,7 @@ import {
 } from './check_package_artifact_contract.mjs';
 
 const baseline = readPackageArtifactContract();
+let rejectedCases = 0;
 checkPackageArtifactContract(baseline);
 
 function replaced(source, from, to) {
@@ -18,6 +19,7 @@ function rejects(label, override) {
     (error) => error instanceof assert.AssertionError,
     label
   );
+  rejectedCases += 1;
 }
 
 rejects('Node 24 is mandatory', {
@@ -91,6 +93,26 @@ rejects('non-self-contained examples cannot enter the package allowlist', {
     '"docs/README.md",\n    "docs/examples/simple.html",'
   )
 });
+for (const [field, filename] of [
+  ['readmeSource', 'README.md'],
+  ['changelogSource', 'CHANGELOG.md'],
+  ['browserDocsSource', 'docs/README.md'],
+  ['modernDocsSource', 'docs/modern-java.md'],
+  ['supportSource', 'docs/support.md']
+]) {
+  rejects(`${filename} cannot link to omitted source files`, {
+    [field]: `${baseline[field]}\n[unpackaged fixture](classes/NotPackaged.java)\n`
+  });
+}
+assert.throws(() => checkPackageArtifactContract({
+  ...baseline,
+  modernDocsSource: `${baseline.modernDocsSource}\n[first](../classes/First.java)\n[second](../ci/second.mjs)\n`
+}), (error) => {
+  assert.match(error.message, /classes\/First\.java/);
+  assert.match(error.message, /ci\/second\.mjs/);
+  return error instanceof assert.AssertionError;
+}, 'documentation validation reports every broken relative link');
+rejectedCases += 1;
 rejects('prepack compile errors are fatal', {
   prepackSource: replaced(
     baseline.prepackSource,
@@ -191,4 +213,4 @@ rejects('the verified tarball must be uploaded after the smoke', {
   )
 });
 
-console.log('package-artifact-contract-negative:30:ok');
+console.log(`package-artifact-contract-negative:${rejectedCases}:ok`);

@@ -42,7 +42,7 @@ matrix continues to describe the current implementation.
 | 26 | 70 | current feature-release class-file and library surface | Partial: simple class-file container plus runnable print fixture | Very high |
 
 Java 21/25 final pattern note: the native-oracle
-[pattern fixture](../classes/modern_fixture/Java21PatternSwitch.java) exercises
+[pattern fixture](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/classes/modern_fixture/Java21PatternSwitch.java) exercises
 44 selected assertions for `instanceof` binding, ordered class/interface/enum
 switch labels, guarded restart, null/default/exhaustive switches, nested record
 deconstruction, nullable components and accessor failures with original
@@ -51,16 +51,16 @@ handles these cases, including `EnumDesc` nested dynamic constants and javac 25'
 primitive selectors/class labels (`I`/`Z`/`J`/`D`) and all eight primitive record
 component bindings, with correct wide `long`/`double` argument slots. Primitive selectors are boxed for
 this final record-lowering path only, not preview cross-primitive conversions. The
-[bootstrap contracts](../classes/modern_fixture/Java21SwitchBootstrapContracts.java)
+[bootstrap contracts](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/classes/modern_fixture/Java21SwitchBootstrapContracts.java)
 add 31 native-compared assertions for string/integer labels, numeric conversions
 and failure propagation, restart bounds before null and malformed inputs. Their
-companion is deliberately [generated](../ci/generate_switch_bootstrap_fixture.mjs)
+companion is deliberately [generated](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/ci/generate_switch_bootstrap_fixture.mjs)
 after javac; all final bytes are identical across native, Node and Chromium.
 See the [Java 21](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/runtime/SwitchBootstraps.html)
 and [Java 25](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/runtime/SwitchBootstraps.html)
 bootstrap contracts and [record-pattern semantics](https://docs.oracle.com/javase/specs/jls/se21/html/jls-14.html#jls-14.30.2).
 These compiler-generated tests do not establish the public API contract.
-The separate [public API fixture](../classes/modern_fixture/Java21SwitchBootstrapAPI.java)
+The separate [public API fixture](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/classes/modern_fixture/Java21SwitchBootstrapAPI.java)
 checks 169 selected common final Java 21/25 API assertions through direct `typeSwitch` and
 `enumSwitch` calls. They return real `ConstantCallSite` objects with invocable
 targets/dynamic invokers. Tests cover exact/inexact/adapted handles, public varargs
@@ -74,7 +74,7 @@ with invalid restarts on the all-string path are outside this common public API 
 Preview primitive conversions and complete language conformance remain
 unimplemented; the remaining Java 21/25 language and library surface is partial.
 
-The Java 25-only [public primitive fixture](../classes/modern_fixture/Java25SwitchBootstrapPrimitives.java)
+The Java 25-only [public primitive fixture](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/classes/modern_fixture/Java25SwitchBootstrapPrimitives.java)
 adds 651 assertions for typed `Z`/`B`/`C`/`S`/`I`/`J`/`F`/`D` selectors and
 identity primitive/wrapper Class labels, including boxed Object selectors,
 wide arguments, target adaptation, snapshots, empty labels and restart bounds.
@@ -86,7 +86,7 @@ accepts these primitive call sites while the API description remains
 reference-oriented. This identity fixture does not cover cross-primitive Class
 conversions or preview constant labels.
 
-The separate Java 25-only [exact-conversion fixture](../classes/modern_fixture/Java25SwitchBootstrapExactConversions.java)
+The separate Java 25-only [exact-conversion fixture](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/classes/modern_fixture/Java25SwitchBootstrapExactConversions.java)
 adds 2,926 assertions across 140 fixed-mask values for all 49 pairs of seven
 numeric primitive selector types and seven numeric primitive Class labels.
 Matching requires a lossless conversion, with selected
@@ -98,7 +98,7 @@ types, preview constant labels and primitive source patterns remain outside
 these selected slices; neither fixture establishes complete public API or
 language conformance.
 
-The [binary32 instruction fixture](../classes/modern_fixture/Java21FloatPrecision.java)
+The [binary32 instruction fixture](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/classes/modern_fixture/Java21FloatPrecision.java)
 adds 471 native-compared assertions on genuine javac 21/25 output for `i2f`,
 `l2f`, `d2f`, float arithmetic and selected `f2i`/`f2l`/`f2d` controls on Node
 and Chromium. Raw bits and widened double values expose unrounded intermediates.
@@ -113,7 +113,7 @@ including operand stack effects. Native math libraries, universal floating-point
 conformance and explicit long-to-double-to-float bootstrap/constant adapters
 remain outside this slice.
 
-The separate [evolved-binary gate](../ci/java_pattern_evolution_test.mjs) compiles
+The separate [evolved-binary gate](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/ci/java_pattern_evolution_test.mjs) compiles
 enum, sealed-class and sealed-interface callers with genuine javac 21 and 25,
 then recompiles only the enum or permitted-type declaration. It covers added
 and reordered enum constants and newly permitted sealed implementations while
@@ -125,7 +125,7 @@ continues without a match. The ledger records compiler operations, replacement
 hashes and unchanged callers. This selected corpus is not general binary
 compatibility or complete pattern-language conformance.
 
-Java 25 IO note: the [IO fixture](../classes/modern_fixture/Java25IO.java)
+Java 25 IO note: the [IO fixture](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/classes/modern_fixture/Java25IO.java)
 compares six isolated modes against native Java 25 on Node and Chromium.
 `print(Object)`, both `println` overloads, and both `readln` overloads delegate
 to standard streams. Coverage includes null/object rendering, explicit print
@@ -139,7 +139,7 @@ Java 25 library compatibility are not established by these tests. See the
 [Java 25 IO API](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IO.html).
 
 Java 22 unnamed-variable/pattern note: the
-[fixture](../classes/modern_fixture/Java22UnnamedPatterns.java) checks 33 selected
+[fixture](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/classes/modern_fixture/Java22UnnamedPatterns.java) checks 33 selected
 assertions for local/loop/catch/lambda/resource variables, initializer and close
 effects, nested typed/match-all patterns, nulls and guards. Ignored record
 components still invoke accessors; failures retain their `MatchException`
@@ -149,7 +149,7 @@ these final source-lowering cases, not full Java 22 runtime/API conformance or a
 separate native Java 22 gate.
 
 Java 25 module-import note: the
-[fixture](../classes/modern_fixture/Java25ModuleImports.java) checks ten selected
+[fixture](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/classes/modern_fixture/Java25ModuleImports.java) checks ten selected
 assertions over `java.base` packages and `java.desktop`/`java.sql` imports,
 duplicate imports and single-type/package-import precedence. Genuine javac 25
 resolves these source imports; the resulting class-path bytecode runs on native
@@ -158,7 +158,7 @@ readability, exports/opens or strong encapsulation. See
 [JLS 25 module imports](https://docs.oracle.com/javase/specs/jls/se25/html/jls-7.html#jls-7.5.5).
 
 Java 25 flexible-constructor note: the
-[fixture](../classes/modern_fixture/Java25FlexibleConstructors.java) checks 50
+[fixture](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/classes/modern_fixture/Java25FlexibleConstructors.java) checks 50
 assertions for prologue computation/validation/finally, this-constructor chains,
 early own-field writes observed during super dispatch, field/instance
 initialization order, allowed captured locals, wide `long`/`double` values and
@@ -174,13 +174,13 @@ instance/default-interface methods. Instance startup invokes a non-private
 zero-argument constructor before the selected main; failures retain a nonzero
 exit status. Older class files keep the existing static `main(String[])`
 protocol, not the Java 21–24 preview startup protocol.
-The [named](../classes/modern_fixture/Java25InstanceMain.java) and
-[compact-source](../classes/modern_fixture/Java25CompactMain.java) fixtures use
+The [named](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/classes/modern_fixture/Java25InstanceMain.java) and
+[compact-source](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/classes/modern_fixture/Java25CompactMain.java) fixtures use
 genuine final javac 25 output. Compact-source implicit classes and `java.base`
 imports, field initialization, UTF-8 arguments and IO output run on both hosts.
 This does not add a source-file launcher or hosted javac 25.
 
-The [launcher gate](../ci/java25_main_test.mjs) checks twelve native-positive,
+The [launcher gate](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/ci/java25_main_test.mjs) checks twelve native-positive,
 six native-negative and two legacy cases, plus three explicitly separate
 JLS-only inheritance cases on Node and Chromium (forty-six guest checks).
 Corretto 25.0.3 invokes private/non-inherited superclass mains in those three
@@ -1505,10 +1505,10 @@ expanded.
   not complete VM verification or Java 26 language/API support. See
   [JVMS 25 class versions](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-4.html#jvms-4.1)
   and [class derivation errors](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-5.html#jvms-5.3.5).
-- The [admission checks](../ci/class_file_version_test.cjs) cover 57 parser,
+- The [admission checks](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/ci/class_file_version_test.cjs) cover 57 parser,
   loader, Lookup, failed-definition recovery, application-loader propagation and
   launch-shutdown scenarios. The
-  [native/host gate](../ci/java_class_version_test.mjs) adds two untouched javac
+  [native/host gate](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/ci/java_class_version_test.mjs) adds two untouched javac
   21/25 controls, four explicitly header-mutated historical controls and nineteen
   negative cases (fifty Node/Chromium checks). Version mutations, input hashes
   and runtime/toolchain provenance remain separate from genuine compiler output.
@@ -1759,13 +1759,13 @@ expanded.
   `Class` and `Constable`. The separate selected C5 corpus now also checks
   empty constables for actual hidden classes and arrays with hidden components;
   selected nominal descriptor resolution is now independently checked by
-  [C6](phase-c-invocation.md#c6-verified-batch-exit), not completed by C5 alone.
+  [C6](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/phase-c-invocation.md#c6-verified-batch-exit), not completed by C5 alone.
 - `java.lang.Class.isHidden()` is a parsed public native Java 15 method, so
   direct calls, reflective lookup and enumeration, `Method.invoke`, and
   `Lookup.unreflect` share one implementation with HotSpot-compatible
   `IntrinsicCandidate` metadata. Coverage includes false results for non-hidden
   ordinary, nested, local, anonymous, JDK, primitive, void, and array classes.
-  The separate [selected C5 evidence](phase-c-invocation.md#c5-verified-batch-exit)
+  The separate [selected C5 evidence](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/phase-c-invocation.md#c5-verified-batch-exit)
   adds true results for actual hidden definitions and false for their arrays,
   with definition/class-data initialization, Lookup authority, identity/nest and
   reflective final-write restrictions. Hidden classes/arrays remain unavailable
@@ -2267,7 +2267,7 @@ expanded.
 ## Known Constant API Gaps
 
 - The retained constant-library shims now have a separate [selected C6 execution
-  gate](phase-c-invocation.md#c6-verified-batch-exit): 64 original-javac 21/25
+  gate](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/phase-c-invocation.md#c6-verified-batch-exit): 64 original-javac 21/25
   cases in four 16-case type, handle, dynamic and VarHandle groups. All 24
   native/Node/Chromium cells and 384 mandatory outcomes pass. Earlier Java 12/17
   descriptor, boolean/null, explicitCast/getStaticFinal and invoke smokes remain
@@ -2303,12 +2303,12 @@ expanded.
   empty-method-descriptor/missing-member-type category differences; errors are
   not whitelisted or normalized. Original companion Code evidence is not
   opaque static reachability or dynamic branch coverage. See the
-  [invoke design](design/java-lang-invoke.md#c6-nominal-descriptor-resolution)
-  and [Phase C boundaries](phase-c-invocation.md#c6-selected-nominal-constants).
+  [invoke design](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/design/java-lang-invoke.md#c6-nominal-descriptor-resolution)
+  and [Phase C boundaries](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/phase-c-invocation.md#c6-selected-nominal-constants).
 
 ## Known Class-File API Gaps
 
-- [C7a's selected public pipeline](phase-c-invocation.md#c7a-verified-batch-exit)
+- [C7a's selected public pipeline](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/phase-c-invocation.md#c7a-verified-batch-exit)
   verifies 32 original-javac 25 cases in 12 native Java 25/Node/Chromium cells
   and 96 mandatory outcomes. This is an actual Java class library, not the
   VM-internal parser or a test decoder. The final API exists since Java 24;
@@ -2320,14 +2320,14 @@ expanded.
   define/initialize classes to produce its verdict; typed-invalid output is
   retained but never defined. Shared-pool raw copies require exact source
   identity; selected rebuilt Code rebinds offsets and regenerates frames.
-- [C7b's selected expansion](phase-c-invocation.md#c7b-verified-batch-exit)
+- [C7b's selected expansion](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/phase-c-invocation.md#c7b-verified-batch-exit)
   verifies another 16 original-javac25 cases/six cells/48 outcomes: labels,
   integer/reference predicates, loops, switch padding/defaults, ordered handlers,
   typed StackMapTable parsing and default/forced frame regeneration. LONG stack
   and wide DOUBLE local joins plus branchful insertion/identity transforms are
   covered. Declared frames govern downstream checks, not just inferred states.
   DROP outputs lacking required frames remain invalid and are never defined.
-- [C7c's selected expansion](phase-c-invocation.md#c7c-verified-batch-exit)
+- [C7c's selected expansion](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/phase-c-invocation.md#c7c-verified-batch-exit)
   verifies 24 more original Java25 cases/nine cells/72 outcomes: typed extended
   attributes, genuine custom reader/writer callbacks, CP17/18/bootstrap models
   and actual NEW_POOL semantic remapping. LDC width, branch/switch/frame offsets
@@ -2352,7 +2352,7 @@ expanded.
   are compared, not byte-for-byte native pool/class parity or general callback
   data flow. C7a–C7c together pass 72 cases/27 cells/216 outcomes on the C7c
   implementation; this does not complete the public API. See the
-  [C7c boundaries](phase-c-invocation.md#c7c-selected-attributes-bootstrap-models-and-fresh-pools).
+  [C7c boundaries](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/phase-c-invocation.md#c7c-selected-attributes-bootstrap-models-and-fresh-pools).
 
 ## Known Collection Factory Gaps
 
@@ -2666,12 +2666,12 @@ expanded.
   signature, lazy generic repositories scoped to the declaring record, nested
   type-use annotations and owners, runtime-visible declaration annotations,
   accessor, declaring record, null for non-record classes, empty record arrays
-  and array cloning. The [B6 selected corpus](phase-b-loading.md#b6-selected-records)
+  and array cloning. The [B6 selected corpus](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/phase-b-loading.md#b6-selected-records)
   compares generic/type-annotation trees with ordinary fields and checks exact
   lazy missing-type, evolved-arity and malformed-signature errors. Its 77 cases
   pass on pinned 21/25 native, Node and Chromium, with unchanged original
   regressions; this does not establish every generic-reflection or record
-  contract. See [the reflection design](design/record-reflection.md).
+  contract. See [the reflection design](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/design/record-reflection.md).
 
 ## Known Sealed-Class Gaps
 
@@ -2683,7 +2683,7 @@ expanded.
   sealed interfaces, final permitted classes, ordinary classes, selected JDK
   classes, primitives, void, arrays, fresh arrays and mutation isolation.
   Array order is not a general specification guarantee.
-- The [B7 selected corpus](phase-b-loading.md#b7-selected-sealed-types) adds
+- The [B7 selected corpus](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/phase-b-loading.md#b7-selected-sealed-types) adds
   62 genuine/mutated cases on pinned 21/25 native, Node and Chromium. Direct
   superclass/interface checks bind actual defining-loader and runtime-package
   identities and reject prohibited derivation with exact
@@ -2700,7 +2700,7 @@ expanded.
 
 ## Final-Language Evidence Boundaries
 
-The [B8 selected corpus](phase-b-loading.md#b8-selected-final-language) adds
+The [B8 selected corpus](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/phase-b-loading.md#b8-selected-final-language) adds
 58 fixed final-language and actual-startup cases. At clean `f8d41537b`, all 21
 applicable pinned Java 21/25 native/Node/Chromium cells and the separate retained
 language, existing launcher and evolved-switch gates pass. B1–B7 host gates and
@@ -2713,7 +2713,7 @@ runtime access and broader scheduler/memory-model support remain separate work.
 
 ## Method-Handle Evidence Boundaries
 
-[Phase C C1](phase-c-invocation.md#c1-verified-batch-exit) adds selected
+[Phase C C1](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/phase-c-invocation.md#c1-verified-batch-exit) adds selected
 Lookup/direct-handle, invocation/adaptation and combinator exception-order
 evidence. At clean `a99d5f74f`, all 60 cases pass across 24 pinned Java 21/25
 native/Node/Chromium cells (360 outcomes), using genuine, unchanged javac
@@ -2729,7 +2729,7 @@ commit. One existing optional unit diagnostic is skipped; no required C1
 execution is skipped. Consumer compiler smokes use Node/native Java 17 and do
 not replace the genuine 21/25 C1 host matrix.
 
-[C2's selected matrix](phase-c-invocation.md#c2-verified-batch-exit) adds 48
+[C2's selected matrix](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/phase-c-invocation.md#c2-verified-batch-exit) adds 48
 array-adapter, variable-arity/routing and control-flow cases. At clean
 `be7cb5dc2`, all 18 pinned Java 21/25 native/Node/Chromium cells and 288 outcomes
 pass with the original expectations. The runtime adds parsed `withVarargs`
@@ -2746,7 +2746,7 @@ C1/C2 execution is skipped. The overlay verifier independently checks all
 1,460 Code bodies in its 37-class inventory; the compiler-only bootstrap
 artifact has a separate, exact 41-class inventory.
 
-[C3's selected matrix](phase-c-invocation.md#c3-verified-batch-exit) adds 48
+[C3's selected matrix](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/phase-c-invocation.md#c3-verified-batch-exit) adds 48
 field/static, array and interoperation cases. At clean `15bbeab5b`, all 18
 pinned Java 21/25 native/Node/Chromium cells and 288 outcomes pass. Original
 javac bytes prove 186 case-linked Code probes and all 31 access-mode names;
@@ -2776,7 +2776,7 @@ do not complete any full owner/API matrix; source units remain unassessed.
 
 ## User Bootstrap And Hidden-Class Evidence
 
-[C4's selected matrix](phase-c-invocation.md#c4-verified-batch-exit) adds 48 user
+[C4's selected matrix](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/phase-c-invocation.md#c4-verified-batch-exit) adds 48 user
 dynamic-constant, invokedynamic and error cases. At frozen `8d38c63e2`, all 18
 pinned Java 21/25 native/Node/Chromium cells and 288 outcomes pass. Six directly
 generated original 65/69 instruction classes plus 18 untouched javac artifacts
@@ -2791,7 +2791,7 @@ identity are explicitly outside the comparison matrix. Runtime units separately
 check specified Error caching. Concurrent linkage, maximal arity and cross-thread
 visibility are not established by these selected value/error traces.
 
-[C5's independent matrix](phase-c-invocation.md#c5-verified-batch-exit) adds 48
+[C5's independent matrix](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/phase-c-invocation.md#c5-verified-batch-exit) adds 48
 definition, identity and class-data cases; all 18 original-javac Java 21/25
 native/Node/Chromium cells and 288 outcomes pass at the same implementation.
 The six compilations retain 26 class-file artifacts, 234 case-linked Code probes
@@ -2819,7 +2819,7 @@ B1–B8, original 323-fixture and selected compiler-consumer verification.
 
 ## Selected C6 nominal constants and refreshed boundaries
 
-[C6's independent matrix](phase-c-invocation.md#c6-verified-batch-exit) verifies
+[C6's independent matrix](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/phase-c-invocation.md#c6-verified-batch-exit) verifies
 64 selected original-javac nominal type, handle, dynamic and VarHandle cases at
 clean implementation `0aa573593`. All 24 native/Node/Chromium Java 21/25 cells
 and 384 mandatory outcomes pass. The eight compilations retain 42 class-file
@@ -2866,7 +2866,7 @@ stay false.
 
 ## Selected C7a public class-file pipeline and refreshed boundaries
 
-[C7a's independent exit](phase-c-invocation.md#c7a-verified-batch-exit) verifies
+[C7a's independent exit](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/phase-c-invocation.md#c7a-verified-batch-exit) verifies
 32 selected public parse/model, branch-free build, transform and typed-verify
 cases at clean implementation `bed25a30e`. All 12 native Java 25/Node/Chromium
 cells and 96 outcomes pass. Four original compilations retain 11 artifacts,
@@ -2897,9 +2897,9 @@ The final fail-closed local receipt has exit code 0 and SHA-256
 the batch exit records its path, runtime and individual ledger/input hashes.
 No C7a Pro review was produced: consultation failed before
 chat creation. At that historical C7a exit, C7b–C7d were the follow-ups.
-The [C7b selected exit](phase-c-invocation.md#c7b-verified-batch-exit) added
+The [C7b selected exit](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/phase-c-invocation.md#c7b-verified-batch-exit) added
 16 cases/six cells/48 outcomes and rechecks the unchanged 32 C7a cases on
-`2e7cbf57b`. The [C7c selected exit](phase-c-invocation.md#c7c-verified-batch-exit)
+`2e7cbf57b`. The [C7c selected exit](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/phase-c-invocation.md#c7c-verified-batch-exit)
 adds 24 cases/nine cells/72 outcomes and rechecks both unchanged public-library
 gates at `21439e0d7`: 72 cases/27 cells/216 outcomes. Strict builds, 1,357
 passing units (one existing optional skip), full workflow guards and the
