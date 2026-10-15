@@ -43,7 +43,6 @@ export function parseManifest(input: Buffer | string): Manifest {
       if (sectionEnded) {
         attributes = Object.create(null);
         sections.push(attributes);
-        sectionEnded = false;
       }
       var separator = line.indexOf(58),
         name = separator < 0 ? '' : line.toString('utf8', 0, separator);
@@ -51,9 +50,11 @@ export function parseManifest(input: Buffer | string): Manifest {
         throw new Error('Invalid manifest header.');
       }
       currentName = name.toLowerCase();
-      if (attributes !== mainAttributes && Object.keys(attributes).length === 0 && currentName !== 'name') {
+      // Only the first header after a section boundary needs this check.
+      if (sectionEnded && currentName !== 'name') {
         throw new Error('Manifest entry section must begin with Name.');
       }
+      sectionEnded = false;
       currentValue = [line.slice(separator + 2)];
     }
   });

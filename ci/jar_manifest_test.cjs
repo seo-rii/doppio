@@ -48,6 +48,32 @@ test('Manifest preserves sections, colons, value whitespace, and UTF-8 folding a
   assert.equal(manifestHasMultiReleaseTrue('Manifest-Version: 1.0\nMulti-Release: true \n\n'), false);
 });
 
+test('Large entry sections do not repeatedly enumerate accumulated attributes', () => {
+  const headerCount = 4000;
+  const headers = Array.from({length: headerCount}, (_, i) => `X-${i}: value-${i}\n`).join('');
+  const source = `Manifest-Version: 1.0\n\nName: example/Entry.class\n${headers}\n`;
+  const originalKeys = Object.keys;
+  let enumeratedKeys = 0, manifest;
+  // Count section-wide work instead of relying on a timing threshold that can
+  // vary with CI load. One complete enumeration is linear; one per header is not.
+  Object.keys = object => {
+    const keys = originalKeys(object);
+    enumeratedKeys += keys.length;
+    return keys;
+  };
+  try {
+    manifest = parseManifest(source);
+  } finally {
+    Object.keys = originalKeys;
+  }
+  assert.equal(manifest.entries.length, 1);
+  assert.equal(manifest.entries[0].name, 'example/Entry.class');
+  assert.equal(manifest.entries[0].attributes['x-0'], 'value-0');
+  assert.equal(manifest.entries[0].attributes[`x-${headerCount - 1}`], `value-${headerCount - 1}`);
+  assert.ok(enumeratedKeys <= 2 * (headerCount + 1),
+    `entry parsing enumerated ${enumeratedKeys} keys for ${headerCount} headers`);
+});
+
 test('Malformed headers and orphan continuations fail predictably', () => {
   for (const source of ['Not-A-Header\n', 'Main-Class:value\n', ' continuation\n',
     'Manifest-Version: 1.0\n\nMain-Class: entry.WithoutName\n']) {
