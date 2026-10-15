@@ -295,6 +295,10 @@ export async function runJarTests({browser = false, caseIds = []} = {}) {
       if (session) await session.close();
     } finally {
       if (temporaryRoot) fs.rmSync(temporaryRoot, {recursive: true, force: true});
+      ledger.notRunCases = (ledger.selectedCases || []).filter(id => !ledger.cases.some(record => record.id === id));
+      for (const record of ledger.cases) {
+        record.notRunHosts = ledger.hosts.filter(host => !(host in record.execution));
+      }
       ledger.completedAt = new Date().toISOString();
       writeLedger(ledger);
     }
