@@ -13,7 +13,7 @@ import gLong from './gLong';
 import Heap from './heap';
 import assert from './assert';
 import {AssertionDirective, JVMOptions} from './interfaces';
-import {assertionDefault, assertionDirectives, assertionStatus} from './assertions';
+import {assertionDefault, assertionDirectives, assertionStatus, legacyAssertionSettings} from './assertions';
 import {validateResponsiveness} from './responsiveness';
 import * as JVMTypes from '../includes/JVMTypes';
 import Parker from './parker';
@@ -80,8 +80,6 @@ class JVM {
   // The initial JVM thread used to kick off execution.
   private firstThread: JVMThread = null;
   private responsiveness: number | (() => number) = null;
-  private enabledAssertions: boolean | string[] = false;
-  private disabledAssertions: string[] = [];
   private assertionDirectives: AssertionDirective[] = [];
   private printJITCompilation: boolean = false;
   private systemClassLoader: ClassLoader = null;
@@ -178,13 +176,6 @@ class JVM {
     }
 
     this.nativeClasspath = opts.nativeClasspath;
-    if (opts.enableAssertions) {
-      this.enabledAssertions = opts.enableAssertions;
-    }
-    if (opts.disableAssertions) {
-      this.disabledAssertions = opts.disableAssertions;
-    }
-
     this.assertionDirectives = assertionDirectives(opts);
     this.responsiveness = typeof opts.responsiveness === 'function' ?
       opts.responsiveness : validateResponsiveness(opts.responsiveness);
@@ -795,14 +786,14 @@ class JVM {
    * Get a listing of classes with assertions enabled. Can also return 'true' or 'false.
    */
   public getEnabledAssertions(): string[] | boolean {
-    return this.enabledAssertions;
+    return legacyAssertionSettings(this.assertionDirectives).enabled;
   }
 
   /**
    * Get a listing of classes with assertions disabled.
    */
   public getDisabledAssertions(): string[] {
-    return this.disabledAssertions;
+    return legacyAssertionSettings(this.assertionDirectives).disabled;
   }
 
   public setPrintJITCompilation(enabledOrNot: boolean) {

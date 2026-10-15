@@ -238,13 +238,13 @@ test('JVM construction rejects invalid numeric responsiveness before native init
   }
 });
 
-async function constructWithoutBoot(responsiveness) {
+async function constructWithoutBoot(responsiveness, options = {}) {
   const stop = new Error('stop before class loading');
   world([], [() => { throw stop; }]);
   const completions = [];
   let vm;
   await new Promise(resolve => {
-    vm = new JVM(constructorOptions(responsiveness), error => {
+    vm = new JVM({...constructorOptions(responsiveness), ...options}, error => {
       completions.push(error);
       resolve();
     });
@@ -252,6 +252,75 @@ async function constructWithoutBoot(responsiveness) {
   assert.deepEqual(completions, [stop]);
   return vm;
 }
+
+test('legacy assertion getters reflect ordered CLI directives and the global enable default', async () => {
+  const vm = await constructWithoutBoot(1000, {assertionDirectives: [
+    {scope: 'default', enabled: false},
+    {scope: 'default', enabled: true},
+    {scope: 'class', target: 'pkg.C', enabled: false}
+  ]});
+  assert.equal(vm.getEnabledAssertions(), true);
+  assert.deepEqual(vm.getDisabledAssertions(), ['pkg.C']);
+  assert.equal(vm.isAssertionEnabled('pkg.C', false), false);
+  assert.equal(vm.isAssertionEnabled('pkg.Other', false), true);
+});
+
+test('legacy assertion getter lists keep the last directive for each class or package in order', async () => {
+  const vm = await constructWithoutBoot(1000, {assertionDirectives: [
+    {scope: 'class', target: 'pkg.B', enabled: true},
+    {scope: 'package', target: 'pkg', enabled: true},
+    {scope: 'class', target: 'pkg.A', enabled: false},
+    {scope: 'class', target: 'pkg.B', enabled: false},
+    {scope: 'class', target: 'pkg.A', enabled: true},
+    {scope: 'class', target: 'pkg.B', enabled: true},
+    {scope: 'package', target: 'pkg', enabled: false},
+    {scope: 'package', target: '', enabled: true}
+  ]});
+  assert.deepEqual(vm.getEnabledAssertions(), ['pkg.A', 'pkg.B', '...']);
+  assert.deepEqual(vm.getDisabledAssertions(), ['pkg...']);
+  assert.equal(vm.isAssertionEnabled('pkg.A', false), true, 'class exceptions still override package defaults');
+  assert.equal(vm.isAssertionEnabled('pkg.Other', false), false);
+  assert.equal(vm.isAssertionEnabled('Main', false), true);
+});
+
+test('legacy assertion options and newer directives share the getters without losing package notation', async () => {
+  const vm = await constructWithoutBoot(1000, {
+    enableAssertions: ['old.Keep', 'pkg...', 'old.Toggle'],
+    disableAssertions: ['old.Disabled', 'pkg.Gone'],
+    assertionDirectives: [
+      {scope: 'class', target: 'old.Toggle', enabled: false},
+      {scope: 'class', target: 'pkg.Gone', enabled: true},
+      {scope: 'package', target: 'pkg', enabled: false},
+      {scope: 'package', target: '', enabled: true},
+      {scope: 'system', enabled: true}
+    ]
+  });
+  assert.deepEqual(vm.getEnabledAssertions(), ['old.Keep', 'pkg.Gone', '...']);
+  assert.deepEqual(vm.getDisabledAssertions(), ['old.Disabled', 'old.Toggle', 'pkg...']);
+  assert.equal(vm.isAssertionEnabled('old.Keep', false), true);
+  assert.equal(vm.isAssertionEnabled('old.Toggle', false), false);
+  assert.equal(vm.isAssertionEnabled('pkg.Gone', false), true);
+  assert.equal(vm.isAssertionEnabled('pkg.Other', false), false);
+  assert.equal(vm.areSystemAssertionsEnabled(), true);
+});
+
+test('legacy assertion getters follow a later global disable and preserve explicit legacy targets', async () => {
+  const vm = await constructWithoutBoot(1000, {
+    enableAssertions: true,
+    disableAssertions: ['pkg.C'],
+    assertionDirectives: [
+      {scope: 'default', enabled: false},
+      {scope: 'class', target: 'pkg.C', enabled: true}
+    ]
+  });
+  assert.deepEqual(vm.getEnabledAssertions(), ['pkg.C']);
+  assert.deepEqual(vm.getDisabledAssertions(), []);
+  assert.equal(vm.isAssertionEnabled('pkg.C', false), true);
+  assert.equal(vm.isAssertionEnabled('pkg.Other', false), false);
+  const defaults = await constructWithoutBoot(1000);
+  assert.equal(defaults.getEnabledAssertions(), false);
+  assert.deepEqual(defaults.getDisabledAssertions(), []);
+});
 
 test('JVM construction and getResponsiveness accept the inclusive numeric budget boundaries', async () => {
   for (const budget of [1, 1000, 2147483647]) {

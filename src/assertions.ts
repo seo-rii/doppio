@@ -28,6 +28,27 @@ export function assertionDefault(directives: AssertionDirective[], systemClass: 
   return enabled;
 }
 
+/** Project ordered settings onto the legacy boolean/list introspection API. */
+export function legacyAssertionSettings(directives: AssertionDirective[]): {
+  enabled: boolean | string[]; disabled: string[];
+} {
+  const lastTarget: {[key: string]: number} = Object.create(null),
+    enabled: string[] = [], disabled: string[] = [];
+  directives.forEach((directive, index) => {
+    if (directive.scope === 'class' || directive.scope === 'package') {
+      lastTarget[directive.scope + ':' + directive.target] = index;
+    }
+  });
+  // Preserve last-occurrence order and keep the public package "..." notation.
+  directives.forEach((directive, index) => {
+    if (lastTarget[directive.scope + ':' + directive.target] !== index) return;
+    const target = directive.target + (directive.scope === 'package' ? '...' : '');
+    (directive.enabled ? enabled : disabled).push(target);
+  });
+  return {enabled: assertionDefault(directives, false) ? true : enabled.length > 0 ? enabled : false,
+    disabled};
+}
+
 export function assertionStatus(directives: AssertionDirective[], className: string,
                                 systemClass: boolean): boolean {
   let classEnabled: boolean = null,
