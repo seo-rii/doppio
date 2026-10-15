@@ -421,6 +421,7 @@ if (completeResult.status !== 0) {
 
 for (const name of [
   'Check runtime foundation contracts',
+  'Verify generated modern fixtures on pinned native Java',
   'Run CLI and JAR foundation compatibility',
   'Upload runtime foundation results',
   'Check Java compatibility baseline tooling',
@@ -612,7 +613,8 @@ for (const [original, replacement] of [
 
 // Foundation commands and evidence are part of the same fail-closed runtime gate.
 const foundationStepNames = ['Check runtime foundation contracts',
-  'Run CLI and JAR foundation compatibility', 'Upload runtime foundation results'];
+  'Run CLI and JAR foundation compatibility', 'Upload runtime foundation results',
+  'Verify generated modern fixtures on pinned native Java'];
 for (const name of foundationStepNames) {
   const block = realWorkflow.match(new RegExp(
     String.raw`      - name: ${name}\n[\s\S]*?(?=      - name:|$)`))?.[0];
@@ -626,6 +628,13 @@ for (const name of foundationStepNames) {
     ['timeout-minutes: 115', 'timeout-minutes: 150'],
     ['run: yarn ci:foundations', 'run: node ci/cli_launch_test.mjs'],
     ['run: yarn ci:foundations', 'run: yarn ci:foundations || true'],
+  ] : name === foundationStepNames[3] ? [
+    ['timeout-minutes: 3', 'timeout-minutes: 30'],
+    ['DOPPIO_REQUIRE_MODERN_GENERATOR_NATIVE=1', 'DOPPIO_REQUIRE_MODERN_GENERATOR_NATIVE=0'],
+    ['run: DOPPIO_REQUIRE_MODERN_GENERATOR_NATIVE=1 node --test ci/modern_classfile_generator_test.cjs',
+      'run: DOPPIO_REQUIRE_MODERN_GENERATOR_NATIVE=1 node --test ci/modern_classfile_generator_test.cjs || true'],
+    ['run: DOPPIO_REQUIRE_MODERN_GENERATOR_NATIVE=1 node --test ci/modern_classfile_generator_test.cjs',
+      'run: echo generated fixtures checked'],
   ] : [
     ["if: always() && steps.runtime_foundations.outcome != 'skipped'", 'if: success()'],
     ['uses: actions/upload-artifact@v7', 'uses: actions/upload-artifact@v6'],
@@ -657,6 +666,8 @@ for (const name of foundationStepNames) {
 for (const [first, second] of [
   ['Check runtime foundation contracts', 'Bundle deterministic compiler runtime inputs'],
   ['Prepare pinned Java compatibility toolchains', 'Run CLI and JAR foundation compatibility'],
+  ['Prepare pinned Java compatibility toolchains', 'Verify generated modern fixtures on pinned native Java'],
+  ['Verify generated modern fixtures on pinned native Java', 'Run CLI and JAR foundation compatibility'],
   ['Run CLI and JAR foundation compatibility', 'Upload runtime foundation results'],
 ]) {
   expectCheckerFailure(`reordered foundation steps: ${first} and ${second}`, {

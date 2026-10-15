@@ -129,6 +129,10 @@ jobs:
         timeout-minutes: 25
         run: node ci/prepare_java_compatibility_toolchains.mjs
 
+      - name: Verify generated modern fixtures on pinned native Java
+        timeout-minutes: 3
+        run: DOPPIO_REQUIRE_MODERN_GENERATOR_NATIVE=1 node --test ci/modern_classfile_generator_test.cjs
+
       - name: Run CLI and JAR foundation compatibility
         id: runtime_foundations
         timeout-minutes: 115

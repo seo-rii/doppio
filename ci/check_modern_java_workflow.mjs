@@ -585,6 +585,10 @@ for (const [name, fields] of [
     'timeout-minutes: 3',
     'run: yarn ci:foundations:test',
   ]],
+  ['Verify generated modern fixtures on pinned native Java', [
+    'timeout-minutes: 3',
+    'run: DOPPIO_REQUIRE_MODERN_GENERATOR_NATIVE=1 node --test ci/modern_classfile_generator_test.cjs',
+  ]],
   ['Run CLI and JAR foundation compatibility', [
     'id: runtime_foundations',
     'timeout-minutes: 115',
@@ -1311,6 +1315,7 @@ const runtimeOrder = [
   'Run Java 17 legacy compatibility tests',
   'Run modern Java compatibility tests',
   'Prepare pinned Java compatibility toolchains',
+  'Verify generated modern fixtures on pinned native Java',
   'Run CLI and JAR foundation compatibility',
   'Upload runtime foundation results',
   'Verify complete phase A requirements inventory',
@@ -1458,7 +1463,8 @@ for (const [name, commands] of [['user bootstrap', [bootstrapUnitCommand, bootst
   ['class-file structural', [classFileStructuralUnitCommand, classFileStructuralRunnerCommand]],
   ['public class-file verifier', [classFileVerifierUnitCommand, classFileVerifierRunnerCommand]],
   ['partial multidimensional allocation', [partialMultianewarrayUnitCommand]],
-  ['runtime foundation', ['yarn ci:foundations:test', 'yarn ci:foundations']]]) {
+  ['runtime foundation', ['yarn ci:foundations:test', 'yarn ci:foundations',
+    'DOPPIO_REQUIRE_MODERN_GENERATOR_NATIVE=1 node --test ci/modern_classfile_generator_test.cjs']]]) {
   for (const command of commands) if (countLiteral(runtimeJob, `        run: ${command}\n`) !== 1) {
     fail(`Modern Java workflow must execute ${name} command exactly once: ${command}`);
   }
