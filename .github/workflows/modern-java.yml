@@ -92,6 +92,10 @@ jobs:
       - name: Verify compiler bootstrap overlay
         run: ./ci/modern_bootstrap_overlay_smoke.sh
 
+      - name: Check runtime foundation contracts
+        timeout-minutes: 3
+        run: yarn ci:foundations:test
+
       - name: Bundle deterministic compiler runtime inputs
         id: bundle_runtime
         run: >-
@@ -124,6 +128,22 @@ jobs:
       - name: Prepare pinned Java compatibility toolchains
         timeout-minutes: 25
         run: node ci/prepare_java_compatibility_toolchains.mjs
+
+      - name: Run CLI and JAR foundation compatibility
+        id: runtime_foundations
+        timeout-minutes: 15
+        run: yarn ci:foundations
+
+      - name: Upload runtime foundation results
+        if: always() && steps.runtime_foundations.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          path: |
+            build/cli-foundations-results.json
+            build/jar-foundations-results.json
+            build/runtime-foundations-summary.json
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Verify complete phase A requirements inventory
         id: phase_a_inventory
