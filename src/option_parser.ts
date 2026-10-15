@@ -146,7 +146,6 @@ export class OptionParser {
 
     this._prefixes.forEach((prefix) => result[prefix] = {});
 
-    argv = argv.map((arg) => arg.trim()).filter((arg) => arg !== '');
     len = argv.length;
 
     while (ptr < len) {

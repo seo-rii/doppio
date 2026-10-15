@@ -214,7 +214,7 @@ export default function java(args: string[], opts: JVMCLIOptions,
     opts.classpath = [];
   }
 
-  if (standard.stringOption('jar', null)) {
+  if (standard.stringOption('jar', null) !== null) {
     opts.classpath.push(standard.stringOption('jar', null));
   } else if (standard.stringOption('classpath', null)) {
     opts.classpath = opts.classpath.concat(standard.stringOption('classpath', null).split(':'));
@@ -262,7 +262,7 @@ export default function java(args: string[], opts: JVMCLIOptions,
 function launchJvm(standardOptions: PrefixParseResult, opts: JVMCLIOptions, jvmState: JVM, doneCb: (status: number) => void,
                     jvmStarted: (jvmState: JVM) => void): void {
   let mainArgs = standardOptions.unparsedArgs();
-  if (standardOptions.stringOption('jar', null)) {
+  if (standardOptions.stringOption('jar', null) !== null) {
     jvmState.runJar(mainArgs, doneCb);
     jvmStarted(jvmState);
   } else if (mainArgs.length > 0) {
