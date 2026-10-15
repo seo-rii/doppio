@@ -81,7 +81,7 @@ function assertExecution(record, entry, label) {
   }
 }
 
-export async function runJarTests({browser = false} = {}) {
+export async function runJarTests({browser = false, caseIds = []} = {}) {
   const ledger = {schemaVersion: 1, scope: ledgerScope, status: 'running', startedAt: new Date().toISOString(),
     hosts: ['native', 'cli-jit', 'api-jit', 'api-int', ...(browser ? ['chromium'] : [])],
     node: process.version, normalization: 'CRLF to LF only',
@@ -166,7 +166,8 @@ export async function runJarTests({browser = false} = {}) {
     const cases = [
       {id: '한글 spaces', mainClass: 'JarLaunchFixture', stdout: argumentOutput, exitCode: 0},
       {id: 'missing-manifest', manifest: null, stdout: '', exitCode: 1,
-        error: /missing manifest|no main manifest attribute/i},
+        error: /JAR file is missing manifest/,
+        nativeError: /no main manifest attribute|invalid or corrupt jarfile/i},
       {id: 'missing-main-attribute', manifest: 'Manifest-Version: 1.0\r\n\r\n', stdout: '', exitCode: 1,
         error: /does not specify a main class|no main manifest attribute/i},
       {id: 'missing-class', mainClass: 'missing.Main', stdout: '', exitCode: 1,
@@ -206,7 +207,11 @@ export async function runJarTests({browser = false} = {}) {
       {id: 'main-failure25', mainClass: named25 + '$MainFailure', release: 25,
         stdout: '', exitCode: 1, error: /java\.lang\.IllegalArgumentException: main-failure/},
     ];
-    for (const entry of cases) {
+    assert.ok(caseIds.every(id => cases.some(entry => entry.id === id)), 'Every selected JAR case must exist.');
+    const selectedCases = caseIds.length === 0 ? cases : cases.filter(entry => caseIds.includes(entry.id));
+    ledger.selectedCases = selectedCases.map(entry => entry.id);
+    ledger.omittedCases = cases.filter(entry => !selectedCases.includes(entry)).map(entry => entry.id);
+    for (const entry of selectedCases) {
       entry.jarPath = path.join(archives, entry.id + '.jar');
       const manifestRoot = path.join(temporaryRoot, 'manifests', entry.id);
       const args = ['--create', '--no-manifest', '--file', entry.jarPath,
@@ -227,19 +232,20 @@ export async function runJarTests({browser = false} = {}) {
       ledger.browser = session.provenance;
     }
     const runner = path.join(runtimeRoot, 'console/runner.js');
-    const inventory = new Map(cases.map(entry => [entry.id,
+    const inventory = new Map(selectedCases.map(entry => [entry.id,
       crypto.createHash('sha256').update(fs.readFileSync(entry.jarPath)).digest('hex')]));
-    for (const entry of cases) {
+    for (const entry of selectedCases) {
       const programArguments = entry.release === 25 ? ['alpha', 'βeta'] : argumentsToMain;
       const record = {id: entry.id, release: entry.release || 17, mainClass: entry.mainClass || null,
         archive: {path: entry.jarPath, sha256: inventory.get(entry.id)}, arguments: programArguments,
-        expected: {exitCode: entry.exitCode, stdout: entry.stdout, error: entry.error?.source || null},
+        expected: {exitCode: entry.exitCode, stdout: entry.stdout, error: entry.error?.source || null,
+          nativeError: (entry.nativeError || entry.error)?.source || null},
         status: 'running', execution: {}};
       ledger.cases.push(record);
       const native = await runCommand(entry.release === 25 ? java25('java') : java17('java'),
         ['-jar', entry.jarPath, ...programArguments], {cwd: temporaryRoot, timeoutMs});
       record.execution.native = native;
-      assertExecution(native, entry, `native ${entry.id}`);
+      assertExecution(native, {...entry, error: entry.nativeError || entry.error}, `native ${entry.id}`);
       for (const host of ['cli-jit', 'api-jit', 'api-int', ...(browser ? ['chromium'] : [])]) {
         let result;
         if (host === 'chromium') {
@@ -277,8 +283,8 @@ export async function runJarTests({browser = false} = {}) {
     if (session) session.verifyIntegrity();
     ledger.status = 'passed';
     ledger.comparisons = comparisons;
-    console.log(`PASS JAR launcher: ${cases.length} native cases, ${comparisons} guest checks (CLI, JVM API, interpreter/JIT${browser ? ', Chromium' : ''})`);
-    return {cases: cases.length, comparisons};
+    console.log(`PASS JAR launcher: ${selectedCases.length} native cases, ${comparisons} guest checks (CLI, JVM API, interpreter/JIT${browser ? ', Chromium' : ''})`);
+    return {cases: selectedCases.length, comparisons};
   } catch (error) {
     ledger.status = 'failed';
     ledger.error = error.stack || error.message;
@@ -299,9 +305,12 @@ if (process.argv[2] === '--api-run') {
   runApiProbe(process.argv.slice(3));
 } else if (process.argv[1] && path.resolve(process.argv[1]) === filename) {
   try {
-    assert.ok(process.argv.slice(2).every(argument => argument === '--browser') && process.argv.slice(2).length <= 1,
-      'Usage: node ci/jar_launch_test.mjs [--browser]');
-    await runJarTests({browser: process.argv.includes('--browser')});
+    const options = process.argv.slice(2);
+    assert.ok(options.every(argument => argument === '--browser' || argument.startsWith('--case=')) &&
+      options.filter(argument => argument === '--browser').length <= 1,
+    'Usage: node ci/jar_launch_test.mjs [--browser] [--case=CASE_ID ...]');
+    await runJarTests({browser: options.includes('--browser'),
+      caseIds: options.filter(argument => argument.startsWith('--case=')).map(argument => argument.slice(7))});
   } catch (error) {
     console.error(error.stack || error.message);
     process.exitCode = 1;

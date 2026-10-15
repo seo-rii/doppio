@@ -6,6 +6,12 @@ import {runCommand} from './run_java_compatibility.mjs';
 import {createBrowserSession} from './java_compatibility_browser.mjs';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
+const flags = process.argv.slice(2);
+assert.ok(flags.every(flag => flag === '--browser' || flag.startsWith('--case=')),
+  'Usage: node ci/cli_launch_test.mjs [--browser] [--case=id,id]');
+const selections = flags.filter(flag => flag.startsWith('--case='));
+assert.ok(selections.length <= 1, 'Only one --case selection is allowed');
+const selected = selections.length ? selections[0].slice('--case='.length).split(',') : null;
 const work = fs.mkdtempSync(path.join(repoRoot, 'build/cli-foundations-'));
 const classes = path.join(work, '한글 classes with spaces');
 fs.mkdirSync(classes);
@@ -58,6 +64,15 @@ const assertionCases = [[], ['-ea'], ['-ea', '-da'], ['-da', '-ea'],
   ['-ea', '-da:...'], ['-esa', '-dsa'], ['-dsa', '-esa'],
   ['-ea:java.lang...', '-dsa'], ['-esa', '-da:java.lang.String'],
   ['-enableassertions:cli...', '-disableassertions:cli.Probe', '-ea:cli.Probe']];
+const inventory = ['application-arguments', 'property-whitespace',
+  ...assertionCases.map((_, index) => `assertions-${index}`),
+  'native-module-jit', 'native-module-interpreter', 'missing-native-path-fails-boot',
+  ...(flags.includes('--browser') ? ['chromium-application-arguments'] : [])];
+if (selected) assert.ok(selected.length > 0 && selected.every(id => inventory.includes(id)) &&
+  new Set(selected).size === selected.length, 'Unknown or duplicate CLI case selection');
+ledger.selected = selected || inventory;
+ledger.omitted = inventory.filter(id => selected && !selected.includes(id));
+const included = id => selected === null || selected.includes(id);
 const command = (executable, args) => runCommand(executable, args,
   {cwd: repoRoot, timeoutMs: 30_000, maxOutputBytes: 1024 * 1024});
 function completed(record, code = 0) {
@@ -85,27 +100,33 @@ try {
   ledger.compilation = await command('javac', ['--release', '8', '-encoding', 'UTF-8', '-d', classes,
     ...Object.keys(sources).map(name => path.join(work, name))]);
   completed(ledger.compilation);
-  await compare('application-arguments', [], ['args', ...rawArguments]);
-  await compare('property-whitespace', ['-Dsample=  trailing spaces  '], ['property']);
-  for (const [index, flags] of assertionCases.entries()) await compare(`assertions-${index}`, flags, ['assertions']);
+  if (included('application-arguments')) await compare('application-arguments', [], ['args', ...rawArguments]);
+  if (included('property-whitespace')) await compare('property-whitespace', ['-Dsample=  trailing spaces  '], ['property']);
+  for (const [index, vmFlags] of assertionCases.entries()) {
+    if (included(`assertions-${index}`)) await compare(`assertions-${index}`, vmFlags, ['assertions']);
+  }
   const nativePath = path.join(work, '네이티브 with spaces');
   fs.mkdirSync(nativePath);
   fs.writeFileSync(path.join(nativePath, 'probe.js'),
     "registerNatives({'cli/NativeProbe': {'value()I': function() { return 4321; }}});\n");
   for (const mode of [[], ['-Xint']]) {
+    const id = `native-module-${mode.length ? 'interpreter' : 'jit'}`;
+    if (!included(id)) continue;
     const execution = await command(process.execPath, ['--no-deprecation', runner, ...mode,
       '-Xnative-classpath', nativePath, '-cp', classes, 'cli.NativeProbe']);
-    ledger.cases.push({id: `native-module-${mode.length ? 'interpreter' : 'jit'}`, execution});
+    ledger.cases.push({id, execution});
     completed(execution);
     assert.equal(execution.stdout, '4321\n');
     assert.equal(execution.stderr, '');
   }
-  const missing = await command(process.execPath, ['--no-deprecation', runner,
-    '-Xnative-classpath', path.join(work, 'missing-natives'), '-cp', classes, 'cli.NativeProbe']);
-  ledger.cases.push({id: 'missing-native-path-fails-boot', execution: missing});
-  completed(missing, 1);
-  assert.match(missing.stderr, /ENOENT/);
-  if (process.argv.includes('--browser')) {
+  if (included('missing-native-path-fails-boot')) {
+    const missing = await command(process.execPath, ['--no-deprecation', runner,
+      '-Xnative-classpath', path.join(work, 'missing-natives'), '-cp', classes, 'cli.NativeProbe']);
+    ledger.cases.push({id: 'missing-native-path-fails-boot', execution: missing});
+    completed(missing, 1);
+    assert.match(missing.stderr, /ENOENT/);
+  }
+  if (flags.includes('--browser') && included('chromium-application-arguments')) {
     browser = await createBrowserSession({repoRoot});
     ledger.browserProvenance = browser.provenance;
     const execution = await browser.execute({classesPath: classes, mainClass: 'cli.Probe',
@@ -113,7 +134,10 @@ try {
     ledger.cases.push({id: 'chromium-application-arguments', execution});
     completed(execution);
     assert.deepEqual(execution.browserErrors, []);
-    assert.equal(execution.stdout, ledger.cases[0].native.stdout);
+    const native = ledger.cases.find(record => record.id === 'application-arguments')?.native ||
+      await command('java', ['-cp', classes, 'cli.Probe', 'args', ...rawArguments]);
+    completed(native);
+    assert.equal(execution.stdout, native.stdout);
     assert.equal(execution.stderr, '');
     ledger.browserIntegrity = browser.verifyIntegrity();
   }
