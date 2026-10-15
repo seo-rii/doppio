@@ -138,6 +138,14 @@ test('Chromium adapter captures streams, arguments and errors and recovers after
     assert.ok(passed.stdout.startsWith('héllo\n'));
     const captured = JSON.parse(passed.stdout.split('\n')[1]);
     assert.deepEqual(captured.args, ['-cp', '/classes', 'arguments', 'one', 'two with spaces', '☕']);
+    const jar = await session.execute({classesPath: fixture.classesPath,
+      jarPath: '/classes/한글 app.jar', timeoutMs: 10_000,
+      arguments: ['arguments', '', ' ', '\t\n', '-ea']});
+    assert.equal(jar.status, 'passed', JSON.stringify(jar));
+    const jarCaptured = JSON.parse(jar.stdout.split('\n')[1]);
+    assert.deepEqual(jarCaptured.args, ['-jar', '/classes/한글 app.jar', 'arguments', '', ' ', '\t\n', '-ea']);
+    await assert.rejects(session.execute({classesPath: fixture.classesPath,
+      jarPath: '/classes/../outside.jar', timeoutMs: 10_000}), /main class or .* JAR path/);
     assert.equal(captured.cwd, '/work');
     assert.equal(captured.timezone, 'UTC');
     assert.equal(captured.classBytes, 'cafebabe');

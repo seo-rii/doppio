@@ -216,12 +216,14 @@ export async function createBrowserSession({ repoRoot = defaultRepoRoot,
         return { ...verified, chromiumExecutableSha256: provenance.chromiumExecutable.sha256,
           adapterSha256: provenance.adapter.sha256 };
       },
-      async execute({ classesPath, mainClass, arguments: programArguments = [], timeoutMs,
+      async execute({ classesPath, mainClass, jarPath, arguments: programArguments = [], timeoutMs,
         standardInput = '', maxOutputBytes = outputLimitBytes }) {
         requireCondition(!closed && !active, 'Browser sessions require one active execution at a time.');
-        requireCondition(typeof mainClass === 'string' && mainClass.length > 0 &&
+        requireCondition(((typeof mainClass === 'string' && mainClass.length > 0 && jarPath === undefined) ||
+          (mainClass === undefined && typeof jarPath === 'string' && jarPath.startsWith('/classes/') &&
+            !jarPath.split('/').includes('..'))) &&
           Array.isArray(programArguments) && programArguments.every((argument) => typeof argument === 'string'),
-        'A main class and string program arguments are required.');
+        'A main class or /classes/ JAR path and string program arguments are required.');
         requireCondition(typeof standardInput === 'string' && Buffer.byteLength(standardInput, 'utf8') <= 1024 * 1024,
           'Browser standard input must be a UTF-8 string of at most 1048576 bytes.');
         requireCondition(Number.isSafeInteger(timeoutMs) && timeoutMs > 0 &&
@@ -229,7 +231,8 @@ export async function createBrowserSession({ repoRoot = defaultRepoRoot,
         'Positive execution timeout and output limits are required.');
         active = true;
         const started = Date.now();
-        const record = { command: ['chromium', 'Doppio.VM.CLI', '-cp', '/classes', mainClass, ...programArguments],
+        const launchArguments = jarPath === undefined ? ['-cp', '/classes', mainClass] : ['-jar', jarPath];
+        const record = { command: ['chromium', 'Doppio.VM.CLI', ...launchArguments, ...programArguments],
           cwd: '/work', timeoutMs, status: 'running', exitCode: null, signal: null, timedOut: false,
           outputLimitExceeded: false, stdout: '', stderr: '', error: null, browserErrors: [] };
         const chunks = { stdout: [], stderr: [] };
@@ -265,7 +268,7 @@ export async function createBrowserSession({ repoRoot = defaultRepoRoot,
           timer = setTimeout(() => { record.timedOut = true; stop(); }, timeoutMs);
           const execution = (async () => {
             await page.goto(assets.baseUrl, { waitUntil: 'load', timeout: timeoutMs });
-            record.exitCode = await page.evaluate(async ({ baseUrl, registered, mainClass, programArguments,
+            record.exitCode = await page.evaluate(async ({ baseUrl, registered, launchArguments, programArguments,
               standardInput, maxOutputBytes }) => {
               const BFS = window.BrowserFS;
               const load = (listingUrl, fileBaseUrl) => new Promise((resolve, reject) => {
@@ -308,13 +311,13 @@ export async function createBrowserSession({ repoRoot = defaultRepoRoot,
               await new Promise((resolve) => process.nextTick(resolve));
               return new Promise((resolve, reject) => {
                 try {
-                  window.Doppio.VM.CLI(['-cp', '/classes', mainClass, ...programArguments],
+                  window.Doppio.VM.CLI([...launchArguments, ...programArguments],
                     { doppioHomePath: '/sys', tmpDir: '/tmp' },
                     (exitCode) => new Promise((drained) => process.nextTick(drained))
                       .then(() => outputDelivery).then(() => resolve(exitCode), reject));
                 } catch (error) { reject(error); }
               });
-            }, { baseUrl: assets.baseUrl, registered, mainClass, programArguments, standardInput, maxOutputBytes });
+            }, { baseUrl: assets.baseUrl, registered, launchArguments, programArguments, standardInput, maxOutputBytes });
           })();
           const settled = execution.catch((error) => { record.error = error.message; });
           await Promise.race([settled, stopped]);

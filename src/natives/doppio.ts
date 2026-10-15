@@ -8,9 +8,25 @@ import LogLevel = logging.LogLevel;
 import util = Doppio.VM.Util;
 import IJVMConstructor = Doppio.VM.ClassFile.IJVMConstructor;
 import * as NodeCrypto from 'crypto';
+import {invokeMain} from '../MainLauncher';
+import {ThreadStatus} from '../enums';
 declare var msCrypto: Crypto;
 
 export default function (): any {
+  class doppio_JarLauncher {
+    public static 'launchMain(Ljava/lang/Class;[Ljava/lang/String;)V'(thread: JVMThread,
+        mainClass: JVMTypes.java_lang_Class, args: JVMTypes.JVMArray<JVMTypes.java_lang_String>): void {
+      thread.setStatus(ThreadStatus.ASYNC_WAITING);
+      invokeMain(thread, <ReferenceClassData<any>> mainClass.$cls, args, (error) => {
+        if (error) {
+          thread.throwException(error);
+        } else {
+          thread.asyncReturn();
+        }
+      });
+    }
+  }
+
   class doppio_Debug {
 
     public static 'SetLogLevel(Ldoppio/Debug$LogLevel;)V'(thread: JVMThread, loglevel: JVMTypes.doppio_Debug$LogLevel): void {
@@ -105,6 +121,7 @@ export default function (): any {
   }
 
   return {
+    'doppio/JarLauncher': doppio_JarLauncher,
     'doppio/Debug': doppio_Debug,
     'doppio/JavaScript': doppio_JavaScript,
     "doppio/security/BrowserPRNG": doppio_security_BrowserPRNG,

@@ -1,6 +1,7 @@
 import {are_in_browser, initCarr, merge, asyncForEach, asyncSeries, ext_classname, initString, int_classname, descriptor2typestr} from './util';
 import SafeMap from './SafeMap';
-import {dumpStats, Method} from './methods';
+import {dumpStats} from './methods';
+import {invokeMain} from './MainLauncher';
 import {ClassData, ReferenceClassData, ArrayClassData} from './ClassData';
 import {BootstrapClassLoader, ClassLoader} from './ClassLoader';
 import * as fs from 'fs';
@@ -418,7 +419,6 @@ class JVM {
       this.status = JVMStatus.RUNNING;
       // If cdata is null, there was an error that ended execution.
       if (cdata != null) {
-        this.exitCode = 0;
         // Convert the arguments.
         var strArrCons = (<ArrayClassData<JVMTypes.java_lang_String>> this.bsCl.getInitializedClass(thread, '[Ljava/lang/String;')).getConstructor(thread),
           jvmifiedArgs = new strArrCons(thread, args.length), i: number;
@@ -439,108 +439,8 @@ class JVM {
           }
         };
 
-        // Find the main method, and run it.
-        var cdataStatics = <any> cdata.getConstructor(thread);
-        if (cdata.majorVersion >= 69) {
-          // Final Java 25 broadens the launch protocol. Do not accidentally
-          // enable the Java 21-24 preview protocol for older class files.
-          var mainMethod: Method = null;
-          for (var signature of ['main([Ljava/lang/String;)V', 'main()V']) {
-            var candidate = cdata.methodLookup(signature);
-            if (candidate !== null && candidate.accessFlags.isPrivate()) {
-              candidate = null;
-            }
-            if (candidate !== null && candidate.cls !== cdata) {
-              // Static interface methods are not inherited by implementors.
-              if (candidate.cls.accessFlags.isInterface() && candidate.isStatic) {
-                candidate = null;
-              } else if (!candidate.accessFlags.isPublic() && !candidate.accessFlags.isProtected()) {
-                // Package access must remain inherited through every class in
-                // the chain; the VM's general method table also includes
-                // entries that are not Java-language inherited members.
-                var currentClass = cdata;
-                while (currentClass !== null && currentClass !== candidate.cls
-                    && currentClass.getPackageName() === candidate.cls.getPackageName()) {
-                  currentClass = currentClass.getSuperClass();
-                }
-                if (currentClass !== candidate.cls) {
-                  candidate = null;
-                }
-              }
-            }
-            if (candidate === null) {
-              // A non-inherited class method in the VM lookup table must not
-              // hide a Java-language inherited interface default method.
-              var pendingClasses = [cdata], visitedClasses: ReferenceClassData<any>[] = [],
-                interfaceCandidates: Method[] = [];
-              while (pendingClasses.length > 0) {
-                var searchClass = pendingClasses.pop();
-                if (visitedClasses.indexOf(searchClass) !== -1) {
-                  continue;
-                }
-                visitedClasses.push(searchClass);
-                pendingClasses = pendingClasses.concat(searchClass.getInterfaces());
-                if (searchClass.accessFlags.isInterface()) {
-                  searchClass.getMethods().forEach((method) => {
-                    if (method.signature === signature && !method.isStatic && !method.accessFlags.isPrivate()) {
-                      interfaceCandidates.push(method);
-                    }
-                  });
-                } else if (searchClass.getSuperClass() !== null) {
-                  pendingClasses.push(searchClass.getSuperClass());
-                }
-              }
-              var mostSpecific = interfaceCandidates.filter((method) => interfaceCandidates.every((other) =>
-                method === other || !other.cls.isSubinterface(method.cls)));
-              if (mostSpecific.length === 1) {
-                candidate = mostSpecific[0];
-              }
-            }
-            if (candidate === null) {
-              continue;
-            }
-            mainMethod = candidate;
-            break;
-          }
-          if (mainMethod === null) {
-            this.exitCode = 1;
-            thread.throwNewException('Ljava/lang/NoSuchMethodError;',
-              `Could not find a non-private main method in class ${cdata.getExternalName()}.`);
-            return;
-          }
-          var mainArgs = mainMethod.parameterTypes.length === 1 ? [jvmifiedArgs] : [];
-          if (mainMethod.isStatic) {
-            (<any> mainMethod.cls.getConstructor(thread))[mainMethod.fullSignature](thread, mainArgs, mainCompleted);
-          } else {
-            if (cdata.accessFlags.isAbstract() || cdata.accessFlags.isInterface()) {
-              this.exitCode = 1;
-              thread.throwNewException('Ljava/lang/InstantiationError;',
-                `Cannot instantiate main class ${cdata.getExternalName()}.`);
-              return;
-            }
-            var zeroArgConstructor = cdata.getMethods().filter((method) => method.signature === '<init>()V')[0];
-            if (zeroArgConstructor === undefined || zeroArgConstructor.accessFlags.isPrivate()) {
-              this.exitCode = 1;
-              thread.throwNewException('Ljava/lang/NoSuchMethodError;',
-                `Could not find a non-private zero argument constructor in class ${cdata.getExternalName()}.`);
-              return;
-            }
-            var receiver = new cdataStatics(thread);
-            receiver[zeroArgConstructor.fullSignature](thread, [], (error?: JVMTypes.java_lang_Throwable): void => {
-              if (error) {
-                mainCompleted(error);
-              } else {
-                // The selected Java member can differ from the VM's general
-                // signature entry (for example, a private superclass main).
-                receiver[mainMethod.fullSignature](thread, mainArgs, mainCompleted);
-              }
-            });
-          }
-        } else if (cdataStatics['main([Ljava/lang/String;)V']) {
-          cdataStatics['main([Ljava/lang/String;)V'](thread, [jvmifiedArgs], mainCompleted);
-        } else {
-          this.exitCode = 1;
-          thread.throwNewException("Ljava/lang/NoSuchMethodError;", `Could not find main method in class ${cdata.getExternalName()}.`);
+        if (invokeMain(thread, cdata, jvmifiedArgs, mainCompleted)) {
+          this.exitCode = 0;
         }
       } else {
         process.stdout.write(`Error: Could not find or load main class ${ext_classname(className)}\n`);
@@ -575,8 +475,7 @@ class JVM {
   /**
    * Run the specified JAR file on this JVM instance.
    * @param args Command line arguments passed to the class.
-   * @param cb Called when the JVM finishes executing. Called with 'true' if
-   *   the JVM exited normally, 'false' if there was an error.
+   * @param cb Called after JVM shutdown with the process exit status.
    */
   public runJar(args: string[], cb: (code: number) => void): void {
     this.runClass('doppio.JarLauncher', args, cb);
