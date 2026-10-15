@@ -10,6 +10,9 @@ export default class Heap {
 
   // size = total amount of memory for the heap.
   constructor(private size: number) {
+    if (!Number.isSafeInteger(size) || size < 0) {
+      throw new RangeError("heap size must be a non-negative safe integer");
+    }
     this._buffer    = new Buffer(size);
     this._remaining = size;  // the whole thing is available.
     this._offset    = 0;     // start of the buffer.
@@ -22,22 +25,19 @@ export default class Heap {
 
   // Allocate size bytes, returning the "address".
   malloc(size: number): number {
+    if (!Number.isSafeInteger(size) || size < 0) {
+      throw new RangeError("allocation size must be a non-negative safe integer");
+    }
     // if size is less than a word, round it up to a word (4 bytes).
     if (size <= 4) {
       size = 4;
-    }
-    // if we are out of memory, throw an exception.
-    if (this._remaining < size) {
-      // TODO: could actually scan larger freelists to see if there's
-      // free memory there.
-      throw "out of memory";
     }
     // compute the size class.
     var addr : number;
     var cl   : number;
     cl   = Heap.size_to_class(size);
     addr = this._freeLists[cl].pop();
-    // if there's no more memory, get some.
+    // Reuse reserved slots even when no unallocated buffer space remains.
     if (addr === undefined) {
       addr = this.refill(cl);
     }
@@ -100,22 +100,23 @@ export default class Heap {
   private refill(cl: number): number {
     // Get the largest size for this class.
     var sz = this.cl_to_size(cl);
-    // Figure out how many objects we are going to "allocate".
-    var count : number = Math.floor(Heap._chunkSize / sz);
-    if (count < 1) {
-      count = 1;
+    // Check the rounded slot size before changing any allocator state.
+    if (this._remaining < sz) {
+      throw "out of memory";
     }
-    // Now store the size class *for the first object* only.
-    // We will later look up this object via "pointer arithmetic".
+    // Each chunk belongs to one class, as required by free() and Unsafe.
+    // A partial final chunk may contain fewer slots and unusable padding;
+    // reserve that padding too so a later class cannot share its size map.
+    var reserved = sz >= Heap._chunkSize ? sz : Math.min(Heap._chunkSize, this._remaining);
+    var count = Math.floor(reserved / sz);
     var addr = this._offset;
     this._sizeMap[addr] = cl;
     // Add each one to the freelist.
     for (var i = 0; i < count; i++) {
-      this._remaining -= sz;
-      addr = this._offset;
-      this._freeLists[cl].push (addr);
-      this._offset += sz;
+      this._freeLists[cl].push(addr + i * sz);
     }
+    this._offset += reserved;
+    this._remaining -= reserved;
     return this._freeLists[cl].pop();
   }
 
@@ -124,7 +125,7 @@ export default class Heap {
     var log2  = 0;
     var value = 1;
     while (value < num) {
-      value <<= (1);
+      value *= 2;
       log2++;
     }
     return (log2);
@@ -137,13 +138,13 @@ export default class Heap {
 
   // see above: classes are just powers of two.
   private cl_to_size(cl: number): number {
-    return (1 << cl);
+    return Math.pow(2, cl);
   }
 
   // Holds all memory, which we will allocate from via pointer bumping.
   private _buffer : NodeBuffer;
 
-  // How much is left in the buffer, in bytes.
+  // Unallocated buffer bytes, excluding chunks already reserved for freelists.
   private _remaining : number;
 
   // The current offset in the buffer.
