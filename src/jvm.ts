@@ -12,6 +12,7 @@ import gLong from './gLong';
 import Heap from './heap';
 import assert from './assert';
 import {JVMOptions} from './interfaces';
+import {validateResponsiveness} from './responsiveness';
 import * as JVMTypes from '../includes/JVMTypes';
 import Parker from './parker';
 import ThreadPool from './threadpool';
@@ -185,7 +186,8 @@ class JVM {
       this.disabledAssertions = opts.disableAssertions;
     }
 
-    this.responsiveness = opts.responsiveness;
+    this.responsiveness = typeof opts.responsiveness === 'function' ?
+      opts.responsiveness : validateResponsiveness(opts.responsiveness);
 
     this._initSystemProperties(bootstrapClasspath,
       opts.classpath.map((p: string): string => path.resolve(p)),
@@ -322,11 +324,7 @@ class JVM {
 
   public getResponsiveness():number {
     const resp = this.responsiveness;
-    if (typeof resp === 'number') {
-      return resp;
-    } else if (typeof resp === 'function') {
-      return resp();
-    }
+    return validateResponsiveness(typeof resp === 'function' ? resp() : resp);
   }
 
   public static getDefaultOptions(doppioHome: string): JVMOptions {

@@ -3,6 +3,7 @@ import JVM from './jvm';
 import {descriptor2typestr, int_classname, merge} from './util';
 import {setLogLevel, LogLevel} from './logging';
 import {JVMCLIOptions} from './interfaces';
+import {validateResponsiveness} from './responsiveness';
 
 declare const RELEASE: boolean;
 let parser = new OptionParser({
@@ -147,11 +148,12 @@ export default function java(args: string[], opts: JVMCLIOptions,
       return printNonStandardHelp(opts.launcherName, parser.help('X'), doneCb, 1);
     }
     const responsiveness = parseInt(responsivenessOption, 10);
-    if (responsiveness <= 0) {
+    try {
+      opts.responsiveness = validateResponsiveness(responsiveness);
+    } catch (err) {
       process.stderr.write(`Invalid responsiveness: ${responsivenessOption}.\n`);
       return printNonStandardHelp(opts.launcherName, parser.help('X'), doneCb, 1);
     }
-    opts.responsiveness = responsiveness;
   }
 
   if (/^[0-9]+$/.test(logOption)) {

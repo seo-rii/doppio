@@ -162,7 +162,8 @@ The full set of configuration options to DoppioJVM are as follows:
 
   /** UNCOMMON OPTIONS **/
 
-  // Responsiveness of JVM (expressed in milliseconds before a thread yields co-operatively)
+  // Integer milliseconds before yielding, from 1 through 2147483647.
+  // Function results are validated on each use.
   responsiveness?: number | () => number,
   // Enable assertions across all classes (if `true`) or
   // selected packages/classes
