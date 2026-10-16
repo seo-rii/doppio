@@ -7,6 +7,12 @@
 /**
  * Standard JVM options.
  */
+export interface AssertionDirective {
+  enabled: boolean;
+  scope: 'default' | 'system' | 'package' | 'class';
+  target?: string;
+}
+
 export interface JVMOptions {
   // [Required] Path where DoppioJVM's things are.
   // DoppioJVM expects that:
@@ -32,11 +38,13 @@ export interface JVMOptions {
   // Disable assertions on specific classes / packages
   // (see http://docs.oracle.com/javase/7/docs/technotes/guides/language/assert.html for syntax)
   disableAssertions?: string[];
+  // Applied in order after the legacy assertion options above.
+  assertionDirectives?: AssertionDirective[];
   // System properties for the JVM.
   properties?: {[name: string]: string};
   // Path where DoppioJVM can store temporary files. Defaults to /tmp.
   tmpDir?: string;
-  // Responsiveness of JVM (expressed in milliseconds before a thread yields co-operatively)
+  // Integer milliseconds before yielding, from 1 through 2147483647.
   responsiveness?: number | (() => number);
   // Confine to Interpreted mode
   intMode?: boolean;

@@ -5,6 +5,7 @@ import * as BrowserFS from 'browserfs';
 const bfsPath = BrowserFS.BFSRequire('path');
 import * as nodePath from 'path';
 import {asyncForEach} from './util';
+import {parseManifest} from './manifest';
 // Type information only.
 import TBFSFS from 'browserfs/dist/node/core/FS';
 // Export so it can be returned from ClasspathJar.
@@ -71,25 +72,13 @@ function win2nix(p: string): string {
   return p.replace(/\\/g, '/');
 }
 
-export function manifestHasMultiReleaseTrue(manifest: string): boolean {
-  let lines = manifest.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n'),
-    attributes: {[name: string]: string} = {},
-    currentAttribute: string = null;
-  for (let i = 0; i < lines.length; i++) {
-    let line = lines[i];
-    if (line.length === 0) {
-      currentAttribute = null;
-    } else if (line.charAt(0) === ' ' && currentAttribute !== null) {
-      attributes[currentAttribute] += line.slice(1);
-    } else {
-      let separator = line.indexOf(':');
-      if (separator !== -1) {
-        currentAttribute = line.slice(0, separator).toLowerCase();
-        attributes[currentAttribute] = line.slice(separator + 1).trim();
-      }
-    }
+export function manifestHasMultiReleaseTrue(manifest: Buffer | string): boolean {
+  try {
+    let value = parseManifest(manifest).mainAttributes['multi-release'];
+    return value !== undefined && value.toLowerCase() === 'true';
+  } catch (e) {
+    return false;
   }
-  return attributes['multi-release'] === 'true';
 }
 
 /**
@@ -167,7 +156,7 @@ export abstract class AbstractClasspathJar {
 
   private _getMultiReleaseVersions(): number[] {
     try {
-      let manifest = this._fs.readFileSync('/META-INF/MANIFEST.MF').toString('utf8');
+      let manifest = this._fs.readFileSync('/META-INF/MANIFEST.MF');
       if (!manifestHasMultiReleaseTrue(manifest)) {
         return [];
       }

@@ -1,11 +1,20 @@
 import assert from 'node:assert/strict';
+import path from 'node:path';
+import {validatePackagedRelativeLinks} from './package_documentation_links.mjs';
 import {
   checkPackageArtifactContract,
   readPackageArtifactContract
 } from './check_package_artifact_contract.mjs';
 
 const baseline = readPackageArtifactContract();
+let rejectedCases = 0;
 checkPackageArtifactContract(baseline);
+for (const target of ['bin/doppio', 'bin/doppioh', 'dist/release/doppio.js', 'dist/release-cli/src/doppiojvm.js']) {
+  checkPackageArtifactContract({...baseline,
+    readmeSource: `${baseline.readmeSource}\n[Packaged descendant](${target})\n`,
+    supportSource: `${baseline.supportSource}\n[Packaged descendant](../${target})\n`
+  });
+}
 
 function replaced(source, from, to) {
   assert.ok(source.includes(from), `fixture replacement did not match: ${from}`);
@@ -18,6 +27,7 @@ function rejects(label, override) {
     (error) => error instanceof assert.AssertionError,
     label
   );
+  rejectedCases += 1;
 }
 
 rejects('Node 24 is mandatory', {
@@ -91,6 +101,34 @@ rejects('non-self-contained examples cannot enter the package allowlist', {
     '"docs/README.md",\n    "docs/examples/simple.html",'
   )
 });
+for (const [field, filename] of [
+  ['readmeSource', 'README.md'],
+  ['changelogSource', 'CHANGELOG.md'],
+  ['browserDocsSource', 'docs/README.md'],
+  ['modernDocsSource', 'docs/modern-java.md'],
+  ['supportSource', 'docs/support.md']
+]) {
+  rejects(`${filename} cannot link to omitted source files`, {
+    [field]: `${baseline[field]}\n[unpackaged fixture](classes/NotPackaged.java)\n`
+  });
+}
+for (const target of ['bin-other/doppio', 'dist-old/release/doppio.js', 'dist/../ci/not-packaged.mjs']) {
+  rejects(`directory membership respects path boundaries: ${target}`, {
+    readmeSource: `${baseline.readmeSource}\n[Outside directory allowlist](${target})\n`
+  });
+}
+assert.throws(() => validatePackagedRelativeLinks(path.resolve(import.meta.dirname, '..'), ['README.md'], {
+  readFile: () => '[Missing installed descendant](bin/does-not-exist-package-contract-fixture)'
+}), /broken packaged relative link/, 'installed-consumer validation still rejects absent directory descendants');
+assert.throws(() => checkPackageArtifactContract({
+  ...baseline,
+  modernDocsSource: `${baseline.modernDocsSource}\n[first](../classes/First.java)\n[second](../ci/second.mjs)\n`
+}), (error) => {
+  assert.match(error.message, /classes\/First\.java/);
+  assert.match(error.message, /ci\/second\.mjs/);
+  return error instanceof assert.AssertionError;
+}, 'documentation validation reports every broken relative link');
+rejectedCases += 1;
 rejects('prepack compile errors are fatal', {
   prepackSource: replaced(
     baseline.prepackSource,
@@ -191,4 +229,4 @@ rejects('the verified tarball must be uploaded after the smoke', {
   )
 });
 
-console.log('package-artifact-contract-negative:30:ok');
+console.log(`package-artifact-contract-negative:${rejectedCases}:ok`);

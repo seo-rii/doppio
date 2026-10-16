@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {validatePackagedRelativeLinks} from './package_documentation_links.mjs';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const manifestPath = path.join(repoRoot, 'package.json');
@@ -111,34 +112,6 @@ function parsePackOutput(output) {
   return JSON.parse(jsonStart === -1 ? trimmed : trimmed.slice(jsonStart + 1));
 }
 
-function validatePackagedRelativeLinks(packageRoot, relativePaths) {
-  for (const relativePath of relativePaths) {
-    const contents = fs.readFileSync(path.join(packageRoot, relativePath), 'utf8');
-    const targets = [];
-    if (relativePath.endsWith('.md')) {
-      for (const match of contents.matchAll(/\]\(([^)]+)\)/g)) {
-        targets.push(match[1]);
-      }
-    } else if (relativePath.endsWith('.html')) {
-      for (const match of contents.matchAll(/(?:href|src)=["']([^"']+)["']/g)) {
-        targets.push(match[1]);
-      }
-    }
-
-    for (let target of targets) {
-      target = target.trim().replace(/^<|>$/g, '').split('#', 1)[0].split('?', 1)[0];
-      if (target.length === 0 || target.startsWith('/') || /^[a-z][a-z0-9+.-]*:/i.test(target)) {
-        continue;
-      }
-      const resolvedTarget = path.resolve(packageRoot, path.dirname(relativePath), decodeURIComponent(target));
-      assert.ok(
-        resolvedTarget === packageRoot || resolvedTarget.startsWith(`${packageRoot}${path.sep}`),
-        `${relativePath} links outside the package: ${target}`
-      );
-      assert.ok(fs.existsSync(resolvedTarget), `${relativePath} has a broken packaged relative link: ${target}`);
-    }
-  }
-}
 
 assert.equal(manifest.name, 'doppiojvm');
 assert.equal(manifest.version, '0.6.0');

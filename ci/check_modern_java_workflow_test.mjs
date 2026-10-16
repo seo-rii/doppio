@@ -419,7 +419,111 @@ if (completeResult.status !== 0) {
   throw new Error(`Complete sharded workflow should pass:\n${completeResult.stderr}`);
 }
 
+function evidenceUpload({ name, archive, title = 'Upload additional evidence' } = {}) {
+  return [
+    ...(title === null ? ['      - uses: actions/upload-artifact@v7'] : [
+      `      - name: ${title}`,
+      '        uses: actions/upload-artifact@v7',
+    ]),
+    '        with:',
+    ...(name === undefined ? [] : [`          name: ${name}`]),
+    '          path: build/additional-evidence.json',
+    ...(archive === undefined ? [] : [`          archive: ${archive}`]),
+    '          if-no-files-found: error',
+    '          retention-days: 7',
+    '',
+    '',
+  ].join('\n');
+}
+
+function addEvidenceUpload(workflow, job, options) {
+  const upload = evidenceUpload(options);
+  if (job === 'test') return `${workflow}\n${upload}`;
+  const nextJob = { runtime: 'compiler', compiler: 'test' }[job];
+  return replaceRequired(workflow, `  ${nextJob}:\n`, `${upload}  ${nextJob}:\n`);
+}
+
+const archiveName = 'additional-evidence-${{ github.run_id }}-${{ github.run_attempt }}';
+for (const [label, workflow] of [
+  ['an explicit default-archive name', addEvidenceUpload(realWorkflow, 'runtime', { name: archiveName })],
+  ['an explicitly archived quoted name', addEvidenceUpload(realWorkflow, 'test', {
+    name: `"${archiveName}"`, archive: 'true',
+  })],
+  ['a filename-based raw artifact', addEvidenceUpload(realWorkflow, 'test', { archive: "'false'" })],
+  ['matrix-specific archive names', addEvidenceUpload(realWorkflow, 'compiler', {
+    name: 'additional-evidence-${{ matrix.shard }}-${{github.run_id}}-${{github.run_attempt}}',
+  })],
+]) {
+  const result = runChecker({ workflow });
+  if (result.status !== 0) {
+    throw new Error(`Workflow with ${label} should pass:\n${result.stderr}`);
+  }
+}
+
+for (const [label, options] of [
+  ['a missing default-archive name', {}],
+  ['a missing explicit-archive name', { archive: 'true' }],
+  ['an empty archived name', { name: '' }],
+  ['a quoted whitespace-only archived name', { name: "'   '" }],
+  ['a commented archived name', { name: '# additional-evidence' }],
+  ['an unnamed upload step without an artifact name', { title: null }],
+]) {
+  expectCheckerFailure(label, { workflow: addEvidenceUpload(realWorkflow, 'test', options) },
+    'must set an explicit nonempty archived artifact name');
+}
+const additionalArchive = addEvidenceUpload(realWorkflow, 'runtime', { name: archiveName });
+for (const [label, job, name] of [
+  ['duplicate archive names within a job', 'runtime', archiveName],
+  ['duplicate archive names across jobs', 'test', archiveName],
+  ['quoted and expression-whitespace-equivalent archive names', 'test',
+    "'additional-evidence-${{github.run_id}}-${{  github.run_attempt  }}'"],
+]) {
+  expectCheckerFailure(label, { workflow: addEvidenceUpload(additionalArchive, job, { name }) },
+    'archived artifact names must be unique across all jobs');
+}
+expectCheckerFailure('an archive name reused by every matrix shard', {
+  workflow: addEvidenceUpload(realWorkflow, 'compiler', { name: archiveName }),
+}, 'archived artifact names must be unique across all jobs');
+expectCheckerFailure('an expanded matrix archive name colliding with a different job', {
+  workflow: addEvidenceUpload(addEvidenceUpload(realWorkflow, 'runtime', {
+    name: 'additional-evidence-compiler-01',
+  }), 'compiler', { name: 'additional-evidence-${{ matrix.shard }}' }),
+}, 'archived artifact names must be unique across all jobs');
+expectCheckerFailure('an unresolved archived name expression', {
+  workflow: addEvidenceUpload(realWorkflow, 'test', { name: '${{ steps.evidence.outputs.name }}' }),
+}, 'must use deterministic archived artifact name expressions');
+expectCheckerFailure('a nonliteral archive setting', {
+  workflow: addEvidenceUpload(realWorkflow, 'test', {
+    name: archiveName, archive: '${{ inputs.archive }}',
+  }),
+}, 'must use a literal true or false archive input');
+expectCheckerFailure('a raw upload with an ignored artifact name', {
+  workflow: addEvidenceUpload(realWorkflow, 'test', { name: archiveName, archive: 'false' }),
+}, 'raw artifact uploads must rely on the uploaded filename');
+for (const input of ['name', 'archive']) {
+  const upload = evidenceUpload({ name: archiveName, archive: 'true' });
+  const duplicated = replaceRequired(upload, '        with:\n',
+    `        with:\n          '${input}': ${input === 'name' ? archiveName : 'true'}\n`);
+  expectCheckerFailure(`a duplicate ${input} artifact input`, {
+    workflow: replaceRequired(realWorkflow, '  compiler:\n', `${duplicated}  compiler:\n`),
+  }, `must not repeat the ${input} artifact input`);
+}
+for (const artifactName of [
+  'runtime-foundation-results-${{ github.run_id }}-${{ github.run_attempt }}',
+  'phase-a-requirements-inventory-${{ github.run_id }}-${{ github.run_attempt }}',
+]) {
+  for (const replacement of ['', '          name: artifact\n']) {
+    expectCheckerFailure(`a missing or fallback name for ${artifactName}`, {
+      workflow: replaceRequired(realWorkflow, `          name: ${artifactName}\n`, replacement),
+    }, 'exact bounded, fail-closed baseline command or artifact contract');
+  }
+}
+
 for (const name of [
+  'Check runtime foundation contracts',
+  'Verify generated modern fixtures on pinned native Java',
+  'Run CLI and JAR foundation compatibility',
+  'Upload runtime foundation results',
   'Check Java compatibility baseline tooling',
   'Check phase A inventory and evidence contracts',
   'Build Java compatibility browser runtime',
@@ -605,6 +709,73 @@ for (const [original, replacement] of [
     { workflow: replaceRequired(realWorkflow, original, replacement) },
     'exact bounded, fail-closed baseline command or artifact contract'
   );
+}
+
+// Foundation commands and evidence are part of the same fail-closed runtime gate.
+const foundationStepNames = ['Check runtime foundation contracts',
+  'Run CLI and JAR foundation compatibility', 'Upload runtime foundation results',
+  'Verify generated modern fixtures on pinned native Java'];
+for (const name of foundationStepNames) {
+  const block = realWorkflow.match(new RegExp(
+    String.raw`      - name: ${name}\n[\s\S]*?(?=      - name:|$)`))?.[0];
+  if (!block) throw new Error(`Missing foundation fixture step: ${name}`);
+  const changes = name === foundationStepNames[0] ? [
+    ['timeout-minutes: 3', 'timeout-minutes: 30'],
+    ['run: yarn ci:foundations:test', 'run: yarn ci:foundations:test || true'],
+    ['run: yarn ci:foundations:test', 'run: echo foundation contracts checked'],
+  ] : name === foundationStepNames[1] ? [
+    ['id: runtime_foundations', 'id: foundations_without_ledger_gate'],
+    ['timeout-minutes: 115', 'timeout-minutes: 150'],
+    ['run: yarn ci:foundations', 'run: node ci/cli_launch_test.mjs'],
+    ['run: yarn ci:foundations', 'run: yarn ci:foundations || true'],
+  ] : name === foundationStepNames[3] ? [
+    ['timeout-minutes: 3', 'timeout-minutes: 30'],
+    ['DOPPIO_REQUIRE_MODERN_GENERATOR_NATIVE=1', 'DOPPIO_REQUIRE_MODERN_GENERATOR_NATIVE=0'],
+    ['run: DOPPIO_REQUIRE_MODERN_GENERATOR_NATIVE=1 node --test ci/modern_classfile_generator_test.cjs',
+      'run: DOPPIO_REQUIRE_MODERN_GENERATOR_NATIVE=1 node --test ci/modern_classfile_generator_test.cjs || true'],
+    ['run: DOPPIO_REQUIRE_MODERN_GENERATOR_NATIVE=1 node --test ci/modern_classfile_generator_test.cjs',
+      'run: echo generated fixtures checked'],
+  ] : [
+    ["if: always() && steps.runtime_foundations.outcome != 'skipped'", 'if: success()'],
+    ['uses: actions/upload-artifact@v7', 'uses: actions/upload-artifact@v6'],
+    ['name: runtime-foundation-results-${{ github.run_id }}-${{ github.run_attempt }}',
+      'name: phase-a-requirements-inventory-${{ github.run_id }}-${{ github.run_attempt }}'],
+    ['          name: runtime-foundation-results-${{ github.run_id }}-${{ github.run_attempt }}\n', ''],
+    ['build/cli-foundations-results.json', 'build/missing-cli-foundations.json'],
+    ['build/jar-foundations-results.json', 'build/missing-jar-foundations.json'],
+    ['build/runtime-foundations-summary.json', 'build/missing-foundations-summary.json'],
+    ['if-no-files-found: error', 'if-no-files-found: warn'],
+    ['retention-days: 7', 'retention-days: 1'],
+  ];
+  for (const [before, after] of changes) {
+    expectCheckerFailure(`changed ${name}: ${before}`, {
+      workflow: replaceRequired(realWorkflow, block, replaceRequired(block, before, after)),
+    }, 'exact bounded, fail-closed baseline command or artifact contract');
+  }
+  if (name !== foundationStepNames[2]) {
+    expectCheckerFailure(`conditional ${name}`, {
+      workflow: replaceRequired(realWorkflow, block, block.replace(
+        `      - name: ${name}\n`, `      - name: ${name}\n        if: success()\n`)),
+    }, 'exact bounded, fail-closed baseline command or artifact contract');
+    expectCheckerFailure(`duplicate ${name} command`, {
+      workflow: replaceRequired(realWorkflow, block,
+        block + block.replace(name, `${name} duplicate`)),
+    }, 'execute runtime foundation command exactly once');
+  }
+  expectCheckerFailure(`duplicate ${name} step`, {
+    workflow: replaceRequired(realWorkflow, block, block + block.replace(/run: .+/, 'run: echo duplicate')),
+  }, `contain the ${name} step exactly once`);
+}
+for (const [first, second] of [
+  ['Check runtime foundation contracts', 'Bundle deterministic compiler runtime inputs'],
+  ['Prepare pinned Java compatibility toolchains', 'Run CLI and JAR foundation compatibility'],
+  ['Prepare pinned Java compatibility toolchains', 'Verify generated modern fixtures on pinned native Java'],
+  ['Verify generated modern fixtures on pinned native Java', 'Run CLI and JAR foundation compatibility'],
+  ['Run CLI and JAR foundation compatibility', 'Upload runtime foundation results'],
+]) {
+  expectCheckerFailure(`reordered foundation steps: ${first} and ${second}`, {
+    workflow: swapAdjacentSteps(realWorkflow, first, second),
+  }, 'runtime gates and artifact publication must remain in dependency order');
 }
 
 for (const omitted of verificationUnits) {

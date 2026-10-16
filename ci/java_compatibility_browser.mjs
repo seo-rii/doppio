@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import {trackFoundationProcess} from './runtime_foundation_processes.mjs';
 
 const require = createRequire(import.meta.url);
 const adapterPath = fileURLToPath(import.meta.url);
@@ -192,13 +193,36 @@ export function browserCookies({ repoRoot = defaultRepoRoot, baseUrl, environmen
 }
 
 export async function createBrowserSession({ repoRoot = defaultRepoRoot,
-  runtimePath = 'build/release/doppio.js' } = {}) {
+  runtimePath = 'build/release/doppio.js', signal } = {}) {
+  signal?.throwIfAborted();
   repoRoot = fs.realpathSync(repoRoot);
   const assets = await createAssetServer({ repoRoot, runtimePath });
-  let browser;
+  let browser, browserServer, closePromise;
+  const closeResources = () => {
+    if (!closePromise) closePromise = (async () => {
+      signal?.removeEventListener('abort', abort);
+      try {
+        if (browser) await browser.close();
+      } finally {
+        try { if (browserServer) await browserServer.close(); } finally { await assets.close(); }
+      }
+    })();
+    return closePromise;
+  };
+  const abort = () => {
+    // A launch has its own bounded timeout. If it is still pending, the check
+    // immediately after launch closes the server before connecting or executing.
+    if (browserServer) void closeResources().catch(() => {});
+  };
+  signal?.addEventListener('abort', abort, {once: true});
   try {
+    signal?.throwIfAborted();
     const executablePath = process.env.DOPPIO_CHROMIUM_EXECUTABLE || chromium.executablePath();
-    browser = await chromium.launch({ executablePath, headless: true });
+    browserServer = await chromium.launchServer({executablePath, headless: true, timeout: 30_000});
+    trackFoundationProcess(browserServer.process());
+    signal?.throwIfAborted();
+    browser = await chromium.connect(browserServer.wsEndpoint(), {timeout: 30_000});
+    signal?.throwIfAborted();
     const cookies = browserCookies({ repoRoot, baseUrl: assets.baseUrl });
     const provenance = { ...assets.provenance, node: process.version,
       playwright: require('playwright/package.json').version, chromium: browser.version(),
@@ -216,12 +240,15 @@ export async function createBrowserSession({ repoRoot = defaultRepoRoot,
         return { ...verified, chromiumExecutableSha256: provenance.chromiumExecutable.sha256,
           adapterSha256: provenance.adapter.sha256 };
       },
-      async execute({ classesPath, mainClass, arguments: programArguments = [], timeoutMs,
+      async execute({ classesPath, mainClass, jarPath, arguments: programArguments = [], timeoutMs,
         standardInput = '', maxOutputBytes = outputLimitBytes }) {
+        signal?.throwIfAborted();
         requireCondition(!closed && !active, 'Browser sessions require one active execution at a time.');
-        requireCondition(typeof mainClass === 'string' && mainClass.length > 0 &&
+        requireCondition(((typeof mainClass === 'string' && mainClass.length > 0 && jarPath === undefined) ||
+          (mainClass === undefined && typeof jarPath === 'string' && jarPath.startsWith('/classes/') &&
+            !jarPath.split('/').includes('..'))) &&
           Array.isArray(programArguments) && programArguments.every((argument) => typeof argument === 'string'),
-        'A main class and string program arguments are required.');
+        'A main class or /classes/ JAR path and string program arguments are required.');
         requireCondition(typeof standardInput === 'string' && Buffer.byteLength(standardInput, 'utf8') <= 1024 * 1024,
           'Browser standard input must be a UTF-8 string of at most 1048576 bytes.');
         requireCondition(Number.isSafeInteger(timeoutMs) && timeoutMs > 0 &&
@@ -229,7 +256,8 @@ export async function createBrowserSession({ repoRoot = defaultRepoRoot,
         'Positive execution timeout and output limits are required.');
         active = true;
         const started = Date.now();
-        const record = { command: ['chromium', 'Doppio.VM.CLI', '-cp', '/classes', mainClass, ...programArguments],
+        const launchArguments = jarPath === undefined ? ['-cp', '/classes', mainClass] : ['-jar', jarPath];
+        const record = { command: ['chromium', 'Doppio.VM.CLI', ...launchArguments, ...programArguments],
           cwd: '/work', timeoutMs, status: 'running', exitCode: null, signal: null, timedOut: false,
           outputLimitExceeded: false, stdout: '', stderr: '', error: null, browserErrors: [] };
         const chunks = { stdout: [], stderr: [] };
@@ -265,7 +293,7 @@ export async function createBrowserSession({ repoRoot = defaultRepoRoot,
           timer = setTimeout(() => { record.timedOut = true; stop(); }, timeoutMs);
           const execution = (async () => {
             await page.goto(assets.baseUrl, { waitUntil: 'load', timeout: timeoutMs });
-            record.exitCode = await page.evaluate(async ({ baseUrl, registered, mainClass, programArguments,
+            record.exitCode = await page.evaluate(async ({ baseUrl, registered, launchArguments, programArguments,
               standardInput, maxOutputBytes }) => {
               const BFS = window.BrowserFS;
               const load = (listingUrl, fileBaseUrl) => new Promise((resolve, reject) => {
@@ -308,13 +336,13 @@ export async function createBrowserSession({ repoRoot = defaultRepoRoot,
               await new Promise((resolve) => process.nextTick(resolve));
               return new Promise((resolve, reject) => {
                 try {
-                  window.Doppio.VM.CLI(['-cp', '/classes', mainClass, ...programArguments],
+                  window.Doppio.VM.CLI([...launchArguments, ...programArguments],
                     { doppioHomePath: '/sys', tmpDir: '/tmp' },
                     (exitCode) => new Promise((drained) => process.nextTick(drained))
                       .then(() => outputDelivery).then(() => resolve(exitCode), reject));
                 } catch (error) { reject(error); }
               });
-            }, { baseUrl: assets.baseUrl, registered, mainClass, programArguments, standardInput, maxOutputBytes });
+            }, { baseUrl: assets.baseUrl, registered, launchArguments, programArguments, standardInput, maxOutputBytes });
           })();
           const settled = execution.catch((error) => { record.error = error.message; });
           await Promise.race([settled, stopped]);
@@ -341,13 +369,12 @@ export async function createBrowserSession({ repoRoot = defaultRepoRoot,
         return record;
       },
       async close() {
-        if (closed) return;
         closed = true;
-        try { await browser.close(); } finally { await assets.close(); }
+        return closeResources();
       },
     };
   } catch (error) {
-    try { if (browser) await browser.close(); } finally { await assets.close(); }
+    await closeResources();
     throw error;
   }
 }

@@ -3,6 +3,7 @@ import JVM from './jvm';
 import {descriptor2typestr, int_classname, merge} from './util';
 import {setLogLevel, LogLevel} from './logging';
 import {JVMCLIOptions} from './interfaces';
+import {validateResponsiveness} from './responsiveness';
 
 declare const RELEASE: boolean;
 let parser = new OptionParser({
@@ -147,11 +148,12 @@ export default function java(args: string[], opts: JVMCLIOptions,
       return printNonStandardHelp(opts.launcherName, parser.help('X'), doneCb, 1);
     }
     const responsiveness = parseInt(responsivenessOption, 10);
-    if (responsiveness <= 0) {
+    try {
+      opts.responsiveness = validateResponsiveness(responsiveness);
+    } catch (err) {
       process.stderr.write(`Invalid responsiveness: ${responsivenessOption}.\n`);
       return printNonStandardHelp(opts.launcherName, parser.help('X'), doneCb, 1);
     }
-    opts.responsiveness = responsiveness;
   }
 
   if (/^[0-9]+$/.test(logOption)) {
@@ -176,24 +178,21 @@ export default function java(args: string[], opts: JVMCLIOptions,
     })(doneCb);
   }
 
-  if (standard.flag('enablesystemassertions', false)) {
-    opts.enableSystemAssertions = true;
-  }
-
-  if (standard.flag('disablesystemassertions', false)) {
-    opts.enableSystemAssertions = false;
-  }
-
-  if (standard.flag('enableassertions', false)) {
-    opts.enableAssertions = true;
-  } else if (standard.stringOption('enableassertions', null)) {
-    opts.enableAssertions = standard.stringOption('enableassertions', null).split(':');
-  }
-
-  if (standard.stringOption('disableassertions', null)) {
-    opts.disableAssertions = standard.stringOption('disableassertions', null).split(':');
-  }
-  // NOTE: Boolean form of -disableassertions is a NOP.
+  opts.assertionDirectives = (opts.assertionDirectives || []).slice(0);
+  standard.orderedOptions().forEach(option => {
+    const enabled = option.name === 'enableassertions' || option.name === 'enablesystemassertions';
+    if (option.name === 'enablesystemassertions' || option.name === 'disablesystemassertions') {
+      opts.assertionDirectives.push({enabled, scope: 'system'});
+    } else if (option.name === 'enableassertions' || option.name === 'disableassertions') {
+      if (typeof option.value === 'boolean') {
+        opts.assertionDirectives.push({enabled, scope: 'default'});
+      } else {
+        const isPackage = option.value.slice(-3) === '...';
+        opts.assertionDirectives.push({enabled, scope: isPackage ? 'package' : 'class',
+          target: isPackage ? option.value.slice(0, -3) : option.value});
+      }
+    }
+  });
 
   // Bootstrap classpath items.
   let bscl = nonStandard.stringOption('bootclasspath', null);
@@ -214,7 +213,7 @@ export default function java(args: string[], opts: JVMCLIOptions,
     opts.classpath = [];
   }
 
-  if (standard.stringOption('jar', null)) {
+  if (standard.stringOption('jar', null) !== null) {
     opts.classpath.push(standard.stringOption('jar', null));
   } else if (standard.stringOption('classpath', null)) {
     opts.classpath = opts.classpath.concat(standard.stringOption('classpath', null).split(':'));
@@ -225,9 +224,9 @@ export default function java(args: string[], opts: JVMCLIOptions,
   }
 
   // User-supplied native classpath.
-  let nativeClasspath = standard.stringOption('native-classpath', null);
+  let nativeClasspath = nonStandard.stringOption('native-classpath', null);
   if (nativeClasspath) {
-    opts.nativeClasspath = opts.nativeClasspath.concat(nativeClasspath.split(':'));
+    opts.nativeClasspath = (opts.nativeClasspath || []).concat(nativeClasspath.split(':'));
   }
 
   // Construct the JVM.
@@ -262,7 +261,7 @@ export default function java(args: string[], opts: JVMCLIOptions,
 function launchJvm(standardOptions: PrefixParseResult, opts: JVMCLIOptions, jvmState: JVM, doneCb: (status: number) => void,
                     jvmStarted: (jvmState: JVM) => void): void {
   let mainArgs = standardOptions.unparsedArgs();
-  if (standardOptions.stringOption('jar', null)) {
+  if (standardOptions.stringOption('jar', null) !== null) {
     jvmState.runJar(mainArgs, doneCb);
     jvmStarted(jvmState);
   } else if (mainArgs.length > 0) {

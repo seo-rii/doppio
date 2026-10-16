@@ -157,12 +157,14 @@ The full set of configuration options to DoppioJVM are as follows:
   classpath: string[],
   // Paths where native JVM methods are located in the BrowserFS file system,
   // e.g. [/sys/natives, /path/to/my/natives]
-  // Defaults to [].
+  // Defaults to []. Explicit paths must be readable; loading errors fail boot.
+  // Later paths override earlier paths. Files within each path load in lexical order.
   nativeClasspath: string[],
 
   /** UNCOMMON OPTIONS **/
 
-  // Responsiveness of JVM (expressed in milliseconds before a thread yields co-operatively)
+  // Integer milliseconds before yielding, from 1 through 2147483647.
+  // Function results are validated on each use.
   responsiveness?: number | () => number,
   // Enable assertions across all classes (if `true`) or
   // selected packages/classes
@@ -171,6 +173,13 @@ The full set of configuration options to DoppioJVM are as follows:
   // Disable assertions on specific classes / packages
   // (see http://docs.oracle.com/javase/7/docs/technotes/guides/language/assert.html for syntax)
   disableAssertions?: string[],
+  // Optional ordered overrides, applied after the legacy assertion options.
+  // More specific classes/packages take priority; repeated targets use the last value.
+  assertionDirectives?: {
+    enabled: boolean,
+    scope: 'default' | 'system' | 'package' | 'class',
+    target?: string
+  }[],
   // True if assertions are enabled in system classes, false otherwise.
   // (equivalent to -esa command line option)
   enableSystemAssertions?: boolean,

@@ -92,6 +92,10 @@ jobs:
       - name: Verify compiler bootstrap overlay
         run: ./ci/modern_bootstrap_overlay_smoke.sh
 
+      - name: Check runtime foundation contracts
+        timeout-minutes: 3
+        run: yarn ci:foundations:test
+
       - name: Bundle deterministic compiler runtime inputs
         id: bundle_runtime
         run: >-
@@ -125,6 +129,27 @@ jobs:
         timeout-minutes: 25
         run: node ci/prepare_java_compatibility_toolchains.mjs
 
+      - name: Verify generated modern fixtures on pinned native Java
+        timeout-minutes: 3
+        run: DOPPIO_REQUIRE_MODERN_GENERATOR_NATIVE=1 node --test ci/modern_classfile_generator_test.cjs
+
+      - name: Run CLI and JAR foundation compatibility
+        id: runtime_foundations
+        timeout-minutes: 115
+        run: yarn ci:foundations
+
+      - name: Upload runtime foundation results
+        if: always() && steps.runtime_foundations.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          name: runtime-foundation-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build/cli-foundations-results.json
+            build/jar-foundations-results.json
+            build/runtime-foundations-summary.json
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Verify complete phase A requirements inventory
         id: phase_a_inventory
         timeout-minutes: 30
@@ -134,6 +159,7 @@ jobs:
         if: always() && steps.phase_a_inventory.outcome != 'skipped'
         uses: actions/upload-artifact@v7
         with:
+          name: phase-a-requirements-inventory-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             build/phase-a-inventory.json
             build/phase-a-edition-deltas.json.gz

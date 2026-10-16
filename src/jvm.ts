@@ -1,6 +1,7 @@
 import {are_in_browser, initCarr, merge, asyncForEach, asyncSeries, ext_classname, initString, int_classname, descriptor2typestr} from './util';
 import SafeMap from './SafeMap';
-import {dumpStats, Method} from './methods';
+import {dumpStats} from './methods';
+import {invokeMain} from './MainLauncher';
 import {ClassData, ReferenceClassData, ArrayClassData} from './ClassData';
 import {BootstrapClassLoader, ClassLoader} from './ClassLoader';
 import * as fs from 'fs';
@@ -11,7 +12,9 @@ import {ThreadStatus, JVMStatus} from './enums';
 import gLong from './gLong';
 import Heap from './heap';
 import assert from './assert';
-import {JVMOptions} from './interfaces';
+import {AssertionDirective, JVMOptions} from './interfaces';
+import {assertionDefault, assertionDirectives, assertionStatus, legacyAssertionSettings} from './assertions';
+import {validateResponsiveness} from './responsiveness';
 import * as JVMTypes from '../includes/JVMTypes';
 import Parker from './parker';
 import ThreadPool from './threadpool';
@@ -77,9 +80,7 @@ class JVM {
   // The initial JVM thread used to kick off execution.
   private firstThread: JVMThread = null;
   private responsiveness: number | (() => number) = null;
-  private enableSystemAssertions: boolean = false;
-  private enabledAssertions: boolean | string[] = false;
-  private disabledAssertions: string[] = [];
+  private assertionDirectives: AssertionDirective[] = [];
   private printJITCompilation: boolean = false;
   private systemClassLoader: ClassLoader = null;
   private nextRef: number = 0;
@@ -175,17 +176,9 @@ class JVM {
     }
 
     this.nativeClasspath = opts.nativeClasspath;
-    if (opts.enableSystemAssertions) {
-      this.enableSystemAssertions = opts.enableSystemAssertions;
-    }
-    if (opts.enableAssertions) {
-      this.enabledAssertions = opts.enableAssertions;
-    }
-    if (opts.disableAssertions) {
-      this.disabledAssertions = opts.disableAssertions;
-    }
-
-    this.responsiveness = opts.responsiveness;
+    this.assertionDirectives = assertionDirectives(opts);
+    this.responsiveness = typeof opts.responsiveness === 'function' ?
+      opts.responsiveness : validateResponsiveness(opts.responsiveness);
 
     this._initSystemProperties(bootstrapClasspath,
       opts.classpath.map((p: string): string => path.resolve(p)),
@@ -288,7 +281,7 @@ class JVM {
 
           // Initialize assertion data.
           // TODO: Is there a better way to force this? :|
-          let defaultAssertionStatus = this.enabledAssertions === true ? 1 : 0;
+          let defaultAssertionStatus = assertionDefault(this.assertionDirectives, false) ? 1 : 0;
           rv['java/lang/ClassLoader/setDefaultAssertionStatus(Z)V'](firstThread, [defaultAssertionStatus], next);
         }
       });
@@ -322,11 +315,7 @@ class JVM {
 
   public getResponsiveness():number {
     const resp = this.responsiveness;
-    if (typeof resp === 'number') {
-      return resp;
-    } else if (typeof resp === 'function') {
-      return resp();
-    }
+    return validateResponsiveness(typeof resp === 'function' ? resp() : resp);
   }
 
   public static getDefaultOptions(doppioHome: string): JVMOptions {
@@ -420,7 +409,6 @@ class JVM {
       this.status = JVMStatus.RUNNING;
       // If cdata is null, there was an error that ended execution.
       if (cdata != null) {
-        this.exitCode = 0;
         // Convert the arguments.
         var strArrCons = (<ArrayClassData<JVMTypes.java_lang_String>> this.bsCl.getInitializedClass(thread, '[Ljava/lang/String;')).getConstructor(thread),
           jvmifiedArgs = new strArrCons(thread, args.length), i: number;
@@ -441,108 +429,8 @@ class JVM {
           }
         };
 
-        // Find the main method, and run it.
-        var cdataStatics = <any> cdata.getConstructor(thread);
-        if (cdata.majorVersion >= 69) {
-          // Final Java 25 broadens the launch protocol. Do not accidentally
-          // enable the Java 21-24 preview protocol for older class files.
-          var mainMethod: Method = null;
-          for (var signature of ['main([Ljava/lang/String;)V', 'main()V']) {
-            var candidate = cdata.methodLookup(signature);
-            if (candidate !== null && candidate.accessFlags.isPrivate()) {
-              candidate = null;
-            }
-            if (candidate !== null && candidate.cls !== cdata) {
-              // Static interface methods are not inherited by implementors.
-              if (candidate.cls.accessFlags.isInterface() && candidate.isStatic) {
-                candidate = null;
-              } else if (!candidate.accessFlags.isPublic() && !candidate.accessFlags.isProtected()) {
-                // Package access must remain inherited through every class in
-                // the chain; the VM's general method table also includes
-                // entries that are not Java-language inherited members.
-                var currentClass = cdata;
-                while (currentClass !== null && currentClass !== candidate.cls
-                    && currentClass.getPackageName() === candidate.cls.getPackageName()) {
-                  currentClass = currentClass.getSuperClass();
-                }
-                if (currentClass !== candidate.cls) {
-                  candidate = null;
-                }
-              }
-            }
-            if (candidate === null) {
-              // A non-inherited class method in the VM lookup table must not
-              // hide a Java-language inherited interface default method.
-              var pendingClasses = [cdata], visitedClasses: ReferenceClassData<any>[] = [],
-                interfaceCandidates: Method[] = [];
-              while (pendingClasses.length > 0) {
-                var searchClass = pendingClasses.pop();
-                if (visitedClasses.indexOf(searchClass) !== -1) {
-                  continue;
-                }
-                visitedClasses.push(searchClass);
-                pendingClasses = pendingClasses.concat(searchClass.getInterfaces());
-                if (searchClass.accessFlags.isInterface()) {
-                  searchClass.getMethods().forEach((method) => {
-                    if (method.signature === signature && !method.isStatic && !method.accessFlags.isPrivate()) {
-                      interfaceCandidates.push(method);
-                    }
-                  });
-                } else if (searchClass.getSuperClass() !== null) {
-                  pendingClasses.push(searchClass.getSuperClass());
-                }
-              }
-              var mostSpecific = interfaceCandidates.filter((method) => interfaceCandidates.every((other) =>
-                method === other || !other.cls.isSubinterface(method.cls)));
-              if (mostSpecific.length === 1) {
-                candidate = mostSpecific[0];
-              }
-            }
-            if (candidate === null) {
-              continue;
-            }
-            mainMethod = candidate;
-            break;
-          }
-          if (mainMethod === null) {
-            this.exitCode = 1;
-            thread.throwNewException('Ljava/lang/NoSuchMethodError;',
-              `Could not find a non-private main method in class ${cdata.getExternalName()}.`);
-            return;
-          }
-          var mainArgs = mainMethod.parameterTypes.length === 1 ? [jvmifiedArgs] : [];
-          if (mainMethod.isStatic) {
-            (<any> mainMethod.cls.getConstructor(thread))[mainMethod.fullSignature](thread, mainArgs, mainCompleted);
-          } else {
-            if (cdata.accessFlags.isAbstract() || cdata.accessFlags.isInterface()) {
-              this.exitCode = 1;
-              thread.throwNewException('Ljava/lang/InstantiationError;',
-                `Cannot instantiate main class ${cdata.getExternalName()}.`);
-              return;
-            }
-            var zeroArgConstructor = cdata.getMethods().filter((method) => method.signature === '<init>()V')[0];
-            if (zeroArgConstructor === undefined || zeroArgConstructor.accessFlags.isPrivate()) {
-              this.exitCode = 1;
-              thread.throwNewException('Ljava/lang/NoSuchMethodError;',
-                `Could not find a non-private zero argument constructor in class ${cdata.getExternalName()}.`);
-              return;
-            }
-            var receiver = new cdataStatics(thread);
-            receiver[zeroArgConstructor.fullSignature](thread, [], (error?: JVMTypes.java_lang_Throwable): void => {
-              if (error) {
-                mainCompleted(error);
-              } else {
-                // The selected Java member can differ from the VM's general
-                // signature entry (for example, a private superclass main).
-                receiver[mainMethod.fullSignature](thread, mainArgs, mainCompleted);
-              }
-            });
-          }
-        } else if (cdataStatics['main([Ljava/lang/String;)V']) {
-          cdataStatics['main([Ljava/lang/String;)V'](thread, [jvmifiedArgs], mainCompleted);
-        } else {
-          this.exitCode = 1;
-          thread.throwNewException("Ljava/lang/NoSuchMethodError;", `Could not find main method in class ${cdata.getExternalName()}.`);
+        if (invokeMain(thread, cdata, jvmifiedArgs, mainCompleted)) {
+          this.exitCode = 0;
         }
       } else {
         process.stdout.write(`Error: Could not find or load main class ${ext_classname(className)}\n`);
@@ -577,8 +465,7 @@ class JVM {
   /**
    * Run the specified JAR file on this JVM instance.
    * @param args Command line arguments passed to the class.
-   * @param cb Called when the JVM finishes executing. Called with 'true' if
-   *   the JVM exited normally, 'false' if there was an error.
+   * @param cb Called after JVM shutdown with the process exit status.
    */
   public runJar(args: string[], cb: (code: number) => void): void {
     this.runClass('doppio.JarLauncher', args, cb);
@@ -801,48 +688,35 @@ class JVM {
    * Currently a hack around our
    * @todo Make neater with async stuff.
    */
-  private initializeNatives(doneCb: () => void): void {
-    const registeredModules = JVM.getNativeMethodModules();
-    for (let i = 0; i < registeredModules.length; i++) {
-      this.registerNatives(registeredModules[i]());
-    }
-    var nextDir = () => {
-      if (i === this.nativeClasspath.length) {
-        // Next phase: Load up the files.
-        let count: number = processFiles.length;
-        if (count === 0) {
-          return doneCb();
-        }
-        processFiles.forEach((file: string) => {
-          fs.readFile(file, (err: any, data: NodeBuffer) => {
-            if (!err) {
-              this.registerNatives(this.evalNativeModule(data.toString()));
-            }
-            if (--count === 0) {
-              doneCb();
-            }
-          });
-        });
-      } else {
-        var dir = this.nativeClasspath[i++];
-        fs.readdir(dir, (err: any, files: string[]) => {
-          if (err) {
-            return doneCb();
-          }
-
-          var j: number, file: string;
-          for (j = 0; j < files.length; j++) {
-            file = files[j];
-            if (file.substring(file.length - 3, file.length) === '.js') {
-              processFiles.push(path.join(dir, file));
-            }
-          }
-          nextDir();
-        });
+  private initializeNatives(doneCb: (err?: any) => void): void {
+    try {
+      const registeredModules = JVM.getNativeMethodModules();
+      for (let i = 0; i < registeredModules.length; i++) {
+        this.registerNatives(registeredModules[i]());
       }
-    }, i: number = 0, processFiles: string[] = [];
-
-    nextDir();
+    } catch (err) {
+      return doneCb(err);
+    }
+    // Explicit native paths are required inputs. Later paths override earlier
+    // paths; files within a path register in lexical order, independent of I/O.
+    asyncForEach(this.nativeClasspath, (dir, nextDir) => {
+      fs.readdir(dir, (err: any, files: string[]) => {
+        if (err) return nextDir(err);
+        const modules = files.filter(file => file.slice(-3) === '.js').sort();
+        asyncForEach(modules, (file, nextFile) => {
+          const filename = path.join(dir, file);
+          fs.readFile(filename, (readErr: any, data: NodeBuffer) => {
+            if (readErr) return nextFile(readErr);
+            try {
+              this.registerNatives(this.evalNativeModule(data.toString()));
+            } catch (moduleErr) {
+              return nextFile(new Error(`Unable to load native module ${filename}: ${moduleErr}`));
+            }
+            nextFile();
+          });
+        }, nextDir);
+      });
+    }, doneCb);
   }
 
   /**
@@ -897,21 +771,29 @@ class JVM {
    * Returns `true` if system assertions are enabled, false otherwise.
    */
   public areSystemAssertionsEnabled(): boolean {
-    return this.enableSystemAssertions;
+    return assertionDefault(this.assertionDirectives, true);
+  }
+
+  public getAssertionDirectives(): AssertionDirective[] {
+    return this.assertionDirectives.slice(0);
+  }
+
+  public isAssertionEnabled(className: string, systemClass: boolean): boolean {
+    return assertionStatus(this.assertionDirectives, className, systemClass);
   }
 
   /**
    * Get a listing of classes with assertions enabled. Can also return 'true' or 'false.
    */
   public getEnabledAssertions(): string[] | boolean {
-    return this.enabledAssertions;
+    return legacyAssertionSettings(this.assertionDirectives).enabled;
   }
 
   /**
    * Get a listing of classes with assertions disabled.
    */
   public getDisabledAssertions(): string[] {
-    return this.disabledAssertions;
+    return legacyAssertionSettings(this.assertionDirectives).disabled;
   }
 
   public setPrintJITCompilation(enabledOrNot: boolean) {

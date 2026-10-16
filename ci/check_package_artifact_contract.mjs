@@ -3,6 +3,7 @@ import {createRequire} from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {validatePackagedRelativeLinks} from './package_documentation_links.mjs';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const require = createRequire(import.meta.url);
@@ -15,6 +16,9 @@ export function readPackageArtifactContract(root = repoRoot) {
     prepackSource: fs.readFileSync(path.join(root, 'prepack.cjs'), 'utf8'),
     publicTypesSource: fs.readFileSync(path.join(root, 'types', 'public.d.ts'), 'utf8'),
     browserDocsSource: fs.readFileSync(path.join(root, 'docs', 'README.md'), 'utf8'),
+    modernDocsSource: fs.readFileSync(path.join(root, 'docs', 'modern-java.md'), 'utf8'),
+    readmeSource: fs.readFileSync(path.join(root, 'README.md'), 'utf8'),
+    changelogSource: fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8'),
     downloaderSource: fs.readFileSync(path.join(root, 'console', 'download_jdk.ts'), 'utf8'),
     downloaderTestSource: fs.readFileSync(path.join(root, 'ci', 'download_jdk_transaction_test.cjs'), 'utf8'),
     supportSource: fs.readFileSync(path.join(root, 'docs', 'support.md'), 'utf8'),
@@ -80,6 +84,32 @@ export function checkPackageArtifactContract(sources) {
   assert.equal(manifest.types, 'types/public.d.ts');
   assert.deepEqual(manifest.bin, expectedBins);
   assert.deepEqual(manifest.files, expectedFiles);
+  const documentation = {
+    'README.md': sources.readmeSource,
+    'CHANGELOG.md': sources.changelogSource,
+    'docs/README.md': sources.browserDocsSource,
+    'docs/modern-java.md': sources.modernDocsSource,
+    'docs/support.md': sources.supportSource
+  };
+  const packagedPaths = new Set(['README.md', 'LICENSE', 'package.json', ...manifest.files]);
+  // bin and dist are directory entries, so their descendants belong to the
+  // package contract too. Generated dist files need not exist before prepack;
+  // the installed-consumer check separately verifies every actual target.
+  const packagedDirectories = ['bin/', 'dist/'];
+  for (const filename of packagedPaths) {
+    let directory = path.dirname(filename);
+    while (directory !== '.') {
+      packagedPaths.add(directory);
+      directory = path.dirname(directory);
+    }
+  }
+  validatePackagedRelativeLinks(repoRoot, Object.keys(documentation), {
+    readFile: (filename) => documentation[path.relative(repoRoot, filename).split(path.sep).join('/')],
+    exists: (filename) => {
+      const relative = path.relative(repoRoot, filename).split(path.sep).join('/');
+      return packagedPaths.has(relative) || packagedDirectories.some(directory => relative.startsWith(directory));
+    }
+  });
   assert.equal(manifest.scripts.prepack, 'node ./prepack.cjs');
   assert.equal(manifest.scripts.install, 'node ./install.js');
   assert.equal(manifest.scripts.prepublish, undefined);

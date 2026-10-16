@@ -2,9 +2,10 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawn, spawnSync } from 'node:child_process';
+import { fork, spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { treeDigest, validateLock } from './prepare_java_compatibility_toolchains.mjs';
+import {trackFoundationProcess} from './runtime_foundation_processes.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const defaultRepoRoot = path.resolve(path.dirname(scriptPath), '..');
@@ -174,10 +175,11 @@ function controlledEnvironment() {
 // Kill the process group as well as the direct child. A hung descendant must not
 // keep the pipes open forever after its compiler or VM parent has been killed.
 export function runCommand(command, args, { cwd, timeoutMs, maxOutputBytes = outputLimitBytes,
-  standardInput = '', environment = controlledEnvironment() }) {
+  standardInput = '', environment = controlledEnvironment(), signal }) {
   requireCondition(Number.isSafeInteger(timeoutMs) && timeoutMs > 0, 'A positive process timeout is required.');
   requireCondition(typeof standardInput === 'string' && Buffer.byteLength(standardInput, 'utf8') <= inputLimitBytes,
     'Process standard input must be a UTF-8 string of at most 1048576 bytes.');
+  signal?.throwIfAborted();
   return new Promise((resolve) => {
     const started = Date.now();
     const record = { command: [command, ...args], cwd, timeoutMs, status: 'running', exitCode: null,
@@ -187,13 +189,25 @@ export function runCommand(command, args, { cwd, timeoutMs, maxOutputBytes = out
     let finished = false;
     let timer;
     let drainTimer;
-    const child = spawn(command, args, { cwd, env: environment, stdio: ['pipe', 'pipe', 'pipe'],
-      detached: process.platform !== 'win32', windowsHide: true });
+    const supervised = process.connected && process.send && process.env.DOPPIO_FOUNDATIONS_RUN_ID;
+    const child = supervised ? fork(path.join(import.meta.dirname, 'runtime_foundation_command.mjs'),
+      [command, ...args], {cwd, env: environment, execArgv: [], stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+        detached: process.platform !== 'win32', windowsHide: true}) :
+      spawn(command, args, { cwd, env: environment, stdio: ['pipe', 'pipe', 'pipe'],
+        detached: process.platform !== 'win32', windowsHide: true });
+    let commandResult;
+    if (supervised) child.on('message', message => {
+      if (message?.type === 'foundation-command-result') commandResult = message;
+      if (message?.type === 'foundation-command-error') record.error = message.message;
+    });
+    const stopTracking = trackFoundationProcess(child);
     const finish = () => {
       if (finished) return;
       finished = true;
       clearTimeout(timer);
       clearTimeout(drainTimer);
+      signal?.removeEventListener('abort', abort);
+      stopTracking();
       for (const stream of ['stdout', 'stderr']) {
         const bytes = Buffer.concat(chunks[stream]);
         try {
@@ -226,6 +240,12 @@ export function runCommand(command, args, { cwd, timeoutMs, maxOutputBytes = out
         finish();
       }, 1000);
     };
+    const abort = () => {
+      record.error = signal.reason?.message || 'Process execution was cancelled.';
+      record.cancelled = true;
+      kill();
+    };
+    signal?.addEventListener('abort', abort, {once: true});
     for (const stream of ['stdout', 'stderr']) {
       child[stream].on('data', (data) => {
         const remaining = Math.max(0, maxOutputBytes - capturedBytes);
@@ -244,8 +264,8 @@ export function runCommand(command, args, { cwd, timeoutMs, maxOutputBytes = out
     });
     child.stdin.end(standardInput, 'utf8');
     child.on('close', (code, signal) => {
-      record.exitCode = code;
-      record.signal = signal;
+      record.exitCode = commandResult ? commandResult.exitCode : code;
+      record.signal = signal || commandResult?.signal || null;
       finish();
     });
     timer = setTimeout(() => { record.timedOut = true; kill(); }, timeoutMs);
