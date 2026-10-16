@@ -17,6 +17,30 @@ import {prepareLambdaAnonymousClass, installLambdaAdapters} from '../LambdaAdapt
 import {prepareReflectionClass, installReflectionAdapters} from '../ReflectionAdapters';
 
 export default function (): any {
+  function allocateNativeMemory(thread: JVMThread, size: Long): Long {
+    if (size.isNegative()) {
+      thread.throwNewException('Ljava/lang/IllegalArgumentException;', 'Negative native memory allocation size.');
+      return null;
+    }
+    if (size.isZero()) return Long.ZERO;
+    const bytes = size.toNumber();
+    if (!Number.isSafeInteger(bytes)) {
+      thread.throwNewException('Ljava/lang/OutOfMemoryError;', 'Native allocation exceeds the supported address range.');
+      return null;
+    }
+    try {
+      return Long.fromNumber(thread.getJVM().getHeap().malloc(bytes, true));
+    } catch (error) {
+      if (error !== 'out of memory' && !(error instanceof RangeError)) throw error;
+      thread.throwNewException('Ljava/lang/OutOfMemoryError;', String(error));
+      return null;
+    }
+  }
+
+  function freeNativeMemory(thread: JVMThread, address: Long): void {
+    if (!address.isZero()) thread.getJVM().getHeap().free(address.toNumber());
+  }
+
   function getFieldInfo(thread: JVMThread, unsafe: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long): [any, string] {
     var fieldName: string, objBase: any, objCls = obj.getClass(), cls: ReferenceClassData<JVMTypes.java_lang_Object>, compName: string,
       unsafeCons: typeof JVMTypes.sun_misc_Unsafe = <any> (<ReferenceClassData<JVMTypes.sun_misc_Unsafe>> unsafe.getClass()).getConstructor(thread),
@@ -328,8 +352,7 @@ export default function (): any {
     }
 
     public static 'allocateMemory(J)J'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, size: Long): Long {
-      var heap = thread.getJVM().getHeap();
-      return Long.fromNumber(heap.malloc(size.toNumber()));
+      return allocateNativeMemory(thread, size);
     }
 
     public static 'reallocateMemory(JJ)J'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, address: Long, size: Long): Long {
@@ -337,23 +360,22 @@ export default function (): any {
         oldAddr = address.toNumber(),
         newSize = size.toNumber();
       if (newSize === 0) {
-        if (oldAddr !== 0) {
-          heap.free(oldAddr);
-        }
+        freeNativeMemory(thread, address);
         return Long.ZERO;
       }
-      if (oldAddr === 0) {
-        return Long.fromNumber(heap.malloc(newSize));
+      const replacement = allocateNativeMemory(thread, size);
+      if (replacement === null || oldAddr === 0) {
+        return replacement;
       }
 
       // Heap tracks allocation size classes per 4096-byte chunk, matching pageSize().
       const heapInternals: any = heap,
         oldClass = heapInternals._sizeMap[oldAddr & ~(4096 - 1)],
         oldSize = Math.pow(2, oldClass),
-        newAddr = heap.malloc(newSize);
+        newAddr = replacement.toNumber();
       heap.memcpy(oldAddr, newAddr, Math.min(oldSize, newSize));
       heap.free(oldAddr);
-      return Long.fromNumber(newAddr);
+      return replacement;
     }
 
     public static 'setMemory(Ljava/lang/Object;JJB)V'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, address: Long, bytes: Long, value: number): void {
@@ -729,8 +751,7 @@ export default function (): any {
     }
 
     public static 'freeMemory(J)V'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, address: Long): void {
-      var heap = thread.getJVM().getHeap();
-      heap.free(address.toNumber());
+      freeNativeMemory(thread, address);
     }
 
     public static 'staticFieldOffset(Ljava/lang/reflect/Field;)J'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, field: JVMTypes.java_lang_reflect_Field): Long {
@@ -1070,11 +1091,11 @@ export default function (): any {
     }
 
     public static 'allocateMemory(J)J'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object, size: Long): Long {
-      return Long.fromNumber(thread.getJVM().getHeap().malloc(size.toNumber()));
+      return allocateNativeMemory(thread, size);
     }
 
     public static 'freeMemory(J)V'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object, address: Long): void {
-      thread.getJVM().getHeap().free(address.toNumber());
+      freeNativeMemory(thread, address);
     }
 
     public static 'getInt(Ljava/lang/Object;J)I'(thread: JVMThread, javaThis: JVMTypes.java_lang_Object, obj: JVMTypes.java_lang_Object, offset: Long): number {
