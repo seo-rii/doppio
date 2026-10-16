@@ -144,6 +144,90 @@ function extractStep(job, stepName) {
   return match.groups.body;
 }
 
+function requireUniqueEvidenceArtifactNames(workflow) {
+  const names = new Map();
+  const jobs = [...workflow.matchAll(/^  ([A-Za-z0-9_-]+):\s*$/gm)];
+  for (const [jobIndex, job] of jobs.entries()) {
+    const body = workflow.slice(job.index + job[0].length,
+      jobs[jobIndex + 1]?.index ?? workflow.length);
+    const steps = [...body.matchAll(/^      -[ \t]+/gm)];
+    let matrixInstances;
+    for (const [stepIndex, start] of steps.entries()) {
+      const step = body.slice(start.index, steps[stepIndex + 1]?.index ?? body.length);
+      if (!/^(?:      - |        )(?:(?:"uses"|'uses')|uses):\s*['"]?actions\/upload-artifact@[^\s'"]+['"]?\s*$/m.test(step)) {
+        continue;
+      }
+      const label = `${job[1]} upload step ${stepIndex + 1}`;
+      const input = (key) => {
+        const fields = [...step.matchAll(new RegExp(
+          `^          (?:(?:"${key}"|'${key}')|${key}):[ \\t]*(.*)$`, 'gm'))];
+        if (fields.length > 1) {
+          fail(`Modern Java workflow ${label} must not repeat the ${key} artifact input.`);
+        }
+        if (!fields.length) return null;
+        const scalar = fields[0][1].trim();
+        if (/^"(?:[^"\\]|\\.)*"$/.test(scalar)) {
+          try { return JSON.parse(scalar).trim(); } catch { /* Reject invalid YAML below. */ }
+        } else if (/^'(?:[^']|'')*'$/.test(scalar)) {
+          return scalar.slice(1, -1).replace(/''/g, "'").trim();
+        } else if (!/^[\[\]{|>!&*'"#]/.test(scalar)) {
+          return scalar;
+        }
+        fail(`Modern Java workflow ${label} must use a single-line scalar ${key} artifact input.`);
+      };
+      const archive = input('archive');
+      const name = input('name');
+      if (archive === 'false') {
+        if (name !== null) {
+          fail('Modern Java workflow raw artifact uploads must rely on the uploaded filename; ' +
+            'upload-artifact@v7 ignores name.');
+        }
+        continue;
+      }
+      if (archive !== null && archive !== 'true') {
+        fail(`Modern Java workflow ${label} must use a literal true or false archive input.`);
+      }
+      if (!name) {
+        fail(`Modern Java workflow ${label} must set an explicit nonempty archived artifact name.`);
+      }
+      // The workflow uses literal matrix axes. Expand them so one upload step
+      // cannot accidentally reuse the same archive name across matrix jobs.
+      if (!matrixInstances) {
+        matrixInstances = [{}];
+        const header = body.slice(0, steps[0]?.index ?? body.length);
+        const matrix = header.match(/^      matrix:\n(?<axes>(?:        [^\n]+\n)*)/m);
+        if (matrix) {
+          for (const axis of matrix.groups.axes.trimEnd().split('\n')) {
+            const values = axis.match(/^        ([A-Za-z0-9_-]+):\s*\[([A-Za-z0-9_, .-]+)\]\s*$/);
+            if (!values) {
+              fail(`Modern Java workflow ${job[1]} archived artifact names need literal matrix axes.`);
+            }
+            matrixInstances = matrixInstances.flatMap((instance) =>
+              values[2].split(',').map((value) => ({ ...instance, [values[1]]: value.trim() })));
+          }
+        } else if (/^      matrix:/m.test(header)) {
+          fail(`Modern Java workflow ${job[1]} archived artifact names need literal matrix axes.`);
+        }
+      }
+      for (const instance of matrixInstances) {
+        const resolved = name.replace(/\$\{\{([\s\S]*?)\}\}/g, (_match, expression) => {
+          const key = expression.trim();
+          if (key === 'github.run_id' || key === 'github.run_attempt') return `\${{ ${key} }}`;
+          if (key.startsWith('matrix.') && Object.hasOwn(instance, key.slice(7))) {
+            return instance[key.slice(7)];
+          }
+          fail(`Modern Java workflow ${label} must use deterministic archived artifact name expressions.`);
+        });
+        if (names.has(resolved)) {
+          fail(`Modern Java workflow archived artifact names must be unique across all jobs: ` +
+            `${JSON.stringify(resolved)} is reused by ${names.get(resolved)} and ${label}.`);
+        }
+        names.set(resolved, label);
+      }
+    }
+  }
+}
+
 function requireExactSchedulingStep(step, fixtureName, command) {
   const timeoutFields = step.match(
     /^        (?:(?:"timeout-minutes"|'timeout-minutes')|timeout-minutes)\s*:/gm
@@ -598,6 +682,7 @@ for (const [name, fields] of [
     "if: always() && steps.runtime_foundations.outcome != 'skipped'",
     'uses: actions/upload-artifact@v7',
     'with:',
+    '  name: runtime-foundation-results-${{ github.run_id }}-${{ github.run_attempt }}',
     '  path: |',
     '    build/cli-foundations-results.json',
     '    build/jar-foundations-results.json',
@@ -634,6 +719,7 @@ for (const [name, fields] of [
     "if: always() && steps.phase_a_inventory.outcome != 'skipped'",
     'uses: actions/upload-artifact@v7',
     'with:',
+    '  name: phase-a-requirements-inventory-${{ github.run_id }}-${{ github.run_attempt }}',
     '  path: |',
     '    build/phase-a-inventory.json',
     '    build/phase-a-edition-deltas.json.gz',
@@ -1618,6 +1704,7 @@ const topLevelJobs = [...workflow.matchAll(/^  ([A-Za-z0-9_-]+):\s*$/gm)].map((m
 if (topLevelJobs.at(-1) !== 'test') {
   fail('Modern Java test release gate must remain the terminal workflow job.');
 }
+requireUniqueEvidenceArtifactNames(workflow);
 
 console.log(
   `Modern Java workflow shards ${expectedScripts.length} compiler smokes across ` +

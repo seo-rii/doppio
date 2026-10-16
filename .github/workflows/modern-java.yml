@@ -142,6 +142,7 @@ jobs:
         if: always() && steps.runtime_foundations.outcome != 'skipped'
         uses: actions/upload-artifact@v7
         with:
+          name: runtime-foundation-results-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             build/cli-foundations-results.json
             build/jar-foundations-results.json
@@ -158,6 +159,7 @@ jobs:
         if: always() && steps.phase_a_inventory.outcome != 'skipped'
         uses: actions/upload-artifact@v7
         with:
+          name: phase-a-requirements-inventory-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             build/phase-a-inventory.json
             build/phase-a-edition-deltas.json.gz
