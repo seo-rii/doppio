@@ -95,6 +95,36 @@ export default function (): any {
     fi[0][fi[1]] = val;
   }
 
+  // A null object base denotes an absolute address. Reuse the scalar address
+  // overloads so the two forms keep identical widths, byte order and long bits.
+  function primitiveGetter(signature: string) {
+    return (thread: JVMThread, unsafe: JVMTypes.sun_misc_Unsafe,
+        obj: JVMTypes.java_lang_Object, offset: Long): any => {
+      return obj === null ? (<any> sun_misc_Unsafe)[signature](thread, unsafe, offset) :
+        getFromVMIndex(thread, unsafe, obj, offset);
+    };
+  }
+
+  function primitiveSetter(signature: string) {
+    return (thread: JVMThread, unsafe: JVMTypes.sun_misc_Unsafe,
+        obj: JVMTypes.java_lang_Object, offset: Long, value: any): void => {
+      if (obj === null) (<any> sun_misc_Unsafe)[signature](thread, unsafe, offset, value);
+      else setFromVMIndex(thread, unsafe, obj, offset, value);
+    };
+  }
+
+  function getBooleanAtOffset(thread: JVMThread, unsafe: JVMTypes.sun_misc_Unsafe,
+      obj: JVMTypes.java_lang_Object, offset: Long): number {
+    return obj === null ? (thread.getJVM().getHeap().get_byte(offset.toNumber()) !== 0 ? 1 : 0) :
+      getFromVMIndex<number>(thread, unsafe, obj, offset);
+  }
+
+  function putBooleanAtOffset(thread: JVMThread, unsafe: JVMTypes.sun_misc_Unsafe,
+      obj: JVMTypes.java_lang_Object, offset: Long, value: number): void {
+    if (obj === null) thread.getJVM().getHeap().set_byte(offset.toNumber(), value ? 1 : 0);
+    else setFromVMIndex(thread, unsafe, obj, offset, value);
+  }
+
   function getIntVolatile(thread: JVMThread, unsafe: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long): number {
     if (obj === null) {
       return thread.getJVM().getHeap().get_word(offset.toNumber());
@@ -250,33 +280,33 @@ export default function (): any {
 
   class sun_misc_Unsafe {
 
-    public static 'getInt(Ljava/lang/Object;J)I': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = getFromVMIndex;
-    public static 'putInt(Ljava/lang/Object;JI)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = setFromVMIndex;
+    public static 'getInt(Ljava/lang/Object;J)I': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = primitiveGetter('getInt(J)I');
+    public static 'putInt(Ljava/lang/Object;JI)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = primitiveSetter('putInt(JI)V');
 
     public static 'getObject(Ljava/lang/Object;J)Ljava/lang/Object;': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => JVMTypes.java_lang_Object = getFromVMIndex;
     public static 'putObject(Ljava/lang/Object;JLjava/lang/Object;)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, new_obj: JVMTypes.java_lang_Object) => void = setFromVMIndex;
 
-    public static 'getBoolean(Ljava/lang/Object;J)Z': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = getFromVMIndex;
-    public static 'putBoolean(Ljava/lang/Object;JZ)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = setFromVMIndex;
+    public static 'getBoolean(Ljava/lang/Object;J)Z': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = getBooleanAtOffset;
+    public static 'putBoolean(Ljava/lang/Object;JZ)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = putBooleanAtOffset;
 
-    public static 'getByte(Ljava/lang/Object;J)B': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = getFromVMIndex;
-    public static 'putByte(Ljava/lang/Object;JB)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = setFromVMIndex;
+    public static 'getByte(Ljava/lang/Object;J)B': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = primitiveGetter('getByte(J)B');
+    public static 'putByte(Ljava/lang/Object;JB)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = primitiveSetter('putByte(JB)V');
 
-    public static 'getShort(Ljava/lang/Object;J)S': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = getFromVMIndex;
-    public static 'putShort(Ljava/lang/Object;JS)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = setFromVMIndex;
+    public static 'getShort(Ljava/lang/Object;J)S': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = primitiveGetter('getShort(J)S');
+    public static 'putShort(Ljava/lang/Object;JS)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = primitiveSetter('putShort(JS)V');
 
-    public static 'getChar(Ljava/lang/Object;J)C': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = getFromVMIndex;
-    public static 'putChar(Ljava/lang/Object;JC)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = setFromVMIndex;
+    public static 'getChar(Ljava/lang/Object;J)C': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = primitiveGetter('getChar(J)C');
+    public static 'putChar(Ljava/lang/Object;JC)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = primitiveSetter('putChar(JC)V');
 
-    public static 'getLong(Ljava/lang/Object;J)J': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => Long = getFromVMIndex;
-    public static 'putLong(Ljava/lang/Object;JJ)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, x: Long) => void = setFromVMIndex;
+    public static 'getLong(Ljava/lang/Object;J)J': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => Long = primitiveGetter('getLong(J)J');
+    public static 'putLong(Ljava/lang/Object;JJ)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, x: Long) => void = primitiveSetter('putLong(JJ)V');
 
-    public static 'getFloat(Ljava/lang/Object;J)F': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = getFromVMIndex;
-    public static 'putFloat(Ljava/lang/Object;JF)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = setFromVMIndex;
+    public static 'getFloat(Ljava/lang/Object;J)F': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = primitiveGetter('getFloat(J)F');
+    public static 'putFloat(Ljava/lang/Object;JF)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = primitiveSetter('putFloat(JF)V');
 
-    public static 'getDouble(Ljava/lang/Object;J)D': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = getFromVMIndex;
+    public static 'getDouble(Ljava/lang/Object;J)D': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = primitiveGetter('getDouble(J)D');
 
-    public static 'putDouble(Ljava/lang/Object;JD)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = setFromVMIndex;
+    public static 'putDouble(Ljava/lang/Object;JD)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = primitiveSetter('putDouble(JD)V');
 
     public static 'getByte(J)B'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, address: Long): number {
       var heap = thread.getJVM().getHeap();
@@ -871,30 +901,30 @@ export default function (): any {
     public static 'getIntVolatile(Ljava/lang/Object;J)I': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = getIntVolatile;
     public static 'putIntVolatile(Ljava/lang/Object;JI)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = putIntVolatile;
 
-    public static 'getBooleanVolatile(Ljava/lang/Object;J)Z': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = getFromVMIndex;
-    public static 'putBooleanVolatile(Ljava/lang/Object;JZ)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = setFromVMIndex;
+    public static 'getBooleanVolatile(Ljava/lang/Object;J)Z': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = getBooleanAtOffset;
+    public static 'putBooleanVolatile(Ljava/lang/Object;JZ)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = putBooleanAtOffset;
 
-    public static 'getByteVolatile(Ljava/lang/Object;J)B': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = getFromVMIndex;
-    public static 'putByteVolatile(Ljava/lang/Object;JB)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = setFromVMIndex;
+    public static 'getByteVolatile(Ljava/lang/Object;J)B': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = primitiveGetter('getByte(J)B');
+    public static 'putByteVolatile(Ljava/lang/Object;JB)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = primitiveSetter('putByte(JB)V');
 
-    public static 'getShortVolatile(Ljava/lang/Object;J)S': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = getFromVMIndex;
-    public static 'putShortVolatile(Ljava/lang/Object;JS)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = setFromVMIndex;
+    public static 'getShortVolatile(Ljava/lang/Object;J)S': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = primitiveGetter('getShort(J)S');
+    public static 'putShortVolatile(Ljava/lang/Object;JS)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = primitiveSetter('putShort(JS)V');
 
-    public static 'getCharVolatile(Ljava/lang/Object;J)C': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = getFromVMIndex;
-    public static 'putCharVolatile(Ljava/lang/Object;JC)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = setFromVMIndex;
+    public static 'getCharVolatile(Ljava/lang/Object;J)C': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = primitiveGetter('getChar(J)C');
+    public static 'putCharVolatile(Ljava/lang/Object;JC)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = primitiveSetter('putChar(JC)V');
 
-    public static 'getLongVolatile(Ljava/lang/Object;J)J': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => Long = getFromVMIndex;
-    public static 'putLongVolatile(Ljava/lang/Object;JJ)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: Long) => void = setFromVMIndex;
+    public static 'getLongVolatile(Ljava/lang/Object;J)J': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => Long = primitiveGetter('getLong(J)J');
+    public static 'putLongVolatile(Ljava/lang/Object;JJ)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: Long) => void = primitiveSetter('putLong(JJ)V');
 
-    public static 'getFloatVolatile(Ljava/lang/Object;J)F': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = getFromVMIndex;
-    public static 'putFloatVolatile(Ljava/lang/Object;JF)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = setFromVMIndex;
+    public static 'getFloatVolatile(Ljava/lang/Object;J)F': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = primitiveGetter('getFloat(J)F');
+    public static 'putFloatVolatile(Ljava/lang/Object;JF)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = primitiveSetter('putFloat(JF)V');
 
-    public static 'getDoubleVolatile(Ljava/lang/Object;J)D': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = getFromVMIndex;
-    public static 'putDoubleVolatile(Ljava/lang/Object;JD)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = setFromVMIndex;
+    public static 'getDoubleVolatile(Ljava/lang/Object;J)D': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long) => number = primitiveGetter('getDouble(J)D');
+    public static 'putDoubleVolatile(Ljava/lang/Object;JD)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = primitiveSetter('putDouble(JD)V');
 
     public static 'putOrderedObject(Ljava/lang/Object;JLjava/lang/Object;)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newObj: JVMTypes.java_lang_Object) => void = setFromVMIndex;
-    public static 'putOrderedInt(Ljava/lang/Object;JI)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = setFromVMIndex;
-    public static 'putOrderedLong(Ljava/lang/Object;JJ)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: Long) => void = setFromVMIndex;
+    public static 'putOrderedInt(Ljava/lang/Object;JI)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: number) => void = primitiveSetter('putInt(JI)V');
+    public static 'putOrderedLong(Ljava/lang/Object;JJ)V': (thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, obj: JVMTypes.java_lang_Object, offset: Long, newValue: Long) => void = primitiveSetter('putLong(JJ)V');
 
     /**
      * Unblock the given thread blocked on park, or, if it is not blocked, cause
