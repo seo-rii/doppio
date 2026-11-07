@@ -149,7 +149,7 @@ failed definitions, application-loader propagation and deferred launch shutdown.
 Historical header mutations are structural probes, not language compatibility
 claims; the existing major range 45–70 remains partial.
 
-[Phase A's inventory and evidence rules](phase-a-inventory.md) distinguish
+[Phase A's inventory and evidence rules](https://github.com/seo-rii/doppio/blob/27c73672b7e4c2bd1cd06e2462844f6b44071ebe/docs/phase-a-inventory.md) distinguish
 complete requirements accounting from implemented and tested behavior.
 
 The `yarn ci:java-pattern-evolution` gate separately recompiles enum and sealed
