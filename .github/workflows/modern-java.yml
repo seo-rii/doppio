@@ -85,6 +85,10 @@ jobs:
         timeout-minutes: 20
         run: ./node_modules/.bin/grunt --stack modern-ci-release-cli --grunt-ignore-compile-errors
 
+      - name: Verify Unsafe and JVM halt runtime contracts
+        timeout-minutes: 3
+        run: yarn ci:runtime-contracts:test
+
       - name: Build Java compatibility browser runtime
         timeout-minutes: 10
         run: ./node_modules/.bin/grunt --stack make_build_dir:release vite-release listings:release --grunt-ignore-compile-errors
