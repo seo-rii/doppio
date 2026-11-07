@@ -635,11 +635,10 @@ class JVM {
    * Completely halt the JVM.
    */
   public halt(status: number): void {
+    if (this.status === JVMStatus.TERMINATED) return;
     this.exitCode = status;
     this.status = JVMStatus.TERMINATING;
-    this.threadPool.getThreads().forEach((t) => {
-      t.setStatus(ThreadStatus.TERMINATED);
-    });
+    this.threadPool.halt();
   }
 
   /**

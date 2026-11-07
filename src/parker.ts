@@ -8,11 +8,13 @@ import assert from './assert';
 export default class Parker {
   private _parkCounts: { [threadRef: number]: number } = {};
   private _parkCallbacks: { [threadRef: number]: () => void } = {};
+  private _parkCancellations: { [threadRef: number]: () => void } = {};
 
-  public park(thread: JVMThread, cb: () => void) {
+  public park(thread: JVMThread, cb: () => void, onCancel?: () => void) {
     var ref = thread.getRef();
     assert(!this._parkCallbacks[ref] && thread.getStatus() !== ThreadStatus.PARKED, `Thread ${ref} is doubly parked? Should be impossible.`);
     this._parkCallbacks[ref] = cb;
+    if (onCancel) this._parkCancellations[ref] = onCancel;
     this._mutateParkCount(thread, 1);
     // It's possible the thread was instantly unparked due to a previously
     // unbalancing park.
@@ -32,8 +34,17 @@ export default class Parker {
     }
   }
 
+  /** Discard a halted thread's permit/callback and release its timer, without resuming it. */
+  public cancel(thread: JVMThread): void {
+    var ref = thread.getRef(), cancel = this._parkCancellations[ref];
+    delete this._parkCounts[ref];
+    delete this._parkCallbacks[ref];
+    delete this._parkCancellations[ref];
+    if (cancel) cancel();
+  }
+
   private _mutateParkCount(thread: JVMThread, delta: number): void {
-    var ref = thread.getRef(), cb: () => void;
+    var ref = thread.getRef(), cb: () => void, cancel: () => void;
     // Initialize park count.
     if (!this._parkCounts[ref]) {
       this._parkCounts[ref] = 0;
@@ -41,16 +52,20 @@ export default class Parker {
     if (0 === (this._parkCounts[ref] += delta)) {
       assert(!!this._parkCallbacks[ref], `Balancing unpark for thread ${ref} with no callback? Should be impossible.`);
       cb = this._parkCallbacks[ref];
+      cancel = this._parkCancellations[ref];
 
       // Cleanup.
       delete this._parkCounts[ref];
       delete this._parkCallbacks[ref];
+      delete this._parkCancellations[ref];
 
       // Avoid situations where a terminated thread's timeout wakes up
       // and tries to revive its thread.
       if (thread.getStatus() === ThreadStatus.PARKED) {
         thread.setStatus(ThreadStatus.ASYNC_WAITING);
         cb();
+      } else if (cancel) {
+        cancel();
       }
     }
   }

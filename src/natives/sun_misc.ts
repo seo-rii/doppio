@@ -970,7 +970,7 @@ export default function (): any {
       parker.park(thread, () => {
         clearTimeout(timer);
         thread.asyncReturn();
-      });
+      }, () => clearTimeout(timer));
     }
 
     public static 'getLoadAverage([DI)I'(thread: JVMThread, javaThis: JVMTypes.sun_misc_Unsafe, arg0: JVMTypes.JVMArray<number>, arg1: number): number {

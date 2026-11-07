@@ -1,6 +1,8 @@
 import {JVMThread} from './threading';
 import {ThreadStatus} from './enums';
 import assert from './assert';
+import gLong from './gLong';
+import scheduleThreadTimeout from './ThreadTimer';
 
 /**
  * Represents a JVM monitor.
@@ -60,7 +62,7 @@ export default class Monitor {
        * The timer ID for the timeout callback, if isTimed is true. Allows us
        * to revoke timeout timers before they execute.
        */
-      timer?: number;
+      timer?: () => void;
     }
   } = {};
 
@@ -188,7 +190,8 @@ export default class Monitor {
    * @todo Use high-precision timers in browsers that support it.
    * @return True if the wait succeeded, false if it triggered an exception.
    */
-  public wait(thread: JVMThread, cb: (fromTimer: boolean) => void, timeoutMs?: number, timeoutNs?: number): boolean {
+  public wait(thread: JVMThread, cb: (fromTimer: boolean) => void, timeoutMs?: number | gLong, timeoutNs?: number): boolean {
+    var timed = timeoutMs != null && (typeof timeoutMs === 'number' ? timeoutMs !== 0 : !timeoutMs.isZero());
     if (this.getOwner() === thread) {
       // INVARIANT: Thread shouldn't currently be blocked on a monitor.
       assert(thread.getStatus() !== ThreadStatus.BLOCKED);
@@ -196,17 +199,16 @@ export default class Monitor {
         thread: thread,
         cb: cb,
         count: this.count,
-        isTimed: timeoutMs != null && timeoutMs !== 0
+        isTimed: timed
       };
 
       // Revoke ownership.
       this.owner = null;
       this.count = 0;
 
-      if (timeoutMs != null && timeoutMs !== 0) {
+      if (timed) {
         // Scheduler a timer that wakes up the thread.
-        // XXX: Casting to 'number', since NodeJS typings specify a Timer.
-        this.waiting[thread.getRef()].timer = <number><any> setTimeout(() => {
+        this.waiting[thread.getRef()].timer = scheduleThreadTimeout(() => {
           this.unwait(thread, true);
         }, timeoutMs);
         thread.setStatus(ThreadStatus.TIMED_WAITING, this);
@@ -257,13 +259,14 @@ export default class Monitor {
           waitEntry.cb(fromTimer);
         }
       };
-    assert(waitEntry != null);
+    // A timeout may already be queued when VM halt cancels the registration.
+    if (waitEntry == null) return;
     delete this.waiting[thread.getRef()];
     // Step 2: Remove the timer if the timer did not trigger this event.
     if (thread.getStatus() === ThreadStatus.TIMED_WAITING && !fromTimer) {
       var timerId = waitEntry.timer;
       assert(timerId != null);
-      clearTimeout(timerId);
+      timerId();
     }
 
     // Step 3: Acquire the monitor [ASYNC]
@@ -272,6 +275,16 @@ export default class Monitor {
       // it will trigger blockCb once the thread acquires the lock.
       blockCb();
     }
+  }
+
+  /** Remove a halted thread's wait/block registrations without reacquiring or notifying. */
+  public cancel(thread: JVMThread): void {
+    var ref = thread.getRef(), entry = this.waiting[ref];
+    if (entry) {
+      if (entry.timer) entry.timer();
+      delete this.waiting[ref];
+    }
+    delete this.blocked[ref];
   }
 
   /**

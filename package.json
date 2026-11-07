@@ -96,6 +96,7 @@
   },
   "scripts": {
     "test": "grunt test",
+    "ci:runtime-contracts:test": "node --test ci/heap_allocation_test.cjs ci/unsafe_null_base_test.cjs ci/thread_timer_test.cjs ci/jvm_halt_lifecycle_test.cjs",
     "prepack": "node ./prepack.cjs",
     "install": "node ./install.js",
     "appveyor-test": "grunt --stack test-browser-appveyor",

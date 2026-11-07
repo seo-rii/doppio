@@ -1251,7 +1251,7 @@ export default function (): any {
       }
       monitor.wait(thread, (fromTimer: boolean) => {
         thread.asyncReturn();
-      }, timeout.toNumber());
+      }, timeout);
     }
 
   }
@@ -2105,17 +2105,7 @@ export default function (): any {
     }
 
     public static 'sleep(J)V'(thread: JVMThread, millis: Long): void {
-      var beforeMethod = thread.currentMethod();
-      thread.setStatus(ThreadStatus.ASYNC_WAITING);
-      setTimeout(() => {
-        // Check if the thread was interrupted during our sleep. Interrupting
-        // sleep causes an exception, so we need to ignore the setTimeout
-        // callback in this case.
-        if (beforeMethod === thread.currentMethod()) {
-          thread.setStatus(ThreadStatus.RUNNABLE);
-          thread.asyncReturn();
-        }
-      }, millis.toNumber());
+      thread.sleep(millis);
     }
 
     public static 'start0()V'(thread: JVMThread, javaThis: JVMTypes.java_lang_Thread): void {
@@ -2277,6 +2267,7 @@ export default function (): any {
                   currentFullSignature === 'java/lang/Thread/sleep(Ljava/time/Duration;)V') {
                 // Clear interrupt state before throwing the exception.
                 nativeThreadObj.setInterrupted(false);
+                nativeThreadObj.cancelSleep();
                 nativeThreadObj.throwNewException('Ljava/lang/InterruptedException;', 'interrupt0 called');
               } else {
                 // Set the interrupted status.

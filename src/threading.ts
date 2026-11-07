@@ -16,6 +16,7 @@ import Monitor from './Monitor';
 import {default as ThreadPool, Thread} from './threadpool';
 import {setImmediate} from 'browserfs';
 import global from './global';
+import scheduleThreadTimeout from './ThreadTimer';
 
 const debug = logging.debug;
 const vtrace = logging.vtrace;
@@ -716,6 +717,8 @@ export class JVMThread implements Thread {
   private tpool: ThreadPool<JVMThread>;
   private jvmThreadObj: JVMTypes.java_lang_Thread;
   private jvm: JVM;
+  private sleepCancellation: () => void = null;
+  private halted: boolean = false;
   public jitDisabled: boolean;
 
   /**
@@ -727,6 +730,10 @@ export class JVMThread implements Thread {
     this.bsCl = jvm.getBootstrapClassLoader();
     this.tpool = tpool;
     this.jvmThreadObj = threadObj;
+  }
+
+  private isHalted(): boolean {
+    return this.halted || !!(this.tpool && this.tpool.isHalted());
   }
 
   /**
@@ -798,6 +805,25 @@ export class JVMThread implements Thread {
     this.interrupted = interrupted;
   }
 
+  /** Sleep belongs to its exact native frame, including across interruptions. */
+  public sleep(millis: gLong): void {
+    if (this.isHalted()) return;
+    var frame = this.stack[this.stack.length - 1];
+    this.cancelSleep();
+    this.setStatus(ThreadStatus.ASYNC_WAITING);
+    this.sleepCancellation = scheduleThreadTimeout(() => {
+      this.sleepCancellation = null;
+      if (this.isCurrentFrame(frame)) this.asyncReturn();
+    }, millis);
+  }
+
+  public cancelSleep(): void {
+    if (this.sleepCancellation) {
+      this.sleepCancellation();
+      this.sleepCancellation = null;
+    }
+  }
+
   /**
    * Retrieve the bootstrap classloader.
    */
@@ -833,6 +859,7 @@ export class JVMThread implements Thread {
   public import<T>(name: string, cb: (rv?: T) => void, explicit?: boolean): void;
   public import<T>(names: string[], cb: (rv?: T) => void, explicit?: boolean): void;
   public import<T>(names: string | string[], cb: (rv?: T) => void, explicit: boolean = true): void {
+    if (this.isHalted()) return;
     let loader = this.getLoader();
     this.setStatus(ThreadStatus.ASYNC_WAITING);
     if (Array.isArray(names)) {
@@ -929,6 +956,7 @@ export class JVMThread implements Thread {
    * SHOULD ONLY BE INVOKED BY THE SCHEDULER.
    */
   public run(): void {
+    if (this.isHalted()) return;
     var stack = this.stack,
       startTime: number = (new Date()).getTime();
 
@@ -1013,6 +1041,8 @@ export class JVMThread implements Thread {
    * Updates both the JVMThread object and this object.
    */
   private rawSetStatus(newStatus: ThreadStatus): void {
+    if (this.status === newStatus ||
+        (this.isHalted() && newStatus !== ThreadStatus.TERMINATED)) return;
     var jvmNewStatus: number = 0, oldStatus = this.status;
 
     if (logLevel === LogLevel.VTRACE) {
@@ -1059,6 +1089,11 @@ export class JVMThread implements Thread {
    * Contains JVM-specific thread logic.
    */
   public setStatus(status: ThreadStatus, monitor: Monitor = null): void {
+    if (this.isHalted()) {
+      // A late class/I/O callback may already have pushed a Java frame.
+      this.stack.length = 0;
+      return;
+    }
     if (this.status !== status) {
       let oldStatus = this.status;
 
@@ -1126,6 +1161,20 @@ export class JVMThread implements Thread {
     }
   }
 
+  /** VM halt bypasses Java exit hooks and cancels registrations without waking them. */
+  public halt(): void {
+    if (this.halted) return;
+    this.halted = true;
+    this.cancelSleep();
+    if (this.monitor) {
+      this.monitor.cancel(this);
+      this.monitor = null;
+    }
+    if (this.jvm) this.jvm.getParker().cancel(this);
+    this.stack.length = 0;
+    if (this.status !== ThreadStatus.TERMINATED) this.rawSetStatus(ThreadStatus.TERMINATED);
+  }
+
   /**
    * Called when the priority of the thread changes.
    * Should only be called by java.lang.setPriority0.
@@ -1165,6 +1214,7 @@ export class JVMThread implements Thread {
   public asyncReturn(rv: number, rv2: any): void;
   public asyncReturn(rv: gLong, rv2: any): void;
   public asyncReturn(rv?: any, rv2?: any): void {
+    if (this.isHalted()) return;
     var stack = this.stack;
     if (!RELEASE) {
       assert(this.status === ThreadStatus.RUNNABLE || this.status === ThreadStatus.ASYNC_WAITING);
@@ -1218,6 +1268,7 @@ export class JVMThread implements Thread {
    */
   public runWithExceptionBoundary<T>(operation: (done: (value: T) => void) => void,
       cb: (error: JVMTypes.java_lang_Throwable, value?: T) => void): void {
+    if (this.isHalted()) return;
     // A pending I/O operation must not let the scheduler run this boundary
     // without a value. Java loader calls may make the thread runnable again.
     this.setStatus(ThreadStatus.ASYNC_WAITING);
@@ -1230,6 +1281,7 @@ export class JVMThread implements Thread {
       }, true);
     this.stack.push(boundary);
     operation((value: T) => {
+      if (this.isHalted()) return;
       assert(!completed, 'Exception boundary already completed');
       assert(this.stack[this.stack.length - 1] === boundary, 'Metadata completed while Java frames remain active');
       completed = true;
@@ -1255,6 +1307,8 @@ export class JVMThread implements Thread {
    * It is not valid to call this method if the thread is in any other state.
    */
   public throwException(exception: JVMTypes.java_lang_Throwable): void {
+    if (this.isHalted()) return;
+    this.cancelSleep();
     assert(this.status === ThreadStatus.RUNNABLE || this.status === ThreadStatus.ASYNC_WAITING,
       `Tried to throw exception while thread was in state ${ThreadStatus[this.status]}`);
     var stack = this.stack, idx: number = stack.length - 1;
@@ -1291,9 +1345,11 @@ export class JVMThread implements Thread {
    * @param msg The message to include with the exception.
    */
   public throwNewException<T extends JVMTypes.java_lang_Throwable>(clsName: string, msg: string) {
+    if (this.isHalted()) return;
     let loader = this.getLoader();
     var cls = <ReferenceClassData<T>> loader.getInitializedClass(this, clsName),
       throwException = () => {
+        if (this.isHalted()) return;
         var eCons = cls.getConstructor(this),
           e = new eCons(this);
 
