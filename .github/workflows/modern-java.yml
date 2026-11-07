@@ -14,7 +14,7 @@ permissions:
 jobs:
   runtime:
     name: Runtime and Java 17 compatibility tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
