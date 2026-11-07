@@ -14,7 +14,7 @@ permissions:
 jobs:
   runtime:
     name: Runtime and Java 17 compatibility tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -84,6 +84,10 @@ jobs:
       - name: Build release CLI runner
         timeout-minutes: 20
         run: ./node_modules/.bin/grunt --stack modern-ci-release-cli --grunt-ignore-compile-errors
+
+      - name: Verify Unsafe and JVM halt runtime contracts
+        timeout-minutes: 3
+        run: yarn ci:runtime-contracts:test
 
       - name: Build Java compatibility browser runtime
         timeout-minutes: 10

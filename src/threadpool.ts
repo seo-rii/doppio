@@ -10,6 +10,7 @@ export interface Thread {
   isDaemon(): boolean;
   getPriority(): number;
   setStatus(status: ThreadStatus): void;
+  halt(): void;
   run(): void;
 }
 
@@ -135,6 +136,8 @@ class WeightedRoundRobinScheduler<T extends Thread> implements Scheduler<T> {
  */
 export default class ThreadPool<T extends Thread> {
   private threads: T[] = [];
+  private halted: boolean = false;
+  private halting: boolean = false;
   private runningThread: T;
   private scheduler: Scheduler<T> = new WeightedRoundRobinScheduler<T>();
   /**
@@ -155,6 +158,23 @@ export default class ThreadPool<T extends Thread> {
   public getThreads(): T[] {
     // Return a copy of our internal array.
     return this.threads.slice(0);
+  }
+
+  public isHalted(): boolean {
+    return this.halted;
+  }
+
+  /** Stop every thread before delivering the VM's final completion callback. */
+  public halt(): void {
+    if (this.halted) return;
+    this.halted = true;
+    this.halting = true;
+    try {
+      this.threads.slice().forEach(thread => thread.halt());
+    } finally {
+      this.halting = false;
+      this.notifyEmpty();
+    }
   }
 
   /**
@@ -184,10 +204,15 @@ export default class ThreadPool<T extends Thread> {
     // Remove the specified thread from the threadpool.
     this.threads.splice(idx, 1);
 
-    if (!this.anyNonDaemonicThreads()) {
+    this.notifyEmpty();
+  }
+
+  private notifyEmpty(): void {
+    if (!this.halting && this.emptyCallback && !this.anyNonDaemonicThreads()) {
       const close = this.emptyCallback();
       if (close) {
         this.emptyCallback = null;
+        this.halted = true;
       }
     }
   }
@@ -196,6 +221,7 @@ export default class ThreadPool<T extends Thread> {
    * Called when a thread's status changes.
    */
   public statusChange(thread: T, oldStatus: ThreadStatus, newStatus: ThreadStatus): void {
+    if (this.halted && (newStatus !== ThreadStatus.TERMINATED || this.threads.indexOf(thread) === -1)) return;
     var wasRunnable  = isRunnable(oldStatus),
       nowRunnable = isRunnable(newStatus);
 

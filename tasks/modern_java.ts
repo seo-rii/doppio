@@ -9,9 +9,64 @@ function shellEscape(str: string): string {
   return "'" + str.replace(/'/g, "'\\''") + "'";
 }
 
+interface GeneratedStackMapFrame {
+  pc: number;
+  locals: number[][];
+  stack?: number[][];
+}
+
+function verificationObject(classIndex: number): number[] {
+  return [7, (classIndex >>> 8) & 0xff, classIndex & 0xff];
+}
+
+/** Encode explicit full frames at branch targets and exception handlers. */
+function generatedCodeAttribute(code: number[], codeNameIndex: number, maxStack: number,
+    maxLocals: number, exceptions: number[][] = [], stackMapNameIndex: number = 0,
+    frames: GeneratedStackMapFrame[] = []): number[] {
+  var bytes: number[] = [], stackMap: number[] = [];
+  function u2(value: number, output: number[] = bytes): void {
+    output.push((value >>> 8) & 0xff, value & 0xff);
+  }
+  function u4(value: number, output: number[] = bytes): void {
+    output.push((value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff);
+  }
+  if (frames.length > 0) {
+    if (stackMapNameIndex === 0) throw new Error('StackMapTable constant is required for generated frames.');
+    var payload: number[] = [], previousPC = -1;
+    u2(frames.length, payload);
+    frames.forEach(frame => {
+      if (frame.pc <= previousPC || frame.pc >= code.length) {
+        throw new Error('Generated stack-map frame offsets must be ordered instruction boundaries.');
+      }
+      payload.push(255); // full_frame
+      u2(frame.pc - previousPC - 1, payload);
+      previousPC = frame.pc;
+      u2(frame.locals.length, payload);
+      frame.locals.forEach(type => type.forEach(value => payload.push(value)));
+      var stack = frame.stack || [];
+      u2(stack.length, payload);
+      stack.forEach(type => type.forEach(value => payload.push(value)));
+    });
+    u2(stackMapNameIndex, stackMap);
+    u4(payload.length, stackMap);
+    payload.forEach(value => stackMap.push(value));
+  }
+  u2(codeNameIndex);
+  u4(12 + code.length + exceptions.length * 8 + stackMap.length);
+  u2(maxStack);
+  u2(maxLocals);
+  u4(code.length);
+  code.forEach(value => bytes.push(value));
+  u2(exceptions.length);
+  exceptions.forEach(entry => entry.forEach(value => u2(value)));
+  u2(frames.length > 0 ? 1 : 0);
+  stackMap.forEach(value => bytes.push(value));
+  return bytes;
+}
+
 function modernJava(grunt: IGrunt) {
   function generateSimpleClass(className: string, majorVersion: number, mainOutput?: string): Buffer {
-    var bytes: number[] = [];
+    var bytes: number[] = [], nextConstant = 1;
 
     function u1(value: number): void {
       bytes.push(value & 0xff);
@@ -25,39 +80,44 @@ function modernJava(grunt: IGrunt) {
       bytes.push((value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff);
     }
 
-    function utf8(value: string): void {
+    function utf8(value: string): number {
       var buf = Buffer.from(value, 'utf8');
       u1(1);
       u2(buf.length);
       for (var i = 0; i < buf.length; i++) {
         u1(buf[i]);
       }
+      return nextConstant++;
     }
 
-    function cls(nameIndex: number): void {
+    function cls(nameIndex: number): number {
       u1(7);
       u2(nameIndex);
+      return nextConstant++;
     }
 
-    function nameAndType(nameIndex: number, descriptorIndex: number): void {
+    function nameAndType(nameIndex: number, descriptorIndex: number): number {
       u1(12);
       u2(nameIndex);
       u2(descriptorIndex);
+      return nextConstant++;
     }
 
-    function ref(tag: number, classIndex: number, nameAndTypeIndex: number): void {
+    function ref(tag: number, classIndex: number, nameAndTypeIndex: number): number {
       u1(tag);
       u2(classIndex);
       u2(nameAndTypeIndex);
+      return nextConstant++;
     }
 
-    function str(stringIndex: number): void {
+    function str(stringIndex: number): number {
       u1(8);
       u2(stringIndex);
+      return nextConstant++;
     }
 
     function codeAttr(code: number[], maxStack: number, maxLocals: number): void {
-      u2(7);
+      u2(codeName);
       u4(12 + code.length);
       u2(maxStack);
       u2(maxLocals);
@@ -67,58 +127,57 @@ function modernJava(grunt: IGrunt) {
       u2(0);
     }
 
+    // Keep symbolic references to every pool entry used by class metadata or
+    // bytecode. Inserting a constant must not silently rename a constructor.
+    var thisClass = cls(utf8(className)),
+      objectClass = cls(utf8('java/lang/Object')),
+      constructorName = utf8('<init>'),
+      constructorDescriptor = utf8('()V'),
+      codeName = utf8('Code'),
+      objectConstructor = ref(10, objectClass, nameAndType(constructorName, constructorDescriptor)),
+      mainName: number, mainDescriptor: number, systemOut: number,
+      println: number, outputString: number;
+    if (mainOutput !== undefined) {
+      mainName = utf8('main');
+      mainDescriptor = utf8('([Ljava/lang/String;)V');
+      var systemClass = cls(utf8('java/lang/System')),
+        outName = utf8('out'),
+        outDescriptor = utf8('Ljava/io/PrintStream;'),
+        printStreamClass = cls(utf8('java/io/PrintStream')),
+        printlnName = utf8('println'),
+        printlnDescriptor = utf8('(Ljava/lang/String;)V');
+      systemOut = ref(9, systemClass, nameAndType(outName, outDescriptor));
+      println = ref(10, printStreamClass, nameAndType(printlnName, printlnDescriptor));
+      outputString = str(utf8(mainOutput));
+    }
+    var constantPool = bytes;
+    bytes = [];
     u4(0xcafebabe);
     u2(0);
     u2(majorVersion);
-    u2(mainOutput === undefined ? 10 : 26);
-    cls(2);
-    utf8(className);
-    cls(4);
-    utf8('java/lang/Object');
-    utf8('<init>');
-    utf8('()V');
-    utf8('Code');
-    ref(10, 3, 9);
-    nameAndType(5, 6);
-    if (mainOutput !== undefined) {
-      utf8('main');
-      utf8('([Ljava/lang/String;)V');
-      cls(13);
-      utf8('java/lang/System');
-      ref(9, 12, 15);
-      nameAndType(16, 17);
-      utf8('out');
-      utf8('Ljava/io/PrintStream;');
-      cls(19);
-      utf8('java/io/PrintStream');
-      ref(10, 18, 21);
-      nameAndType(22, 23);
-      utf8('println');
-      utf8('(Ljava/lang/String;)V');
-      str(25);
-      utf8(mainOutput);
-    }
+    u2(nextConstant);
+    constantPool.forEach(u1);
 
     u2(0x0021);
-    u2(1);
-    u2(3);
+    u2(thisClass);
+    u2(objectClass);
     u2(0);
     u2(0);
     u2(mainOutput === undefined ? 1 : 2);
     u2(0x0001);
-    u2(4);
-    u2(6);
+    u2(constructorName);
+    u2(constructorDescriptor);
     u2(1);
-    codeAttr([0x2a, 0xb7, 0x00, 0x08, 0xb1], 1, 1);
+    codeAttr([0x2a, 0xb7, objectConstructor >>> 8, objectConstructor & 0xff, 0xb1], 1, 1);
     if (mainOutput !== undefined) {
       u2(0x0009);
-      u2(10);
-      u2(11);
+      u2(mainName);
+      u2(mainDescriptor);
       u2(1);
       codeAttr([
-        0xb2, 0x00, 0x0e,
-        0x12, 0x18,
-        0xb6, 0x00, 0x14,
+        0xb2, systemOut >>> 8, systemOut & 0xff,
+        0x13, outputString >>> 8, outputString & 0xff,
+        0xb6, println >>> 8, println & 0xff,
         0xb1
       ], 2, 1);
     }
@@ -651,15 +710,8 @@ function modernJava(grunt: IGrunt) {
       u2(nameAndTypeIndex);
     }
 
-    function codeAttr(code: number[], maxStack: number, maxLocals: number): void {
-      u2(7);
-      u4(12 + code.length);
-      u2(maxStack);
-      u2(maxLocals);
-      u4(code.length);
-      code.forEach(u1);
-      u2(0);
-      u2(0);
+    function codeAttr(code: number[], maxStack: number, maxLocals: number, frames?: GeneratedStackMapFrame[]): void {
+      generatedCodeAttribute(code, 7, maxStack, maxLocals, [], 40, frames).forEach(u1);
     }
 
     var mainCode = [
@@ -696,7 +748,7 @@ function modernJava(grunt: IGrunt) {
     u4(0xcafebabe);
     u2(0);
     u2(63);
-    u2(40);
+    u2(43);
     cls(2);
     utf8('classes/modern_test/Java19ThreadId');
     cls(4);
@@ -736,6 +788,9 @@ function modernJava(grunt: IGrunt) {
     ref(10, 27, 38);
     nameAndType(39, 36);
     utf8('getId');
+    utf8('StackMapTable');
+    cls(42);
+    utf8('[Ljava/lang/String;');
 
     u2(0x0021);
     u2(1);
@@ -752,7 +807,12 @@ function modernJava(grunt: IGrunt) {
     u2(10);
     u2(11);
     u2(1);
-    codeAttr(mainCode, 4, 3);
+    codeAttr(mainCode, 4, 3, [
+      {pc: 17, locals: [verificationObject(41), verificationObject(27)]},
+      {pc: 18, locals: [verificationObject(41), verificationObject(27)], stack: [[1]]},
+      {pc: 42, locals: [verificationObject(41), verificationObject(27), [1]]},
+      {pc: 43, locals: [verificationObject(41), verificationObject(27), [1]], stack: [[1]]}
+    ]);
     u2(0);
 
     grunt.file.write(outPath, Buffer.from(bytes));
@@ -815,22 +875,8 @@ function modernJava(grunt: IGrunt) {
       u2(stringIndex);
     }
 
-    function codeAttr(code: number[], maxStack: number, maxLocals: number, exceptions?: number[][]): void {
-      var exceptionTable = exceptions || [];
-      u2(7);
-      u4(12 + code.length + (exceptionTable.length * 8));
-      u2(maxStack);
-      u2(maxLocals);
-      u4(code.length);
-      code.forEach(u1);
-      u2(exceptionTable.length);
-      exceptionTable.forEach(function(entry: number[]): void {
-        u2(entry[0]);
-        u2(entry[1]);
-        u2(entry[2]);
-        u2(entry[3]);
-      });
-      u2(0);
+    function codeAttr(code: number[], maxStack: number, maxLocals: number, exceptions?: number[][], frames?: GeneratedStackMapFrame[]): void {
+      generatedCodeAttribute(code, 7, maxStack, maxLocals, exceptions, 59, frames).forEach(u1);
     }
 
     function patchU2(code: number[], offset: number, value: number): void {
@@ -884,7 +930,7 @@ function modernJava(grunt: IGrunt) {
     u4(0xcafebabe);
     u2(0);
     u2(63);
-    u2(59);
+    u2(62);
     cls(2);
     utf8('classes/modern_test/Java19ThreadSleepDuration');
     cls(4);
@@ -943,6 +989,9 @@ function modernJava(grunt: IGrunt) {
     utf8('npe');
     cls(58);
     utf8('java/lang/NullPointerException');
+    utf8('StackMapTable');
+    cls(61);
+    utf8('[Ljava/lang/String;');
 
     u2(0x0021);
     u2(1);
@@ -959,7 +1008,10 @@ function modernJava(grunt: IGrunt) {
     u2(10);
     u2(11);
     u2(1);
-    codeAttr(mainCode, 2, 2, [[tryStart, tryEnd, catchStart, 57]]);
+    codeAttr(mainCode, 2, 2, [[tryStart, tryEnd, catchStart, 57]], [
+      {pc: catchStart, locals: [verificationObject(60)], stack: [verificationObject(57)]},
+      {pc: afterCatch, locals: [verificationObject(60)]}
+    ]);
     u2(0);
 
     grunt.file.write(outPath, Buffer.from(bytes));
@@ -1027,22 +1079,8 @@ function modernJava(grunt: IGrunt) {
       u4(low);
     }
 
-    function codeAttr(code: number[], maxStack: number, maxLocals: number, exceptions?: number[][]): void {
-      var exceptionTable = exceptions || [];
-      u2(codeAttributeIndex);
-      u4(12 + code.length + (exceptionTable.length * 8));
-      u2(maxStack);
-      u2(maxLocals);
-      u4(code.length);
-      code.forEach(u1);
-      u2(exceptionTable.length);
-      exceptionTable.forEach(function(entry: number[]): void {
-        u2(entry[0]);
-        u2(entry[1]);
-        u2(entry[2]);
-        u2(entry[3]);
-      });
-      u2(0);
+    function codeAttr(code: number[], maxStack: number, maxLocals: number, exceptions?: number[][], frames?: GeneratedStackMapFrame[]): void {
+      generatedCodeAttribute(code, codeAttributeIndex, maxStack, maxLocals, exceptions, 45, frames).forEach(u1);
     }
 
     var sleeperCode = [
@@ -1063,7 +1101,7 @@ function modernJava(grunt: IGrunt) {
     u4(0xcafebabe);
     u2(0);
     u2(63);
-    u2(45);
+    u2(46);
     cls(2);
     utf8('classes/modern_test/Java19ThreadSleepDurationInterruptSleeper');
     cls(4);
@@ -1107,6 +1145,7 @@ function modernJava(grunt: IGrunt) {
     cls(42);
     utf8('java/lang/InterruptedException');
     longConst(2000);
+    utf8('StackMapTable');
     u2(0x0021);
     u2(1);
     u2(3);
@@ -1123,7 +1162,10 @@ function modernJava(grunt: IGrunt) {
     u2(12);
     u2(8);
     u2(1);
-    codeAttr(sleeperCode, 2, 2, [[0, 9, 20, 41]]);
+    codeAttr(sleeperCode, 2, 2, [[0, 9, 20, 41]], [
+      {pc: 20, locals: [verificationObject(1)], stack: [verificationObject(41)]},
+      {pc: 29, locals: [verificationObject(1)]}
+    ]);
     u2(0);
     grunt.file.write(sleeperPath, Buffer.from(bytes));
     grunt.log.ok('Generated ' + sleeperPath);
@@ -1508,22 +1550,8 @@ function modernJava(grunt: IGrunt) {
       u2(stringIndex);
     }
 
-    function codeAttr(code: number[], maxStack: number, maxLocals: number, exceptions?: number[][]): void {
-      var exceptionTable = exceptions || [];
-      u2(7);
-      u4(12 + code.length + (exceptionTable.length * 8));
-      u2(maxStack);
-      u2(maxLocals);
-      u4(code.length);
-      code.forEach(u1);
-      u2(exceptionTable.length);
-      exceptionTable.forEach(function(entry: number[]): void {
-        u2(entry[0]);
-        u2(entry[1]);
-        u2(entry[2]);
-        u2(entry[3]);
-      });
-      u2(0);
+    function codeAttr(code: number[], maxStack: number, maxLocals: number, exceptions?: number[][], frames?: GeneratedStackMapFrame[]): void {
+      generatedCodeAttribute(code, 7, maxStack, maxLocals, exceptions, 99, frames).forEach(u1);
     }
 
     function patchU2(code: number[], offset: number, value: number): void {
@@ -1710,7 +1738,7 @@ function modernJava(grunt: IGrunt) {
     u4(0xcafebabe);
     u2(0);
     u2(65);
-    u2(99);
+    u2(102);
     cls(2);
     utf8('classes/modern_test/Java21ListSequenced');
     cls(4);
@@ -1809,6 +1837,9 @@ function modernJava(grunt: IGrunt) {
     utf8('(I)V');
     nameAndType(22, 96);
     ref(10, 18, 97);
+    utf8('StackMapTable');
+    cls(101);
+    utf8('[Ljava/lang/String;');
 
     u2(0x0021);
     u2(1);
@@ -1828,6 +1859,15 @@ function modernJava(grunt: IGrunt) {
     codeAttr(mainCode, 4, 4, [
       [firstTryStart, firstTryEnd, firstCatchStart, 62],
       [lastTryStart, lastTryEnd, lastCatchStart, 62]
+    ], [
+      {pc: booleanFalse, locals: [verificationObject(100), verificationObject(27)], stack: [verificationObject(18)]},
+      {pc: booleanAfter, locals: [verificationObject(100), verificationObject(27)], stack: [verificationObject(18), [1]]},
+      {pc: firstCatchStart, locals: [verificationObject(100)], stack: [verificationObject(62)]},
+      {pc: firstAfterCatch, locals: [verificationObject(100)]},
+      {pc: lastCatchStart, locals: [verificationObject(100)], stack: [verificationObject(62)]},
+      {pc: lastAfterCatch, locals: [verificationObject(100)]},
+      {pc: doubleReversedFalse, locals: [verificationObject(100), [0], verificationObject(27)], stack: [verificationObject(18)]},
+      {pc: doubleReversedAfter, locals: [verificationObject(100), [0], verificationObject(27)], stack: [verificationObject(18), [1]]}
     ]);
     u2(0);
 
@@ -1897,22 +1937,8 @@ function modernJava(grunt: IGrunt) {
       u2(stringIndex);
     }
 
-    function codeAttr(code: number[], maxStack: number, maxLocals: number, exceptions?: number[][]): void {
-      var exceptionTable = exceptions || [];
-      u2(7);
-      u4(12 + code.length + (exceptionTable.length * 8));
-      u2(maxStack);
-      u2(maxLocals);
-      u4(code.length);
-      code.forEach(u1);
-      u2(exceptionTable.length);
-      exceptionTable.forEach(function(entry: number[]): void {
-        u2(entry[0]);
-        u2(entry[1]);
-        u2(entry[2]);
-        u2(entry[3]);
-      });
-      u2(0);
+    function codeAttr(code: number[], maxStack: number, maxLocals: number, exceptions?: number[][], frames?: GeneratedStackMapFrame[]): void {
+      generatedCodeAttribute(code, 7, maxStack, maxLocals, exceptions, 83, frames).forEach(u1);
     }
 
     function patchU2(code: number[], offset: number, value: number): void {
@@ -2023,7 +2049,7 @@ function modernJava(grunt: IGrunt) {
     u4(0xcafebabe);
     u2(0);
     u2(65);
-    u2(83);
+    u2(86);
     cls(2);
     utf8('classes/modern_test/Java21DequeSequenced');
     cls(4);
@@ -2106,6 +2132,9 @@ function modernJava(grunt: IGrunt) {
     utf8('nse-first');
     cls(82);
     utf8('java/util/NoSuchElementException');
+    utf8('StackMapTable');
+    cls(85);
+    utf8('[Ljava/lang/String;');
 
     u2(0x0021);
     u2(1);
@@ -2124,6 +2153,11 @@ function modernJava(grunt: IGrunt) {
     u2(1);
     codeAttr(mainCode, 4, 4, [
       [firstTryStart, firstTryEnd, firstCatchStart, 81]
+    ], [
+      {pc: doubleReversedFalse, locals: [verificationObject(84), verificationObject(30), verificationObject(33)], stack: [verificationObject(18)]},
+      {pc: doubleReversedAfter, locals: [verificationObject(84), verificationObject(30), verificationObject(33)], stack: [verificationObject(18), [1]]},
+      {pc: firstCatchStart, locals: [verificationObject(84)], stack: [verificationObject(81)]},
+      {pc: firstAfterCatch, locals: [verificationObject(84)]}
     ]);
     u2(0);
 
@@ -2261,22 +2295,8 @@ function modernJava(grunt: IGrunt) {
       }
     }
 
-    function codeAttr(code: number[], codeNameIndex: number, maxStack: number, maxLocals: number, exceptions?: number[][]): void {
-      var exceptionTable = exceptions || [];
-      u2(codeNameIndex);
-      u4(12 + code.length + (exceptionTable.length * 8));
-      u2(maxStack);
-      u2(maxLocals);
-      u4(code.length);
-      code.forEach(u1);
-      u2(exceptionTable.length);
-      exceptionTable.forEach(function(entry: number[]): void {
-        u2(entry[0]);
-        u2(entry[1]);
-        u2(entry[2]);
-        u2(entry[3]);
-      });
-      u2(0);
+    function codeAttr(code: number[], codeNameIndex: number, maxStack: number, maxLocals: number, exceptions?: number[][], frames?: GeneratedStackMapFrame[]): void {
+      generatedCodeAttribute(code, codeNameIndex, maxStack, maxLocals, exceptions, stackMapName, frames).forEach(u1);
     }
 
     function patchU2(code: number[], offset: number, value: number): void {
@@ -2316,6 +2336,8 @@ function modernJava(grunt: IGrunt) {
     var thisClass = cpClass('classes/modern_test/Java21SortedSetSequenced'),
       objectClass = cpClass('java/lang/Object'),
       codeName = cpUtf8('Code'),
+      stackMapName = cpUtf8('StackMapTable'),
+      argsClass = cpClass('[Ljava/lang/String;'),
       initName = cpUtf8('<init>'),
       voidDescriptor = cpUtf8('()V'),
       objectInit = cpRef(10, 'java/lang/Object', '<init>', '()V'),
@@ -2459,6 +2481,11 @@ function modernJava(grunt: IGrunt) {
     codeAttr(mainCode, codeName, 4, 4, [
       [firstTryStart, firstTryEnd, firstCatchStart, noSuchElementClass],
       [addFirstTryStart, addFirstTryEnd, addFirstCatchStart, unsupportedOperationClass]
+    ], [
+      {pc: firstCatchStart, locals: [verificationObject(argsClass), verificationObject(treeSetClass), verificationObject(sequencedSetClass)], stack: [verificationObject(noSuchElementClass)]},
+      {pc: firstAfterCatch, locals: [verificationObject(argsClass), verificationObject(treeSetClass), verificationObject(sequencedSetClass)]},
+      {pc: addFirstCatchStart, locals: [verificationObject(argsClass), verificationObject(treeSetClass), verificationObject(sequencedSetClass)], stack: [verificationObject(unsupportedOperationClass)]},
+      {pc: addFirstAfterCatch, locals: [verificationObject(argsClass), verificationObject(treeSetClass), verificationObject(sequencedSetClass)]}
     ]);
     u2(0);
 
@@ -2600,22 +2627,8 @@ function modernJava(grunt: IGrunt) {
       }
     }
 
-    function codeAttr(code: number[], codeNameIndex: number, maxStack: number, maxLocals: number, exceptions?: number[][]): void {
-      var exceptionTable = exceptions || [];
-      u2(codeNameIndex);
-      u4(12 + code.length + (exceptionTable.length * 8));
-      u2(maxStack);
-      u2(maxLocals);
-      u4(code.length);
-      code.forEach(u1);
-      u2(exceptionTable.length);
-      exceptionTable.forEach(function(entry: number[]): void {
-        u2(entry[0]);
-        u2(entry[1]);
-        u2(entry[2]);
-        u2(entry[3]);
-      });
-      u2(0);
+    function codeAttr(code: number[], codeNameIndex: number, maxStack: number, maxLocals: number, exceptions?: number[][], frames?: GeneratedStackMapFrame[]): void {
+      generatedCodeAttribute(code, codeNameIndex, maxStack, maxLocals, exceptions, stackMapName, frames).forEach(u1);
     }
 
     function patchU2(code: number[], offset: number, value: number): void {
@@ -2654,6 +2667,8 @@ function modernJava(grunt: IGrunt) {
     var thisClass = cpClass('classes/modern_test/Java21SortedMapSequenced'),
       objectClass = cpClass('java/lang/Object'),
       codeName = cpUtf8('Code'),
+      stackMapName = cpUtf8('StackMapTable'),
+      argsClass = cpClass('[Ljava/lang/String;'),
       initName = cpUtf8('<init>'),
       voidDescriptor = cpUtf8('()V'),
       objectInit = cpRef(10, 'java/lang/Object', '<init>', '()V'),
@@ -2806,6 +2821,9 @@ function modernJava(grunt: IGrunt) {
     u2(1);
     codeAttr(mainCode, codeName, 3, 4, [
       [putFirstTryStart, putFirstTryEnd, putFirstCatchStart, unsupportedOperationClass]
+    ], [
+      {pc: putFirstCatchStart, locals: [verificationObject(argsClass), verificationObject(treeMapClass), verificationObject(sequencedMapClass)], stack: [verificationObject(unsupportedOperationClass)]},
+      {pc: putFirstAfterCatch, locals: [verificationObject(argsClass), verificationObject(treeMapClass), verificationObject(sequencedMapClass)]}
     ]);
     u2(0);
 
